@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REPO="https://github.com/YOUR_USERNAME/ConfigFlow.git"
+REPO="https://github.com/Emadhabibnia1385/ConfigFlow.git"
 DIR="/opt/configflow"
 SERVICE="configflow"
 PY_FILE="bot.py"
