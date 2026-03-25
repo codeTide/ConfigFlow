@@ -1,10 +1,9 @@
 #!/bin/bash
+set -Eeuo pipefail
 
 REPO="https://github.com/Emadhabibnia1385/ConfigFlow.git"
 DIR="/opt/configflow"
 SERVICE="configflow"
-PY_FILE="bot.py"
-BRANCH="main"
 
 R='\033[31m'; G='\033[32m'; Y='\033[33m'; C='\033[36m'; M='\033[35m'; B='\033[1m'; N='\033[0m'
 
@@ -12,84 +11,99 @@ header() {
   clear 2>/dev/null || true
   echo -e "${C}╔════════════════════════════════════════════════════════════════════════╗${N}"
   echo -e "${C}║${N}                                                                        ${C}║${N}"
-  echo -e "${C}║${N}   ${B}${M} ██████╗ ██████╗ ███╗   ██╗███████╗██╗ ██████╗ ███████╗██╗      ${N}${C}║${N}"
-  echo -e "${C}║${N}   ${B}${M}██╔════╝██╔═══██╗████╗  ██║██╔════╝██║██╔════╝ ██╔════╝██║      ${N}${C}║${N}"
-  echo -e "${C}║${N}   ${B}${M}██║     ██║   ██║██╔██╗ ██║█████╗  ██║██║  ███╗█████╗  ██║      ${N}${C}║${N}"
-  echo -e "${C}║${N}   ${B}${M}██║     ██║   ██║██║╚██╗██║██╔══╝  ██║██║   ██║██╔══╝  ██║      ${N}${C}║${N}"
-  echo -e "${C}║${N}   ${B}${M}╚██████╗╚██████╔╝██║ ╚████║██║     ██║╚██████╔╝██║     ███████╗ ${N}${C}║${N}"
-  echo -e "${C}║${N}   ${B}${M} ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝ ╚═╝     ╚══════╝ ${N}${C}║${N}"
+  echo -e "${C}║${N}  ${B}${M}███████╗ ██████╗ ███╗   ███╗ ██████╗ ███████╗██████╗ ██╗██████╗      ${N} ${C}║${N}"
+  echo -e "${C}║${N}  ${B}${M}██╔════╝██╔═══██╗████╗ ████║██╔═══██╗██╔════╝██╔══██╗██║██╔══██╗     ${N} ${C}║${N}"
+  echo -e "${C}║${N}  ${B}${M}█████╗  ██║   ██║██╔████╔██║██║   ██║█████╗  ██████╔╝██║██████╔╝     ${N} ${C}║${N}"
+  echo -e "${C}║${N}  ${B}${M}██╔══╝  ██║   ██║██║╚██╔╝██║██║   ██║██╔══╝  ██╔══██╗██║██╔═══╝      ${N} ${C}║${N}"
+  echo -e "${C}║${N}  ${B}${M}███████╗╚██████╔╝██║ ╚═╝ ██║╚██████╔╝███████╗██║  ██║██║██║          ${N} ${C}║${N}"
+  echo -e "${C}║${N}  ${B}${M}╚══════╝ ╚═════╝ ╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝╚═╝          ${N} ${C}║${N}"
   echo -e "${C}║${N}                                                                        ${C}║${N}"
-  echo -e "${C}║${N}              ${B}🚀 ConfigFlow - Telegram VPN Selling Bot${N}               ${C}║${N}"
+  echo -e "${C}║${N}              ${B}🚀 Telegram Config Sales Bot${N}                             ${C}║${N}"
   echo -e "${C}║${N}                                                                        ${C}║${N}"
-  echo -e "${C}║${N}          ${B}Inventory-based delivery | Wallet | Card-to-Card${N}          ${C}║${N}"
+  echo -e "${C}║${N}                 ${B}Developer:${N} t.me/EmadHabibnia                           ${C}║${N}"
+  echo -e "${C}║${N}                 ${B}Channel:${N} t.me/ExpiryHub                                ${C}║${N}"
   echo -e "${C}║${N}                                                                        ${C}║${N}"
   echo -e "${C}╚════════════════════════════════════════════════════════════════════════╝${N}"
   echo ""
 }
 
-err() {
-  echo -e "${R}✗ $*${N}" >&2
-  echo ""
-  read -p "Press Enter to continue..." _
-  return 1
-}
-
+err() { echo -e "${R}✗ $*${N}" >&2; exit 1; }
 ok()  { echo -e "${G}✓ $*${N}"; }
 info(){ echo -e "${Y}➜ $*${N}"; }
-pause() { echo ""; read -p "Press Enter to continue..." _; }
+
+on_error() {
+  echo -e "${R}✗ Error on line ${BASH_LINENO[0]}${N}"
+}
+trap on_error ERR
 
 check_root() {
   if [[ $EUID -ne 0 ]]; then
-    echo -e "${R}✗ Please run with sudo or as root${N}"
-    exit 1
+    err "Please run with sudo or as root"
   fi
 }
 
-run_silent() { "$@" >/dev/null 2>&1; }
+ensure_safe_cwd() {
+  cd / 2>/dev/null || true
+}
 
-detect_py_file() {
-  if [[ -f "$DIR/bot.py" ]]; then
-    PY_FILE="bot.py"
-  elif [[ -f "$DIR/BOT.py" ]]; then
-    PY_FILE="BOT.py"
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || err "Missing command: $1"
+}
+
+install_prereqs() {
+  info "Installing prerequisites..."
+  apt-get update -y
+  apt-get install -y git python3 python3-venv python3-pip curl
+}
+
+clone_or_update_repo() {
+  info "Downloading ConfigFlow..."
+
+  mkdir -p "$DIR"
+
+  if [[ -d "$DIR/.git" ]]; then
+    info "Repository exists. Updating..."
+    cd "$DIR"
+    git fetch --all --prune
+    git reset --hard origin/main
   else
-    err "No bot entry file found (bot.py or BOT.py) in $DIR"
-    return 1
+    rm -rf "$DIR"
+    mkdir -p "$DIR"
+    git clone "$REPO" "$DIR"
+    cd "$DIR"
   fi
-  return 0
+
+  [[ -f "$DIR/bot.py" ]] || err "bot.py not found after download. Repo content missing?"
+  [[ -f "$DIR/requirements.txt" ]] || err "requirements.txt not found after download."
 }
 
-validate_repo_access() {
-  git ls-remote --heads "$REPO" "$BRANCH" >/dev/null 2>&1
+setup_venv() {
+  info "Setting up Python environment..."
+  if [[ ! -d "$DIR/venv" ]]; then
+    python3 -m venv "$DIR/venv"
+  fi
+
+  "$DIR/venv/bin/pip" install --upgrade pip wheel
+  "$DIR/venv/bin/pip" install -r "$DIR/requirements.txt"
 }
 
-ask_config() {
+configure_env() {
   echo ""
-  info "ConfigFlow Configuration (required)"
+  info "Bot Configuration"
+  read -r -p "Enter your Telegram Bot TOKEN: " BOT_TOKEN
+  [[ -n "${BOT_TOKEN// }" ]] || err "TOKEN cannot be empty"
 
-  echo -n "Enter Telegram Bot TOKEN: "
-  read -r BOT_TOKEN
-  [[ -z "$BOT_TOKEN" ]] && { err "TOKEN cannot be empty"; return 1; }
+  read -r -p "Enter your Admin Chat ID (numeric): " ADMIN_ID
+  [[ "$ADMIN_ID" =~ ^-?[0-9]+$ ]] || err "ADMIN_CHAT_ID must be numeric"
 
-  echo -n "Enter Primary Admin ID (numeric): "
-  read -r ADMIN_IDS
-  [[ ! "$ADMIN_IDS" =~ ^[0-9]+$ ]] && { err "Admin ID must be numeric"; return 1; }
-
-  return 0
-}
-
-write_env() {
   cat > "$DIR/.env" << EOF
-BOT_TOKEN=$BOT_TOKEN
-ADMIN_IDS=$ADMIN_IDS
-DB_NAME=trackless_bot.db
+TOKEN=$BOT_TOKEN
+ADMIN_CHAT_ID=$ADMIN_ID
 EOF
-  chmod 600 "$DIR/.env" >/dev/null 2>&1 || true
+  chmod 600 "$DIR/.env"
 }
 
-create_service() {
-  detect_py_file || return 1
-
+create_systemd_service() {
   info "Creating systemd service..."
   cat > "/etc/systemd/system/$SERVICE.service" << EOF
 [Unit]
@@ -100,118 +114,67 @@ After=network.target
 Type=simple
 WorkingDirectory=$DIR
 EnvironmentFile=$DIR/.env
-ExecStart=$DIR/venv/bin/python $DIR/$PY_FILE
+ExecStart=$DIR/venv/bin/python $DIR/bot.py
 Restart=always
 RestartSec=5
-User=root
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-  run_silent systemctl daemon-reload || { err "systemctl daemon-reload failed"; return 1; }
-  run_silent systemctl enable "$SERVICE" || { err "systemctl enable failed"; return 1; }
-  run_silent systemctl restart "$SERVICE" || { err "systemctl restart failed"; return 1; }
-  return 0
+  systemctl daemon-reload
+  systemctl enable "$SERVICE" >/dev/null 2>&1 || true
+}
+
+start_service() {
+  systemctl restart "$SERVICE"
+  ok "ConfigFlow installed successfully!"
+  echo ""
+  systemctl status "$SERVICE" --no-pager -l || true
 }
 
 install_bot() {
-  info "Installing prerequisites..."
-  run_silent apt-get update -qq || { err "apt update failed"; return 1; }
-  run_silent apt-get install -y -qq git python3 python3-venv python3-pip sqlite3 curl ca-certificates || { err "apt install failed"; return 1; }
-
-  info "Checking GitHub repository access..."
-  validate_repo_access || { err "Cannot access repository or branch: $REPO [$BRANCH]. Make sure the repository is public and the branch exists."; return 1; }
-
-  info "Downloading ConfigFlow..."
-  if [[ -d "$DIR/.git" ]]; then
-    (cd "$DIR" && git fetch origin "$BRANCH" && git reset --hard "origin/$BRANCH") >/dev/null 2>&1 || { err "git update failed"; return 1; }
-  else
-    rm -rf "$DIR"
-    git clone --branch "$BRANCH" --single-branch "$REPO" "$DIR" || { err "git clone failed. Repository may be private or unreachable."; return 1; }
-  fi
-
-  detect_py_file || return 1
-
-  info "Setting up Python environment..."
-  if [[ ! -d "$DIR/venv" ]]; then
-    python3 -m venv "$DIR/venv" >/dev/null 2>&1 || { err "venv create failed"; return 1; }
-  fi
-
-  info "Upgrading pip..."
-  "$DIR/venv/bin/pip" install --upgrade pip wheel || { err "pip upgrade failed"; return 1; }
-
-  info "Installing requirements..."
-  if [[ -f "$DIR/requirements.txt" ]]; then
-    "$DIR/venv/bin/pip" install -r "$DIR/requirements.txt" || { err "requirements install failed"; return 1; }
-  else
-    "$DIR/venv/bin/pip" install pyTelegramBotAPI qrcode pillow python-dotenv || { err "pip install failed"; return 1; }
-  fi
-
-  header
-  ok "Packages downloaded and installed successfully!"
-  echo ""
-
-  ask_config || return 1
-  write_env
-
-  create_service || return 1
-
-  echo ""
-  ok "ConfigFlow installed successfully!"
-  echo ""
-  systemctl status "$SERVICE" --no-pager -l
-  return 0
+  ensure_safe_cwd
+  install_prereqs
+  clone_or_update_repo
+  setup_venv
+  configure_env
+  create_systemd_service
+  start_service
 }
 
 update_bot() {
-  info "Updating ConfigFlow from GitHub..."
-  [[ -d "$DIR/.git" ]] || { err "Not installed. Install first."; return 1; }
-
-  validate_repo_access || { err "Cannot access repository or branch: $REPO [$BRANCH]"; return 1; }
-
-  (cd "$DIR" && git fetch origin "$BRANCH" && git reset --hard "origin/$BRANCH") || { err "git update failed"; return 1; }
-
-  detect_py_file || return 1
-
-  info "Updating requirements..."
-  if [[ -f "$DIR/requirements.txt" ]]; then
-    "$DIR/venv/bin/pip" install -r "$DIR/requirements.txt" || { err "requirements update failed"; return 1; }
-  fi
-
-  run_silent systemctl restart "$SERVICE" || { err "restart failed"; return 1; }
-
-  header
+  ensure_safe_cwd
+  [[ -d "$DIR/.git" ]] || err "Not installed. Please run Install first."
+  info "Updating ConfigFlow..."
+  clone_or_update_repo
+  setup_venv
+  systemctl restart "$SERVICE"
   ok "Updated successfully!"
-  return 0
 }
 
 edit_config() {
-  [[ -f "$DIR/.env" ]] || { err "Config not found. Install first."; return 1; }
+  ensure_safe_cwd
+  [[ -f "$DIR/.env" ]] || err "Config file not found. Please install first."
   nano "$DIR/.env"
-  run_silent systemctl restart "$SERVICE" || { err "restart failed"; return 1; }
-  header
+  systemctl restart "$SERVICE"
   ok "Configuration updated and bot restarted!"
-  return 0
 }
 
 remove_bot() {
-  echo -n "Are you sure you want to remove ConfigFlow? (yes/no): "
-  read -r confirm
+  ensure_safe_cwd
+  read -r -p "Are you sure you want to remove ConfigFlow? (yes/no): " confirm
   if [[ "$confirm" != "yes" ]]; then
     info "Cancelled"
-    return 0
+    return
   fi
 
-  run_silent systemctl stop "$SERVICE"
-  run_silent systemctl disable "$SERVICE"
-  run_silent rm -f "/etc/systemd/system/$SERVICE.service"
-  run_silent systemctl daemon-reload
+  systemctl stop "$SERVICE" 2>/dev/null || true
+  systemctl disable "$SERVICE" 2>/dev/null || true
+  rm -f "/etc/systemd/system/$SERVICE.service"
+  systemctl daemon-reload
   rm -rf "$DIR"
-
-  header
   ok "ConfigFlow removed completely"
-  return 0
 }
 
 show_menu() {
@@ -228,41 +191,28 @@ show_menu() {
   echo ""
 }
 
-read_choice() {
-  IFS= read -r choice
-  choice="${choice//[$'\t\r\n ']/}"
-  echo "$choice"
-}
-
 main() {
   check_root
+  ensure_safe_cwd
 
   while true; do
     header
     show_menu
 
-    echo -n "Select option [0-9]: "
-    choice="$(read_choice)"
+    read -r -p "Select option [0-9]: " choice
 
-    case "$choice" in
-      1) install_bot; pause ;;
-      2) update_bot; pause ;;
-      3) edit_config; pause ;;
-      4) run_silent systemctl start "$SERVICE" && header && ok "Bot started"; pause ;;
-      5) run_silent systemctl stop "$SERVICE" && header && ok "Bot stopped"; pause ;;
-      6) run_silent systemctl restart "$SERVICE" && header && ok "Bot restarted"; pause ;;
-      7)
-        echo -e "${Y}Press Ctrl+C to exit logs${N}"
-        sleep 2
-        journalctl -u "$SERVICE" -f
-        ;;
-      8)
-        systemctl status "$SERVICE" --no-pager -l
-        pause
-        ;;
-      9) remove_bot; pause ;;
-      0) echo "Goodbye!"; exit 0 ;;
-      *) header; echo -e "${R}Invalid option${N}"; sleep 1 ;;
+    case "${choice:-}" in
+      1) install_bot ;;
+      2) update_bot ;;
+      3) edit_config ;;
+      4) systemctl start "$SERVICE"; ok "Bot started"; read -r -p "Press Enter to continue...";;
+      5) systemctl stop "$SERVICE"; ok "Bot stopped"; read -r -p "Press Enter to continue...";;
+      6) systemctl restart "$SERVICE"; ok "Bot restarted"; read -r -p "Press Enter to continue...";;
+      7) echo -e "${Y}Press Ctrl+C to exit logs${N}"; sleep 1; journalctl -u "$SERVICE" -f;;
+      8) systemctl status "$SERVICE" --no-pager -l; read -r -p "Press Enter to continue...";;
+      9) remove_bot; read -r -p "Press Enter to continue...";;
+      0) echo "Goodbye!"; exit 0;;
+      *) echo -e "${R}Invalid option${N}"; sleep 1;;
     esac
   done
 }
