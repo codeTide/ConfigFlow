@@ -1,27 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-ConfigFlow / TracklessVPN Telegram Bot
+Meli Trackless / TracklessVPN Telegram Bot — v4
+Enhanced Edition: inline menus, crypto payments, reseller, backup, channel lock, etc.
 
 Requirements:
-    pip install -r requirements.txt
+    pip install pyTelegramBotAPI qrcode pillow python-dotenv
 
 Run:
     export BOT_TOKEN="YOUR_BOT_TOKEN"
     export ADMIN_IDS="123456789"
     python bot.py
-
-Notes:
-    - همه چیز در یک فایل پایتون قرار گرفته است.
-    - دیتابیس SQLite به صورت خودکار کنار فایل ساخته می‌شود.
-    - برای دریافت پیام‌های ادمین، آیدی عددی ادمین را در ADMIN_IDS قرار دهید.
 """
 
 import io
 import os
 import re
 import html
+import shutil
 import sqlite3
-from datetime import datetime
+import threading
+import traceback
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 import qrcode
@@ -30,34 +29,46 @@ from telebot import types
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 ADMIN_IDS = {
     int(item.strip())
-    for item in os.getenv("ADMIN_IDS", "123456789").split(",")
+    for item in os.getenv("ADMIN_IDS", "").split(",")
     if item.strip().isdigit()
 }
-DB_NAME = os.getenv("DB_NAME", "trackless_bot.db")
+DB_NAME = os.getenv("DB_NAME", "meli_trackless.db")
 
 BRAND_TITLE = "TracklessVPN"
 BOT_HANDLE = "@TracklessSell_bot"
 CHANNEL_HANDLE = "@TracklessVPN"
 DEFAULT_ADMIN_HANDLE = "@Tracklessvpnadmin"
 
-if BOT_TOKEN == "YOUR_BOT_TOKEN":
-    raise SystemExit("لطفاً BOT_TOKEN را در متغیر محیطی تنظیم کنید.")
+# Crypto currency definitions: (setting_key_suffix, display_name, emoji)
+CRYPTO_CURRENCIES = [
+    ("tron",      "Tron (TRC20)",  "🔴"),
+    ("ton",       "TON",           "💎"),
+    ("usdt_bep20","USDT (BEP20)",  "💚"),
+    ("usdc_bep20","USDC (BEP20)",  "🔵"),
+    ("ltc",       "LTC",           "⚡"),
+]
 
+NOBITEX_PRICE_URL = "https://nobitex.ir/price"
+CONFIGS_PER_PAGE  = 10
+USERS_PER_PAGE    = 20
+
+if not BOT_TOKEN or ":" not in BOT_TOKEN:
+    raise SystemExit("BOT_TOKEN تنظیم نشده یا معتبر نیست.")
 if not ADMIN_IDS:
-    raise SystemExit("لطفاً ADMIN_IDS را با آیدی عددی ادمین تنظیم کنید.")
+    raise SystemExit("ADMIN_IDS تنظیم نشده است.")
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML", threaded=True)
-USER_STATE = {}
-
+USER_STATE: dict = {}
 PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+_backup_timer: threading.Timer | None = None
 
 
-# ---------------------------
-# Utilities
-# ---------------------------
+# ──────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────
 def now_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -68,9 +79,7 @@ def is_admin(user_id: int) -> bool:
 
 def normalize_text_number(value: str) -> str:
     value = (value or "").translate(PERSIAN_DIGITS)
-    value = value.replace(",", "").replace("٬", "").replace(" ", "")
-    value = value.replace("تومان", "").replace("ریال", "")
-    return value.strip()
+    return value.replace(",", "").replace("٬", "").replace(" ", "").replace("تومان", "").replace("ریال", "").strip()
 
 
 def parse_int(value: str):
@@ -80,54 +89,66 @@ def parse_int(value: str):
     return int(cleaned)
 
 
-def fmt_price(amount: int) -> str:
-    return f"{int(amount):,}"
+def fmt_price(amount) -> str:
+    return f"{int(amount or 0):,}"
 
 
 def display_name(tg_user) -> str:
-    name = " ".join([part for part in [tg_user.first_name or "", tg_user.last_name or ""] if part]).strip()
+    name = " ".join(p for p in [tg_user.first_name or "", tg_user.last_name or ""] if p).strip()
     return name or "ㅤ"
 
 
-def display_username(username: str) -> str:
+def display_username(username: str | None) -> str:
     return f"@{username}" if username else "@ ندارد"
 
 
-def safe_support_url(raw_value: str):
-    raw_value = (raw_value or "").strip()
-    if not raw_value:
+def safe_support_url(raw_value: str) -> str | None:
+    raw = (raw_value or "").strip()
+    if not raw:
         return None
-    if raw_value.startswith("http://") or raw_value.startswith("https://"):
-        return raw_value
-    raw_value = raw_value.replace("https://", "").replace("http://", "")
-    raw_value = raw_value.replace("t.me/", "").replace("telegram.me/", "")
-    raw_value = raw_value.replace("@", "").strip()
-    if not raw_value:
-        return None
-    return f"https://t.me/{raw_value}"
-
-
-def card_owner_or_placeholder(value: str) -> str:
-    return value.strip() if value and value.strip() else "ثبت نشده"
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return raw
+    raw = raw.replace("https://", "").replace("http://", "").replace("t.me/", "").replace("telegram.me/", "").replace("@", "").strip()
+    return f"https://t.me/{raw}" if raw else None
 
 
 def state_get(user_id: int):
     return USER_STATE.get(user_id)
 
 
-def state_set(user_id: int, name: str, **data):
-    USER_STATE[user_id] = {"name": name, "data": data}
+def state_set(user_id: int, state_name: str, **data):
+    USER_STATE[user_id] = {"state_name": state_name, "data": data}
 
 
 def state_clear(user_id: int):
     USER_STATE.pop(user_id, None)
 
 
-# ---------------------------
+def state_name(user_id: int) -> str | None:
+    st = USER_STATE.get(user_id)
+    return st["state_name"] if st else None
+
+
+def state_data(user_id: int) -> dict:
+    st = USER_STATE.get(user_id)
+    return st.get("data", {}) if st else {}
+
+
+def esc(text) -> str:
+    return html.escape(str(text or ""))
+
+
+def back_button(target: str = "main"):
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"nav:{target}"))
+    return kb
+
+
+# ──────────────────────────────────────────────
 # Database
-# ---------------------------
-def get_conn():
-    conn = sqlite3.connect(DB_NAME)
+# ──────────────────────────────────────────────
+def get_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -135,1531 +156,2584 @@ def get_conn():
 
 def init_db():
     with get_conn() as conn:
-        conn.executescript(
-            """
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
-                full_name TEXT,
-                username TEXT,
-                balance INTEGER NOT NULL DEFAULT 0,
-                joined_at TEXT NOT NULL,
-                last_seen_at TEXT NOT NULL
+                user_id       INTEGER PRIMARY KEY,
+                full_name     TEXT,
+                username      TEXT,
+                balance       INTEGER NOT NULL DEFAULT 0,
+                joined_at     TEXT    NOT NULL,
+                last_seen_at  TEXT    NOT NULL,
+                first_start_notified INTEGER NOT NULL DEFAULT 0,
+                is_safe       INTEGER NOT NULL DEFAULT 1,
+                is_reseller   INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS config_types (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id   INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE
             );
 
             CREATE TABLE IF NOT EXISTS packages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                volume_gb INTEGER NOT NULL,
-                duration_days INTEGER NOT NULL,
-                price INTEGER NOT NULL,
-                active INTEGER NOT NULL DEFAULT 1,
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_id        INTEGER NOT NULL,
+                name           TEXT    NOT NULL,
+                volume_gb      INTEGER NOT NULL,
+                duration_days  INTEGER NOT NULL,
+                price          INTEGER NOT NULL,
+                active         INTEGER NOT NULL DEFAULT 1,
                 FOREIGN KEY(type_id) REFERENCES config_types(id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS configs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_id INTEGER NOT NULL,
-                package_id INTEGER NOT NULL,
-                service_name TEXT NOT NULL,
-                config_text TEXT NOT NULL,
-                inquiry_link TEXT,
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_id             INTEGER NOT NULL,
+                package_id          INTEGER NOT NULL,
+                service_name        TEXT    NOT NULL,
+                config_text         TEXT    NOT NULL,
+                inquiry_link        TEXT,
+                created_at          TEXT    NOT NULL,
                 reserved_payment_id INTEGER,
-                sold_to INTEGER,
-                purchase_id INTEGER,
-                created_at TEXT NOT NULL,
-                sold_at TEXT,
-                FOREIGN KEY(type_id) REFERENCES config_types(id) ON DELETE CASCADE,
-                FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE CASCADE
+                sold_to             INTEGER,
+                purchase_id         INTEGER,
+                sold_at             TEXT,
+                ended               INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(type_id)   REFERENCES config_types(id) ON DELETE CASCADE,
+                FOREIGN KEY(package_id) REFERENCES packages(id)    ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS payments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                kind TEXT NOT NULL,
-                user_id INTEGER NOT NULL,
-                package_id INTEGER,
-                amount INTEGER NOT NULL,
-                payment_method TEXT NOT NULL,
-                status TEXT NOT NULL,
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind            TEXT NOT NULL,
+                user_id         INTEGER NOT NULL,
+                package_id      INTEGER,
+                amount          INTEGER NOT NULL,
+                payment_method  TEXT    NOT NULL,
+                status          TEXT    NOT NULL,
                 receipt_file_id TEXT,
-                receipt_text TEXT,
-                admin_note TEXT,
-                created_at TEXT NOT NULL,
-                approved_at TEXT
+                receipt_text    TEXT,
+                admin_note      TEXT,
+                created_at      TEXT    NOT NULL,
+                approved_at     TEXT,
+                config_id       INTEGER,
+                crypto_currency TEXT
             );
 
             CREATE TABLE IF NOT EXISTS purchases (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id        INTEGER NOT NULL,
+                package_id     INTEGER NOT NULL,
+                config_id      INTEGER NOT NULL,
+                amount         INTEGER NOT NULL,
+                payment_method TEXT    NOT NULL,
+                created_at     TEXT    NOT NULL,
+                is_test        INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS reseller_prices (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    INTEGER NOT NULL,
                 package_id INTEGER NOT NULL,
-                config_id INTEGER NOT NULL,
-                amount INTEGER NOT NULL,
-                payment_method TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                price      INTEGER NOT NULL,
+                UNIQUE(user_id, package_id)
             );
 
             CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
+                key   TEXT PRIMARY KEY,
                 value TEXT
             );
-            """
-        )
+        """)
+
+        # Default settings
         defaults = {
-            "support_username": "",
-            "payment_card": "",
-            "payment_bank": "",
-            "payment_owner": "",
+            "support_username":        "",
+            "payment_card":            "",
+            "payment_bank":            "",
+            "payment_owner":           "",
+            "payment_card_status":     "public",  # public | safe
+            "crypto_tron":             "",
+            "crypto_ton":              "",
+            "crypto_usdt_bep20":       "",
+            "crypto_usdc_bep20":       "",
+            "crypto_ltc":              "",
+            "channel_lock_enabled":    "0",
+            "channel_lock_id":         "",
+            "auto_backup_enabled":     "0",
+            "backup_interval_hours":   "24",
+            "backup_chat_id":          "",
         }
-        for key, value in defaults.items():
-            conn.execute(
-                "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
-                (key, value),
-            )
+        for k, v in defaults.items():
+            conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?,?)", (k, v))
+
+        # Safe schema migrations
+        _migrate(conn, "ALTER TABLE users ADD COLUMN first_start_notified INTEGER NOT NULL DEFAULT 0")
+        _migrate(conn, "ALTER TABLE users ADD COLUMN is_safe INTEGER NOT NULL DEFAULT 1")
+        _migrate(conn, "ALTER TABLE users ADD COLUMN is_reseller INTEGER NOT NULL DEFAULT 0")
+        _migrate(conn, "ALTER TABLE configs ADD COLUMN ended INTEGER NOT NULL DEFAULT 0")
+        _migrate(conn, "ALTER TABLE payments ADD COLUMN crypto_currency TEXT")
 
 
-def get_setting(key: str, default: str = "") -> str:
+def _migrate(conn, sql: str):
+    try:
+        conn.execute(sql)
+    except Exception:
+        pass
+
+
+# ── Settings ──
+def setting_get(key: str, default: str = "") -> str:
     with get_conn() as conn:
-        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-        if row:
-            return row["value"] or default
-    return default
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else default
 
 
-def set_setting(key: str, value: str):
+def setting_set(key: str, value: str):
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO settings (key, value) VALUES (?, ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (key, value),
         )
 
 
-def upsert_user(tg_user):
-    current_time = now_str()
+# ── Users ──
+def ensure_user(tg_user) -> bool:
+    uid = tg_user.id
     full_name = display_name(tg_user)
     username = tg_user.username or ""
     with get_conn() as conn:
-        exists = conn.execute(
-            "SELECT user_id FROM users WHERE user_id = ?", (tg_user.id,)
-        ).fetchone()
-        if exists:
+        row = conn.execute("SELECT user_id FROM users WHERE user_id=?", (uid,)).fetchone()
+        if row:
             conn.execute(
-                "UPDATE users SET full_name = ?, username = ?, last_seen_at = ? WHERE user_id = ?",
-                (full_name, username, current_time, tg_user.id),
+                "UPDATE users SET full_name=?, username=?, last_seen_at=? WHERE user_id=?",
+                (full_name, username, now_str(), uid),
             )
-        else:
-            conn.execute(
-                "INSERT INTO users (user_id, full_name, username, balance, joined_at, last_seen_at) "
-                "VALUES (?, ?, ?, 0, ?, ?)",
-                (tg_user.id, full_name, username, current_time, current_time),
-            )
+            return False
+        conn.execute(
+            "INSERT INTO users(user_id,full_name,username,joined_at,last_seen_at,first_start_notified,is_safe,is_reseller) VALUES(?,?,?,?,?,0,1,0)",
+            (uid, full_name, username, now_str(), now_str()),
+        )
+        return True
 
 
 def get_user(user_id: int):
     with get_conn() as conn:
-        return conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        return conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone()
 
 
-def change_balance(user_id: int, delta: int):
+def get_user_detail(user_id: int):
     with get_conn() as conn:
-        conn.execute(
-            "UPDATE users SET balance = balance + ? WHERE user_id = ?",
-            (delta, user_id),
-        )
+        return conn.execute("""
+            SELECT u.*,
+                   (SELECT COUNT(*) FROM purchases p WHERE p.user_id=u.user_id) AS purchase_count,
+                   (SELECT COALESCE(SUM(amount),0) FROM purchases p WHERE p.user_id=u.user_id) AS total_spent
+            FROM users u WHERE u.user_id=?
+        """, (user_id,)).fetchone()
 
 
-def get_types():
+def get_users(page: int = 0):
+    offset = page * USERS_PER_PAGE
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT u.*,
+                   (SELECT COUNT(*) FROM purchases p WHERE p.user_id=u.user_id) AS purchase_count
+            FROM users u ORDER BY u.user_id DESC LIMIT ? OFFSET ?
+        """, (USERS_PER_PAGE, offset)).fetchall()
+        total = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+    return rows, total
+
+
+def get_users_for_broadcast(has_purchase: bool | None = None):
+    q = "SELECT user_id FROM users WHERE 1=1"
+    if has_purchase is True:
+        q += " AND EXISTS (SELECT 1 FROM purchases p WHERE p.user_id=users.user_id)"
+    elif has_purchase is False:
+        q += " AND NOT EXISTS (SELECT 1 FROM purchases p WHERE p.user_id=users.user_id)"
+    with get_conn() as conn:
+        return conn.execute(q).fetchall()
+
+
+def update_balance(user_id: int, delta: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET balance=balance+? WHERE user_id=?", (delta, user_id))
+
+
+def set_user_safe(user_id: int, is_safe: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET is_safe=? WHERE user_id=?", (is_safe, user_id))
+
+
+def set_user_reseller(user_id: int, is_reseller: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET is_reseller=? WHERE user_id=?", (is_reseller, user_id))
+
+
+def notify_first_start_if_needed(tg_user):
+    uid = tg_user.id
+    with get_conn() as conn:
+        row = conn.execute("SELECT first_start_notified FROM users WHERE user_id=?", (uid,)).fetchone()
+        if not row or row["first_start_notified"]:
+            return
+        conn.execute("UPDATE users SET first_start_notified=1 WHERE user_id=?", (uid,))
+    text = (
+        "📢 | یه گل جدید عضو ربات شد :\n\n"
+        f"نام: {display_name(tg_user)}\n"
+        f"نام کاربری: {display_username(tg_user.username)}\n"
+        f"آیدی عددی: <code>{tg_user.id}</code>"
+    )
+    for aid in ADMIN_IDS:
+        try:
+            bot.send_message(aid, text)
+        except Exception:
+            pass
+
+
+# ── Config Types ──
+def get_all_types():
     with get_conn() as conn:
         return conn.execute("SELECT * FROM config_types ORDER BY id DESC").fetchall()
 
 
 def get_type(type_id: int):
     with get_conn() as conn:
-        return conn.execute("SELECT * FROM config_types WHERE id = ?", (type_id,)).fetchone()
+        return conn.execute("SELECT * FROM config_types WHERE id=?", (type_id,)).fetchone()
 
 
 def add_type(name: str):
     with get_conn() as conn:
-        conn.execute("INSERT INTO config_types (name) VALUES (?)", (name.strip(),))
+        conn.execute("INSERT INTO config_types(name) VALUES(?)", (name.strip(),))
 
 
-def update_type(type_id: int, name: str):
+def update_type(type_id: int, new_name: str):
     with get_conn() as conn:
-        conn.execute("UPDATE config_types SET name = ? WHERE id = ?", (name.strip(), type_id))
-
-
-def can_delete_type(type_id: int) -> bool:
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) AS cnt FROM packages WHERE type_id = ?", (type_id,)
-        ).fetchone()
-        return bool(row and row["cnt"] == 0)
+        conn.execute("UPDATE config_types SET name=? WHERE id=?", (new_name.strip(), type_id))
 
 
 def delete_type(type_id: int):
     with get_conn() as conn:
-        conn.execute("DELETE FROM config_types WHERE id = ?", (type_id,))
+        conn.execute("DELETE FROM config_types WHERE id=?", (type_id,))
 
 
-def get_packages(type_id=None):
-    sql = (
-        "SELECT p.*, t.name AS type_name, "
-        "(SELECT COUNT(*) FROM configs c "
-        " WHERE c.package_id = p.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL) AS available_count "
-        "FROM packages p "
-        "JOIN config_types t ON t.id = p.type_id "
-    )
+# ── Packages ──
+def _package_base_query():
+    return """
+        SELECT p.*, t.name AS type_name,
+            (SELECT COUNT(*) FROM configs c WHERE c.package_id=p.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL) AS stock,
+            (SELECT COUNT(*) FROM configs c WHERE c.package_id=p.id AND c.sold_to IS NOT NULL) AS sold_count
+        FROM packages p
+        JOIN config_types t ON t.id=p.type_id
+    """
+
+
+def get_packages(type_id=None, price_only=None, include_inactive=False):
+    q = _package_base_query() + " WHERE 1=1"
     params = []
+    if not include_inactive:
+        q += " AND p.active=1"
     if type_id is not None:
-        sql += "WHERE p.type_id = ? "
+        q += " AND p.type_id=?"
         params.append(type_id)
-    sql += "ORDER BY p.id DESC"
+    if price_only is not None:
+        q += " AND p.price=?"
+        params.append(price_only)
+    q += " ORDER BY p.id DESC"
     with get_conn() as conn:
-        return conn.execute(sql, params).fetchall()
+        return conn.execute(q, params).fetchall()
 
 
 def get_package(package_id: int):
     with get_conn() as conn:
         return conn.execute(
-            "SELECT p.*, t.name AS type_name, "
-            "(SELECT COUNT(*) FROM configs c "
-            " WHERE c.package_id = p.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL) AS available_count "
-            "FROM packages p "
-            "JOIN config_types t ON t.id = p.type_id "
-            "WHERE p.id = ?",
-            (package_id,),
+            _package_base_query() + " WHERE p.id=?", (package_id,)
         ).fetchone()
 
 
 def add_package(type_id: int, name: str, volume_gb: int, duration_days: int, price: int):
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO packages (type_id, name, volume_gb, duration_days, price, active) VALUES (?, ?, ?, ?, ?, 1)",
+            "INSERT INTO packages(type_id,name,volume_gb,duration_days,price,active) VALUES(?,?,?,?,?,1)",
             (type_id, name.strip(), volume_gb, duration_days, price),
         )
 
 
-def update_package(package_id: int, name: str, volume_gb: int, duration_days: int, price: int):
+def update_package_field(pkg_id: int, field: str, value):
+    allowed = {"name", "volume_gb", "duration_days", "price"}
+    if field not in allowed:
+        return
     with get_conn() as conn:
-        conn.execute(
-            "UPDATE packages SET name = ?, volume_gb = ?, duration_days = ?, price = ? WHERE id = ?",
-            (name.strip(), volume_gb, duration_days, price, package_id),
-        )
+        conn.execute(f"UPDATE packages SET {field}=? WHERE id=?", (value, pkg_id))
 
 
-def delete_package(package_id: int):
+def delete_package(pkg_id: int):
     with get_conn() as conn:
-        conn.execute("DELETE FROM packages WHERE id = ?", (package_id,))
+        conn.execute("DELETE FROM packages WHERE id=?", (pkg_id,))
 
 
-def can_delete_package(package_id: int) -> bool:
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) AS cnt FROM configs WHERE package_id = ?", (package_id,)
-        ).fetchone()
-        return bool(row and row["cnt"] == 0)
-
-
+# ── Configs ──
 def add_config(type_id: int, package_id: int, service_name: str, config_text: str, inquiry_link: str):
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO configs (type_id, package_id, service_name, config_text, inquiry_link, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO configs(type_id,package_id,service_name,config_text,inquiry_link,created_at) VALUES(?,?,?,?,?,?)",
             (type_id, package_id, service_name.strip(), config_text.strip(), inquiry_link.strip(), now_str()),
         )
 
 
+def get_available_configs_for_package(package_id: int, page: int = 0, page_size: int = CONFIGS_PER_PAGE):
+    offset = page * page_size
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM configs WHERE package_id=? AND sold_to IS NULL AND reserved_payment_id IS NULL ORDER BY id ASC LIMIT ? OFFSET ?",
+            (package_id, page_size, offset),
+        ).fetchall()
+        total = conn.execute(
+            "SELECT COUNT(*) AS c FROM configs WHERE package_id=? AND sold_to IS NULL AND reserved_payment_id IS NULL",
+            (package_id,),
+        ).fetchone()["c"]
+    return rows, total
+
+
+def get_sold_configs_for_package(package_id: int, page: int = 0, page_size: int = CONFIGS_PER_PAGE):
+    offset = page * page_size
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT c.*, u.full_name AS buyer_name, u.username AS buyer_username
+            FROM configs c
+            LEFT JOIN users u ON u.user_id=c.sold_to
+            WHERE c.package_id=? AND c.sold_to IS NOT NULL
+            ORDER BY c.sold_at DESC LIMIT ? OFFSET ?
+        """, (package_id, page_size, offset)).fetchall()
+        total = conn.execute(
+            "SELECT COUNT(*) AS c FROM configs WHERE package_id=? AND sold_to IS NOT NULL",
+            (package_id,),
+        ).fetchone()["c"]
+    return rows, total
+
+
+def get_all_available_configs(page: int = 0, page_size: int = CONFIGS_PER_PAGE):
+    offset = page * page_size
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT c.*, p.name AS pkg_name, t.name AS type_name
+            FROM configs c
+            JOIN packages p ON p.id=c.package_id
+            JOIN config_types t ON t.id=c.type_id
+            WHERE c.sold_to IS NULL AND c.reserved_payment_id IS NULL
+            ORDER BY c.id ASC LIMIT ? OFFSET ?
+        """, (page_size, offset)).fetchall()
+        total = conn.execute(
+            "SELECT COUNT(*) AS c FROM configs WHERE sold_to IS NULL AND reserved_payment_id IS NULL"
+        ).fetchone()["c"]
+    return rows, total
+
+
+def get_all_sold_configs(page: int = 0, page_size: int = CONFIGS_PER_PAGE):
+    offset = page * page_size
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT c.*, p.name AS pkg_name, t.name AS type_name,
+                   u.full_name AS buyer_name, u.username AS buyer_username
+            FROM configs c
+            JOIN packages p ON p.id=c.package_id
+            JOIN config_types t ON t.id=c.type_id
+            LEFT JOIN users u ON u.user_id=c.sold_to
+            WHERE c.sold_to IS NOT NULL
+            ORDER BY c.sold_at DESC LIMIT ? OFFSET ?
+        """, (page_size, offset)).fetchall()
+        total = conn.execute(
+            "SELECT COUNT(*) AS c FROM configs WHERE sold_to IS NOT NULL"
+        ).fetchone()["c"]
+    return rows, total
+
+
 def get_config(config_id: int):
     with get_conn() as conn:
-        return conn.execute(
-            "SELECT c.*, p.name AS package_name, p.volume_gb, p.duration_days, p.price, t.name AS type_name "
-            "FROM configs c "
-            "JOIN packages p ON p.id = c.package_id "
-            "JOIN config_types t ON t.id = c.type_id "
-            "WHERE c.id = ?",
-            (config_id,),
-        ).fetchone()
+        return conn.execute("SELECT * FROM configs WHERE id=?", (config_id,)).fetchone()
 
 
-def get_remaining_stock_packages():
+def reserve_first_config(package_id: int, payment_id: int | None = None):
     with get_conn() as conn:
-        return conn.execute(
-            "SELECT p.id, p.name, p.volume_gb, p.duration_days, p.price, t.name AS type_name, "
-            "COUNT(c.id) AS remaining_count "
-            "FROM packages p "
-            "JOIN config_types t ON t.id = p.type_id "
-            "LEFT JOIN configs c ON c.package_id = p.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL "
-            "GROUP BY p.id "
-            "ORDER BY p.id DESC"
-        ).fetchall()
-
-
-def get_remaining_configs_by_package(package_id: int):
-    with get_conn() as conn:
-        return conn.execute(
-            "SELECT c.*, p.name AS package_name, p.volume_gb, p.duration_days, t.name AS type_name "
-            "FROM configs c "
-            "JOIN packages p ON p.id = c.package_id "
-            "JOIN config_types t ON t.id = c.type_id "
-            "WHERE c.package_id = ? AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL "
-            "ORDER BY c.id DESC",
-            (package_id,),
-        ).fetchall()
-
-
-def create_wallet_purchase(user_id: int, package_id: int):
-    with get_conn() as conn:
-        pkg = conn.execute(
-            "SELECT p.*, t.name AS type_name FROM packages p JOIN config_types t ON t.id = p.type_id WHERE p.id = ?",
+        row = conn.execute(
+            "SELECT id FROM configs WHERE package_id=? AND sold_to IS NULL AND reserved_payment_id IS NULL ORDER BY id ASC LIMIT 1",
             (package_id,),
         ).fetchone()
-        if not pkg:
-            return None, "این پکیج پیدا نشد."
-
-        user = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
-        if not user:
-            return None, "کاربر پیدا نشد."
-        if user["balance"] < pkg["price"]:
-            return None, "موجودی کیف پول شما برای این خرید کافی نیست."
-
-        cfg = conn.execute(
-            "SELECT * FROM configs WHERE package_id = ? AND sold_to IS NULL AND reserved_payment_id IS NULL ORDER BY id LIMIT 1",
-            (package_id,),
-        ).fetchone()
-        if not cfg:
-            return None, "در حال حاضر موجودی این سرویس به اتمام رسیده است."
-
-        conn.execute(
-            "UPDATE users SET balance = balance - ? WHERE user_id = ?",
-            (pkg["price"], user_id),
-        )
-        cur = conn.execute(
-            "INSERT INTO purchases (user_id, package_id, config_id, amount, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, package_id, cfg["id"], pkg["price"], "wallet", now_str()),
-        )
-        purchase_id = cur.lastrowid
-        conn.execute(
-            "UPDATE configs SET sold_to = ?, purchase_id = ?, sold_at = ? WHERE id = ?",
-            (user_id, purchase_id, now_str(), cfg["id"]),
-        )
-    return get_purchase(purchase_id), None
+        if not row:
+            return None
+        if payment_id:
+            conn.execute("UPDATE configs SET reserved_payment_id=? WHERE id=?", (payment_id, row["id"]))
+        return row["id"]
 
 
-def create_purchase_payment_with_reserve(user_id: int, package_id: int):
+def release_reserved_config(config_id: int):
     with get_conn() as conn:
-        pkg = conn.execute(
-            "SELECT * FROM packages WHERE id = ?",
-            (package_id,),
-        ).fetchone()
-        if not pkg:
-            return None, "پکیج موردنظر پیدا نشد."
-
-        cfg = conn.execute(
-            "SELECT * FROM configs WHERE package_id = ? AND sold_to IS NULL AND reserved_payment_id IS NULL ORDER BY id LIMIT 1",
-            (package_id,),
-        ).fetchone()
-        if not cfg:
-            return None, "برای این پکیج فعلاً کانفیگ آماده تحویل موجود نیست."
-
-        cur = conn.execute(
-            "INSERT INTO payments (kind, user_id, package_id, amount, payment_method, status, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("purchase", user_id, package_id, pkg["price"], "card_to_card", "pending", now_str()),
-        )
-        payment_id = cur.lastrowid
-        conn.execute(
-            "UPDATE configs SET reserved_payment_id = ? WHERE id = ?",
-            (payment_id, cfg["id"]),
-        )
-    return get_payment(payment_id), None
+        conn.execute("UPDATE configs SET reserved_payment_id=NULL WHERE id=?", (config_id,))
 
 
-def create_wallet_charge_payment(user_id: int, amount: int):
+def mark_config_ended(config_id: int, ended: int):
     with get_conn() as conn:
-        cur = conn.execute(
-            "INSERT INTO payments (kind, user_id, package_id, amount, payment_method, status, created_at) "
-            "VALUES (?, ?, NULL, ?, ?, ?, ?)",
-            ("wallet", user_id, amount, "card_to_card", "pending", now_str()),
-        )
-        payment_id = cur.lastrowid
-    return get_payment(payment_id)
+        conn.execute("UPDATE configs SET ended=? WHERE id=?", (ended, config_id))
 
 
-def update_payment_receipt(payment_id: int, file_id: str = None, receipt_text: str = None):
+def assign_config_to_user(config_id: int, user_id: int, package_id: int, amount: int, payment_method: str, is_test: int = 0) -> int:
     with get_conn() as conn:
         conn.execute(
-            "UPDATE payments SET receipt_file_id = ?, receipt_text = ? WHERE id = ?",
-            (file_id, (receipt_text or "").strip(), payment_id),
+            "INSERT INTO purchases(user_id,package_id,config_id,amount,payment_method,created_at,is_test) VALUES(?,?,?,?,?,?,?)",
+            (user_id, package_id, config_id, amount, payment_method, now_str(), is_test),
         )
-
-
-def get_payment(payment_id: int):
-    with get_conn() as conn:
-        return conn.execute(
-            "SELECT pay.*, u.full_name, u.username, "
-            "p.name AS package_name, p.volume_gb, p.duration_days, t.name AS type_name, "
-            "(SELECT service_name FROM configs WHERE reserved_payment_id = pay.id LIMIT 1) AS service_name "
-            "FROM payments pay "
-            "JOIN users u ON u.user_id = pay.user_id "
-            "LEFT JOIN packages p ON p.id = pay.package_id "
-            "LEFT JOIN config_types t ON t.id = p.type_id "
-            "WHERE pay.id = ?",
-            (payment_id,),
-        ).fetchone()
-
-
-def approve_wallet_charge(payment_id: int, admin_note: str):
-    with get_conn() as conn:
-        pay = conn.execute(
-            "SELECT * FROM payments WHERE id = ? AND kind = 'wallet' AND status = 'pending'",
-            (payment_id,),
-        ).fetchone()
-        if not pay:
-            return None, "این درخواست قبلاً بررسی شده یا معتبر نیست."
+        purchase_id = conn.execute("SELECT last_insert_rowid() AS x").fetchone()["x"]
         conn.execute(
-            "UPDATE payments SET status = 'approved', admin_note = ?, approved_at = ? WHERE id = ?",
-            (admin_note, now_str(), payment_id),
+            "UPDATE configs SET sold_to=?, purchase_id=?, sold_at=?, reserved_payment_id=NULL WHERE id=?",
+            (user_id, purchase_id, now_str(), config_id),
         )
-        conn.execute(
-            "UPDATE users SET balance = balance + ? WHERE user_id = ?",
-            (pay["amount"], pay["user_id"]),
-        )
-    return get_payment(payment_id), None
+        return purchase_id
 
 
-def reject_wallet_charge(payment_id: int, admin_note: str):
-    with get_conn() as conn:
-        pay = conn.execute(
-            "SELECT * FROM payments WHERE id = ? AND kind = 'wallet' AND status = 'pending'",
-            (payment_id,),
-        ).fetchone()
-        if not pay:
-            return None, "این درخواست قبلاً بررسی شده یا معتبر نیست."
-        conn.execute(
-            "UPDATE payments SET status = 'rejected', admin_note = ?, approved_at = ? WHERE id = ?",
-            (admin_note, now_str(), payment_id),
-        )
-    return get_payment(payment_id), None
-
-
-def approve_purchase_payment(payment_id: int, admin_note: str):
-    with get_conn() as conn:
-        pay = conn.execute(
-            "SELECT * FROM payments WHERE id = ? AND kind = 'purchase' AND status = 'pending'",
-            (payment_id,),
-        ).fetchone()
-        if not pay:
-            return None, None, "این درخواست قبلاً بررسی شده یا معتبر نیست."
-
-        cfg = conn.execute(
-            "SELECT * FROM configs WHERE reserved_payment_id = ? LIMIT 1",
-            (payment_id,),
-        ).fetchone()
-        if not cfg:
-            return None, None, "کانفیگ رزروشده برای این پرداخت پیدا نشد."
-
-        conn.execute(
-            "UPDATE payments SET status = 'approved', admin_note = ?, approved_at = ? WHERE id = ?",
-            (admin_note, now_str(), payment_id),
-        )
-        cur = conn.execute(
-            "INSERT INTO purchases (user_id, package_id, config_id, amount, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (pay["user_id"], pay["package_id"], cfg["id"], pay["amount"], pay["payment_method"], now_str()),
-        )
-        purchase_id = cur.lastrowid
-        conn.execute(
-            "UPDATE configs SET sold_to = ?, purchase_id = ?, sold_at = ?, reserved_payment_id = NULL WHERE id = ?",
-            (pay["user_id"], purchase_id, now_str(), cfg["id"]),
-        )
-    return get_payment(payment_id), get_purchase(purchase_id), None
-
-
-def reject_purchase_payment(payment_id: int, admin_note: str):
-    with get_conn() as conn:
-        pay = conn.execute(
-            "SELECT * FROM payments WHERE id = ? AND kind = 'purchase' AND status = 'pending'",
-            (payment_id,),
-        ).fetchone()
-        if not pay:
-            return None, "این درخواست قبلاً بررسی شده یا معتبر نیست."
-        conn.execute(
-            "UPDATE payments SET status = 'rejected', admin_note = ?, approved_at = ? WHERE id = ?",
-            (admin_note, now_str(), payment_id),
-        )
-        conn.execute(
-            "UPDATE configs SET reserved_payment_id = NULL WHERE reserved_payment_id = ?",
-            (payment_id,),
-        )
-    return get_payment(payment_id), None
-
-
+# ── Purchases ──
 def get_purchase(purchase_id: int):
     with get_conn() as conn:
-        return conn.execute(
-            "SELECT pu.*, u.full_name, u.username, "
-            "p.name AS package_name, p.volume_gb, p.duration_days, p.price, t.name AS type_name, "
-            "c.service_name, c.config_text, c.inquiry_link "
-            "FROM purchases pu "
-            "JOIN users u ON u.user_id = pu.user_id "
-            "JOIN packages p ON p.id = pu.package_id "
-            "JOIN config_types t ON t.id = p.type_id "
-            "JOIN configs c ON c.id = pu.config_id "
-            "WHERE pu.id = ?",
-            (purchase_id,),
-        ).fetchone()
+        return conn.execute("""
+            SELECT pr.*, p.name AS package_name, p.volume_gb, p.duration_days, p.price,
+                   t.name AS type_name, c.service_name, c.config_text, c.inquiry_link, c.ended
+            FROM purchases pr
+            JOIN packages p ON p.id=pr.package_id
+            JOIN config_types t ON t.id=p.type_id
+            JOIN configs c ON c.id=pr.config_id
+            WHERE pr.id=?
+        """, (purchase_id,)).fetchone()
 
 
 def get_user_purchases(user_id: int):
     with get_conn() as conn:
-        return conn.execute(
-            "SELECT pu.*, p.name AS package_name, p.volume_gb, p.duration_days, t.name AS type_name, "
-            "c.service_name, c.config_text, c.inquiry_link "
-            "FROM purchases pu "
-            "JOIN packages p ON p.id = pu.package_id "
-            "JOIN config_types t ON t.id = p.type_id "
-            "JOIN configs c ON c.id = pu.config_id "
-            "WHERE pu.user_id = ? ORDER BY pu.id DESC",
-            (user_id,),
-        ).fetchall()
+        return conn.execute("""
+            SELECT pr.*, p.name AS package_name, p.volume_gb, p.duration_days, p.price,
+                   t.name AS type_name, c.service_name, c.config_text, c.inquiry_link, c.ended
+            FROM purchases pr
+            JOIN packages p ON p.id=pr.package_id
+            JOIN config_types t ON t.id=p.type_id
+            JOIN configs c ON c.id=pr.config_id
+            WHERE pr.user_id=?
+            ORDER BY pr.id DESC
+        """, (user_id,)).fetchall()
 
 
-# ---------------------------
-# Text builders
-# ---------------------------
-def start_text(name: str) -> str:
-    return (
-        f"🌿 سلام {html.escape(name)} عزیز،\n\n"
-        f"به ربات فروش کانفیگ شرایط نت ملی <b>{BRAND_TITLE}</b> خوش آمدی.\n"
-        "اینجا می‌تونی خیلی راحت سرویس جدید بخری، سرویس‌های قبلی‌ات را ببینی و کیف پولت را مدیریت کنی.\n\n"
-        f"🤖 بات فروش: {BOT_HANDLE}\n"
-        f"🎭 ادمین: {DEFAULT_ADMIN_HANDLE}\n"
-        f"📣 کانال: {CHANNEL_HANDLE}\n\n"
-        "از منوی زیر یکی از گزینه‌ها را انتخاب کن 🌸"
-    )
+def user_has_test_for_type(user_id: int, type_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT 1 FROM purchases pr
+            JOIN packages p ON p.id=pr.package_id
+            WHERE pr.user_id=? AND pr.is_test=1 AND p.type_id=? LIMIT 1
+        """, (user_id, type_id)).fetchone()
+    return bool(row)
 
 
-def profile_text(user_row) -> str:
-    return (
-        "👤 <b>پروفایل کاربری</b>\n\n"
-        f"📱 نام: {html.escape(user_row['full_name'] or 'ㅤ')}\n"
-        f"🔗 نام کاربری: {html.escape(display_username(user_row['username']))}\n"
-        f"🆔 آیدی عددی: <code>{user_row['user_id']}</code>\n\n"
-        f"💰 موجودی: <b>{fmt_price(user_row['balance'])}</b> تومان"
-    )
+# ── Payments ──
+def create_payment(kind: str, user_id: int, package_id: int | None, amount: int,
+                   payment_method: str, status: str = "pending",
+                   config_id: int | None = None, crypto_currency: str | None = None) -> int:
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO payments(kind,user_id,package_id,amount,payment_method,status,created_at,config_id,crypto_currency)
+            VALUES(?,?,?,?,?,?,?,?,?)
+        """, (kind, user_id, package_id, amount, payment_method, status, now_str(), config_id, crypto_currency))
+        return conn.execute("SELECT last_insert_rowid() AS x").fetchone()["x"]
 
 
-def package_summary_text(pkg) -> str:
-    return (
-        "🧾 <b>پکیج انتخابی شما</b>\n\n"
-        f"🚦 سرور: {html.escape(pkg['type_name'])}\n"
-        f"📦 نام پکیج: {html.escape(pkg['name'])}\n"
-        f"🔋 حجم سرویس: {pkg['volume_gb']} گیگ\n"
-        f"⏰ مدت سرویس: {pkg['duration_days']} روز\n"
-        f"💳 مبلغ: <b>{fmt_price(pkg['price'])}</b> تومان\n"
-        f"📦 موجودی آماده تحویل: {pkg['available_count']} عدد\n\n"
-        "لطفاً روش پرداخت را انتخاب کن:"
-    )
+def get_payment(payment_id: int):
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM payments WHERE id=?", (payment_id,)).fetchone()
 
 
-def payment_card_text(amount: int) -> str:
-    bank = get_setting("payment_bank")
-    owner = get_setting("payment_owner")
-    card = get_setting("payment_card")
-    if not bank or not owner or not card:
-        return (
-            "⚠️ اطلاعات پرداخت هنوز توسط ادمین کامل نشده است.\n"
-            "لطفاً کمی بعد دوباره تلاش کن یا با پشتیبانی در ارتباط باش."
+def update_payment_receipt(payment_id: int, file_id: str | None, text_value: str | None):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE payments SET receipt_file_id=?, receipt_text=? WHERE id=?",
+            (file_id, text_value, payment_id),
         )
-    return (
-        "💳 <b>کارت به کارت</b>\n\n"
-        f"لطفاً مبلغ <b>{fmt_price(amount)}</b> تومان را به اطلاعات زیر واریز کنید:\n\n"
-        f"🏦 {html.escape(bank)}\n"
-        f"👤 {html.escape(owner)}\n"
-        f"💳 شماره کارت <code>{html.escape(card)}</code>\n\n"
-        "📸 پس از واریز، لطفاً تصویر رسید یا شماره پیگیری خود را ارسال کنید.\n"
-        "برای لغو هم می‌توانید واژه <b>لغو</b> را بفرستید."
-    )
 
 
-def purchase_admin_text(purchase_like, method_title: str) -> str:
-    return (
-        f"❗️|💳 خرید جدید ( {method_title} )\n\n"
-        f"▫️آیدی کاربر: <code>{purchase_like['user_id']}</code>\n"
-        f"👨‍💼اسم کاربر: {html.escape(purchase_like['full_name'] or 'ㅤ')}\n"
-        f"⚡️ نام کاربری: {html.escape(display_username(purchase_like['username']))}\n"
-        f"💰مبلغ پرداختی: {fmt_price(purchase_like['amount'])} تومان\n"
-        f"🚦سرور: {html.escape(purchase_like['type_name'])}\n"
-        f"✏️ نام سرویس: {html.escape(purchase_like['service_name'])}\n"
-        f"🔋حجم سرویس: {purchase_like['volume_gb']} گیگ\n"
-        f"⏰ مدت سرویس: {purchase_like['duration_days']} روز"
-    )
+def approve_payment(payment_id: int, admin_note: str):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE payments SET status='approved', admin_note=?, approved_at=? WHERE id=?",
+            (admin_note, now_str(), payment_id),
+        )
 
 
-def wallet_admin_text(pay) -> str:
-    return (
-        "💰 درخواست جدید شارژ کیف پول\n\n"
-        f"▫️آیدی کاربر: <code>{pay['user_id']}</code>\n"
-        f"👨‍💼اسم کاربر: {html.escape(pay['full_name'] or 'ㅤ')}\n"
-        f"⚡️ نام کاربری: {html.escape(display_username(pay['username']))}\n"
-        f"💳 روش پرداخت: کارت به کارت\n"
-        f"💰 مبلغ شارژ: {fmt_price(pay['amount'])} تومان"
-    )
+def reject_payment(payment_id: int, admin_note: str):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE payments SET status='rejected', admin_note=?, approved_at=? WHERE id=?",
+            (admin_note, now_str(), payment_id),
+        )
 
 
-def user_joined_admin_text(tg_user) -> str:
-    return (
-        "📢 | یه گل جدید عضو ربات شد :\n\n"
-        f"نام و نام خانوادگی: {html.escape(display_name(tg_user))}\n"
-        f"نام کاربری: {html.escape(display_username(tg_user.username))}\n"
-        f"آیدی عددی: <code>{tg_user.id}</code>"
-    )
+def complete_payment(payment_id: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE payments SET status='completed', approved_at=? WHERE id=?", (now_str(), payment_id))
 
 
-def config_caption(purchase) -> str:
-    link = (purchase["inquiry_link"] or "").strip()
-    volume_web = (
-        f'<a href="{html.escape(link)}">مشاهده استعلام حجم</a>' if link else "ثبت نشده"
-    )
-    return (
-        f"🔮 نام سرویس: {html.escape(purchase['service_name'])}\n"
-        f"🔋حجم سرویس: {purchase['volume_gb']} گیگ\n"
-        f"⏰ مدت سرویس: {purchase['duration_days']} روز\n\n"
-        f"🔋 Volume web: {volume_web}\n\n"
-        "🌟 QRCode سرویس شما آماده است."
-    )
+# ── Reseller Prices ──
+def get_reseller_price(user_id: int, package_id: int) -> int | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT price FROM reseller_prices WHERE user_id=? AND package_id=?",
+            (user_id, package_id),
+        ).fetchone()
+    return row["price"] if row else None
 
 
-def config_text_body(purchase) -> str:
-    return (
-        "💝 <b>config :</b>\n"
-        f"<code>{html.escape(purchase['config_text'])}</code>"
-    )
+def set_reseller_price(user_id: int, package_id: int, price: int):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO reseller_prices(user_id,package_id,price) VALUES(?,?,?) ON CONFLICT(user_id,package_id) DO UPDATE SET price=excluded.price",
+            (user_id, package_id, price),
+        )
 
 
-# ---------------------------
-# Markups
-# ---------------------------
-def main_menu_markup(user_id: int):
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    kb.add(types.KeyboardButton("خرید کانفیگ جدید"), types.KeyboardButton("کانفیگ های من"))
-    kb.add(types.KeyboardButton("حساب کاربری"), types.KeyboardButton("ارتباط با پشتیبانی"))
+def get_effective_price(user_id: int, package_id: int, base_price: int) -> int:
+    rp = get_reseller_price(user_id, package_id)
+    return rp if rp is not None else base_price
+
+
+# ──────────────────────────────────────────────
+# Channel Lock
+# ──────────────────────────────────────────────
+def check_channel_membership(user_id: int) -> bool:
     if is_admin(user_id):
-        kb.add(types.KeyboardButton("پنل مدیریت"))
-    return kb
-
-
-def admin_menu_markup():
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    kb.add(types.KeyboardButton("مدیریت نوع ها"), types.KeyboardButton("مدیریت پکیج ها"))
-    kb.add(types.KeyboardButton("ثبت کانفیگ"), types.KeyboardButton("کانفیگ های ثبت شده"))
-    kb.add(types.KeyboardButton("ویرایش اطلاعات"), types.KeyboardButton("بازگشت به منوی اصلی"))
-    return kb
-
-
-def support_markup():
-    url = safe_support_url(get_setting("support_username"))
-    if not url:
-        return None
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("💬 ورود به پشتیبانی", url=url))
-    return kb
-
-
-def profile_markup():
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("➕ شارژ کیف پول", callback_data="profile_charge_wallet"))
-    return kb
-
-
-def payment_method_markup(package_id: int):
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("💰 پرداخت از موجودی", callback_data=f"pay_wallet_{package_id}"))
-    kb.add(types.InlineKeyboardButton("💳 کارت به کارت", callback_data=f"pay_card_{package_id}"))
-    return kb
-
-
-def renew_markup():
-    url = safe_support_url(get_setting("support_username"))
-    if not url:
-        return None
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🔄 تمدید سرویس", url=url))
-    return kb
-
-
-def payment_review_markup(payment_id: int):
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        types.InlineKeyboardButton("✅ تایید", callback_data=f"adm_pay_approve_{payment_id}"),
-        types.InlineKeyboardButton("❌ رد", callback_data=f"adm_pay_reject_{payment_id}"),
-    )
-    return kb
-
-
-def noop_button(text: str):
-    return types.InlineKeyboardButton(text, callback_data="noop")
-
-
-# ---------------------------
-# Send helpers
-# ---------------------------
-def send_profile(chat_id: int, user_id: int):
-    user_row = get_user(user_id)
-    if not user_row:
-        return
-    bot.send_message(chat_id, profile_text(user_row), reply_markup=profile_markup())
-
-
-def send_support(chat_id: int):
-    markup = support_markup()
-    if not markup:
-        bot.send_message(chat_id, "⚠️ پشتیبانی هنوز ست نشده است.")
-        return
-    bot.send_message(chat_id, "💬 برای ارتباط با پشتیبانی، روی دکمه زیر بزنید.", reply_markup=markup)
-
-
-def send_type_selection(chat_id: int):
-    type_rows = get_types()
-    if not type_rows:
-        bot.send_message(chat_id, "⚠️ هنوز نوعی برای فروش ثبت نشده است.")
-        return
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    for row in type_rows:
-        kb.add(types.InlineKeyboardButton(f"🚦 {row['name']}", callback_data=f"buy_type_{row['id']}"))
-    bot.send_message(chat_id, "🌈 نوع کانفیگ موردنظر را انتخاب کن:", reply_markup=kb)
-
-
-def send_packages_for_type(chat_id: int, type_id: int):
-    packages = get_packages(type_id)
-    if not packages:
-        bot.send_message(chat_id, "⚠️ برای این نوع هنوز پکیجی ثبت نشده است.")
-        return
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    for pkg in packages:
-        text = (
-            f"📦 {pkg['name']} | {pkg['volume_gb']} گیگ | {pkg['duration_days']} روز | "
-            f"{fmt_price(pkg['price'])} تومان"
-        )
-        kb.add(types.InlineKeyboardButton(text, callback_data=f"buy_pkg_{pkg['id']}"))
-    bot.send_message(chat_id, "🧾 یکی از پکیج‌های زیر را انتخاب کن:", reply_markup=kb)
-
-
-def send_my_configs(chat_id: int, user_id: int):
-    purchases = get_user_purchases(user_id)
-    if not purchases:
-        bot.send_message(chat_id, "📭 هنوز سرویسی برای شما ثبت نشده است.")
-        return
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    for item in purchases:
-        kb.add(types.InlineKeyboardButton(f"🔮 {item['service_name']}", callback_data=f"my_cfg_{item['id']}"))
-    bot.send_message(chat_id, "📦 سرویس‌های شما به شرح زیر است:", reply_markup=kb)
-
-
-def make_qr_image(data: str) -> io.BytesIO:
-    qr = qrcode.QRCode(box_size=10, border=2)
-    qr.add_data(data)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    bio = io.BytesIO()
-    bio.name = "config_qr.png"
-    img.save(bio, format="PNG")
-    bio.seek(0)
-    return bio
-
-
-def send_config_to_user(chat_id: int, purchase_id: int):
-    purchase = get_purchase(purchase_id)
-    if not purchase:
-        bot.send_message(chat_id, "⚠️ اطلاعات سرویس پیدا نشد.")
-        return
-
-    qr_file = make_qr_image(purchase["config_text"])
-    bot.send_photo(
-        chat_id,
-        qr_file,
-        caption=config_caption(purchase),
-        reply_markup=renew_markup(),
-    )
-    bot.send_message(chat_id, config_text_body(purchase))
-
-
-def notify_admins_new_user(tg_user):
-    text = user_joined_admin_text(tg_user)
-    for admin_id in ADMIN_IDS:
-        try:
-            bot.send_message(admin_id, text)
-        except Exception:
-            pass
-
-
-def notify_admins_purchase_done(purchase_id: int):
-    purchase = get_purchase(purchase_id)
-    if not purchase:
-        return
-    method = "کیف پول" if purchase["payment_method"] == "wallet" else "کارت به کارت"
-    text = purchase_admin_text(purchase, method)
-    for admin_id in ADMIN_IDS:
-        try:
-            bot.send_message(admin_id, text)
-        except Exception:
-            pass
-
-
-def notify_admins_wallet_charge_request(payment_id: int):
-    pay = get_payment(payment_id)
-    if not pay:
-        return
-    text = wallet_admin_text(pay)
-    receipt_file_id = pay["receipt_file_id"]
-    receipt_text = (pay["receipt_text"] or "").strip()
-    footer = f"\n\n🧾 وضعیت: در انتظار بررسی ادمین"
-    if receipt_text:
-        footer += f"\n✍️ متن/شماره پیگیری: {html.escape(receipt_text)}"
-    for admin_id in ADMIN_IDS:
-        try:
-            if receipt_file_id:
-                bot.send_photo(
-                    admin_id,
-                    receipt_file_id,
-                    caption=text + footer,
-                    reply_markup=payment_review_markup(payment_id),
-                )
-            else:
-                bot.send_message(
-                    admin_id,
-                    text + footer,
-                    reply_markup=payment_review_markup(payment_id),
-                )
-        except Exception:
-            pass
-
-
-def notify_admins_purchase_request(payment_id: int):
-    pay = get_payment(payment_id)
-    if not pay:
-        return
-    text = purchase_admin_text(pay, "کارت به کارت")
-    receipt_file_id = pay["receipt_file_id"]
-    receipt_text = (pay["receipt_text"] or "").strip()
-    footer = f"\n\n🧾 وضعیت: در انتظار تایید رسید"
-    if receipt_text:
-        footer += f"\n✍️ متن/شماره پیگیری: {html.escape(receipt_text)}"
-    for admin_id in ADMIN_IDS:
-        try:
-            if receipt_file_id:
-                bot.send_photo(
-                    admin_id,
-                    receipt_file_id,
-                    caption=text + footer,
-                    reply_markup=payment_review_markup(payment_id),
-                )
-            else:
-                bot.send_message(
-                    admin_id,
-                    text + footer,
-                    reply_markup=payment_review_markup(payment_id),
-                )
-        except Exception:
-            pass
-
-
-def send_manage_types(chat_id: int):
-    rows = get_types()
-    kb = types.InlineKeyboardMarkup(row_width=3)
-    kb.add(types.InlineKeyboardButton("➕ اضافه کردن نوع جدید", callback_data="adm_type_add"))
-    for row in rows:
-        kb.row(
-            noop_button(f"📌 {row['name']}"),
-            types.InlineKeyboardButton("✏️", callback_data=f"adm_type_edit_{row['id']}"),
-            types.InlineKeyboardButton("🗑", callback_data=f"adm_type_del_{row['id']}"),
-        )
-    text = "🛠 <b>مدیریت نوع‌ها</b>\n\nاز دکمه‌های زیر برای افزودن، ویرایش یا حذف نوع‌ها استفاده کنید."
-    if not rows:
-        text += "\n\nهنوز نوعی ثبت نشده است."
-    bot.send_message(chat_id, text, reply_markup=kb)
-
-
-def send_manage_packages(chat_id: int):
-    rows = get_packages()
-    kb = types.InlineKeyboardMarkup(row_width=3)
-    kb.add(types.InlineKeyboardButton("➕ اضافه کردن پکیج جدید", callback_data="adm_pkg_add"))
-    for row in rows:
-        label = (
-            f"📦 {row['type_name']} | {row['name']} | {row['volume_gb']}GB | {row['duration_days']}D | {fmt_price(row['price'])}"
-        )
-        kb.row(
-            noop_button(label),
-            types.InlineKeyboardButton("✏️", callback_data=f"adm_pkg_edit_{row['id']}"),
-            types.InlineKeyboardButton("🗑", callback_data=f"adm_pkg_del_{row['id']}"),
-        )
-    text = "🗂 <b>مدیریت پکیج‌ها</b>\n\nپکیج‌های فروش از این بخش مدیریت می‌شوند."
-    if not rows:
-        text += "\n\nهنوز پکیجی ثبت نشده است."
-    bot.send_message(chat_id, text, reply_markup=kb)
-
-
-def send_settings_menu(chat_id: int):
-    support_value = get_setting("support_username") or "ثبت نشده"
-    card_value = get_setting("payment_card") or "ثبت نشده"
-    bank_value = get_setting("payment_bank") or "ثبت نشده"
-    owner_value = get_setting("payment_owner") or "ثبت نشده"
-
-    text = (
-        "⚙️ <b>ویرایش اطلاعات</b>\n\n"
-        f"🆔 آیدی پشتیبانی: {html.escape(support_value)}\n"
-        f"💳 شماره کارت: <code>{html.escape(card_value)}</code>\n"
-        f"🏦 بانک: {html.escape(bank_value)}\n"
-        f"👤 نام دارنده کارت: {html.escape(owner_value)}"
-    )
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("🆔 ویرایش آیدی پشتیبانی", callback_data="adm_set_support"))
-    kb.add(types.InlineKeyboardButton("💳 ویرایش اطلاعات پرداخت", callback_data="adm_payment_info"))
-    bot.send_message(chat_id, text, reply_markup=kb)
-
-
-def send_payment_info_menu(chat_id: int):
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("💳 ویرایش شماره کارت", callback_data="adm_set_card"))
-    kb.add(types.InlineKeyboardButton("🏦 ویرایش بانک", callback_data="adm_set_bank"))
-    kb.add(types.InlineKeyboardButton("👤 ویرایش نام و نام خانوادگی", callback_data="adm_set_owner"))
-    bot.send_message(chat_id, "💳 یکی از بخش‌های اطلاعات پرداخت را انتخاب کنید:", reply_markup=kb)
-
-
-def send_add_config_type_selector(chat_id: int):
-    rows = get_types()
-    if not rows:
-        bot.send_message(chat_id, "⚠️ ابتدا باید حداقل یک نوع ایجاد کنید.")
-        return
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    for row in rows:
-        kb.add(types.InlineKeyboardButton(f"🚦 {row['name']}", callback_data=f"adm_cfg_type_{row['id']}"))
-    bot.send_message(chat_id, "🧩 نوع کانفیگ را انتخاب کنید:", reply_markup=kb)
-
-
-def send_stock_overview(chat_id: int):
-    rows = get_remaining_stock_packages()
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    for row in rows:
-        text = f"{row['type_name']} - {row['volume_gb']} گیگ | باقی‌مانده: {row['remaining_count']}"
-        kb.add(types.InlineKeyboardButton(text, callback_data=f"adm_stock_pkg_{row['id']}"))
-    if rows:
-        bot.send_message(chat_id, "📦 <b>کانفیگ‌های ثبت شده</b>\n\nبرای مشاهده موجودی هر گروه روی آن بزنید.", reply_markup=kb)
-    else:
-        bot.send_message(chat_id, "📭 هنوز کانفیگی ثبت نشده است.")
-
-
-def send_stock_items(chat_id: int, package_id: int):
-    rows = get_remaining_configs_by_package(package_id)
-    if not rows:
-        bot.send_message(chat_id, "📭 برای این پکیج کانفیگ آزاد باقی نمانده است.")
-        return
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    for row in rows:
-        kb.add(types.InlineKeyboardButton(f"🔮 {row['service_name']}", callback_data=f"adm_stock_cfg_{row['id']}"))
-    bot.send_message(chat_id, "📋 لیست کانفیگ‌های باقی‌مانده:", reply_markup=kb)
-
-
-def send_admin_config_detail(chat_id: int, config_id: int):
-    row = get_config(config_id)
-    if not row:
-        bot.send_message(chat_id, "⚠️ این کانفیگ پیدا نشد.")
-        return
-    text = (
-        f"🔮 نام سرویس: {html.escape(row['service_name'])}\n"
-        f"🚦 نوع: {html.escape(row['type_name'])}\n"
-        f"📦 پکیج: {html.escape(row['package_name'])}\n"
-        f"🔋 حجم: {row['volume_gb']} گیگ\n"
-        f"⏰ مدت: {row['duration_days']} روز\n\n"
-        f"💝 config :\n<code>{html.escape(row['config_text'])}</code>\n\n"
-        f"🔋 Volume web:\n{html.escape(row['inquiry_link'] or 'ثبت نشده')}"
-    )
-    bot.send_message(chat_id, text)
-
-
-# ---------------------------
-# Admin decision helpers
-# ---------------------------
-def finalize_admin_payment_decision(admin_id: int, payment_id: int, decision: str, note: str):
-    note = "" if note.strip() in {"-", ".", "ندارد", "بدون متن"} else note.strip()
-    pay = get_payment(payment_id)
-    if not pay:
-        bot.send_message(admin_id, "⚠️ این درخواست پیدا نشد.")
-        return
-
-    if pay["kind"] == "wallet":
-        if decision == "approve":
-            approved_pay, err = approve_wallet_charge(payment_id, note)
-            if err:
-                bot.send_message(admin_id, f"⚠️ {err}")
-                return
-            bot.send_message(admin_id, "✅ درخواست شارژ کیف پول تایید شد.")
-            msg = "✅ واریزی شما تایید شد."
-            if note:
-                msg += f"\n\n✍️ پیام ادمین:\n{note}"
-            user = get_user(approved_pay["user_id"])
-            msg += f"\n\n💰 موجودی جدید شما: {fmt_price(user['balance'])} تومان"
-            bot.send_message(approved_pay["user_id"], msg)
-        else:
-            rejected_pay, err = reject_wallet_charge(payment_id, note)
-            if err:
-                bot.send_message(admin_id, f"⚠️ {err}")
-                return
-            bot.send_message(admin_id, "❌ درخواست شارژ کیف پول رد شد.")
-            msg = "❌ رسید شما رد شد."
-            if note:
-                msg += f"\n\n✍️ پیام ادمین:\n{note}"
-            bot.send_message(rejected_pay["user_id"], msg)
-        return
-
-    if pay["kind"] == "purchase":
-        if decision == "approve":
-            approved_pay, purchase, err = approve_purchase_payment(payment_id, note)
-            if err:
-                bot.send_message(admin_id, f"⚠️ {err}")
-                return
-            bot.send_message(admin_id, "✅ خرید تایید شد و سرویس تحویل کاربر شد.")
-            user_msg = "✅ پرداخت شما تایید شد."
-            if note:
-                user_msg += f"\n\n✍️ پیام ادمین:\n{note}"
-            bot.send_message(approved_pay["user_id"], user_msg)
-            send_config_to_user(approved_pay["user_id"], purchase["id"])
-            notify_admins_purchase_done(purchase["id"])
-        else:
-            rejected_pay, err = reject_purchase_payment(payment_id, note)
-            if err:
-                bot.send_message(admin_id, f"⚠️ {err}")
-                return
-            bot.send_message(admin_id, "❌ خرید رد شد و رزرو کانفیگ آزاد شد.")
-            user_msg = "❌ رسید شما رد شد."
-            if note:
-                user_msg += f"\n\n✍️ پیام ادمین:\n{note}"
-            bot.send_message(rejected_pay["user_id"], user_msg)
-
-
-# ---------------------------
-# Start / general commands
-# ---------------------------
-@bot.message_handler(commands=["start"])
-def handle_start(message):
-    upsert_user(message.from_user)
-    state_clear(message.from_user.id)
-    bot.send_message(
-        message.chat.id,
-        start_text(display_name(message.from_user)),
-        reply_markup=main_menu_markup(message.from_user.id),
-    )
-    notify_admins_new_user(message.from_user)
-
-
-# ---------------------------
-# Callback queries
-# ---------------------------
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callbacks(call):
+        return True
+    if setting_get("channel_lock_enabled", "0") != "1":
+        return True
+    channel_id = setting_get("channel_lock_id", "").strip()
+    if not channel_id:
+        return True
     try:
-        bot.answer_callback_query(call.id)
+        member = bot.get_chat_member(channel_id, user_id)
+        return member.status in ("member", "creator", "administrator")
+    except Exception:
+        return True  # fail-open
+
+
+def channel_lock_wall(target, user_id: int) -> bool:
+    """Returns True if user passes (can proceed). Sends wall message if not."""
+    if check_channel_membership(user_id):
+        return True
+    channel_id = setting_get("channel_lock_id", "").strip()
+    kb = types.InlineKeyboardMarkup()
+    if channel_id:
+        join_url = f"https://t.me/{channel_id.lstrip('@')}"
+        kb.add(types.InlineKeyboardButton("📢 عضویت در کانال", url=join_url))
+    kb.add(types.InlineKeyboardButton("✅ بررسی عضویت", callback_data="check_membership"))
+    send_or_edit(
+        target,
+        f"⚠️ <b>برای استفاده از ربات باید در کانال ما عضو باشید.</b>\n\n"
+        f"پس از عضویت، روی «بررسی عضویت» بزنید.",
+        kb,
+    )
+    return False
+
+
+# ──────────────────────────────────────────────
+# Telegram UI Helpers
+# ──────────────────────────────────────────────
+def send_or_edit(call_or_msg, text, reply_markup=None, disable_preview=True):
+    try:
+        if hasattr(call_or_msg, "message"):
+            bot.edit_message_text(
+                text,
+                call_or_msg.message.chat.id,
+                call_or_msg.message.message_id,
+                reply_markup=reply_markup,
+                disable_web_page_preview=disable_preview,
+            )
+        else:
+            bot.send_message(call_or_msg.chat.id, text, reply_markup=reply_markup, disable_web_page_preview=disable_preview)
+    except Exception:
+        chat_id = call_or_msg.message.chat.id if hasattr(call_or_msg, "message") else call_or_msg.chat.id
+        try:
+            bot.send_message(chat_id, text, reply_markup=reply_markup, disable_web_page_preview=disable_preview)
+        except Exception:
+            pass
+
+
+def set_bot_commands():
+    try:
+        bot.set_my_commands([types.BotCommand("start", "شروع ربات")])
     except Exception:
         pass
 
-    user_id = call.from_user.id
-    data = call.data or ""
-    upsert_user(call.from_user)
 
-    if data == "noop":
-        return
-
-    # User menu
-    if data == "profile_charge_wallet":
-        state_set(user_id, "wallet_amount")
-        bot.send_message(call.message.chat.id, "💰 لطفاً مبلغ موردنظر را به تومان وارد کنید.\nمثال: <code>500000</code>\n\nبرای لغو، واژه <b>لغو</b> را بفرستید.")
-        return
-
-    if data.startswith("buy_type_"):
-        type_id = int(data.split("_")[-1])
-        send_packages_for_type(call.message.chat.id, type_id)
-        return
-
-    if data.startswith("buy_pkg_"):
-        package_id = int(data.split("_")[-1])
-        pkg = get_package(package_id)
-        if not pkg:
-            bot.send_message(call.message.chat.id, "⚠️ این پکیج پیدا نشد.")
-            return
-        bot.send_message(call.message.chat.id, package_summary_text(pkg), reply_markup=payment_method_markup(package_id))
-        return
-
-    if data.startswith("pay_wallet_"):
-        package_id = int(data.split("_")[-1])
-        purchase, err = create_wallet_purchase(user_id, package_id)
-        if err:
-            bot.send_message(call.message.chat.id, f"⚠️ {err}")
-            return
-        bot.send_message(call.message.chat.id, "✅ خرید شما با موفقیت از کیف پول انجام شد.")
-        send_config_to_user(call.message.chat.id, purchase["id"])
-        notify_admins_purchase_done(purchase["id"])
-        return
-
-    if data.startswith("pay_card_"):
-        package_id = int(data.split("_")[-1])
-        payment, err = create_purchase_payment_with_reserve(user_id, package_id)
-        if err:
-            bot.send_message(call.message.chat.id, f"⚠️ {err}")
-            return
-        text = payment_card_text(payment["amount"])
-        if text.startswith("⚠️ اطلاعات پرداخت"):
-            reject_purchase_payment(payment["id"], "اطلاعات پرداخت هنوز توسط ادمین تنظیم نشده بود.")
-            bot.send_message(call.message.chat.id, text)
-            return
-        state_set(user_id, "await_receipt", payment_id=payment["id"], kind="purchase")
-        bot.send_message(call.message.chat.id, text)
-        return
-
-    if data.startswith("my_cfg_"):
-        purchase_id = int(data.split("_")[-1])
-        purchase = get_purchase(purchase_id)
-        if not purchase or purchase["user_id"] != user_id:
-            bot.send_message(call.message.chat.id, "⚠️ این سرویس در دسترس نیست.")
-            return
-        send_config_to_user(call.message.chat.id, purchase_id)
-        return
-
-    if data == "wallet_method_card":
-        state = state_get(user_id)
-        if not state or state["name"] != "wallet_method":
-            bot.send_message(call.message.chat.id, "⚠️ لطفاً دوباره مبلغ را وارد کنید.")
-            return
-        amount = state["data"]["amount"]
-        payment = create_wallet_charge_payment(user_id, amount)
-        text = payment_card_text(amount)
-        if text.startswith("⚠️ اطلاعات پرداخت"):
-            reject_wallet_charge(payment["id"], "اطلاعات پرداخت هنوز توسط ادمین تنظیم نشده بود.")
-            state_clear(user_id)
-            bot.send_message(call.message.chat.id, text)
-            return
-        state_set(user_id, "await_receipt", payment_id=payment["id"], kind="wallet")
-        bot.send_message(call.message.chat.id, text)
-        return
-
-    # Admin area
-    if not is_admin(user_id):
-        return
-
-    if data == "adm_type_add":
-        state_set(user_id, "admin_add_type")
-        bot.send_message(call.message.chat.id, "✍️ نام نوع جدید را ارسال کنید.\nبرای لغو، واژه <b>لغو</b> را بفرستید.")
-        return
-
-    if data.startswith("adm_type_edit_"):
-        type_id = int(data.split("_")[-1])
-        row = get_type(type_id)
-        if not row:
-            bot.send_message(call.message.chat.id, "⚠️ این نوع پیدا نشد.")
-            return
-        state_set(user_id, "admin_edit_type", type_id=type_id)
-        bot.send_message(call.message.chat.id, f"✏️ نام جدید برای نوع <b>{html.escape(row['name'])}</b> را ارسال کنید.")
-        return
-
-    if data.startswith("adm_type_del_"):
-        type_id = int(data.split("_")[-1])
-        row = get_type(type_id)
-        if not row:
-            bot.send_message(call.message.chat.id, "⚠️ این نوع پیدا نشد.")
-            return
-        if not can_delete_type(type_id):
-            bot.send_message(call.message.chat.id, "⚠️ این نوع دارای پکیج است و فعلاً قابل حذف نیست. ابتدا پکیج‌های مربوطه را حذف کنید.")
-            return
-        delete_type(type_id)
-        bot.send_message(call.message.chat.id, "🗑 نوع موردنظر حذف شد.")
-        send_manage_types(call.message.chat.id)
-        return
-
-    if data == "adm_pkg_add":
-        rows = get_types()
-        if not rows:
-            bot.send_message(call.message.chat.id, "⚠️ ابتدا یک نوع بسازید.")
-            return
-        kb = types.InlineKeyboardMarkup(row_width=1)
-        for row in rows:
-            kb.add(types.InlineKeyboardButton(f"🚦 {row['name']}", callback_data=f"adm_pkg_type_{row['id']}"))
-        bot.send_message(call.message.chat.id, "🧩 نوع این پکیج را انتخاب کنید:", reply_markup=kb)
-        return
-
-    if data.startswith("adm_pkg_type_"):
-        type_id = int(data.split("_")[-1])
-        state_set(user_id, "admin_add_pkg_name", type_id=type_id)
-        bot.send_message(call.message.chat.id, "✍️ نام پکیج را ارسال کنید.")
-        return
-
-    if data.startswith("adm_pkg_edit_"):
-        package_id = int(data.split("_")[-1])
-        row = get_package(package_id)
-        if not row:
-            bot.send_message(call.message.chat.id, "⚠️ این پکیج پیدا نشد.")
-            return
-        state_set(user_id, "admin_edit_pkg_name", package_id=package_id, type_id=row["type_id"])
-        bot.send_message(call.message.chat.id, f"✏️ نام جدید برای پکیج <b>{html.escape(row['name'])}</b> را ارسال کنید.")
-        return
-
-    if data.startswith("adm_pkg_del_"):
-        package_id = int(data.split("_")[-1])
-        if not can_delete_package(package_id):
-            bot.send_message(call.message.chat.id, "⚠️ این پکیج دارای کانفیگ ثبت‌شده یا سابقه فروش است و قابل حذف نیست.")
-            return
-        delete_package(package_id)
-        bot.send_message(call.message.chat.id, "🗑 پکیج موردنظر حذف شد.")
-        send_manage_packages(call.message.chat.id)
-        return
-
-    if data == "adm_set_support":
-        state_set(user_id, "admin_set_support")
-        bot.send_message(call.message.chat.id, "🆔 آیدی پشتیبانی را ارسال کنید.\nنمونه: <code>@Tracklessvpnadmin</code>")
-        return
-
-    if data == "adm_payment_info":
-        send_payment_info_menu(call.message.chat.id)
-        return
-
-    if data == "adm_set_card":
-        state_set(user_id, "admin_set_card")
-        bot.send_message(call.message.chat.id, "💳 شماره کارت را بدون فاصله یا با فاصله ارسال کنید.")
-        return
-
-    if data == "adm_set_bank":
-        state_set(user_id, "admin_set_bank")
-        bot.send_message(call.message.chat.id, "🏦 نام بانک را ارسال کنید.")
-        return
-
-    if data == "adm_set_owner":
-        state_set(user_id, "admin_set_owner")
-        bot.send_message(call.message.chat.id, "👤 نام و نام خانوادگی دارنده کارت را ارسال کنید.")
-        return
-
-    if data.startswith("adm_cfg_type_"):
-        type_id = int(data.split("_")[-1])
-        packages = get_packages(type_id)
-        if not packages:
-            bot.send_message(call.message.chat.id, "⚠️ برای این نوع، پکیجی ثبت نشده است.")
-            return
-        kb = types.InlineKeyboardMarkup(row_width=1)
-        for pkg in packages:
-            text = f"📦 {pkg['name']} | {pkg['volume_gb']} گیگ | {pkg['duration_days']} روز"
-            kb.add(types.InlineKeyboardButton(text, callback_data=f"adm_cfg_pkg_{pkg['id']}"))
-        bot.send_message(call.message.chat.id, "📦 پکیج مربوط را انتخاب کنید:", reply_markup=kb)
-        return
-
-    if data.startswith("adm_cfg_pkg_"):
-        package_id = int(data.split("_")[-1])
-        pkg = get_package(package_id)
-        if not pkg:
-            bot.send_message(call.message.chat.id, "⚠️ پکیج پیدا نشد.")
-            return
-        state_set(user_id, "admin_add_cfg_service_name", type_id=pkg["type_id"], package_id=package_id)
-        bot.send_message(call.message.chat.id, "🔮 نام سرویس را ارسال کنید.")
-        return
-
-    if data.startswith("adm_stock_pkg_"):
-        package_id = int(data.split("_")[-1])
-        send_stock_items(call.message.chat.id, package_id)
-        return
-
-    if data.startswith("adm_stock_cfg_"):
-        config_id = int(data.split("_")[-1])
-        send_admin_config_detail(call.message.chat.id, config_id)
-        return
-
-    if data.startswith("adm_pay_approve_"):
-        payment_id = int(data.split("_")[-1])
-        state_set(user_id, "admin_payment_note", payment_id=payment_id, decision="approve")
-        bot.send_message(call.message.chat.id, "✍️ متن پاسخ ادمین را ارسال کنید.\nبرای بدون متن، فقط <b>-</b> یا <b>.</b> بفرستید.")
-        return
-
-    if data.startswith("adm_pay_reject_"):
-        payment_id = int(data.split("_")[-1])
-        state_set(user_id, "admin_payment_note", payment_id=payment_id, decision="reject")
-        bot.send_message(call.message.chat.id, "✍️ متن دلیل رد را ارسال کنید.\nبرای بدون متن، فقط <b>-</b> یا <b>.</b> بفرستید.")
-        return
-
-
-# ---------------------------
-# Photos (receipts)
-# ---------------------------
-@bot.message_handler(content_types=["photo"])
-def handle_photo(message):
-    upsert_user(message.from_user)
-    user_id = message.from_user.id
-    state = state_get(user_id)
-
-    if not state:
-        bot.send_message(message.chat.id, "📸 تصویر شما دریافت شد، اما در حال حاضر منتظر رسیدی از طرف شما نبودم.")
-        return
-
-    if state["name"] == "await_receipt":
-        payment_id = state["data"]["payment_id"]
-        kind = state["data"]["kind"]
-        file_id = message.photo[-1].file_id
-        receipt_text = message.caption or ""
-        update_payment_receipt(payment_id, file_id=file_id, receipt_text=receipt_text)
-        state_clear(user_id)
-        bot.send_message(message.chat.id, "✅ رسید شما دریافت شد و برای بررسی به ادمین ارسال گردید.")
-        if kind == "wallet":
-            notify_admins_wallet_charge_request(payment_id)
-        else:
-            notify_admins_purchase_request(payment_id)
-        return
-
-    bot.send_message(message.chat.id, "⚠️ فعلاً نیازی به ارسال عکس در این مرحله نیست.")
-
-
-# ---------------------------
-# Text messages
-# ---------------------------
-@bot.message_handler(content_types=["text"])
-def handle_text(message):
-    upsert_user(message.from_user)
-    user_id = message.from_user.id
-    text = (message.text or "").strip()
-
-    if text == "لغو":
-        state_clear(user_id)
-        if is_admin(user_id):
-            bot.send_message(message.chat.id, "🟡 عملیات لغو شد.", reply_markup=admin_menu_markup())
-        else:
-            bot.send_message(message.chat.id, "🟡 عملیات لغو شد.", reply_markup=main_menu_markup(user_id))
-        return
-
-    state = state_get(user_id)
-    if state:
-        state_name = state["name"]
-        data = state["data"]
-
-        # User states
-        if state_name == "wallet_amount":
-            amount = parse_int(text)
-            if not amount or amount <= 0:
-                bot.send_message(message.chat.id, "⚠️ لطفاً مبلغ صحیح را فقط به تومان وارد کنید.")
-                return
-            state_set(user_id, "wallet_method", amount=amount)
-            kb = types.InlineKeyboardMarkup()
-            kb.add(types.InlineKeyboardButton("💳 کارت به کارت", callback_data="wallet_method_card"))
-            bot.send_message(message.chat.id, f"💰 مبلغ <b>{fmt_price(amount)}</b> تومان ثبت شد.\nلطفاً روش شارژ کیف پول را انتخاب کنید:", reply_markup=kb)
-            return
-
-        if state_name == "await_receipt":
-            payment_id = data["payment_id"]
-            kind = data["kind"]
-            update_payment_receipt(payment_id, file_id=None, receipt_text=text)
-            state_clear(user_id)
-            bot.send_message(message.chat.id, "✅ رسید/شماره پیگیری شما دریافت شد و برای بررسی به ادمین ارسال گردید.")
-            if kind == "wallet":
-                notify_admins_wallet_charge_request(payment_id)
-            else:
-                notify_admins_purchase_request(payment_id)
-            return
-
-        # Admin states
-        if is_admin(user_id):
-            if state_name == "admin_add_type":
-                try:
-                    add_type(text)
-                    bot.send_message(message.chat.id, "✅ نوع جدید با موفقیت ثبت شد.")
-                except sqlite3.IntegrityError:
-                    bot.send_message(message.chat.id, "⚠️ این نام قبلاً ثبت شده است.")
-                    return
-                state_clear(user_id)
-                send_manage_types(message.chat.id)
-                return
-
-            if state_name == "admin_edit_type":
-                try:
-                    update_type(data["type_id"], text)
-                    bot.send_message(message.chat.id, "✅ نام نوع با موفقیت ویرایش شد.")
-                except sqlite3.IntegrityError:
-                    bot.send_message(message.chat.id, "⚠️ این نام قبلاً استفاده شده است.")
-                    return
-                state_clear(user_id)
-                send_manage_types(message.chat.id)
-                return
-
-            if state_name == "admin_add_pkg_name":
-                state_set(user_id, "admin_add_pkg_volume", type_id=data["type_id"], name=text)
-                bot.send_message(message.chat.id, "🔋 حجم پکیج را به گیگ وارد کنید.\nمثال: <code>30</code>")
-                return
-
-            if state_name == "admin_add_pkg_volume":
-                volume = parse_int(text)
-                if not volume or volume <= 0:
-                    bot.send_message(message.chat.id, "⚠️ حجم معتبر وارد کنید.")
-                    return
-                state_set(user_id, "admin_add_pkg_duration", type_id=data["type_id"], name=data["name"], volume=volume)
-                bot.send_message(message.chat.id, "⏰ مدت پکیج را به روز وارد کنید.\nمثال: <code>45</code>")
-                return
-
-            if state_name == "admin_add_pkg_duration":
-                duration = parse_int(text)
-                if not duration or duration <= 0:
-                    bot.send_message(message.chat.id, "⚠️ مدت معتبر وارد کنید.")
-                    return
-                state_set(user_id, "admin_add_pkg_price", type_id=data["type_id"], name=data["name"], volume=data["volume"], duration=duration)
-                bot.send_message(message.chat.id, "💳 قیمت پکیج را به تومان وارد کنید.\nمثال: <code>90000</code>")
-                return
-
-            if state_name == "admin_add_pkg_price":
-                price = parse_int(text)
-                if not price or price <= 0:
-                    bot.send_message(message.chat.id, "⚠️ قیمت معتبر وارد کنید.")
-                    return
-                add_package(data["type_id"], data["name"], data["volume"], data["duration"], price)
-                state_clear(user_id)
-                bot.send_message(message.chat.id, "✅ پکیج جدید با موفقیت ثبت شد.")
-                send_manage_packages(message.chat.id)
-                return
-
-            if state_name == "admin_edit_pkg_name":
-                state_set(user_id, "admin_edit_pkg_volume", package_id=data["package_id"], type_id=data["type_id"], name=text)
-                bot.send_message(message.chat.id, "🔋 حجم جدید پکیج را به گیگ وارد کنید.")
-                return
-
-            if state_name == "admin_edit_pkg_volume":
-                volume = parse_int(text)
-                if not volume or volume <= 0:
-                    bot.send_message(message.chat.id, "⚠️ حجم معتبر وارد کنید.")
-                    return
-                state_set(user_id, "admin_edit_pkg_duration", package_id=data["package_id"], type_id=data["type_id"], name=data["name"], volume=volume)
-                bot.send_message(message.chat.id, "⏰ مدت جدید پکیج را به روز وارد کنید.")
-                return
-
-            if state_name == "admin_edit_pkg_duration":
-                duration = parse_int(text)
-                if not duration or duration <= 0:
-                    bot.send_message(message.chat.id, "⚠️ مدت معتبر وارد کنید.")
-                    return
-                state_set(user_id, "admin_edit_pkg_price", package_id=data["package_id"], type_id=data["type_id"], name=data["name"], volume=data["volume"], duration=duration)
-                bot.send_message(message.chat.id, "💳 قیمت جدید پکیج را به تومان وارد کنید.")
-                return
-
-            if state_name == "admin_edit_pkg_price":
-                price = parse_int(text)
-                if not price or price <= 0:
-                    bot.send_message(message.chat.id, "⚠️ قیمت معتبر وارد کنید.")
-                    return
-                update_package(data["package_id"], data["name"], data["volume"], data["duration"], price)
-                state_clear(user_id)
-                bot.send_message(message.chat.id, "✅ اطلاعات پکیج با موفقیت به‌روزرسانی شد.")
-                send_manage_packages(message.chat.id)
-                return
-
-            if state_name == "admin_set_support":
-                set_setting("support_username", text)
-                state_clear(user_id)
-                bot.send_message(message.chat.id, "✅ آیدی پشتیبانی ذخیره شد.")
-                send_settings_menu(message.chat.id)
-                return
-
-            if state_name == "admin_set_card":
-                card_number = normalize_text_number(text)
-                if not re.fullmatch(r"\d{16}", card_number):
-                    bot.send_message(message.chat.id, "⚠️ شماره کارت باید 16 رقمی باشد.")
-                    return
-                set_setting("payment_card", card_number)
-                state_clear(user_id)
-                bot.send_message(message.chat.id, "✅ شماره کارت ذخیره شد.")
-                send_payment_info_menu(message.chat.id)
-                return
-
-            if state_name == "admin_set_bank":
-                set_setting("payment_bank", text)
-                state_clear(user_id)
-                bot.send_message(message.chat.id, "✅ نام بانک ذخیره شد.")
-                send_payment_info_menu(message.chat.id)
-                return
-
-            if state_name == "admin_set_owner":
-                set_setting("payment_owner", text)
-                state_clear(user_id)
-                bot.send_message(message.chat.id, "✅ نام و نام خانوادگی دارنده کارت ذخیره شد.")
-                send_payment_info_menu(message.chat.id)
-                return
-
-            if state_name == "admin_add_cfg_service_name":
-                state_set(user_id, "admin_add_cfg_text", type_id=data["type_id"], package_id=data["package_id"], service_name=text)
-                bot.send_message(message.chat.id, "💝 متن کامل کانفیگ را ارسال کنید.")
-                return
-
-            if state_name == "admin_add_cfg_text":
-                state_set(user_id, "admin_add_cfg_link", type_id=data["type_id"], package_id=data["package_id"], service_name=data["service_name"], config_text=text)
-                bot.send_message(message.chat.id, "🔋 لینک استعلام/Volume web را ارسال کنید.\nاگر ندارید، فقط یک خط تیره <b>-</b> بفرستید.")
-                return
-
-            if state_name == "admin_add_cfg_link":
-                inquiry_link = "" if text.strip() in {"-", ".", "ندارد"} else text.strip()
-                add_config(data["type_id"], data["package_id"], data["service_name"], data["config_text"], inquiry_link)
-                state_clear(user_id)
-                bot.send_message(message.chat.id, "✅ کانفیگ با موفقیت ثبت شد.\nبرای افزودن مورد بعدی دوباره از گزینه <b>ثبت کانفیگ</b> استفاده کنید.")
-                return
-
-            if state_name == "admin_payment_note":
-                finalize_admin_payment_decision(user_id, data["payment_id"], data["decision"], text)
-                state_clear(user_id)
-                return
-
-    # Main menu routing
-    if text == "خرید کانفیگ جدید":
-        send_type_selection(message.chat.id)
-        return
-
-    if text == "کانفیگ های من":
-        send_my_configs(message.chat.id, user_id)
-        return
-
-    if text == "حساب کاربری":
-        send_profile(message.chat.id, user_id)
-        return
-
-    if text == "ارتباط با پشتیبانی":
-        send_support(message.chat.id)
-        return
-
-    if text == "پنل مدیریت" and is_admin(user_id):
-        bot.send_message(message.chat.id, "👑 به پنل مدیریت خوش آمدید.", reply_markup=admin_menu_markup())
-        return
-
-    if text == "بازگشت به منوی اصلی" and is_admin(user_id):
-        bot.send_message(message.chat.id, "🏠 به منوی اصلی برگشتید.", reply_markup=main_menu_markup(user_id))
-        return
-
+# ──────────────────────────────────────────────
+# Keyboards
+# ──────────────────────────────────────────────
+def kb_main(user_id: int) -> types.InlineKeyboardMarkup:
+    user = get_user(user_id)
+    is_reseller = user and user["is_reseller"]
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.row(
+        types.InlineKeyboardButton("🛒 خرید کانفیگ جدید", callback_data="buy:start"),
+        types.InlineKeyboardButton("📦 کانفیگ‌های من",    callback_data="my_configs"),
+    )
+    kb.add(types.InlineKeyboardButton("🎁 تست رایگان", callback_data="test:start"))
+    kb.row(
+        types.InlineKeyboardButton("👤 حساب کاربری",  callback_data="profile"),
+        types.InlineKeyboardButton("💳 شارژ کیف پول", callback_data="wallet:charge"),
+    )
+    kb.add(types.InlineKeyboardButton("🎧 ارتباط با پشتیبانی", callback_data="support"))
+    if is_reseller:
+        kb.add(types.InlineKeyboardButton("🤝 پنل نمایندگی", callback_data="reseller:panel"))
     if is_admin(user_id):
-        if text == "مدیریت نوع ها":
-            send_manage_types(message.chat.id)
-            return
-        if text == "مدیریت پکیج ها":
-            send_manage_packages(message.chat.id)
-            return
-        if text == "ویرایش اطلاعات":
-            send_settings_menu(message.chat.id)
-            return
-        if text == "ثبت کانفیگ":
-            send_add_config_type_selector(message.chat.id)
-            return
-        if text == "کانفیگ های ثبت شده":
-            send_stock_overview(message.chat.id)
-            return
+        kb.add(types.InlineKeyboardButton("⚙️ ورود به پنل مدیریت", callback_data="admin:panel"))
+    return kb
 
-    bot.send_message(
-        message.chat.id,
-        "🌷 پیام شما دریافت شد؛ لطفاً از دکمه‌های منو استفاده کنید.",
-        reply_markup=main_menu_markup(user_id) if not is_admin(user_id) else admin_menu_markup(),
+
+def kb_admin_panel() -> types.InlineKeyboardMarkup:
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.row(
+        types.InlineKeyboardButton("🧩 مدیریت نوع‌ها",    callback_data="admin:types"),
+        types.InlineKeyboardButton("📦 مدیریت پکیج",      callback_data="admin:pkgs"),
+    )
+    kb.row(
+        types.InlineKeyboardButton("📝 ثبت کانفیگ",       callback_data="admin:add_config"),
+        types.InlineKeyboardButton("📊 مدیریت کانفیگ‌ها", callback_data="admin:configs"),
+    )
+    kb.row(
+        types.InlineKeyboardButton("👥 مدیریت کاربران",   callback_data="admin:users"),
+        types.InlineKeyboardButton("📣 فوروارد همگانی",   callback_data="admin:broadcast"),
+    )
+    kb.row(
+        types.InlineKeyboardButton("⚙️ تنظیمات",          callback_data="admin:settings"),
+        types.InlineKeyboardButton("💾 پشتیبان‌گیری",      callback_data="admin:backup"),
+    )
+    kb.add(types.InlineKeyboardButton("📢 قفل کانال", callback_data="admin:channel"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت",    callback_data="nav:main"))
+    return kb
+
+
+def kb_payment_method(context_type: str, context_id) -> types.InlineKeyboardMarkup:
+    """context_type: 'wallet' | 'buy' ; context_id: amount (wallet) | package_id (buy)"""
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    if context_type == "wallet":
+        kb.row(
+            types.InlineKeyboardButton("💳 کارت به کارت",  callback_data=f"wallet:charge:card"),
+            types.InlineKeyboardButton("💰 ارز دیجیتال",  callback_data=f"wallet:charge:crypto"),
+        )
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="wallet:charge"))
+    else:  # buy
+        kb.add(types.InlineKeyboardButton("💰 پرداخت از موجودی", callback_data=f"pay:wallet:{context_id}"))
+        kb.row(
+            types.InlineKeyboardButton("💳 کارت به کارت", callback_data=f"pay:card:{context_id}"),
+            types.InlineKeyboardButton("💰 ارز دیجیتال",  callback_data=f"pay:crypto:{context_id}"),
+        )
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"buy:type:back:{context_id}"))
+    return kb
+
+
+# ──────────────────────────────────────────────
+# Display / Content Helpers
+# ──────────────────────────────────────────────
+def show_main_menu(target):
+    uid = target.from_user.id if hasattr(target, "from_user") else target.chat.id
+    text = (
+        f"🌟 <b>به {BRAND_TITLE} خوش آمدید</b>\n\n"
+        "لطفاً از منوی زیر، بخش مورد نظر خود را انتخاب کنید."
+    )
+    send_or_edit(target, text, kb_main(uid))
+
+
+def show_profile(target, user_id: int):
+    user = get_user(user_id)
+    if not user:
+        return
+    text = (
+        "👤 <b>پروفایل کاربری</b>\n\n"
+        f"📱 نام: {esc(user['full_name'])}\n"
+        f"🆔 نام کاربری: {esc(display_username(user['username']))}\n"
+        f"🔢 آیدی عددی: <code>{user['user_id']}</code>\n\n"
+        f"💰 موجودی: <b>{fmt_price(user['balance'])}</b> تومان"
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("💳 شارژ کیف پول", callback_data="wallet:charge"),
+        types.InlineKeyboardButton("📦 کانفیگ‌های من", callback_data="my_configs"),
+    )
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+    send_or_edit(target, text, kb)
+
+
+def show_support(target):
+    support_raw = setting_get("support_username", DEFAULT_ADMIN_HANDLE)
+    support_url = safe_support_url(support_raw)
+    kb = types.InlineKeyboardMarkup()
+    if support_url:
+        kb.add(types.InlineKeyboardButton("💬 ورود به گفت‌وگوی پشتیبانی", url=support_url))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+    send_or_edit(target, "🎧 <b>ارتباط با پشتیبانی</b>\n\nبرای گفت‌وگو با پشتیبانی، روی دکمه زیر بزنید.", kb)
+
+
+def show_my_configs(target, user_id: int):
+    items = get_user_purchases(user_id)
+    if not items:
+        send_or_edit(target, "📭 هنوز کانفیگی برای حساب شما ثبت نشده است.", back_button("main"))
+        return
+    kb = types.InlineKeyboardMarkup()
+    for item in items:
+        ended_mark = " 🔴" if item["ended"] else ""
+        title = f"{item['service_name']}{ended_mark}"
+        kb.add(types.InlineKeyboardButton(title, callback_data=f"mycfg:{item['id']}"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+    send_or_edit(target, "📦 <b>کانفیگ‌های من</b>\n\nیکی از سرویس‌ها را انتخاب کنید:", kb)
+
+
+def deliver_purchase_message(chat_id: int, purchase_id: int):
+    item = get_purchase(purchase_id)
+    if not item:
+        bot.send_message(chat_id, "❌ اطلاعات خرید یافت نشد.")
+        return
+    cfg = item["config_text"]
+    text = (
+        f"✅ <b>{'تست رایگان' if item['is_test'] else 'سرویس شما آماده است'}</b>\n\n"
+        f"🔮 نام سرویس: <b>{esc(item['service_name'])}</b>\n"
+        f"🧩 نوع سرویس: <b>{esc(item['type_name'])}</b>\n"
+        f"🔋 حجم سرویس: <b>{item['volume_gb']}</b> گیگ\n"
+        f"⏰ مدت سرویس: <b>{item['duration_days']}</b> روز\n\n"
+        f"💝 <b>Config :</b>\n<code>{esc(cfg)}</code>\n\n"
+        f"🔋 Volume web: {esc(item['inquiry_link'] or '-')}"
+    )
+    qr_img = qrcode.make(cfg)
+    bio = io.BytesIO()
+    qr_img.save(bio, format="PNG")
+    bio.seek(0)
+    bio.name = "qrcode.png"
+    kb = types.InlineKeyboardMarkup()
+    support_url = safe_support_url(setting_get("support_username", DEFAULT_ADMIN_HANDLE))
+    if support_url:
+        kb.add(types.InlineKeyboardButton("♻️ تمدید / پشتیبانی", url=support_url))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+    try:
+        bot.send_photo(chat_id, bio, caption=text, reply_markup=kb)
+    except Exception:
+        bot.send_message(chat_id, text, reply_markup=kb)
+
+
+def admin_purchase_notify(payment_method_label: str, user_row, package_row):
+    text = (
+        f"❗️|💳 خرید جدید ({payment_method_label})\n\n"
+        f"▫️آیدی کاربر: <code>{user_row['user_id']}</code>\n"
+        f"👨‍💼اسم کاربر: {esc(user_row['full_name'])}\n"
+        f"⚡️ نام کاربری: {esc(user_row['username'] or 'ندارد')}\n"
+        f"💰مبلغ پرداختی: {fmt_price(package_row['price'])} تومان\n"
+        f"🚦سرور: {esc(package_row['type_name'])}\n"
+        f"✏️ نام سرویس: {esc(package_row['name'])}\n"
+        f"🔋حجم سرویس: {package_row['volume_gb']} گیگ\n"
+        f"⏰ مدت سرویس: {package_row['duration_days']} روز"
+    )
+    for aid in ADMIN_IDS:
+        try:
+            bot.send_message(aid, text)
+        except Exception:
+            pass
+
+
+def send_payment_to_admins(payment_id: int):
+    payment = get_payment(payment_id)
+    if not payment:
+        return
+    user = get_user(payment["user_id"])
+    package_row = get_package(payment["package_id"]) if payment["package_id"] else None
+    kind_label = "شارژ کیف پول" if payment["kind"] == "wallet_charge" else "خرید کانفیگ"
+    method_label = payment["payment_method"]
+    if method_label == "card":
+        method_label = "💳 کارت به کارت"
+    elif method_label == "crypto":
+        method_label = f"💰 ارز دیجیتال ({payment.get('crypto_currency') or ''})"
+    pkg_text = ""
+    if package_row:
+        pkg_text = (
+            f"\n🧩 نوع: {esc(package_row['type_name'])}"
+            f"\n📦 پکیج: {esc(package_row['name'])}"
+            f"\n🔋 حجم: {package_row['volume_gb']} گیگ"
+            f"\n⏰ مدت: {package_row['duration_days']} روز"
+        )
+    text = (
+        f"📥 <b>درخواست جدید برای بررسی</b>\n\n"
+        f"🧾 نوع: {kind_label} | {method_label}\n"
+        f"👤 کاربر: {esc(user['full_name'])}\n"
+        f"🆔 نام کاربری: {esc(display_username(user['username']))}\n"
+        f"🔢 آیدی: <code>{user['user_id']}</code>\n"
+        f"💰 مبلغ: <b>{fmt_price(payment['amount'])}</b> تومان"
+        f"{pkg_text}\n\n"
+        f"📝 توضیح کاربر:\n{esc(payment['receipt_text'] or '-')}"
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("✅ تأیید", callback_data=f"admin:pay:approve:{payment_id}"),
+        types.InlineKeyboardButton("❌ رد",   callback_data=f"admin:pay:reject:{payment_id}"),
+    )
+    for aid in ADMIN_IDS:
+        try:
+            if payment["receipt_file_id"]:
+                bot.send_photo(aid, payment["receipt_file_id"], caption=text, reply_markup=kb)
+            else:
+                bot.send_message(aid, text, reply_markup=kb)
+        except Exception:
+            pass
+
+
+def finish_card_payment_approval(payment_id: int, admin_note: str, approved: bool) -> bool:
+    payment = get_payment(payment_id)
+    if not payment or payment["status"] not in ("pending", "approved", "rejected"):
+        return False
+    user_id = payment["user_id"]
+    if approved:
+        approve_payment(payment_id, admin_note)
+        if payment["kind"] == "wallet_charge":
+            update_balance(user_id, payment["amount"])
+            complete_payment(payment_id)
+            bot.send_message(user_id, f"✅ واریزی شما تأیید شد.\n\n{esc(admin_note)}")
+        elif payment["kind"] == "config_purchase":
+            config_id  = payment["config_id"]
+            package_id = payment["package_id"]
+            package_row = get_package(package_id)
+            if not config_id:
+                config_id = reserve_first_config(package_id, payment_id)
+            if not config_id:
+                bot.send_message(user_id, "❌ پرداخت تأیید شد ولی موجودی کانفیگ تمام شده. لطفاً با پشتیبانی تماس بگیرید.")
+                return False
+            purchase_id = assign_config_to_user(config_id, user_id, package_id, payment["amount"], "card")
+            complete_payment(payment_id)
+            bot.send_message(user_id, f"✅ واریزی شما تأیید شد.\n\n{esc(admin_note)}")
+            deliver_purchase_message(user_id, purchase_id)
+            admin_purchase_notify("کارت به کارت", get_user(user_id), package_row)
+        return True
+    else:
+        reject_payment(payment_id, admin_note)
+        if payment["config_id"]:
+            release_reserved_config(payment["config_id"])
+        bot.send_message(user_id, f"❌ رسید شما رد شد.\n\n{esc(admin_note)}")
+        return True
+
+
+# ──────────────────────────────────────────────
+# Admin helpers – show lists
+# ──────────────────────────────────────────────
+def show_admin_types_again(call):
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("➕ افزودن نوع جدید", callback_data="admin:type:add"))
+    for item in get_all_types():
+        kb.row(
+            types.InlineKeyboardButton(f"🧩 {item['name']}", callback_data="noop"),
+            types.InlineKeyboardButton("✏️", callback_data=f"admin:type:edit:{item['id']}"),
+            types.InlineKeyboardButton("🗑",  callback_data=f"admin:type:del:{item['id']}"),
+        )
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+    send_or_edit(call, "🧩 <b>مدیریت نوع‌ها</b>", kb)
+
+
+def show_admin_packages(call, type_id: int | None = None):
+    """Package management main view."""
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("➕ افزودن پکیج جدید", callback_data="admin:add_package"))
+    all_pkgs = get_packages(type_id=type_id, include_inactive=True)
+    if all_pkgs:
+        for p in all_pkgs:
+            kb.row(
+                types.InlineKeyboardButton(
+                    f"📦 {p['name']} | {p['volume_gb']}GB/{p['duration_days']}روز | {fmt_price(p['price'])} ت | 🟢{p['stock']}",
+                    callback_data="noop",
+                ),
+            )
+            kb.row(
+                types.InlineKeyboardButton("✏️ ویرایش", callback_data=f"admin:pkg:edit:{p['id']}"),
+                types.InlineKeyboardButton("🗑 حذف",   callback_data=f"admin:pkg:del:{p['id']}"),
+            )
+    else:
+        pass
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+    send_or_edit(call, "📦 <b>مدیریت پکیج</b>\n\nلیست تمامی پکیج‌ها:", kb)
+
+
+def show_admin_configs(call):
+    """Main config management view — two-column global counts + package list."""
+    with get_conn() as conn:
+        total_avail = conn.execute(
+            "SELECT COUNT(*) AS c FROM configs WHERE sold_to IS NULL AND reserved_payment_id IS NULL"
+        ).fetchone()["c"]
+        total_sold = conn.execute(
+            "SELECT COUNT(*) AS c FROM configs WHERE sold_to IS NOT NULL"
+        ).fetchone()["c"]
+
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton(f"🟢 مانده ({total_avail})",      callback_data="admin:cfglist:all:a:0"),
+        types.InlineKeyboardButton(f"🔴 فروخته شده ({total_sold})",  callback_data="admin:cfglist:all:s:0"),
     )
 
+    # Package list below
+    pkgs = get_packages(include_inactive=True)
+    for p in pkgs:
+        avail = p["stock"]
+        sold  = p["sold_count"]
+        kb.add(types.InlineKeyboardButton(
+            f"📦 {p['name']} | 🟢{avail} مانده | 🔴{sold} فروخته",
+            callback_data=f"admin:cfglist:pkg:{p['id']}:menu",
+        ))
 
-# ---------------------------
-# Main
-# ---------------------------
-if __name__ == "__main__":
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+    send_or_edit(call, "📊 <b>مدیریت کانفیگ‌ها</b>\n\nانتخاب کنید:", kb)
+
+
+def show_configs_page(call, scope: str, kind: str, page: int, pkg_id: int | None = None):
+    """scope: 'all'|'pkg'  kind: 'a'(available)|'s'(sold)  page: int"""
+    page_size = CONFIGS_PER_PAGE
+    if scope == "all":
+        if kind == "a":
+            rows, total = get_all_available_configs(page, page_size)
+        else:
+            rows, total = get_all_sold_configs(page, page_size)
+    else:
+        if kind == "a":
+            rows, total = get_available_configs_for_package(pkg_id, page, page_size)
+        else:
+            rows, total = get_sold_configs_for_package(pkg_id, page, page_size)
+
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    kb = types.InlineKeyboardMarkup()
+    for r in rows:
+        if kind == "s" and "buyer_name" in r.keys():
+            label = f"{'🔴 ' if r['ended'] else ''}{r['service_name']} ← {r['buyer_name'] or r['sold_to']}"
+        else:
+            label = f"{'🔴 ' if r.get('ended') else '🟢 '}{r['service_name']}"
+        base = f"admin:cfglist:{scope}:{kind}"
+        suffix = f":{pkg_id}" if scope == "pkg" else ""
+        kb.add(types.InlineKeyboardButton(label, callback_data=f"admin:cfg:view:{r['id']}:{scope}:{kind}:{page}{suffix}"))
+
+    # Pagination
+    nav_row = []
+    back_cb = f"admin:cfglist:{scope}:{kind}:{page-1}{(':' + str(pkg_id)) if scope=='pkg' else ''}"
+    next_cb = f"admin:cfglist:{scope}:{kind}:{page+1}{(':' + str(pkg_id)) if scope=='pkg' else ''}"
+    if page > 0:
+        nav_row.append(types.InlineKeyboardButton("◀ قبلی", callback_data=back_cb))
+    nav_row.append(types.InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="noop"))
+    if page + 1 < total_pages:
+        nav_row.append(types.InlineKeyboardButton("بعدی ▶", callback_data=next_cb))
+    if nav_row:
+        kb.row(*nav_row)
+
+    back_target = f"admin:cfglist:pkg:{pkg_id}:menu" if scope == "pkg" else "admin:configs"
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=back_target))
+
+    kind_label = "🟢 مانده" if kind == "a" else "🔴 فروخته شده"
+    send_or_edit(call, f"📋 <b>کانفیگ‌های {kind_label}</b>\n\nتعداد کل: {total} | صفحه {page+1}/{total_pages}", kb)
+
+
+def show_admin_user_detail(call, user_id: int):
+    row = get_user_detail(user_id)
+    if not row:
+        bot.answer_callback_query(call.id, "کاربر یافت نشد.", show_alert=True)
+        return
+    safe_label   = "🟢 امن"  if row["is_safe"]    else "🔘 ناامن"
+    reseller_lbl = "🤝 نماینده ✅" if row["is_reseller"] else "🤝 نماینده ❌"
+    text = (
+        "👤 <b>اطلاعات کاربر</b>\n\n"
+        f"📱 نام: {esc(row['full_name'])}\n"
+        f"🆔 نام کاربری: {esc(display_username(row['username']))}\n"
+        f"🔢 آیدی عددی: <code>{row['user_id']}</code>\n"
+        f"💰 موجودی: <b>{fmt_price(row['balance'])}</b> تومان\n"
+        f"🛍 تعداد خرید: <b>{row['purchase_count']}</b>\n"
+        f"💵 مجموع خرید: <b>{fmt_price(row['total_spent'])}</b> تومان\n"
+        f"🔒 وضعیت: {safe_label}\n"
+        f"🕒 عضویت: {esc(row['joined_at'])}"
+    )
+    kb = types.InlineKeyboardMarkup()
+    # Safe/Unsafe toggle
+    if row["is_safe"]:
+        kb.add(types.InlineKeyboardButton("🔘 تغییر به ناامن", callback_data=f"admin:user:unsafe:{user_id}"))
+    else:
+        kb.add(types.InlineKeyboardButton("🟢 تغییر به امن",   callback_data=f"admin:user:safe:{user_id}"))
+    # Reseller toggle
+    if row["is_reseller"]:
+        kb.add(types.InlineKeyboardButton("❌ لغو نمایندگی",  callback_data=f"admin:user:reseller:0:{user_id}"))
+        kb.add(types.InlineKeyboardButton("💲 قیمت‌های نمایندگی", callback_data=f"admin:user:rprices:{user_id}"))
+    else:
+        kb.add(types.InlineKeyboardButton("🤝 فعال‌سازی نمایندگی", callback_data=f"admin:user:reseller:1:{user_id}"))
+    kb.row(
+        types.InlineKeyboardButton("💰 موجودی",          callback_data=f"admin:user:bal:{user_id}"),
+        types.InlineKeyboardButton("📦 کانفیگ‌ها",       callback_data=f"admin:user:cfgs:{user_id}"),
+    )
+    kb.add(types.InlineKeyboardButton("➕ افزودن کانفیگ", callback_data=f"admin:user:addcfg:{user_id}"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت",        callback_data="admin:users"))
+    send_or_edit(call, text, kb)
+
+
+def show_admin_user_configs(call, user_id: int):
+    purchases = get_user_purchases(user_id)
+    if not purchases:
+        send_or_edit(call, "📭 این کاربر هیچ کانفیگی ندارد.", back_button(f"admin:user:{user_id}"))
+        return
+    kb = types.InlineKeyboardMarkup()
+    for item in purchases:
+        ended = item["ended"]
+        label = f"{'🔴 ' if ended else '🟢 '}{item['service_name']}"
+        kb.row(
+            types.InlineKeyboardButton(label, callback_data="noop"),
+            types.InlineKeyboardButton("🔴 پایان" if not ended else "♻️ احیا",
+                                       callback_data=f"admin:user:cfg_end:{item['config_id']}:{1 if not ended else 0}:{user_id}"),
+        )
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"admin:user:{user_id}"))
+    send_or_edit(call, f"📦 <b>کانفیگ‌های کاربر</b>", kb)
+
+
+# ──────────────────────────────────────────────
+# /start
+# ──────────────────────────────────────────────
+@bot.message_handler(commands=["start"])
+def start_handler(message):
+    ensure_user(message.from_user)
+    notify_first_start_if_needed(message.from_user)
+    state_clear(message.from_user.id)
+    show_main_menu(message)
+
+
+# ──────────────────────────────────────────────
+# Callback dispatcher
+# ──────────────────────────────────────────────
+@bot.callback_query_handler(func=lambda c: True)
+def on_callback(call):
+    uid  = call.from_user.id
+    ensure_user(call.from_user)
+    data = call.data or ""
+
+    try:
+        # ── Navigation ──
+        if data == "nav:main":
+            state_clear(uid)
+            bot.answer_callback_query(call.id)
+            show_main_menu(call)
+            return
+
+        if data == "check_membership":
+            bot.answer_callback_query(call.id)
+            if check_channel_membership(uid):
+                show_main_menu(call)
+            else:
+                bot.answer_callback_query(call.id, "هنوز عضو نشده‌اید!", show_alert=True)
+            return
+
+        # ── Channel lock check (non-admin) ──
+        if not channel_lock_wall(call, uid):
+            bot.answer_callback_query(call.id)
+            return
+
+        # ── Profile / support ──
+        if data == "profile":
+            bot.answer_callback_query(call.id)
+            show_profile(call, uid)
+            return
+
+        if data == "support":
+            bot.answer_callback_query(call.id)
+            show_support(call)
+            return
+
+        if data == "my_configs":
+            bot.answer_callback_query(call.id)
+            show_my_configs(call, uid)
+            return
+
+        if data.startswith("mycfg:"):
+            purchase_id = int(data.split(":")[1])
+            item = get_purchase(purchase_id)
+            if not item or item["user_id"] != uid:
+                bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+                return
+            bot.answer_callback_query(call.id)
+            deliver_purchase_message(call.message.chat.id, purchase_id)
+            return
+
+        # ── Buy flow ──
+        if data == "buy:start":
+            bot.answer_callback_query(call.id)
+            _cb_buy_start(call, uid)
+            return
+
+        if data.startswith("buy:type:"):
+            parts = data.split(":")
+            # buy:type:{type_id} or buy:type:back:{package_id} (back from pkg detail)
+            if parts[2] == "back":
+                package_id = int(parts[3])
+                p = get_package(package_id)
+                bot.answer_callback_query(call.id)
+                _cb_buy_type(call, uid, p["type_id"])
+                return
+            type_id = int(parts[2])
+            bot.answer_callback_query(call.id)
+            _cb_buy_type(call, uid, type_id)
+            return
+
+        if data.startswith("buy:pkg:"):
+            package_id = int(data.split(":")[2])
+            bot.answer_callback_query(call.id)
+            _cb_buy_pkg(call, uid, package_id)
+            return
+
+        # ── Payment methods ──
+        if data.startswith("pay:wallet:"):
+            package_id = int(data.split(":")[2])
+            bot.answer_callback_query(call.id)
+            _cb_pay_wallet(call, uid, package_id)
+            return
+
+        if data.startswith("pay:card:"):
+            package_id = int(data.split(":")[2])
+            bot.answer_callback_query(call.id)
+            _cb_pay_card(call, uid, package_id)
+            return
+
+        if data.startswith("pay:crypto:"):
+            package_id = int(data.split(":")[2])
+            bot.answer_callback_query(call.id)
+            _cb_show_crypto_currencies(call, uid, "buy", package_id)
+            return
+
+        if data.startswith("pay:crypto_cur:"):
+            # pay:crypto_cur:{currency}:{package_id}
+            parts = data.split(":")
+            currency = parts[2]
+            package_id = int(parts[3])
+            bot.answer_callback_query(call.id)
+            _cb_pay_crypto_buy(call, uid, currency, package_id)
+            return
+
+        # ── Free test ──
+        if data == "test:start":
+            bot.answer_callback_query(call.id)
+            _cb_test_start(call)
+            return
+
+        if data.startswith("test:type:"):
+            type_id = int(data.split(":")[2])
+            bot.answer_callback_query(call.id)
+            _cb_test_type(call, uid, type_id)
+            return
+
+        # ── Wallet charge ──
+        if data == "wallet:charge":
+            state_set(uid, "await_wallet_amount")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call,
+                "💳 <b>شارژ کیف پول</b>\n\nلطفاً مبلغ مورد نظر را به تومان وارد کنید:",
+                back_button("main"))
+            return
+
+        if data == "wallet:charge:card":
+            st = state_data(uid)
+            amount = st.get("amount")
+            if not amount:
+                bot.answer_callback_query(call.id, "ابتدا مبلغ را وارد کنید.", show_alert=True)
+                return
+            bot.answer_callback_query(call.id)
+            _cb_wallet_card(call, uid, amount)
+            return
+
+        if data == "wallet:charge:crypto":
+            st = state_data(uid)
+            amount = st.get("amount")
+            if not amount:
+                bot.answer_callback_query(call.id, "ابتدا مبلغ را وارد کنید.", show_alert=True)
+                return
+            bot.answer_callback_query(call.id)
+            _cb_show_crypto_currencies(call, uid, "wallet", amount)
+            return
+
+        if data.startswith("wallet:crypto_cur:"):
+            # wallet:crypto_cur:{currency}
+            currency = data.split(":")[2]
+            st = state_data(uid)
+            amount = st.get("amount")
+            if not amount:
+                bot.answer_callback_query(call.id, "ابتدا مبلغ را وارد کنید.", show_alert=True)
+                return
+            bot.answer_callback_query(call.id)
+            _cb_wallet_crypto(call, uid, currency, amount)
+            return
+
+        # ── Reseller panel ──
+        if data == "reseller:panel":
+            bot.answer_callback_query(call.id)
+            _cb_reseller_panel(call, uid)
+            return
+
+        # ── Admin ──
+        if data == "admin:panel":
+            if not is_admin(uid):
+                bot.answer_callback_query(call.id, "اجازه دسترسی ندارید.", show_alert=True)
+                return
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "⚙️ <b>پنل مدیریت</b>\n\nبخش مورد نظر را انتخاب کنید:", kb_admin_panel())
+            return
+
+        # Admin routes – all require admin
+        if data.startswith("admin:") and not is_admin(uid):
+            bot.answer_callback_query(call.id, "اجازه دسترسی ندارید.", show_alert=True)
+            return
+
+        if data == "admin:types":
+            bot.answer_callback_query(call.id)
+            show_admin_types_again(call)
+            return
+
+        if data == "admin:type:add":
+            state_set(uid, "admin_add_type")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "🧩 نام نوع جدید را ارسال کنید:", back_button("admin:types"))
+            return
+
+        if data.startswith("admin:type:edit:"):
+            type_id = int(data.split(":")[3])
+            row = get_type(type_id)
+            if not row:
+                bot.answer_callback_query(call.id, "نوع یافت نشد.", show_alert=True)
+                return
+            state_set(uid, "admin_edit_type", type_id=type_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, f"✏️ نام جدید برای نوع <b>{esc(row['name'])}</b> را ارسال کنید:", back_button("admin:types"))
+            return
+
+        if data.startswith("admin:type:del:"):
+            type_id = int(data.split(":")[3])
+            delete_type(type_id)
+            bot.answer_callback_query(call.id, "نوع حذف شد.")
+            show_admin_types_again(call)
+            return
+
+        # Package management
+        if data == "admin:pkgs":
+            bot.answer_callback_query(call.id)
+            show_admin_packages(call)
+            return
+
+        if data == "admin:add_package":
+            types_list = get_all_types()
+            kb = types.InlineKeyboardMarkup()
+            for item in types_list:
+                kb.add(types.InlineKeyboardButton(f"🧩 {item['name']}", callback_data=f"admin:add_package:type:{item['id']}"))
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:pkgs"))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "📦 <b>افزودن پکیج</b>\n\nنوع کانفیگ را انتخاب کنید:", kb)
+            return
+
+        if data.startswith("admin:add_package:type:"):
+            type_id = int(data.split(":")[3])
+            type_row = get_type(type_id)
+            state_set(uid, "admin_add_package_name", type_id=type_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, f"✏️ نام پکیج برای نوع <b>{esc(type_row['name'])}</b> را وارد کنید:", back_button("admin:add_package"))
+            return
+
+        if data.startswith("admin:pkg:edit:"):
+            pkg_id = int(data.split(":")[3])
+            p = get_package(pkg_id)
+            if not p:
+                bot.answer_callback_query(call.id, "پکیج یافت نشد.", show_alert=True)
+                return
+            kb = types.InlineKeyboardMarkup()
+            kb.add(types.InlineKeyboardButton("✏️ ویرایش نام",   callback_data=f"admin:pkg:edit:name:{pkg_id}"))
+            kb.add(types.InlineKeyboardButton("💰 ویرایش قیمت",  callback_data=f"admin:pkg:edit:price:{pkg_id}"))
+            kb.add(types.InlineKeyboardButton("🔋 ویرایش حجم",   callback_data=f"admin:pkg:edit:vol:{pkg_id}"))
+            kb.add(types.InlineKeyboardButton("⏰ ویرایش مدت",   callback_data=f"admin:pkg:edit:dur:{pkg_id}"))
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت",       callback_data="admin:pkgs"))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, f"✏️ <b>ویرایش پکیج</b>\n\n{esc(p['name'])} | {p['volume_gb']}GB | {p['duration_days']}روز | {fmt_price(p['price'])} تومان", kb)
+            return
+
+        if data.startswith("admin:pkg:edit:name:"):
+            pkg_id = int(data.split(":")[4])
+            state_set(uid, "admin_edit_pkg_name", pkg_id=pkg_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "✏️ نام جدید پکیج را ارسال کنید:", back_button("admin:pkgs"))
+            return
+
+        if data.startswith("admin:pkg:edit:price:"):
+            pkg_id = int(data.split(":")[4])
+            state_set(uid, "admin_edit_pkg_price", pkg_id=pkg_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "💰 قیمت جدید پکیج را به تومان وارد کنید:", back_button("admin:pkgs"))
+            return
+
+        if data.startswith("admin:pkg:edit:vol:"):
+            pkg_id = int(data.split(":")[4])
+            state_set(uid, "admin_edit_pkg_vol", pkg_id=pkg_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "🔋 حجم جدید پکیج را به گیگ وارد کنید:", back_button("admin:pkgs"))
+            return
+
+        if data.startswith("admin:pkg:edit:dur:"):
+            pkg_id = int(data.split(":")[4])
+            state_set(uid, "admin_edit_pkg_dur", pkg_id=pkg_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "⏰ مدت جدید پکیج را به روز وارد کنید:", back_button("admin:pkgs"))
+            return
+
+        if data.startswith("admin:pkg:del:"):
+            pkg_id = int(data.split(":")[3])
+            delete_package(pkg_id)
+            bot.answer_callback_query(call.id, "پکیج حذف شد.")
+            show_admin_packages(call)
+            return
+
+        # Config management
+        if data == "admin:configs":
+            bot.answer_callback_query(call.id)
+            show_admin_configs(call)
+            return
+
+        if data.startswith("admin:cfglist:"):
+            # admin:cfglist:all:a:0  OR  admin:cfglist:all:s:0
+            # admin:cfglist:pkg:{pkg_id}:menu
+            # admin:cfglist:pkg:{pkg_id}:a:0  OR  admin:cfglist:pkg:{pkg_id}:s:0
+            parts = data.split(":")
+            scope = parts[2]
+            bot.answer_callback_query(call.id)
+            if scope == "all":
+                kind = parts[3]
+                page = int(parts[4])
+                show_configs_page(call, "all", kind, page)
+            else:  # pkg
+                pkg_id = int(parts[3])
+                action = parts[4]
+                if action == "menu":
+                    p = get_package(pkg_id)
+                    if not p:
+                        send_or_edit(call, "پکیج یافت نشد.", back_button("admin:configs"))
+                        return
+                    kb = types.InlineKeyboardMarkup()
+                    kb.row(
+                        types.InlineKeyboardButton(f"🟢 مانده ({p['stock']})", callback_data=f"admin:cfglist:pkg:{pkg_id}:a:0"),
+                        types.InlineKeyboardButton(f"🔴 فروخته ({p['sold_count']})", callback_data=f"admin:cfglist:pkg:{pkg_id}:s:0"),
+                    )
+                    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:configs"))
+                    send_or_edit(call, f"📦 <b>{esc(p['name'])}</b>\n\nنوع مشاهده را انتخاب کنید:", kb)
+                else:
+                    kind = action
+                    page = int(parts[5])
+                    show_configs_page(call, "pkg", kind, page, pkg_id)
+            return
+
+        if data.startswith("admin:cfg:view:"):
+            # admin:cfg:view:{cfg_id}:{scope}:{kind}:{page}[:{pkg_id}]
+            parts = data.split(":")
+            cfg_id = int(parts[3])
+            scope  = parts[4]
+            kind   = parts[5]
+            page   = int(parts[6])
+            pkg_id = int(parts[7]) if len(parts) > 7 else None
+            row = get_config(cfg_id)
+            if not row:
+                bot.answer_callback_query(call.id, "یافت نشد.", show_alert=True)
+                return
+            text = (
+                f"🔮 نام سرویس: <b>{esc(row['service_name'])}</b>\n"
+                f"📅 ثبت شده: {esc(row['created_at'])}\n"
+                f"{'🔴 پایان یافته\n' if row['ended'] else ''}"
+                f"\n💝 Config:\n<code>{esc(row['config_text'])}</code>\n\n"
+                f"🔋 Volume web: {esc(row['inquiry_link'] or '-')}"
+            )
+            if kind == "s":
+                buyer = get_user(row["sold_to"]) if row["sold_to"] else None
+                text += (
+                    f"\n\n👤 خریدار: {esc(buyer['full_name'] if buyer else str(row['sold_to']))}\n"
+                    f"🆔 آیدی: <code>{row['sold_to']}</code>\n"
+                    f"🕒 زمان خرید: {esc(row['sold_at'] or '-')}"
+                )
+            back_suffix = f":{pkg_id}" if scope == "pkg" else ""
+            back_cb = f"admin:cfglist:{scope}:{kind}:{page}{back_suffix}"
+            kb = types.InlineKeyboardMarkup()
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=back_cb))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, text, kb)
+            return
+
+        # Add config
+        if data == "admin:add_config":
+            types_list = get_all_types()
+            kb = types.InlineKeyboardMarkup()
+            for item in types_list:
+                kb.add(types.InlineKeyboardButton(f"🧩 {item['name']}", callback_data=f"admin:add_config:type:{item['id']}"))
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "📝 <b>ثبت کانفیگ</b>\n\nابتدا نوع را انتخاب کنید:", kb)
+            return
+
+        if data.startswith("admin:add_config:type:"):
+            type_id = int(data.split(":")[3])
+            packs = get_packages(type_id=type_id)
+            kb = types.InlineKeyboardMarkup()
+            for p in packs:
+                kb.add(types.InlineKeyboardButton(f"{p['name']} | {p['volume_gb']}GB | {p['duration_days']} روز", callback_data=f"admin:add_config:pkg:{p['id']}"))
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:add_config"))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "📦 پکیج مربوطه را انتخاب کنید:", kb)
+            return
+
+        if data.startswith("admin:add_config:pkg:"):
+            package_id = int(data.split(":")[3])
+            package_row = get_package(package_id)
+            state_set(uid, "admin_add_config_service", package_id=package_id, type_id=package_row["type_id"])
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "✏️ نام سرویس را وارد کنید:", back_button("admin:add_config"))
+            return
+
+        # User management
+        if data == "admin:users":
+            bot.answer_callback_query(call.id)
+            _cb_admin_users(call, 0)
+            return
+
+        if data.startswith("admin:users:page:"):
+            page = int(data.split(":")[3])
+            bot.answer_callback_query(call.id)
+            _cb_admin_users(call, page)
+            return
+
+        if data.startswith("admin:user:") and not data.startswith("admin:user:safe") \
+                and not data.startswith("admin:user:unsafe") and not data.startswith("admin:user:reseller") \
+                and not data.startswith("admin:user:bal") and not data.startswith("admin:user:cfgs") \
+                and not data.startswith("admin:user:cfg_end") and not data.startswith("admin:user:addcfg") \
+                and not data.startswith("admin:user:rprices"):
+            user_id = int(data.split(":")[2])
+            bot.answer_callback_query(call.id)
+            show_admin_user_detail(call, user_id)
+            return
+
+        if data.startswith("admin:user:safe:") or data.startswith("admin:user:unsafe:"):
+            parts = data.split(":")
+            is_safe_val = 1 if parts[2] == "safe" else 0
+            user_id = int(parts[3])
+            set_user_safe(user_id, is_safe_val)
+            bot.answer_callback_query(call.id, "وضعیت کاربر تغییر کرد.")
+            show_admin_user_detail(call, user_id)
+            return
+
+        if data.startswith("admin:user:reseller:"):
+            # admin:user:reseller:{0|1}:{user_id}
+            parts = data.split(":")
+            val     = int(parts[3])
+            user_id = int(parts[4])
+            set_user_reseller(user_id, val)
+            bot.answer_callback_query(call.id, "وضعیت نمایندگی تغییر کرد.")
+            show_admin_user_detail(call, user_id)
+            return
+
+        if data.startswith("admin:user:bal:"):
+            user_id = int(data.split(":")[3])
+            kb = types.InlineKeyboardMarkup()
+            kb.row(
+                types.InlineKeyboardButton("➕ افزایش موجودی", callback_data=f"admin:user:bal:inc:{user_id}"),
+                types.InlineKeyboardButton("➖ کاهش موجودی",  callback_data=f"admin:user:bal:dec:{user_id}"),
+            )
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"admin:user:{user_id}"))
+            u = get_user(user_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, f"💰 موجودی فعلی: <b>{fmt_price(u['balance'])}</b> تومان\n\nعملیات را انتخاب کنید:", kb)
+            return
+
+        if data.startswith("admin:user:bal:inc:"):
+            user_id = int(data.split(":")[4])
+            state_set(uid, "admin_bal_increase", target_user_id=user_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "💰 مبلغ افزایش موجودی را وارد کنید (تومان):", back_button(f"admin:user:{user_id}"))
+            return
+
+        if data.startswith("admin:user:bal:dec:"):
+            user_id = int(data.split(":")[4])
+            state_set(uid, "admin_bal_decrease", target_user_id=user_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "💰 مبلغ کاهش موجودی را وارد کنید (تومان):", back_button(f"admin:user:{user_id}"))
+            return
+
+        if data.startswith("admin:user:cfgs:"):
+            user_id = int(data.split(":")[3])
+            bot.answer_callback_query(call.id)
+            show_admin_user_configs(call, user_id)
+            return
+
+        if data.startswith("admin:user:cfg_end:"):
+            # admin:user:cfg_end:{config_id}:{ended}:{user_id}
+            parts  = data.split(":")
+            cfg_id  = int(parts[3])
+            ended   = int(parts[4])
+            user_id = int(parts[5])
+            mark_config_ended(cfg_id, ended)
+            bot.answer_callback_query(call.id, "وضعیت کانفیگ تغییر کرد.")
+            show_admin_user_configs(call, user_id)
+            return
+
+        if data.startswith("admin:user:addcfg:"):
+            # Show packages to pick from
+            user_id = int(data.split(":")[3])
+            pkgs = get_packages()
+            kb = types.InlineKeyboardMarkup()
+            for p in pkgs:
+                if p["stock"] > 0:
+                    kb.add(types.InlineKeyboardButton(
+                        f"📦 {p['name']} | 🟢{p['stock']} مانده",
+                        callback_data=f"admin:user:addcfg:pkg:{p['id']}:{user_id}",
+                    ))
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"admin:user:{user_id}"))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "📦 پکیج مورد نظر را انتخاب کنید:", kb)
+            return
+
+        if data.startswith("admin:user:addcfg:pkg:"):
+            # admin:user:addcfg:pkg:{pkg_id}:{user_id}
+            parts = data.split(":")
+            pkg_id  = int(parts[4])
+            user_id = int(parts[5])
+            cfgs, _ = get_available_configs_for_package(pkg_id, 0, 20)
+            kb = types.InlineKeyboardMarkup()
+            for c in cfgs:
+                kb.add(types.InlineKeyboardButton(
+                    f"🔮 {c['service_name']}",
+                    callback_data=f"admin:user:addcfg:do:{c['id']}:{pkg_id}:{user_id}",
+                ))
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"admin:user:addcfg:{user_id}"))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "🔮 کانفیگ مورد نظر را انتخاب کنید:", kb)
+            return
+
+        if data.startswith("admin:user:addcfg:do:"):
+            # admin:user:addcfg:do:{cfg_id}:{pkg_id}:{user_id}
+            parts  = data.split(":")
+            cfg_id  = int(parts[4])
+            pkg_id  = int(parts[5])
+            user_id = int(parts[6])
+            # assign
+            purchase_id = assign_config_to_user(cfg_id, user_id, pkg_id, 0, "admin_gift")
+            bot.answer_callback_query(call.id, "کانفیگ با موفقیت انتقال یافت.")
+            try:
+                deliver_purchase_message(user_id, purchase_id)
+            except Exception:
+                pass
+            show_admin_user_detail(call, user_id)
+            return
+
+        if data.startswith("admin:user:rprices:"):
+            user_id = int(data.split(":")[3])
+            pkgs = get_packages()
+            kb = types.InlineKeyboardMarkup()
+            for p in pkgs:
+                rp = get_reseller_price(user_id, p["id"])
+                lbl = f"📦 {p['name']} | قیمت: {fmt_price(rp if rp is not None else p['price'])}"
+                kb.add(types.InlineKeyboardButton(lbl, callback_data=f"admin:user:rp:set:{p['id']}:{user_id}"))
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"admin:user:{user_id}"))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "💲 <b>قیمت‌های نمایندگی</b>\n\nروی هر پکیج بزنید تا قیمت ویرایش شود:", kb)
+            return
+
+        if data.startswith("admin:user:rp:set:"):
+            parts  = data.split(":")
+            pkg_id  = int(parts[4])
+            user_id = int(parts[5])
+            state_set(uid, "admin_set_reseller_price", pkg_id=pkg_id, target_user_id=user_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "💲 قیمت جدید نمایندگی را به تومان وارد کنید:", back_button(f"admin:user:rprices:{user_id}"))
+            return
+
+        # Broadcast
+        if data == "admin:broadcast":
+            kb = types.InlineKeyboardMarkup()
+            kb.add(types.InlineKeyboardButton("📣 همه کاربران",  callback_data="admin:broadcast:all"))
+            kb.add(types.InlineKeyboardButton("🛍 فقط مشتری‌ها", callback_data="admin:broadcast:customers"))
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت",       callback_data="admin:panel"))
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "📣 <b>فوروارد همگانی</b>\n\nگیرنده را انتخاب کنید:", kb)
+            return
+
+        if data == "admin:broadcast:all":
+            state_set(uid, "admin_broadcast_all")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "📣 پیام خود را ارسال کنید. (برای <b>همه کاربران</b>)", back_button("admin:broadcast"))
+            return
+
+        if data == "admin:broadcast:customers":
+            state_set(uid, "admin_broadcast_customers")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "🛍 پیام خود را ارسال کنید. (فقط <b>مشتری‌ها</b>)", back_button("admin:broadcast"))
+            return
+
+        # Settings
+        if data == "admin:settings":
+            _cb_admin_settings(call)
+            return
+
+        if data == "admin:set:support":
+            state_set(uid, "admin_set_support")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "🎧 آیدی یا لینک پشتیبانی را ارسال کنید.\nمثال: <code>@Tracklessvpnadmin</code>", back_button("admin:settings"))
+            return
+
+        if data == "admin:set:payment":
+            _cb_admin_payment_settings(call)
+            return
+
+        if data == "admin:set:card":
+            state_set(uid, "admin_set_card")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "💳 شماره کارت را ارسال کنید:", back_button("admin:set:payment"))
+            return
+
+        if data == "admin:set:bank":
+            state_set(uid, "admin_set_bank")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "🏦 نام بانک را ارسال کنید:", back_button("admin:set:payment"))
+            return
+
+        if data == "admin:set:owner":
+            state_set(uid, "admin_set_owner")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "👤 نام صاحب کارت را ارسال کنید:", back_button("admin:set:payment"))
+            return
+
+        if data == "admin:set:card_status:public":
+            setting_set("payment_card_status", "public")
+            bot.answer_callback_query(call.id, "وضعیت کارت: عمومی")
+            _cb_admin_payment_settings(call)
+            return
+
+        if data == "admin:set:card_status:safe":
+            setting_set("payment_card_status", "safe")
+            bot.answer_callback_query(call.id, "وضعیت کارت: فقط امن")
+            _cb_admin_payment_settings(call)
+            return
+
+        if data == "admin:set:crypto":
+            _cb_admin_crypto_settings(call)
+            return
+
+        if data.startswith("admin:set:crypto:"):
+            currency = data.split(":")[3]
+            state_set(uid, "admin_set_crypto", currency=currency)
+            disp = next((d for k, d, _ in CRYPTO_CURRENCIES if k == currency), currency)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, f"💰 آدرس ولت <b>{disp}</b> را ارسال کنید:", back_button("admin:set:crypto"))
+            return
+
+        # Payment approvals
+        if data.startswith("admin:pay:approve:"):
+            payment_id = int(data.split(":")[3])
+            state_set(uid, "admin_payment_approve_note", payment_id=payment_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "✅ متن تأیید را برای کاربر ارسال کنید:", back_button("admin:panel"))
+            return
+
+        if data.startswith("admin:pay:reject:"):
+            payment_id = int(data.split(":")[3])
+            state_set(uid, "admin_payment_reject_note", payment_id=payment_id)
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "❌ متن رد را برای کاربر ارسال کنید:", back_button("admin:panel"))
+            return
+
+        # Backup
+        if data == "admin:backup":
+            _cb_admin_backup(call)
+            return
+
+        if data == "admin:backup:now":
+            bot.answer_callback_query(call.id)
+            do_backup(uid)
+            return
+
+        if data == "admin:backup:toggle":
+            cur = setting_get("auto_backup_enabled", "0")
+            setting_set("auto_backup_enabled", "0" if cur == "1" else "1")
+            if setting_get("auto_backup_enabled") == "1":
+                schedule_backup()
+            else:
+                cancel_backup()
+            bot.answer_callback_query(call.id)
+            _cb_admin_backup(call)
+            return
+
+        if data == "admin:backup:set_interval":
+            state_set(uid, "admin_set_backup_interval")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, f"⏰ فاصله بکاپ خودکار را به ساعت وارد کنید (فعلی: {setting_get('backup_interval_hours', '24')}):", back_button("admin:backup"))
+            return
+
+        if data == "admin:backup:set_chat":
+            state_set(uid, "admin_set_backup_chat")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call, "📤 آیدی عددی چت/کانال دریافت بکاپ را وارد کنید:", back_button("admin:backup"))
+            return
+
+        # Channel lock
+        if data == "admin:channel":
+            _cb_admin_channel(call)
+            return
+
+        if data == "admin:channel:toggle":
+            cur = setting_get("channel_lock_enabled", "0")
+            setting_set("channel_lock_enabled", "0" if cur == "1" else "1")
+            bot.answer_callback_query(call.id)
+            _cb_admin_channel(call)
+            return
+
+        if data == "admin:channel:set_id":
+            state_set(uid, "admin_set_channel_id")
+            bot.answer_callback_query(call.id)
+            send_or_edit(call,
+                "📢 آیدی عددی کانال را ارسال کنید.\n\n"
+                "⚠️ ابتدا ربات را ادمین کانال کنید تا بتواند عضویت را بررسی کند.\n"
+                "مثال: <code>-1001234567890</code>",
+                back_button("admin:channel"),
+            )
+            return
+
+        if data == "noop":
+            bot.answer_callback_query(call.id)
+            return
+
+        bot.answer_callback_query(call.id)
+
+    except Exception as e:
+        print("CALLBACK_ERROR:", e)
+        traceback.print_exc()
+        try:
+            bot.answer_callback_query(call.id, "خطایی رخ داد.", show_alert=True)
+        except Exception:
+            pass
+
+
+# ──────────────────────────────────────────────
+# Callback helpers (buy / pay / etc.)
+# ──────────────────────────────────────────────
+def _cb_buy_start(call, uid: int):
+    items = get_all_types()
+    kb = types.InlineKeyboardMarkup()
+    for item in items:
+        kb.add(types.InlineKeyboardButton(f"🧩 {item['name']}", callback_data=f"buy:type:{item['id']}"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+    send_or_edit(call, "🛒 <b>خرید کانفیگ جدید</b>\n\nنوع مورد نظر را انتخاب کنید:", kb)
+
+
+def _cb_buy_type(call, uid: int, type_id: int):
+    user = get_user(uid)
+    packages = [p for p in get_packages(type_id=type_id) if p["price"] > 0 and p["stock"] > 0]
+    kb = types.InlineKeyboardMarkup()
+    is_reseller = bool(user and user["is_reseller"])
+    if is_reseller:
+        header = "🎯 <b>قیمت‌های مخصوص همکاری شماست</b>\n\n"
+    else:
+        header = ""
+    for p in packages:
+        effective_price = get_effective_price(uid, p["id"], p["price"])
+        title = f"{p['name']} | {p['volume_gb']}GB | {p['duration_days']} روز | {fmt_price(effective_price)} تومان"
+        kb.add(types.InlineKeyboardButton(title, callback_data=f"buy:pkg:{p['id']}"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="buy:start"))
+    if not packages:
+        send_or_edit(call, "📭 فعلاً پکیج فعالی برای این نوع ثبت نشده است.", kb)
+    else:
+        send_or_edit(call, f"{header}📦 یکی از پکیج‌ها را انتخاب کنید:", kb)
+
+
+def _cb_buy_pkg(call, uid: int, package_id: int):
+    package_row = get_package(package_id)
+    if not package_row:
+        bot.answer_callback_query(call.id, "پکیج یافت نشد.", show_alert=True)
+        return
+    user = get_user(uid)
+    is_reseller = bool(user and user["is_reseller"])
+    effective_price = get_effective_price(uid, package_id, package_row["price"])
+    reseller_note = "\n\n💡 <i>این قیمت مخصوص همکاری شماست.</i>" if is_reseller and effective_price != package_row["price"] else ""
+    text = (
+        f"💳 <b>روش پرداخت</b>\n\n"
+        f"🧩 نوع: {esc(package_row['type_name'])}\n"
+        f"📦 نام پکیج: {esc(package_row['name'])}\n"
+        f"🔋 حجم: {package_row['volume_gb']} گیگ\n"
+        f"⏰ مدت: {package_row['duration_days']} روز\n"
+        f"💰 قیمت: {fmt_price(effective_price)} تومان{reseller_note}"
+    )
+    send_or_edit(call, text, kb_payment_method("buy", package_id))
+
+
+def _cb_pay_wallet(call, uid: int, package_id: int):
+    package_row = get_package(package_id)
+    user = get_user(uid)
+    if not package_row or package_row["stock"] <= 0:
+        bot.answer_callback_query(call.id, "موجودی این پکیج به پایان رسیده است.", show_alert=True)
+        return
+    effective_price = get_effective_price(uid, package_id, package_row["price"])
+    if user["balance"] < effective_price:
+        bot.answer_callback_query(call.id, "موجودی کیف پول کافی نیست.", show_alert=True)
+        return
+    config_id = reserve_first_config(package_id)
+    if not config_id:
+        bot.answer_callback_query(call.id, "فعلاً کانفیگی برای این پکیج موجود نیست.", show_alert=True)
+        return
+    update_balance(uid, -effective_price)
+    purchase_id = assign_config_to_user(config_id, uid, package_id, effective_price, "wallet")
+    pid = create_payment("config_purchase", uid, package_id, effective_price, "wallet", status="completed", config_id=config_id)
+    complete_payment(pid)
+    bot.answer_callback_query(call.id, "خرید با موفقیت انجام شد.")
+    send_or_edit(call, "✅ خرید شما با موفقیت انجام شد.", back_button("main"))
+    deliver_purchase_message(call.message.chat.id, purchase_id)
+    admin_purchase_notify("کیف پول", get_user(uid), package_row)
+
+
+def _cb_pay_card(call, uid: int, package_id: int):
+    package_row = get_package(package_id)
+    if not package_row or package_row["stock"] <= 0:
+        bot.answer_callback_query(call.id, "موجودی این پکیج به پایان رسیده است.", show_alert=True)
+        return
+    user = get_user(uid)
+    card_status = setting_get("payment_card_status", "public")
+    if card_status == "safe" and not user["is_safe"]:
+        bot.answer_callback_query(call.id, "درگاه کارت به کارت فقط برای کاربران تأیید شده فعال است.", show_alert=True)
+        return
+    card = setting_get("payment_card", "")
+    bank = setting_get("payment_bank", "")
+    owner = setting_get("payment_owner", "")
+    if not card:
+        bot.answer_callback_query(call.id, "اطلاعات پرداخت هنوز توسط ادمین ثبت نشده است.", show_alert=True)
+        return
+    effective_price = get_effective_price(uid, package_id, package_row["price"])
+    payment_id = create_payment("config_purchase", uid, package_id, effective_price, "card", status="pending")
+    config_id = reserve_first_config(package_id, payment_id=payment_id)
+    if not config_id:
+        bot.answer_callback_query(call.id, "فعلاً کانفیگی موجود نیست.", show_alert=True)
+        return
+    with get_conn() as conn:
+        conn.execute("UPDATE payments SET config_id=? WHERE id=?", (config_id, payment_id))
+    state_set(uid, "await_purchase_receipt", payment_id=payment_id)
+    text = (
+        "💳 <b>کارت به کارت</b>\n\n"
+        f"لطفاً مبلغ <b>{fmt_price(effective_price)}</b> تومان را به کارت زیر واریز کنید:\n\n"
+        f"🏦 {esc(bank or 'ثبت نشده')}\n"
+        f"👤 {esc(owner or 'ثبت نشده')}\n"
+        f"💳 <code>{esc(card)}</code>\n\n"
+        "📸 پس از واریز، تصویر رسید یا شماره پیگیری را ارسال کنید."
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت به منو", callback_data="nav:main"))
+    send_or_edit(call, text, kb)
+
+
+def _cb_show_crypto_currencies(call, uid: int, context_type: str, context_id):
+    """context_type: 'wallet'|'buy'"""
+    kb = types.InlineKeyboardMarkup()
+    for key, display, emoji in CRYPTO_CURRENCIES:
+        wallet_addr = setting_get(f"crypto_{key}", "")
+        if wallet_addr:
+            if context_type == "wallet":
+                cb = f"wallet:crypto_cur:{key}"
+            else:
+                cb = f"pay:crypto_cur:{key}:{context_id}"
+            kb.add(types.InlineKeyboardButton(f"{emoji} {display}", callback_data=cb))
+    if context_type == "wallet":
+        back_cb = "wallet:charge"
+    else:
+        back_cb = f"buy:pkg:{context_id}"
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=back_cb))
+    if len(kb.keyboard) <= 1:
+        send_or_edit(call, "⚠️ هیچ ارز دیجیتالی هنوز تنظیم نشده است.", kb)
+    else:
+        send_or_edit(call, "💰 <b>پرداخت با ارز دیجیتال</b>\n\nنوع ارز را انتخاب کنید:", kb)
+
+
+def _cb_wallet_crypto(call, uid: int, currency: str, amount: int):
+    disp = next((d for k, d, _ in CRYPTO_CURRENCIES if k == currency), currency)
+    emoji = next((e for k, _, e in CRYPTO_CURRENCIES if k == currency), "💰")
+    wallet_addr = setting_get(f"crypto_{currency}", "")
+    payment_id = create_payment("wallet_charge", uid, None, amount, "crypto", status="pending", crypto_currency=currency)
+    state_set(uid, "await_crypto_receipt", payment_id=payment_id)
+    text = (
+        f"💰 <b>پرداخت با {disp}</b>\n\n"
+        f"لطفاً معادل <b>{fmt_price(amount)}</b> تومان را به آدرس زیر ارسال کنید:\n\n"
+        f"{emoji} نوع ارز: <b>{disp}</b>\n"
+        f"📋 آدرس ولت:\n<code>{esc(wallet_addr)}</code>\n\n"
+        f"📝 پس از ارسال، هش تراکنش یا تصویر تأیید را ارسال کنید.\n\n"
+        f"🔗 <a href='{NOBITEX_PRICE_URL}'>مشاهده قیمت ارز دیجیتال در نوبیتکس</a>"
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت به منو", callback_data="nav:main"))
+    send_or_edit(call, text, kb, disable_preview=False)
+
+
+def _cb_pay_crypto_buy(call, uid: int, currency: str, package_id: int):
+    package_row = get_package(package_id)
+    if not package_row or package_row["stock"] <= 0:
+        bot.answer_callback_query(call.id, "موجودی این پکیج به پایان رسیده است.", show_alert=True)
+        return
+    effective_price = get_effective_price(uid, package_id, package_row["price"])
+    disp = next((d for k, d, _ in CRYPTO_CURRENCIES if k == currency), currency)
+    emoji = next((e for k, _, e in CRYPTO_CURRENCIES if k == currency), "💰")
+    wallet_addr = setting_get(f"crypto_{currency}", "")
+    payment_id = create_payment("config_purchase", uid, package_id, effective_price, "crypto", status="pending", crypto_currency=currency)
+    config_id  = reserve_first_config(package_id, payment_id=payment_id)
+    if not config_id:
+        bot.answer_callback_query(call.id, "فعلاً کانفیگی موجود نیست.", show_alert=True)
+        return
+    with get_conn() as conn:
+        conn.execute("UPDATE payments SET config_id=? WHERE id=?", (config_id, payment_id))
+    state_set(uid, "await_crypto_receipt", payment_id=payment_id)
+    text = (
+        f"💰 <b>پرداخت با {disp}</b>\n\n"
+        f"لطفاً معادل <b>{fmt_price(effective_price)}</b> تومان را به آدرس زیر ارسال کنید:\n\n"
+        f"{emoji} نوع ارز: <b>{disp}</b>\n"
+        f"📋 آدرس ولت:\n<code>{esc(wallet_addr)}</code>\n\n"
+        f"📝 پس از ارسال، هش تراکنش یا تصویر تأیید را ارسال کنید.\n\n"
+        f"🔗 <a href='{NOBITEX_PRICE_URL}'>مشاهده قیمت ارز دیجیتال در نوبیتکس</a>"
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت به منو", callback_data="nav:main"))
+    send_or_edit(call, text, kb, disable_preview=False)
+
+
+def _cb_wallet_card(call, uid: int, amount: int):
+    card_status = setting_get("payment_card_status", "public")
+    user = get_user(uid)
+    if card_status == "safe" and not user["is_safe"]:
+        bot.answer_callback_query(call.id, "درگاه کارت به کارت فقط برای کاربران تأیید شده فعال است.", show_alert=True)
+        return
+    card  = setting_get("payment_card", "")
+    bank  = setting_get("payment_bank", "")
+    owner = setting_get("payment_owner", "")
+    if not card:
+        bot.answer_callback_query(call.id, "اطلاعات پرداخت هنوز ثبت نشده است.", show_alert=True)
+        return
+    payment_id = create_payment("wallet_charge", uid, None, amount, "card", status="pending")
+    state_set(uid, "await_wallet_receipt", payment_id=payment_id, amount=amount)
+    text = (
+        "💳 <b>کارت به کارت</b>\n\n"
+        f"لطفاً مبلغ <b>{fmt_price(amount)}</b> تومان را به کارت زیر واریز کنید:\n\n"
+        f"🏦 {esc(bank or 'ثبت نشده')}\n"
+        f"👤 {esc(owner or 'ثبت نشده')}\n"
+        f"💳 <code>{esc(card)}</code>\n\n"
+        "📸 پس از واریز، تصویر رسید یا شماره پیگیری را ارسال کنید."
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت به منو", callback_data="nav:main"))
+    send_or_edit(call, text, kb)
+
+
+def _cb_test_start(call):
+    items = get_all_types()
+    kb = types.InlineKeyboardMarkup()
+    for item in items:
+        kb.add(types.InlineKeyboardButton(f"🎁 {item['name']}", callback_data=f"test:type:{item['id']}"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+    send_or_edit(call, "🎁 <b>تست رایگان</b>\n\nنوع مورد نظر را انتخاب کنید:", kb)
+
+
+def _cb_test_type(call, uid: int, type_id: int):
+    type_row = get_type(type_id)
+    package_row = None
+    for item in get_packages(type_id=type_id, price_only=0):
+        if item["stock"] > 0:
+            package_row = item
+            break
+    if not package_row:
+        bot.answer_callback_query(call.id, "برای این نوع، تست رایگان موجود نیست.", show_alert=True)
+        return
+    if user_has_test_for_type(uid, type_id):
+        bot.answer_callback_query(call.id, "شما قبلاً تست رایگان این نوع را دریافت کرده‌اید.", show_alert=True)
+        return
+    config_id = reserve_first_config(package_row["id"])
+    if not config_id:
+        bot.answer_callback_query(call.id, "تست رایگان این نوع تمام شده است.", show_alert=True)
+        return
+    purchase_id = assign_config_to_user(config_id, uid, package_row["id"], 0, "free_test", is_test=1)
+    bot.answer_callback_query(call.id, "تست رایگان ارسال شد.")
+    send_or_edit(call, f"✅ تست رایگان نوع <b>{esc(type_row['name'])}</b> آماده شد.", back_button("main"))
+    deliver_purchase_message(call.message.chat.id, purchase_id)
+
+
+def _cb_admin_users(call, page: int):
+    rows, total = get_users(page)
+    total_pages = max(1, (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE)
+    kb = types.InlineKeyboardMarkup()
+    for row in rows:
+        safe_icon = "🟢" if row["is_safe"] else "🔘"
+        reseller_icon = "🤝" if row["is_reseller"] else ""
+        txt = f"{safe_icon}{reseller_icon} {row['full_name']} | {display_username(row['username'])}"
+        kb.add(types.InlineKeyboardButton(txt, callback_data=f"admin:user:{row['user_id']}"))
+    nav = []
+    if page > 0:
+        nav.append(types.InlineKeyboardButton("◀ قبلی", callback_data=f"admin:users:page:{page-1}"))
+    nav.append(types.InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="noop"))
+    if page + 1 < total_pages:
+        nav.append(types.InlineKeyboardButton("بعدی ▶", callback_data=f"admin:users:page:{page+1}"))
+    if nav:
+        kb.row(*nav)
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+    send_or_edit(call, f"👥 <b>مدیریت کاربران</b>\n\nتعداد کل: {total}", kb)
+
+
+def _cb_admin_settings(call):
+    card = setting_get("payment_card", "ثبت نشده")
+    bank = setting_get("payment_bank", "ثبت نشده")
+    owner = setting_get("payment_owner", "ثبت نشده")
+    card_status = setting_get("payment_card_status", "public")
+    card_status_label = "عمومی" if card_status == "public" else "فقط امن"
+    text = (
+        "⚙️ <b>تنظیمات</b>\n\n"
+        f"💳 کارت: <code>{esc(card)}</code>\n"
+        f"🏦 بانک: {esc(bank)}\n"
+        f"👤 صاحب: {esc(owner)}\n"
+        f"🔒 وضعیت نمایش کارت: {card_status_label}"
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("🎧 پشتیبانی",       callback_data="admin:set:support"),
+        types.InlineKeyboardButton("💳 اطلاعات پرداخت", callback_data="admin:set:payment"),
+    )
+    kb.add(types.InlineKeyboardButton("💰 ارز دیجیتال", callback_data="admin:set:crypto"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+    bot.answer_callback_query(call.id)
+    send_or_edit(call, text, kb)
+
+
+def _cb_admin_payment_settings(call):
+    card_status = setting_get("payment_card_status", "public")
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("💳 شماره کارت",   callback_data="admin:set:card"),
+        types.InlineKeyboardButton("🏦 نام بانک",     callback_data="admin:set:bank"),
+    )
+    kb.add(types.InlineKeyboardButton("👤 نام صاحب کارت", callback_data="admin:set:owner"))
+    kb.row(
+        types.InlineKeyboardButton(f"{'✅' if card_status=='public' else '  '} عمومی",   callback_data="admin:set:card_status:public"),
+        types.InlineKeyboardButton(f"{'✅' if card_status=='safe'   else '  '} فقط امن", callback_data="admin:set:card_status:safe"),
+    )
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
+    bot.answer_callback_query(call.id)
+    send_or_edit(call, "💳 <b>اطلاعات پرداخت</b>", kb)
+
+
+def _cb_admin_crypto_settings(call):
+    kb = types.InlineKeyboardMarkup()
+    for key, display, emoji in CRYPTO_CURRENCIES:
+        addr = setting_get(f"crypto_{key}", "")
+        label = f"{emoji} {display}: {'✅' if addr else '❌'}"
+        kb.add(types.InlineKeyboardButton(label, callback_data=f"admin:set:crypto:{key}"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
+    bot.answer_callback_query(call.id)
+    send_or_edit(call, "💰 <b>تنظیم آدرس‌های ارز دیجیتال</b>", kb)
+
+
+def _cb_admin_backup(call):
+    auto_on     = setting_get("auto_backup_enabled", "0") == "1"
+    interval_h  = setting_get("backup_interval_hours", "24")
+    backup_chat = setting_get("backup_chat_id", "")
+    text = (
+        "💾 <b>پشتیبان‌گیری</b>\n\n"
+        f"🤖 بکاپ خودکار: {'✅ فعال' if auto_on else '❌ غیرفعال'}\n"
+        f"⏰ فاصله: هر {interval_h} ساعت\n"
+        f"📤 ارسال به: {esc(backup_chat or 'تنظیم نشده')}"
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("📤 بکاپ دستی همین الان",    callback_data="admin:backup:now"))
+    kb.add(types.InlineKeyboardButton(
+        f"{'⏹ غیرفعال کردن' if auto_on else '▶️ فعال کردن'} بکاپ خودکار",
+        callback_data="admin:backup:toggle",
+    ))
+    kb.row(
+        types.InlineKeyboardButton("⏰ تنظیم فاصله",  callback_data="admin:backup:set_interval"),
+        types.InlineKeyboardButton("📤 تنظیم مقصد",  callback_data="admin:backup:set_chat"),
+    )
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+    bot.answer_callback_query(call.id)
+    send_or_edit(call, text, kb)
+
+
+def _cb_admin_channel(call):
+    enabled    = setting_get("channel_lock_enabled", "0") == "1"
+    channel_id = setting_get("channel_lock_id", "")
+    text = (
+        "📢 <b>قفل کانال</b>\n\n"
+        f"وضعیت: {'✅ فعال' if enabled else '❌ غیرفعال'}\n"
+        f"آیدی کانال: <code>{esc(channel_id or 'تنظیم نشده')}</code>\n\n"
+        "⚠️ برای کارکرد صحیح، ربات باید ادمین کانال باشد."
+    )
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton(
+        f"{'⏹ غیرفعال کردن' if enabled else '▶️ فعال کردن'} قفل کانال",
+        callback_data="admin:channel:toggle",
+    ))
+    kb.add(types.InlineKeyboardButton("📢 تنظیم آیدی کانال", callback_data="admin:channel:set_id"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+    bot.answer_callback_query(call.id)
+    send_or_edit(call, text, kb)
+
+
+def _cb_reseller_panel(call, uid: int):
+    user = get_user(uid)
+    if not user or not user["is_reseller"]:
+        bot.answer_callback_query(call.id, "دسترسی ندارید.", show_alert=True)
+        return
+    pkgs = get_packages()
+    text = "🤝 <b>قیمت‌های ویژه نمایندگی شما</b>\n\n"
+    for p in pkgs:
+        rp = get_reseller_price(uid, p["id"])
+        price = rp if rp is not None else p["price"]
+        text += f"📦 {esc(p['name'])}: {fmt_price(price)} تومان\n"
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🛒 خرید کانفیگ", callback_data="buy:start"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت",      callback_data="nav:main"))
+    send_or_edit(call, text, kb)
+
+
+# ──────────────────────────────────────────────
+# Backup
+# ──────────────────────────────────────────────
+def do_backup(notify_user_id: int | None = None):
+    target_chat = setting_get("backup_chat_id", "").strip()
+    targets = list(ADMIN_IDS)
+    if target_chat and target_chat not in [str(a) for a in targets]:
+        try:
+            targets.append(int(target_chat))
+        except Exception:
+            targets.append(target_chat)
+
+    backup_name = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    try:
+        shutil.copy(DB_NAME, backup_name)
+        with open(backup_name, "rb") as f:
+            for t in targets:
+                try:
+                    bot.send_document(t, f, caption=f"💾 بکاپ دیتابیس — {now_str()}")
+                    f.seek(0)
+                except Exception:
+                    pass
+        os.remove(backup_name)
+        if notify_user_id:
+            bot.send_message(notify_user_id, "✅ بکاپ با موفقیت ارسال شد.")
+    except Exception as e:
+        if notify_user_id:
+            bot.send_message(notify_user_id, f"❌ خطا در بکاپ: {e}")
+
+
+def schedule_backup():
+    global _backup_timer
+    cancel_backup()
+    if setting_get("auto_backup_enabled", "0") != "1":
+        return
+    try:
+        hours = int(setting_get("backup_interval_hours", "24"))
+    except Exception:
+        hours = 24
+    _backup_timer = threading.Timer(hours * 3600, _run_scheduled_backup)
+    _backup_timer.daemon = True
+    _backup_timer.start()
+
+
+def _run_scheduled_backup():
+    do_backup()
+    schedule_backup()  # reschedule
+
+
+def cancel_backup():
+    global _backup_timer
+    if _backup_timer:
+        _backup_timer.cancel()
+        _backup_timer = None
+
+
+# ──────────────────────────────────────────────
+# Text / media state machine
+# ──────────────────────────────────────────────
+@bot.message_handler(content_types=["text", "photo", "document"])
+def universal_handler(message):
+    uid = message.from_user.id
+    ensure_user(message.from_user)
+
+    # Channel lock check (skip for /start and admin)
+    if message.content_type == "text" and message.text and message.text.startswith("/start"):
+        state_clear(uid)
+        show_main_menu(message)
+        return
+
+    if not is_admin(uid) and not check_channel_membership(uid):
+        channel_id = setting_get("channel_lock_id", "").strip()
+        kb = types.InlineKeyboardMarkup()
+        if channel_id:
+            join_url = f"https://t.me/{channel_id.lstrip('@')}"
+            kb.add(types.InlineKeyboardButton("📢 عضویت در کانال", url=join_url))
+        kb.add(types.InlineKeyboardButton("✅ بررسی عضویت", callback_data="check_membership"))
+        bot.send_message(uid, "⚠️ <b>برای استفاده از ربات باید در کانال ما عضو باشید.</b>", reply_markup=kb)
+        return
+
+    st_name = state_name(uid)
+    st_data = state_data(uid)
+
+    try:
+        # ── Broadcast ──
+        if st_name == "admin_broadcast_all" and is_admin(uid):
+            users = get_users_for_broadcast()
+            sent = sum(1 for u in users if _safe_copy(u["user_id"], message))
+            state_clear(uid)
+            bot.send_message(uid, f"✅ پیام برای {sent} کاربر ارسال شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_broadcast_customers" and is_admin(uid):
+            users = get_users_for_broadcast(has_purchase=True)
+            sent = sum(1 for u in users if _safe_copy(u["user_id"], message))
+            state_clear(uid)
+            bot.send_message(uid, f"✅ پیام برای {sent} مشتری ارسال شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Wallet amount entry ──
+        if st_name == "await_wallet_amount":
+            amount = parse_int(message.text or "")
+            if amount is None or amount <= 0:
+                bot.send_message(uid, "⚠️ لطفاً مبلغ معتبر وارد کنید.", reply_markup=back_button("main"))
+                return
+            # Save amount and show payment method selection
+            state_set(uid, "await_wallet_amount", amount=amount)
+            kb = types.InlineKeyboardMarkup()
+            kb.row(
+                types.InlineKeyboardButton("💳 کارت به کارت", callback_data="wallet:charge:card"),
+                types.InlineKeyboardButton("💰 ارز دیجیتال",  callback_data="wallet:charge:crypto"),
+            )
+            kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="wallet:charge"))
+            bot.send_message(uid, f"💰 مبلغ <b>{fmt_price(amount)}</b> تومان ثبت شد.\nروش پرداخت را انتخاب کنید:", reply_markup=kb)
+            return
+
+        # ── Wallet card receipt ──
+        if st_name == "await_wallet_receipt":
+            payment_id = st_data.get("payment_id")
+            file_id = None
+            text_val = message.text or ""
+            if message.photo:
+                file_id = message.photo[-1].file_id
+            elif message.document:
+                file_id = message.document.file_id
+            update_payment_receipt(payment_id, file_id, text_val.strip())
+            state_clear(uid)
+            bot.send_message(uid, "✅ رسید دریافت شد و برای بررسی ادمین ارسال گردید.", reply_markup=kb_main(uid))
+            send_payment_to_admins(payment_id)
+            return
+
+        # ── Crypto receipt (wallet or purchase) ──
+        if st_name == "await_crypto_receipt":
+            payment_id = st_data.get("payment_id")
+            file_id = None
+            text_val = message.text or ""
+            if message.photo:
+                file_id = message.photo[-1].file_id
+            elif message.document:
+                file_id = message.document.file_id
+            update_payment_receipt(payment_id, file_id, text_val.strip())
+            state_clear(uid)
+            bot.send_message(uid, "✅ اطلاعات پرداخت دریافت شد و برای بررسی ارسال گردید.", reply_markup=kb_main(uid))
+            send_payment_to_admins(payment_id)
+            return
+
+        # ── Purchase card receipt ──
+        if st_name == "await_purchase_receipt":
+            payment_id = st_data.get("payment_id")
+            file_id = None
+            text_val = message.text or ""
+            if message.photo:
+                file_id = message.photo[-1].file_id
+            elif message.document:
+                file_id = message.document.file_id
+            update_payment_receipt(payment_id, file_id, text_val.strip())
+            state_clear(uid)
+            bot.send_message(uid, "✅ رسید دریافت شد و برای بررسی ادمین ارسال گردید.", reply_markup=kb_main(uid))
+            send_payment_to_admins(payment_id)
+            return
+
+        # ── Admin: type add/edit ──
+        if st_name == "admin_add_type" and is_admin(uid):
+            name = (message.text or "").strip()
+            if not name:
+                bot.send_message(uid, "⚠️ نام نوع نمی‌تواند خالی باشد.", reply_markup=back_button("admin:types"))
+                return
+            try:
+                add_type(name)
+                state_clear(uid)
+                bot.send_message(uid, "✅ نوع جدید ثبت شد.", reply_markup=kb_admin_panel())
+            except sqlite3.IntegrityError:
+                bot.send_message(uid, "⚠️ این نوع قبلاً ثبت شده است.", reply_markup=back_button("admin:types"))
+            return
+
+        if st_name == "admin_edit_type" and is_admin(uid):
+            new_name = (message.text or "").strip()
+            if not new_name:
+                bot.send_message(uid, "⚠️ نام معتبر وارد کنید.", reply_markup=back_button("admin:types"))
+                return
+            update_type(st_data["type_id"], new_name)
+            state_clear(uid)
+            bot.send_message(uid, "✅ نوع ویرایش شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Admin: add package steps ──
+        if st_name == "admin_add_package_name" and is_admin(uid):
+            pkg_name = (message.text or "").strip()
+            if not pkg_name:
+                bot.send_message(uid, "⚠️ نام پکیج را صحیح وارد کنید.", reply_markup=back_button("admin:add_package"))
+                return
+            state_set(uid, "admin_add_package_volume", type_id=st_data["type_id"], package_name=pkg_name)
+            bot.send_message(uid, "🔋 حجم پکیج را به گیگ وارد کنید:", reply_markup=back_button("admin:add_package"))
+            return
+
+        if st_name == "admin_add_package_volume" and is_admin(uid):
+            volume = parse_int(message.text or "")
+            if volume is None or volume < 0:
+                bot.send_message(uid, "⚠️ حجم معتبر وارد کنید.", reply_markup=back_button("admin:add_package"))
+                return
+            state_set(uid, "admin_add_package_duration",
+                      type_id=st_data["type_id"], package_name=st_data["package_name"], volume=volume)
+            bot.send_message(uid, "⏰ مدت پکیج را به روز وارد کنید:", reply_markup=back_button("admin:add_package"))
+            return
+
+        if st_name == "admin_add_package_duration" and is_admin(uid):
+            duration = parse_int(message.text or "")
+            if duration is None or duration < 0:
+                bot.send_message(uid, "⚠️ مدت معتبر وارد کنید.", reply_markup=back_button("admin:add_package"))
+                return
+            state_set(uid, "admin_add_package_price",
+                      type_id=st_data["type_id"], package_name=st_data["package_name"],
+                      volume=st_data["volume"], duration=duration)
+            bot.send_message(uid, "💰 قیمت پکیج را به تومان وارد کنید. (برای تست رایگان عدد <b>0</b> بفرستید)", reply_markup=back_button("admin:add_package"))
+            return
+
+        if st_name == "admin_add_package_price" and is_admin(uid):
+            price = parse_int(message.text or "")
+            if price is None or price < 0:
+                bot.send_message(uid, "⚠️ قیمت معتبر وارد کنید.", reply_markup=back_button("admin:add_package"))
+                return
+            add_package(st_data["type_id"], st_data["package_name"], st_data["volume"], st_data["duration"], price)
+            state_clear(uid)
+            bot.send_message(uid, "✅ پکیج با موفقیت ثبت شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Admin: edit package fields ──
+        if st_name == "admin_edit_pkg_name" and is_admin(uid):
+            name = (message.text or "").strip()
+            if not name:
+                bot.send_message(uid, "⚠️ نام معتبر وارد کنید.", reply_markup=back_button("admin:pkgs"))
+                return
+            update_package_field(st_data["pkg_id"], "name", name)
+            state_clear(uid)
+            bot.send_message(uid, "✅ نام پکیج ویرایش شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_edit_pkg_price" and is_admin(uid):
+            price = parse_int(message.text or "")
+            if price is None or price < 0:
+                bot.send_message(uid, "⚠️ قیمت معتبر وارد کنید.", reply_markup=back_button("admin:pkgs"))
+                return
+            update_package_field(st_data["pkg_id"], "price", price)
+            state_clear(uid)
+            bot.send_message(uid, "✅ قیمت پکیج ویرایش شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_edit_pkg_vol" and is_admin(uid):
+            vol = parse_int(message.text or "")
+            if vol is None or vol < 0:
+                bot.send_message(uid, "⚠️ حجم معتبر وارد کنید.", reply_markup=back_button("admin:pkgs"))
+                return
+            update_package_field(st_data["pkg_id"], "volume_gb", vol)
+            state_clear(uid)
+            bot.send_message(uid, "✅ حجم پکیج ویرایش شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_edit_pkg_dur" and is_admin(uid):
+            dur = parse_int(message.text or "")
+            if dur is None or dur < 0:
+                bot.send_message(uid, "⚠️ مدت معتبر وارد کنید.", reply_markup=back_button("admin:pkgs"))
+                return
+            update_package_field(st_data["pkg_id"], "duration_days", dur)
+            state_clear(uid)
+            bot.send_message(uid, "✅ مدت پکیج ویرایش شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Admin: add config steps ──
+        if st_name == "admin_add_config_service" and is_admin(uid):
+            service_name = (message.text or "").strip()
+            if not service_name:
+                bot.send_message(uid, "⚠️ نام سرویس را وارد کنید.", reply_markup=back_button("admin:add_config"))
+                return
+            state_set(uid, "admin_add_config_text",
+                      package_id=st_data["package_id"], type_id=st_data["type_id"], service_name=service_name)
+            bot.send_message(uid, "💝 متن کانفیگ را ارسال کنید:", reply_markup=back_button("admin:add_config"))
+            return
+
+        if st_name == "admin_add_config_text" and is_admin(uid):
+            config_text = (message.text or "").strip()
+            if not config_text:
+                bot.send_message(uid, "⚠️ متن کانفیگ را وارد کنید.", reply_markup=back_button("admin:add_config"))
+                return
+            state_set(uid, "admin_add_config_link",
+                      package_id=st_data["package_id"], type_id=st_data["type_id"],
+                      service_name=st_data["service_name"], config_text=config_text)
+            bot.send_message(uid, "🔗 لینک استعلام را ارسال کنید.\nبدون لینک؟ یک خط تیره <code>-</code> بفرستید.", reply_markup=back_button("admin:add_config"))
+            return
+
+        if st_name == "admin_add_config_link" and is_admin(uid):
+            inquiry_link = (message.text or "").strip()
+            if inquiry_link == "-":
+                inquiry_link = ""
+            add_config(st_data["type_id"], st_data["package_id"], st_data["service_name"], st_data["config_text"], inquiry_link)
+            state_clear(uid)
+            bot.send_message(uid, "✅ کانفیگ با موفقیت ثبت شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Admin: settings ──
+        if st_name == "admin_set_support" and is_admin(uid):
+            setting_set("support_username", (message.text or "").strip())
+            state_clear(uid)
+            bot.send_message(uid, "✅ آیدی پشتیبانی ذخیره شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_set_card" and is_admin(uid):
+            setting_set("payment_card", normalize_text_number(message.text or ""))
+            state_clear(uid)
+            bot.send_message(uid, "✅ شماره کارت ذخیره شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_set_bank" and is_admin(uid):
+            setting_set("payment_bank", (message.text or "").strip())
+            state_clear(uid)
+            bot.send_message(uid, "✅ نام بانک ذخیره شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_set_owner" and is_admin(uid):
+            setting_set("payment_owner", (message.text or "").strip())
+            state_clear(uid)
+            bot.send_message(uid, "✅ نام صاحب کارت ذخیره شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_set_crypto" and is_admin(uid):
+            currency = st_data.get("currency", "")
+            addr = (message.text or "").strip()
+            setting_set(f"crypto_{currency}", addr)
+            state_clear(uid)
+            disp = next((d for k, d, _ in CRYPTO_CURRENCIES if k == currency), currency)
+            bot.send_message(uid, f"✅ آدرس ولت {disp} ذخیره شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Admin: payment approvals ──
+        if st_name == "admin_payment_approve_note" and is_admin(uid):
+            payment_id = st_data["payment_id"]
+            note = (message.text or "").strip() or "واریزی شما تأیید شد."
+            finish_card_payment_approval(payment_id, note, approved=True)
+            state_clear(uid)
+            bot.send_message(uid, "✅ درخواست با موفقیت تأیید شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_payment_reject_note" and is_admin(uid):
+            payment_id = st_data["payment_id"]
+            note = (message.text or "").strip() or "رسید شما رد شد."
+            finish_card_payment_approval(payment_id, note, approved=False)
+            state_clear(uid)
+            bot.send_message(uid, "✅ درخواست با موفقیت رد شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Admin: balance ──
+        if st_name == "admin_bal_increase" and is_admin(uid):
+            amount = parse_int(message.text or "")
+            if amount is None or amount <= 0:
+                bot.send_message(uid, "⚠️ مبلغ معتبر وارد کنید.", reply_markup=back_button("admin:panel"))
+                return
+            target_uid = st_data["target_user_id"]
+            update_balance(target_uid, amount)
+            state_clear(uid)
+            u = get_user(target_uid)
+            bot.send_message(uid, f"✅ موجودی افزایش یافت.\nموجودی جدید: {fmt_price(u['balance'])} تومان", reply_markup=kb_admin_panel())
+            try:
+                bot.send_message(target_uid, f"💰 موجودی کیف پول شما <b>{fmt_price(amount)}</b> تومان افزایش یافت.")
+            except Exception:
+                pass
+            return
+
+        if st_name == "admin_bal_decrease" and is_admin(uid):
+            amount = parse_int(message.text or "")
+            if amount is None or amount <= 0:
+                bot.send_message(uid, "⚠️ مبلغ معتبر وارد کنید.", reply_markup=back_button("admin:panel"))
+                return
+            target_uid = st_data["target_user_id"]
+            update_balance(target_uid, -amount)
+            state_clear(uid)
+            u = get_user(target_uid)
+            bot.send_message(uid, f"✅ موجودی کاهش یافت.\nموجودی جدید: {fmt_price(u['balance'])} تومان", reply_markup=kb_admin_panel())
+            try:
+                bot.send_message(target_uid, f"💰 موجودی کیف پول شما <b>{fmt_price(amount)}</b> تومان کاهش یافت.")
+            except Exception:
+                pass
+            return
+
+        # ── Admin: reseller price ──
+        if st_name == "admin_set_reseller_price" and is_admin(uid):
+            price = parse_int(message.text or "")
+            if price is None or price < 0:
+                bot.send_message(uid, "⚠️ قیمت معتبر وارد کنید.", reply_markup=back_button("admin:panel"))
+                return
+            set_reseller_price(st_data["target_user_id"], st_data["pkg_id"], price)
+            state_clear(uid)
+            bot.send_message(uid, "✅ قیمت نمایندگی ثبت شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Admin: backup settings ──
+        if st_name == "admin_set_backup_interval" and is_admin(uid):
+            hours = parse_int(message.text or "")
+            if hours is None or hours < 1:
+                bot.send_message(uid, "⚠️ عدد معتبر وارد کنید (حداقل 1 ساعت).", reply_markup=back_button("admin:backup"))
+                return
+            setting_set("backup_interval_hours", str(hours))
+            state_clear(uid)
+            if setting_get("auto_backup_enabled") == "1":
+                schedule_backup()
+            bot.send_message(uid, f"✅ فاصله بکاپ به {hours} ساعت تنظیم شد.", reply_markup=kb_admin_panel())
+            return
+
+        if st_name == "admin_set_backup_chat" and is_admin(uid):
+            chat_id_val = (message.text or "").strip()
+            setting_set("backup_chat_id", chat_id_val)
+            state_clear(uid)
+            bot.send_message(uid, "✅ مقصد بکاپ ثبت شد.", reply_markup=kb_admin_panel())
+            return
+
+        # ── Admin: channel lock ──
+        if st_name == "admin_set_channel_id" and is_admin(uid):
+            ch_id = (message.text or "").strip()
+            setting_set("channel_lock_id", ch_id)
+            state_clear(uid)
+            bot.send_message(uid, f"✅ آیدی کانال ذخیره شد: <code>{esc(ch_id)}</code>", reply_markup=kb_admin_panel())
+            return
+
+    except Exception as e:
+        print("TEXT_HANDLER_ERROR:", e)
+        traceback.print_exc()
+        state_clear(uid)
+        bot.send_message(uid, "⚠️ در پردازش مرحله جاری خطایی رخ داد. لطفاً دوباره از منو ادامه دهید.", reply_markup=kb_main(uid))
+        return
+
+    # Fallback
+    if message.content_type == "text":
+        bot.send_message(uid, "لطفاً از دکمه‌های منو استفاده کنید.", reply_markup=kb_main(uid))
+
+
+def _safe_copy(to_chat_id: int, message) -> bool:
+    try:
+        bot.copy_message(to_chat_id, message.chat.id, message.message_id)
+        return True
+    except Exception:
+        return False
+
+
+# ──────────────────────────────────────────────
+# Bootstrap
+# ──────────────────────────────────────────────
+def main():
     init_db()
-    print("TracklessVPN bot is running...")
+    set_bot_commands()
+    if setting_get("auto_backup_enabled", "0") == "1":
+        schedule_backup()
+    print("Bot v4 is running...")
     bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
+
+
+if __name__ == "__main__":
+    main()
+
