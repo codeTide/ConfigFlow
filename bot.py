@@ -13,9 +13,11 @@ import io
 import os
 import re
 import html
+import json
 import sqlite3
 import traceback
 import threading
+import urllib.request
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -32,7 +34,17 @@ DB_NAME    = os.getenv("DB_NAME", "meli_trackless.db")
 
 BRAND_TITLE          = "TracklessVPN"
 DEFAULT_ADMIN_HANDLE = "@Tracklessvpnadmin"
-NOBITEX_URL          = "https://nobitex.ir/price"
+CRYPTO_PRICES_API    = "https://sarfe.erfjab.com/api/prices"
+TETRAPAY_CREATE_URL  = "https://tetra98.com/api/create_order"
+TETRAPAY_VERIFY_URL  = "https://tetra98.com/api/verify"
+
+CRYPTO_API_SYMBOLS = {
+    "tron":       "TRX",
+    "ton":        "TON",
+    "usdt_bep20": "USDT",
+    "usdc_bep20": "USDC",
+    "ltc":        "LTC",
+}
 
 CRYPTO_COINS = [
     ("tron",       "🔵 Tron (TRC20)"),
@@ -210,7 +222,13 @@ def init_db():
             "payment_card":     "",
             "payment_bank":     "",
             "payment_owner":    "",
-            "card_visibility":  "public",
+            "gw_card_enabled":      "0",
+            "gw_card_visibility":   "public",
+            "gw_crypto_enabled":    "0",
+            "gw_crypto_visibility": "public",
+            "gw_tetrapay_enabled":    "0",
+            "gw_tetrapay_visibility": "public",
+            "tetrapay_api_key":       "",
             "channel_id":       "",
             "backup_enabled":   "0",
             "backup_interval":  "24",
@@ -246,6 +264,90 @@ def setting_set(key, value):
             "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (key, value)
         )
+
+# ── Gateway helpers ────────────────────────────────────────────────────────────
+def is_gateway_available(gw_name, user_id):
+    enabled = setting_get(f"gw_{gw_name}_enabled", "0")
+    if enabled != "1":
+        return False
+    visibility = setting_get(f"gw_{gw_name}_visibility", "public")
+    if visibility == "secure":
+        user = get_user(user_id)
+        return user and user["status"] == "safe"
+    return True
+
+def is_card_info_complete():
+    return all([
+        setting_get("payment_card", ""),
+        setting_get("payment_bank", ""),
+        setting_get("payment_owner", ""),
+    ])
+
+def fetch_crypto_prices():
+    try:
+        req = urllib.request.Request(CRYPTO_PRICES_API, headers={"User-Agent": "ConfigFlow/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        prices = {}
+        for key, val in data.items():
+            if key.endswith("/IRT"):
+                symbol = key.split("/")[0]
+                try:
+                    prices[symbol] = float(str(val).replace(",", ""))
+                except (ValueError, TypeError):
+                    pass
+        return prices
+    except Exception:
+        return {}
+
+def create_tetrapay_order(amount, hash_id, description="پرداخت"):
+    api_key = setting_get("tetrapay_api_key", "")
+    if not api_key:
+        return False, {"error": "API key not set"}
+    payload = json.dumps({
+        "ApiKey": api_key,
+        "Hash_id": hash_id,
+        "Amount": amount,
+        "Description": description,
+        "Email": "",
+        "Mobile": "",
+        "CallbackURL": "https://configflow.local/cb"
+    }).encode()
+    req = urllib.request.Request(
+        TETRAPAY_CREATE_URL,
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": "ConfigFlow/1.0"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode())
+        if str(result.get("status")) == "100":
+            return True, result
+        return False, result
+    except Exception as e:
+        return False, {"error": str(e)}
+
+def verify_tetrapay_order(authority):
+    api_key = setting_get("tetrapay_api_key", "")
+    if not api_key:
+        return False, {"error": "API key not set"}
+    payload = json.dumps({
+        "authority": authority,
+        "ApiKey": api_key
+    }).encode()
+    req = urllib.request.Request(
+        TETRAPAY_VERIFY_URL,
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": "ConfigFlow/1.0"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode())
+        if str(result.get("status")) == "100":
+            return True, result
+        return False, result
+    except Exception as e:
+        return False, {"error": str(e)}
 
 def ensure_user(tg_user):
     uid = tg_user.id
@@ -789,18 +891,14 @@ def show_payment_method_selection(target, uid, context_data):
     """
     amount     = context_data["amount"]
     kind       = context_data["kind"]
-    card       = setting_get("payment_card", "")
-    visibility = setting_get("card_visibility", "public")
-    user       = get_user(uid)
-    user_status = user["status"] if user else "safe"
-
-    # Show card option based on visibility setting
-    show_card = card and (visibility == "public" or user_status == "safe")
 
     kb = types.InlineKeyboardMarkup()
-    if show_card:
+    if is_gateway_available("card", uid) and is_card_info_complete():
         kb.add(types.InlineKeyboardButton("💳 کارت به کارت", callback_data="pm:card"))
-    kb.add(types.InlineKeyboardButton("💎 ارز دیجیتال", callback_data="pm:crypto"))
+    if is_gateway_available("crypto", uid):
+        kb.add(types.InlineKeyboardButton("💎 ارز دیجیتال", callback_data="pm:crypto"))
+    if is_gateway_available("tetrapay", uid):
+        kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data="pm:tetrapay"))
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
 
     user = get_user(uid)
@@ -814,30 +912,45 @@ def show_payment_method_selection(target, uid, context_data):
         kb
     )
 
-def show_crypto_selection(target):
+def show_crypto_selection(target, amount=None):
     kb = types.InlineKeyboardMarkup()
+    prices = fetch_crypto_prices() if amount else {}
     for coin_key, coin_label in CRYPTO_COINS:
         addr = setting_get(f"crypto_{coin_key}", "")
         if addr:
-            kb.add(types.InlineKeyboardButton(coin_label, callback_data=f"pm:crypto:{coin_key}"))
+            symbol = CRYPTO_API_SYMBOLS.get(coin_key, "")
+            price_note = ""
+            if amount and symbol in prices and prices[symbol] > 0:
+                coin_amount = amount / prices[symbol]
+                price_note = f" ≈ {coin_amount:.4f} {symbol}"
+            kb.add(types.InlineKeyboardButton(f"{coin_label}{price_note}", callback_data=f"pm:crypto:{coin_key}"))
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="pm:back"))
     send_or_edit(target, "💎 <b>ارز دیجیتال</b>\n\nنوع ارز را انتخاب کنید:", kb)
 
 def show_crypto_payment_info(target, uid, coin_key, amount):
     addr  = setting_get(f"crypto_{coin_key}", "")
     label = next((l for k, l in CRYPTO_COINS if k == coin_key), coin_key)
+    symbol = CRYPTO_API_SYMBOLS.get(coin_key, "")
     if not addr:
         send_or_edit(target, "⚠️ آدرس این ارز هنوز توسط ادمین ثبت نشده است.", back_button("main"))
         return
+
+    price_text = ""
+    prices = fetch_crypto_prices()
+    if symbol and symbol in prices and prices[symbol] > 0:
+        coin_amount = amount / prices[symbol]
+        price_text = (
+            f"\n\n💱 <b>معادل ارزی:</b> <code>{coin_amount:.6f}</code> {symbol}\n"
+            f"برای پرداخت با این ارز باید معادل <b>{coin_amount:.6f} {symbol}</b> واریز نمایید."
+        )
+
     text = (
         f"💎 <b>پرداخت با {label}</b>\n\n"
-        f"مبلغ: <b>{fmt_price(amount)}</b> تومان\n\n"
+        f"مبلغ: <b>{fmt_price(amount)}</b> تومان{price_text}\n\n"
         f"📋 آدرس ولت:\n<code>{esc(addr)}</code>\n\n"
-        f"📊 برای بررسی قیمت لحظه‌ای:\n{NOBITEX_URL}\n\n"
         "پس از واریز، تصویر تراکنش یا هش آن را ارسال کنید."
     )
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📊 قیمت لحظه‌ای", url=NOBITEX_URL))
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
     send_or_edit(target, text, kb)
 
@@ -959,10 +1072,14 @@ def on_callback(call):
 
 def _dispatch_callback(call, uid, data):
     # Navigation
-    if data == "nav:main":
+    if data.startswith("nav:"):
+        target = data[4:]
         state_clear(uid)
         bot.answer_callback_query(call.id)
-        show_main_menu(call)
+        if target == "main":
+            show_main_menu(call)
+        else:
+            _fake_call(call, target)
         return
 
     if data == "profile":
@@ -1039,16 +1156,14 @@ def _dispatch_callback(call, uid, data):
             f"💰 قیمت: {fmt_price(price)} تومان\n\n"
             "روش پرداخت را انتخاب کنید:"
         )
-        card        = setting_get("payment_card", "")
-        visibility  = setting_get("card_visibility", "public")
-        user        = get_user(uid)
-        user_status = user["status"] if user else "safe"
-        show_card   = card and (visibility == "public" or user_status == "safe")
         kb = types.InlineKeyboardMarkup()
         kb.add(types.InlineKeyboardButton("💰 پرداخت از موجودی", callback_data=f"pay:wallet:{package_id}"))
-        if show_card:
+        if is_gateway_available("card", uid) and is_card_info_complete():
             kb.add(types.InlineKeyboardButton("💳 کارت به کارت", callback_data=f"pay:card:{package_id}"))
-        kb.add(types.InlineKeyboardButton("💎 ارز دیجیتال", callback_data=f"pay:crypto:{package_id}"))
+        if is_gateway_available("crypto", uid):
+            kb.add(types.InlineKeyboardButton("💎 ارز دیجیتال", callback_data=f"pay:crypto:{package_id}"))
+        if is_gateway_available("tetrapay", uid):
+            kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data=f"pay:tetrapay:{package_id}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"buy:t:{package_row['type_id']}"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
@@ -1125,7 +1240,7 @@ def _dispatch_callback(call, uid, data):
         price = get_effective_price(uid, package_row)
         state_set(uid, "buy_crypto_select_coin", package_id=package_id, amount=price)
         bot.answer_callback_query(call.id)
-        show_crypto_selection(call)
+        show_crypto_selection(call, amount=price)
         return
 
     # Crypto coin selection (after buy)
@@ -1161,17 +1276,96 @@ def _dispatch_callback(call, uid, data):
 
     if data == "pm:crypto":
         sd = state_data(uid)
+        amount = sd.get("amount")
         if state_name(uid) == "wallet_charge_method":
-            amount     = sd.get("amount")
             payment_id = create_payment("wallet_charge", uid, None, amount, "crypto", status="pending")
             state_set(uid, "wallet_crypto_select_coin", amount=amount, payment_id=payment_id)
         bot.answer_callback_query(call.id)
-        show_crypto_selection(call)
+        show_crypto_selection(call, amount=amount)
         return
 
     if data == "pm:back":
         bot.answer_callback_query(call.id)
         show_main_menu(call)
+        return
+
+    # ── TetraPay ──────────────────────────────────────────────────────────────
+    if data.startswith("pay:tetrapay:verify:"):
+        payment_id = int(data.split(":")[3])
+        payment = get_payment(payment_id)
+        if not payment or payment["user_id"] != uid:
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        if payment["status"] != "pending":
+            bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+            return
+        authority = payment["receipt_text"]
+        success, result = verify_tetrapay_order(authority)
+        if success:
+            if payment["kind"] == "wallet_charge":
+                update_balance(uid, payment["amount"])
+                complete_payment(payment_id)
+                bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+                send_or_edit(call, f"✅ پرداخت شما تأیید و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان", back_button("main"))
+                state_clear(uid)
+            else:
+                config_id = payment["config_id"]
+                package_id = payment["package_id"]
+                package_row = get_package(package_id)
+                if not config_id:
+                    config_id = reserve_first_config(package_id, payment_id)
+                if not config_id:
+                    bot.answer_callback_query(call.id, "پرداخت تأیید شد اما کانفیگ موجود نیست. با پشتیبانی تماس بگیرید.", show_alert=True)
+                    return
+                purchase_id = assign_config_to_user(config_id, uid, package_id, payment["amount"], "tetrapay", is_test=0)
+                complete_payment(payment_id)
+                bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+                send_or_edit(call, "✅ پرداخت شما تأیید شد و سرویس آماده است.", back_button("main"))
+                deliver_purchase_message(call.message.chat.id, purchase_id)
+                admin_purchase_notify("TetraPay", get_user(uid), package_row)
+                state_clear(uid)
+        else:
+            bot.answer_callback_query(call.id, "❌ پرداخت هنوز تأیید نشده. لطفاً ابتدا پرداخت را انجام دهید.", show_alert=True)
+        return
+
+    if data.startswith("pay:tetrapay:"):
+        package_id = int(data.split(":")[2])
+        package_row = get_package(package_id)
+        if not package_row or package_row["stock"] <= 0:
+            bot.answer_callback_query(call.id, "موجودی این پکیج تمام شده است.", show_alert=True)
+            return
+        price = get_effective_price(uid, package_row)
+        hash_id = f"cfg-{uid}-{package_id}-{int(datetime.now().timestamp())}"
+        success, result = create_tetrapay_order(price, hash_id, f"خرید {package_row['name']}")
+        if not success:
+            bot.answer_callback_query(call.id, "خطا در ایجاد درخواست پرداخت آنلاین.", show_alert=True)
+            return
+        authority = result.get("Authority", "")
+        pay_url_bot = result.get("payment_url_bot", "")
+        pay_url_web = result.get("payment_url_web", "")
+        payment_id = create_payment("config_purchase", uid, package_id, price, "tetrapay", status="pending")
+        config_id = reserve_first_config(package_id, payment_id=payment_id)
+        if not config_id:
+            bot.answer_callback_query(call.id, "فعلاً کانفیگی موجود نیست.", show_alert=True)
+            return
+        with get_conn() as conn:
+            conn.execute("UPDATE payments SET config_id=?, receipt_text=? WHERE id=?", (config_id, authority, payment_id))
+        state_set(uid, "await_tetrapay_verify", payment_id=payment_id, authority=authority)
+        text = (
+            "🏦 <b>پرداخت آنلاین (TetraPay)</b>\n\n"
+            f"💰 مبلغ: <b>{fmt_price(price)}</b> تومان\n\n"
+            "لطفاً از یکی از لینک‌های زیر پرداخت را انجام دهید.\n"
+            "پس از پرداخت، دکمه «✅ بررسی پرداخت» را بزنید."
+        )
+        kb = types.InlineKeyboardMarkup()
+        if pay_url_bot:
+            kb.add(types.InlineKeyboardButton("💳 پرداخت در تلگرام", url=pay_url_bot))
+        if pay_url_web:
+            kb.add(types.InlineKeyboardButton("🌐 پرداخت در مرورگر", url=pay_url_web))
+        kb.add(types.InlineKeyboardButton("✅ بررسی پرداخت", callback_data=f"pay:tetrapay:verify:{payment_id}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
         return
 
     # ── Free test ─────────────────────────────────────────────────────────────
@@ -1254,7 +1448,42 @@ def _dispatch_callback(call, uid, data):
             return
         state_set(uid, "wallet_crypto_select_coin", amount=amount)
         bot.answer_callback_query(call.id)
-        show_crypto_selection(call)
+        show_crypto_selection(call, amount=amount)
+        return
+
+    if data == "wallet:charge:tetrapay":
+        sd     = state_data(uid)
+        amount = sd.get("amount")
+        if not amount:
+            bot.answer_callback_query(call.id, "ابتدا مبلغ را وارد کنید.", show_alert=True)
+            return
+        hash_id = f"wallet-{uid}-{int(datetime.now().timestamp())}"
+        success, result = create_tetrapay_order(amount, hash_id, "شارژ کیف پول")
+        if not success:
+            bot.answer_callback_query(call.id, "خطا در ایجاد درخواست پرداخت آنلاین.", show_alert=True)
+            return
+        authority = result.get("Authority", "")
+        pay_url_bot = result.get("payment_url_bot", "")
+        pay_url_web = result.get("payment_url_web", "")
+        payment_id = create_payment("wallet_charge", uid, None, amount, "tetrapay", status="pending")
+        with get_conn() as conn:
+            conn.execute("UPDATE payments SET receipt_text=? WHERE id=?", (authority, payment_id))
+        state_set(uid, "await_tetrapay_verify", payment_id=payment_id, authority=authority)
+        text = (
+            "🏦 <b>شارژ کیف پول - پرداخت آنلاین (TetraPay)</b>\n\n"
+            f"💰 مبلغ: <b>{fmt_price(amount)}</b> تومان\n\n"
+            "لطفاً از یکی از لینک‌های زیر پرداخت را انجام دهید.\n"
+            "پس از پرداخت، دکمه «✅ بررسی پرداخت» را بزنید."
+        )
+        kb = types.InlineKeyboardMarkup()
+        if pay_url_bot:
+            kb.add(types.InlineKeyboardButton("💳 پرداخت در تلگرام", url=pay_url_bot))
+        if pay_url_web:
+            kb.add(types.InlineKeyboardButton("🌐 پرداخت در مرورگر", url=pay_url_web))
+        kb.add(types.InlineKeyboardButton("✅ بررسی پرداخت", callback_data=f"pay:tetrapay:verify:{payment_id}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
         return
 
     # ── Admin panel ────────────────────────────────────────────────────────────
@@ -1678,13 +1907,10 @@ def _dispatch_callback(call, uid, data):
     if data == "admin:settings":
         kb = types.InlineKeyboardMarkup()
         kb.row(
-            types.InlineKeyboardButton("🎧 پشتیبانی",        callback_data="adm:set:support"),
-            types.InlineKeyboardButton("💳 اطلاعات پرداخت",  callback_data="adm:set:payment"),
+            types.InlineKeyboardButton("🎧 پشتیبانی",           callback_data="adm:set:support"),
+            types.InlineKeyboardButton("💳 درگاه‌های پرداخت",   callback_data="adm:set:gateways"),
         )
-        kb.row(
-            types.InlineKeyboardButton("💎 ارز دیجیتال",     callback_data="adm:set:crypto"),
-            types.InlineKeyboardButton("📢 کانال قفل",        callback_data="adm:set:channel"),
-        )
+        kb.add(types.InlineKeyboardButton("📢 کانال قفل",        callback_data="adm:set:channel"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت",        callback_data="admin:panel"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, "⚙️ <b>تنظیمات</b>", kb)
@@ -1697,67 +1923,180 @@ def _dispatch_callback(call, uid, data):
                      back_button("admin:settings"))
         return
 
-    if data == "adm:set:payment":
-        vis  = setting_get("card_visibility", "public")
-        vis_label = "عمومی ✅" if vis == "public" else "امن (فقط مشتریان امن) 🔒"
-        kb   = types.InlineKeyboardMarkup()
-        kb.row(
-            types.InlineKeyboardButton("💳 شماره کارت", callback_data="adm:set:card"),
-            types.InlineKeyboardButton("🏦 بانک",        callback_data="adm:set:bank"),
-        )
-        kb.add(types.InlineKeyboardButton("👤 نام صاحب کارت", callback_data="adm:set:owner"))
-        kb.add(types.InlineKeyboardButton(f"👁 نمایش: {vis_label}", callback_data="adm:set:cardvis"))
+    # ── Gateway settings ──────────────────────────────────────────────────────
+    if data == "adm:set:gateways":
+        kb = types.InlineKeyboardMarkup()
+        for gw_key, gw_label in [("card", "💳 کارت به کارت"), ("crypto", "💎 ارز دیجیتال"), ("tetrapay", "🏦 کارت به کارت آنلاین (TetraPay)")]:
+            enabled = setting_get(f"gw_{gw_key}_enabled", "0")
+            status_icon = "🟢" if enabled == "1" else "🔴"
+            kb.add(types.InlineKeyboardButton(f"{status_icon} {gw_label}", callback_data=f"adm:set:gw:{gw_key}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
         bot.answer_callback_query(call.id)
-        card  = setting_get("payment_card","")
-        bank  = setting_get("payment_bank","")
-        owner = setting_get("payment_owner","")
-        text  = (
-            "💳 <b>اطلاعات پرداخت</b>\n\n"
+        send_or_edit(call, "💳 <b>درگاه‌های پرداخت</b>\n\nدرگاه مورد نظر را انتخاب کنید:", kb)
+        return
+
+    if data == "adm:set:gw:card":
+        enabled = setting_get("gw_card_enabled", "0")
+        vis = setting_get("gw_card_visibility", "public")
+        card = setting_get("payment_card", "")
+        bank = setting_get("payment_bank", "")
+        owner = setting_get("payment_owner", "")
+        enabled_label = "🟢 فعال" if enabled == "1" else "🔴 غیرفعال"
+        vis_label = "👥 عمومی" if vis == "public" else "🔒 کاربران امن"
+        kb = types.InlineKeyboardMarkup()
+        kb.row(
+            types.InlineKeyboardButton(f"وضعیت: {enabled_label}", callback_data="adm:gw:card:toggle"),
+            types.InlineKeyboardButton(f"نمایش: {vis_label}", callback_data="adm:gw:card:vis"),
+        )
+        kb.add(types.InlineKeyboardButton("💳 شماره کارت", callback_data="adm:set:card"))
+        kb.add(types.InlineKeyboardButton("🏦 نام بانک", callback_data="adm:set:bank"))
+        kb.add(types.InlineKeyboardButton("👤 نام صاحب کارت", callback_data="adm:set:owner"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:set:gateways"))
+        text = (
+            "💳 <b>درگاه کارت به کارت</b>\n\n"
+            f"وضعیت: {enabled_label}\n"
+            f"نمایش: {vis_label}\n\n"
             f"کارت: <code>{esc(card or 'ثبت نشده')}</code>\n"
             f"بانک: {esc(bank or 'ثبت نشده')}\n"
-            f"صاحب: {esc(owner or 'ثبت نشده')}\n"
-            f"نمایش: {vis_label}"
+            f"صاحب: {esc(owner or 'ثبت نشده')}"
         )
+        bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
         return
 
-    if data == "adm:set:cardvis":
-        vis = setting_get("card_visibility", "public")
-        new_vis = "secure" if vis == "public" else "public"
-        setting_set("card_visibility", new_vis)
+    if data == "adm:gw:card:toggle":
+        enabled = setting_get("gw_card_enabled", "0")
+        setting_set("gw_card_enabled", "0" if enabled == "1" else "1")
         bot.answer_callback_query(call.id, "تغییر یافت.")
-        # Re-show payment settings
-        _fake_call(call, "adm:set:payment")
+        _fake_call(call, "adm:set:gw:card")
+        return
+
+    if data == "adm:gw:card:vis":
+        vis = setting_get("gw_card_visibility", "public")
+        setting_set("gw_card_visibility", "secure" if vis == "public" else "public")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:card")
+        return
+
+    if data == "adm:set:gw:crypto":
+        enabled = setting_get("gw_crypto_enabled", "0")
+        vis = setting_get("gw_crypto_visibility", "public")
+        enabled_label = "🟢 فعال" if enabled == "1" else "🔴 غیرفعال"
+        vis_label = "👥 عمومی" if vis == "public" else "🔒 کاربران امن"
+        kb = types.InlineKeyboardMarkup()
+        kb.row(
+            types.InlineKeyboardButton(f"وضعیت: {enabled_label}", callback_data="adm:gw:crypto:toggle"),
+            types.InlineKeyboardButton(f"نمایش: {vis_label}", callback_data="adm:gw:crypto:vis"),
+        )
+        for coin_key, coin_label in CRYPTO_COINS:
+            addr = setting_get(f"crypto_{coin_key}", "")
+            status_icon = "✅" if addr else "❌"
+            kb.add(types.InlineKeyboardButton(f"{status_icon} {coin_label}", callback_data=f"adm:set:cw:{coin_key}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:set:gateways"))
+        text = (
+            "💎 <b>درگاه ارز دیجیتال</b>\n\n"
+            f"وضعیت: {enabled_label}\n"
+            f"نمایش: {vis_label}\n\n"
+            "برای ویرایش آدرس ولت روی هر ارز بزنید:"
+        )
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
+        return
+
+    if data == "adm:gw:crypto:toggle":
+        enabled = setting_get("gw_crypto_enabled", "0")
+        setting_set("gw_crypto_enabled", "0" if enabled == "1" else "1")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:crypto")
+        return
+
+    if data == "adm:gw:crypto:vis":
+        vis = setting_get("gw_crypto_visibility", "public")
+        setting_set("gw_crypto_visibility", "secure" if vis == "public" else "public")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:crypto")
+        return
+
+    if data == "adm:set:gw:tetrapay":
+        enabled = setting_get("gw_tetrapay_enabled", "0")
+        vis = setting_get("gw_tetrapay_visibility", "public")
+        api_key = setting_get("tetrapay_api_key", "")
+        enabled_label = "🟢 فعال" if enabled == "1" else "🔴 غیرفعال"
+        vis_label = "👥 عمومی" if vis == "public" else "🔒 کاربران امن"
+        kb = types.InlineKeyboardMarkup()
+        kb.row(
+            types.InlineKeyboardButton(f"وضعیت: {enabled_label}", callback_data="adm:gw:tetrapay:toggle"),
+            types.InlineKeyboardButton(f"نمایش: {vis_label}", callback_data="adm:gw:tetrapay:vis"),
+        )
+        kb.add(types.InlineKeyboardButton("🔑 تنظیم کلید API", callback_data="adm:set:tetrapay_key"))
+        if not api_key:
+            kb.add(types.InlineKeyboardButton("🌐 دریافت کلید API از سایت TetraPay", url="https://tetra98.com"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:set:gateways"))
+        if api_key:
+            key_display = f"<code>{esc(api_key[:8])}...{esc(api_key[-4:])}</code>"
+        else:
+            key_display = "❌ <b>ثبت نشده</b> — ابتدا از سایت TetraPay کلید API خود را دریافت کنید"
+        text = (
+            "🏦 <b>درگاه کارت به کارت آنلاین (TetraPay)</b>\n\n"
+            f"وضعیت: {enabled_label}\n"
+            f"نمایش: {vis_label}\n\n"
+            f"کلید API: {key_display}"
+        )
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
+        return
+
+    if data == "adm:gw:tetrapay:toggle":
+        enabled = setting_get("gw_tetrapay_enabled", "0")
+        setting_set("gw_tetrapay_enabled", "0" if enabled == "1" else "1")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:tetrapay")
+        return
+
+    if data == "adm:gw:tetrapay:vis":
+        vis = setting_get("gw_tetrapay_visibility", "public")
+        setting_set("gw_tetrapay_visibility", "secure" if vis == "public" else "public")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:tetrapay")
+        return
+
+    if data == "adm:set:tetrapay_key":
+        state_set(uid, "admin_set_tetrapay_key")
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, "🔑 کلید API تتراپی را ارسال کنید:", back_button("adm:set:gw:tetrapay"))
+        return
+
+    if data == "adm:set:payment":
+        _fake_call(call, "adm:set:gw:card")
+        bot.answer_callback_query(call.id)
+        return
+
+    if data == "adm:set:cardvis":
+        _fake_call(call, "adm:gw:card:vis")
+        bot.answer_callback_query(call.id)
         return
 
     if data == "adm:set:card":
         state_set(uid, "admin_set_card")
         bot.answer_callback_query(call.id)
-        send_or_edit(call, "💳 شماره کارت را ارسال کنید:", back_button("adm:set:payment"))
+        send_or_edit(call, "💳 شماره کارت را ارسال کنید:", back_button("adm:set:gw:card"))
         return
 
     if data == "adm:set:bank":
         state_set(uid, "admin_set_bank")
         bot.answer_callback_query(call.id)
-        send_or_edit(call, "🏦 نام بانک را ارسال کنید:", back_button("adm:set:payment"))
+        send_or_edit(call, "🏦 نام بانک را ارسال کنید:", back_button("adm:set:gw:card"))
         return
 
     if data == "adm:set:owner":
         state_set(uid, "admin_set_owner")
         bot.answer_callback_query(call.id)
-        send_or_edit(call, "👤 نام و نام خانوادگی صاحب کارت را ارسال کنید:", back_button("adm:set:payment"))
+        send_or_edit(call, "👤 نام و نام خانوادگی صاحب کارت را ارسال کنید:", back_button("adm:set:gw:card"))
         return
 
     if data == "adm:set:crypto":
-        kb = types.InlineKeyboardMarkup()
-        for coin_key, coin_label in CRYPTO_COINS:
-            addr = setting_get(f"crypto_{coin_key}", "")
-            status_icon = "✅" if addr else "❌"
-            kb.add(types.InlineKeyboardButton(f"{status_icon} {coin_label}", callback_data=f"adm:set:cw:{coin_key}"))
-        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
+        _fake_call(call, "adm:set:gw:crypto")
         bot.answer_callback_query(call.id)
-        send_or_edit(call, "💎 <b>ولت‌های ارز دیجیتال</b>\n\nبرای ویرایش آدرس روی هر ارز بزنید:", kb)
         return
 
     if data.startswith("adm:set:cw:"):
@@ -1771,7 +2110,7 @@ def _dispatch_callback(call, uid, data):
             f"💎 آدرس ولت <b>{coin_label}</b> را وارد کنید.\n"
             f"آدرس فعلی: <code>{esc(current or 'ثبت نشده')}</code>\n\n"
             "برای حذف، عدد <code>-</code> بفرستید.",
-            back_button("adm:set:crypto")
+            back_button("adm:set:gw:crypto")
         )
         return
 
@@ -2058,16 +2397,14 @@ def universal_handler(message):
             if not amount or amount <= 0:
                 bot.send_message(uid, "⚠️ لطفاً مبلغ معتبر وارد کنید.", reply_markup=back_button("main"))
                 return
-            card        = setting_get("payment_card", "")
-            visibility  = setting_get("card_visibility", "public")
-            user        = get_user(uid)
-            user_status = user["status"] if user else "safe"
-            show_card   = card and (visibility == "public" or user_status == "safe")
             state_set(uid, "wallet_charge_method", amount=amount)
             kb = types.InlineKeyboardMarkup()
-            if show_card:
+            if is_gateway_available("card", uid) and is_card_info_complete():
                 kb.add(types.InlineKeyboardButton("💳 کارت به کارت",  callback_data="wallet:charge:card"))
-            kb.add(types.InlineKeyboardButton("💎 ارز دیجیتال",       callback_data="wallet:charge:crypto"))
+            if is_gateway_available("crypto", uid):
+                kb.add(types.InlineKeyboardButton("💎 ارز دیجیتال",       callback_data="wallet:charge:crypto"))
+            if is_gateway_available("tetrapay", uid):
+                kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data="wallet:charge:tetrapay"))
             kb.add(types.InlineKeyboardButton("🔙 بازگشت",            callback_data="nav:main"))
             bot.send_message(
                 uid,
@@ -2259,6 +2596,13 @@ def universal_handler(message):
             setting_set(f"crypto_{coin_key}", "" if val == "-" else val)
             state_clear(uid)
             bot.send_message(uid, "✅ آدرس ولت ذخیره شد.", reply_markup=kb_admin_panel())
+            return
+
+        if sn == "admin_set_tetrapay_key" and is_admin(uid):
+            val = (message.text or "").strip()
+            setting_set("tetrapay_api_key", val)
+            state_clear(uid)
+            bot.send_message(uid, "✅ کلید API تتراپی ذخیره شد.", reply_markup=kb_admin_panel())
             return
 
         if sn == "admin_set_channel" and is_admin(uid):
