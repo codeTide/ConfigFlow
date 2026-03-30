@@ -482,7 +482,8 @@ def get_registered_packages_stock():
             """
             SELECT p.id, p.name, p.volume_gb, p.duration_days, p.price, t.name AS type_name,
                    COUNT(c.id) FILTER (WHERE c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired=0) AS stock,
-                   COUNT(c.id) FILTER (WHERE c.sold_to IS NOT NULL) AS sold_count
+                   COUNT(c.id) FILTER (WHERE c.sold_to IS NOT NULL) AS sold_count,
+                   COUNT(c.id) FILTER (WHERE c.is_expired=1) AS expired_count
             FROM packages p
             JOIN config_types t ON t.id=p.type_id
             LEFT JOIN configs c ON c.package_id=p.id
@@ -850,7 +851,7 @@ def show_my_configs(target, user_id):
         return
     kb = types.InlineKeyboardMarkup()
     for item in items:
-        expired_mark = " 🔴" if item["is_expired"] else ""
+        expired_mark = " ❌" if item["is_expired"] else ""
         title = f"{item['service_name']}{expired_mark}"
         kb.add(types.InlineKeyboardButton(title, callback_data=f"mycfg:{item['id']}"))
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
@@ -1047,6 +1048,9 @@ def finish_card_payment_approval(payment_id, admin_note, approved):
             if not config_id:
                 bot.send_message(user_id, "❌ پرداخت تأیید شد اما موجودی کانفیگ تمام شده است. با پشتیبانی تماس بگیرید.")
                 return False
+            if payment["config_id"] != config_id:
+                with get_conn() as conn:
+                    conn.execute("UPDATE payments SET config_id=? WHERE id=?", (config_id, payment_id))
             purchase_id = assign_config_to_user(config_id, user_id, package_id, payment["amount"],
                                                 payment["payment_method"], is_test=0)
             complete_payment(payment_id)
@@ -1250,12 +1254,6 @@ def _dispatch_callback(call, uid, data):
             return
         price      = get_effective_price(uid, package_row)
         payment_id = create_payment("config_purchase", uid, package_id, price, "card", status="pending")
-        config_id  = reserve_first_config(package_id, payment_id=payment_id)
-        if not config_id:
-            bot.answer_callback_query(call.id, "فعلاً کانفیگی موجود نیست.", show_alert=True)
-            return
-        with get_conn() as conn:
-            conn.execute("UPDATE payments SET config_id=? WHERE id=?", (config_id, payment_id))
         state_set(uid, "await_purchase_receipt", payment_id=payment_id)
         text = (
             "💳 <b>کارت به کارت</b>\n\n"
@@ -1295,11 +1293,8 @@ def _dispatch_callback(call, uid, data):
             if not package_row or package_row["stock"] <= 0:
                 bot.answer_callback_query(call.id, "موجودی تمام شده است.", show_alert=True)
                 return
-            config_id  = reserve_first_config(package_id)
-            payment_id = create_payment("config_purchase", uid, package_id, amount, f"crypto",
-                                        status="pending", config_id=config_id, crypto_coin=coin_key)
-            with get_conn() as conn:
-                conn.execute("UPDATE payments SET config_id=? WHERE id=?", (config_id, payment_id))
+            payment_id = create_payment("config_purchase", uid, package_id, amount, "crypto",
+                                        status="pending", crypto_coin=coin_key)
             state_set(uid, "await_purchase_receipt", payment_id=payment_id)
             bot.answer_callback_query(call.id)
             show_crypto_payment_info(call, uid, coin_key, amount)
@@ -1384,12 +1379,8 @@ def _dispatch_callback(call, uid, data):
         pay_url_bot = result.get("payment_url_bot", "")
         pay_url_web = result.get("payment_url_web", "")
         payment_id = create_payment("config_purchase", uid, package_id, price, "tetrapay", status="pending")
-        config_id = reserve_first_config(package_id, payment_id=payment_id)
-        if not config_id:
-            bot.answer_callback_query(call.id, "فعلاً کانفیگی موجود نیست.", show_alert=True)
-            return
         with get_conn() as conn:
-            conn.execute("UPDATE payments SET config_id=?, receipt_text=? WHERE id=?", (config_id, authority, payment_id))
+            conn.execute("UPDATE payments SET receipt_text=? WHERE id=?", (authority, payment_id))
         state_set(uid, "await_tetrapay_verify", payment_id=payment_id, authority=authority)
         text = (
             "🏦 <b>پرداخت آنلاین (TetraPay)</b>\n\n"
@@ -1647,6 +1638,21 @@ def _dispatch_callback(call, uid, data):
 
     if data.startswith("admin:pkg:del:"):
         package_id = int(data.split(":")[3])
+        with get_conn() as conn:
+            sold_count = conn.execute(
+                "SELECT COUNT(*) AS n FROM configs WHERE package_id=? AND sold_to IS NOT NULL",
+                (package_id,)
+            ).fetchone()["n"]
+            if sold_count > 0:
+                bot.answer_callback_query(call.id, f"❌ این پکیج {sold_count} کانفیگ فروخته‌شده دارد و قابل حذف نیست.", show_alert=True)
+                return
+            active_configs = conn.execute(
+                "SELECT COUNT(*) AS n FROM configs WHERE package_id=? AND sold_to IS NULL AND is_expired=0 AND reserved_payment_id IS NULL",
+                (package_id,)
+            ).fetchone()["n"]
+            if active_configs > 0:
+                bot.answer_callback_query(call.id, f"❌ این پکیج {active_configs} کانفیگ فعال دارد و قابل حذف نیست.", show_alert=True)
+                return
         delete_package(package_id)
         bot.answer_callback_query(call.id, "پکیج حذف شد.")
         _show_admin_packages(call)
@@ -1693,28 +1699,33 @@ def _dispatch_callback(call, uid, data):
 
     if data.startswith("adm:stk:all:"):
         parts     = data.split(":")
-        sold_flag = (parts[3] == "sl")
+        kind_str  = parts[3]
         page      = int(parts[4])
         # Query all configs across packages
         offset = page * CONFIGS_PER_PAGE
         with get_conn() as conn:
-            if sold_flag:
+            if kind_str == "sl":
                 cfgs = conn.execute(
                     "SELECT * FROM configs WHERE sold_to IS NOT NULL ORDER BY id DESC LIMIT ? OFFSET ?",
                     (CONFIGS_PER_PAGE, offset)
                 ).fetchall()
                 total = conn.execute("SELECT COUNT(*) AS n FROM configs WHERE sold_to IS NOT NULL").fetchone()["n"]
-            else:
+            elif kind_str == "ex":
                 cfgs = conn.execute(
-                    "SELECT * FROM configs WHERE sold_to IS NULL AND reserved_payment_id IS NULL ORDER BY id ASC LIMIT ? OFFSET ?",
+                    "SELECT * FROM configs WHERE is_expired=1 ORDER BY id DESC LIMIT ? OFFSET ?",
                     (CONFIGS_PER_PAGE, offset)
                 ).fetchall()
-                total = conn.execute("SELECT COUNT(*) AS n FROM configs WHERE sold_to IS NULL AND reserved_payment_id IS NULL").fetchone()["n"]
+                total = conn.execute("SELECT COUNT(*) AS n FROM configs WHERE is_expired=1").fetchone()["n"]
+            else:
+                cfgs = conn.execute(
+                    "SELECT * FROM configs WHERE sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired=0 ORDER BY id ASC LIMIT ? OFFSET ?",
+                    (CONFIGS_PER_PAGE, offset)
+                ).fetchall()
+                total = conn.execute("SELECT COUNT(*) AS n FROM configs WHERE sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired=0").fetchone()["n"]
         total_pages = max(1, (total + CONFIGS_PER_PAGE - 1) // CONFIGS_PER_PAGE)
-        kind_str   = "sl" if sold_flag else "av"
         kb         = types.InlineKeyboardMarkup()
         for c in cfgs:
-            expired_mark = " 🔴" if c["is_expired"] else ""
+            expired_mark = " ❌" if c["is_expired"] else ""
             label = f"{c['service_name']}{expired_mark}"
             kb.add(types.InlineKeyboardButton(label, callback_data=f"adm:stk:cfg:{c['id']}"))
         nav_row = []
@@ -1726,7 +1737,12 @@ def _dispatch_callback(call, uid, data):
             kb.row(*nav_row)
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:stock"))
         bot.answer_callback_query(call.id)
-        label_kind = "🔴 کل فروخته شده" if sold_flag else "🟢 کل موجود"
+        if kind_str == "sl":
+            label_kind = "🔴 کل فروخته شده"
+        elif kind_str == "ex":
+            label_kind = "❌ کل منقضی شده"
+        else:
+            label_kind = "🟢 کل موجود"
         send_or_edit(call, f"📋 {label_kind} | صفحه {page+1}/{total_pages} | تعداد کل: {total}", kb)
         return
 
@@ -1735,33 +1751,66 @@ def _dispatch_callback(call, uid, data):
         package_row = get_package(package_id)
         avail = count_configs(package_id, sold=False)
         sold  = count_configs(package_id, sold=True)
+        with get_conn() as conn:
+            expired = conn.execute(
+                "SELECT COUNT(*) AS n FROM configs WHERE package_id=? AND is_expired=1",
+                (package_id,)
+            ).fetchone()["n"]
         kb    = types.InlineKeyboardMarkup()
         kb.row(
             types.InlineKeyboardButton(f"🟢 مانده ({avail})",       callback_data=f"adm:stk:av:{package_id}:0"),
             types.InlineKeyboardButton(f"🔴 فروخته ({sold})",       callback_data=f"adm:stk:sl:{package_id}:0"),
         )
+        kb.add(types.InlineKeyboardButton(f"❌ منقضی ({expired})",  callback_data=f"adm:stk:ex:{package_id}:0"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:stock"))
         bot.answer_callback_query(call.id)
         text = (
             f"📦 <b>{esc(package_row['name'])}</b>\n\n"
             f"🟢 موجود: {avail}\n"
-            f"🔴 فروخته شده: {sold}"
+            f"🔴 فروخته شده: {sold}\n"
+            f"❌ منقضی شده: {expired}"
         )
         send_or_edit(call, text, kb)
         return
 
-    if data.startswith("adm:stk:av:") or data.startswith("adm:stk:sl:"):
+    if data.startswith("adm:stk:av:") or data.startswith("adm:stk:sl:") or data.startswith("adm:stk:ex:"):
         parts      = data.split(":")
-        sold_flag  = (parts[2] == "sl")
+        kind_str   = parts[2]
         package_id = int(parts[3])
         page       = int(parts[4])
-        cfgs       = get_configs_paginated(package_id, sold=sold_flag, page=page)
-        total      = count_configs(package_id, sold=sold_flag)
+        offset     = page * CONFIGS_PER_PAGE
+        with get_conn() as conn:
+            if kind_str == "sl":
+                cfgs = conn.execute(
+                    "SELECT * FROM configs WHERE package_id=? AND sold_to IS NOT NULL ORDER BY id DESC LIMIT ? OFFSET ?",
+                    (package_id, CONFIGS_PER_PAGE, offset)
+                ).fetchall()
+                total = conn.execute(
+                    "SELECT COUNT(*) AS n FROM configs WHERE package_id=? AND sold_to IS NOT NULL",
+                    (package_id,)
+                ).fetchone()["n"]
+            elif kind_str == "ex":
+                cfgs = conn.execute(
+                    "SELECT * FROM configs WHERE package_id=? AND is_expired=1 ORDER BY id DESC LIMIT ? OFFSET ?",
+                    (package_id, CONFIGS_PER_PAGE, offset)
+                ).fetchall()
+                total = conn.execute(
+                    "SELECT COUNT(*) AS n FROM configs WHERE package_id=? AND is_expired=1",
+                    (package_id,)
+                ).fetchone()["n"]
+            else:
+                cfgs = conn.execute(
+                    "SELECT * FROM configs WHERE package_id=? AND sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired=0 ORDER BY id ASC LIMIT ? OFFSET ?",
+                    (package_id, CONFIGS_PER_PAGE, offset)
+                ).fetchall()
+                total = conn.execute(
+                    "SELECT COUNT(*) AS n FROM configs WHERE package_id=? AND sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired=0",
+                    (package_id,)
+                ).fetchone()["n"]
         total_pages = max(1, (total + CONFIGS_PER_PAGE - 1) // CONFIGS_PER_PAGE)
-        kind_str   = "sl" if sold_flag else "av"
         kb         = types.InlineKeyboardMarkup()
         for c in cfgs:
-            expired_mark = " 🔴" if c["is_expired"] else ""
+            expired_mark = " ❌" if c["is_expired"] else ""
             label = f"{c['service_name']}{expired_mark}"
             kb.add(types.InlineKeyboardButton(label, callback_data=f"adm:stk:cfg:{c['id']}"))
         # Pagination
@@ -1774,7 +1823,12 @@ def _dispatch_callback(call, uid, data):
             kb.row(*nav_row)
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"adm:stk:pk:{package_id}"))
         bot.answer_callback_query(call.id)
-        label_kind = "🔴 فروخته شده" if sold_flag else "🟢 موجود"
+        if kind_str == "sl":
+            label_kind = "🔴 فروخته شده"
+        elif kind_str == "ex":
+            label_kind = "❌ منقضی شده"
+        else:
+            label_kind = "🟢 موجود"
         send_or_edit(call, f"📋 {label_kind} | صفحه {page+1}/{total_pages} | تعداد کل: {total}", kb)
         return
 
@@ -1803,11 +1857,12 @@ def _dispatch_callback(call, uid, data):
                     f"زمان خرید: {esc(row['sold_at'] or '-')}"
                 )
         if not row["is_expired"]:
-            kb.add(types.InlineKeyboardButton("🔴 منقضی کردن", callback_data=f"adm:stk:exp:{config_id}"))
+            kb.add(types.InlineKeyboardButton("❌ منقضی کردن", callback_data=f"adm:stk:exp:{config_id}"))
         else:
             text += "\n\n⚠️ این سرویس منقضی شده است."
-        kb.add(types.InlineKeyboardButton("� حذف کانفیگ", callback_data=f"adm:stk:del:{config_id}"))
-        kb.add(types.InlineKeyboardButton("�🔙 بازگشت", callback_data="admin:stock"))
+        if not row["sold_to"]:
+            kb.add(types.InlineKeyboardButton("🗑 حذف کانفیگ", callback_data=f"adm:stk:del:{config_id}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:stock"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
         return
@@ -1833,6 +1888,10 @@ def _dispatch_callback(call, uid, data):
     if data.startswith("adm:stk:del:"):
         config_id = int(data.split(":")[3])
         with get_conn() as conn:
+            row = conn.execute("SELECT sold_to FROM configs WHERE id=?", (config_id,)).fetchone()
+            if row and row["sold_to"]:
+                bot.answer_callback_query(call.id, "❌ این کانفیگ فروخته شده و قابل حذف نیست.", show_alert=True)
+                return
             conn.execute("DELETE FROM configs WHERE id=?", (config_id,))
         bot.answer_callback_query(call.id, "کانفیگ حذف شد.")
         send_or_edit(call, "✅ کانفیگ با موفقیت حذف شد.", back_button("admin:stock"))
@@ -1893,7 +1952,7 @@ def _dispatch_callback(call, uid, data):
                 return
             kb = types.InlineKeyboardMarkup()
             for p in purchases:
-                expired_mark = " 🔴" if p["is_expired"] else ""
+                expired_mark = " ❌" if p["is_expired"] else ""
                 kb.add(types.InlineKeyboardButton(
                     f"{p['service_name']}{expired_mark}",
                     callback_data=f"adm:usrcfg:{target_id}:{p['config_id']}"
@@ -2449,15 +2508,17 @@ def _show_admin_packages(call):
 def _show_admin_stock(call):
     rows = get_registered_packages_stock()
     kb   = types.InlineKeyboardMarkup()
-    total_avail = sum(r["stock"] for r in rows)
-    total_sold  = sum(r["sold_count"] for r in rows)
+    total_avail  = sum(r["stock"] for r in rows)
+    total_sold   = sum(r["sold_count"] for r in rows)
+    total_expired = sum(r["expired_count"] for r in rows)
     kb.row(
         types.InlineKeyboardButton(f"🟢 کل موجود ({total_avail})",  callback_data="adm:stk:all:av:0"),
         types.InlineKeyboardButton(f"🔴 کل فروخته ({total_sold})", callback_data="adm:stk:all:sl:0"),
     )
+    kb.add(types.InlineKeyboardButton(f"❌ کل منقضی ({total_expired})", callback_data="adm:stk:all:ex:0"))
     for row in rows:
         kb.add(types.InlineKeyboardButton(
-            f"📦 {row['type_name']} - {row['name']} | 🟢{row['stock']} 🔴{row['sold_count']}",
+            f"📦 {row['type_name']} - {row['name']} | 🟢{row['stock']} 🔴{row['sold_count']} ❌{row['expired_count']}",
             callback_data=f"adm:stk:pk:{row['id']}"
         ))
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
