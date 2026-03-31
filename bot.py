@@ -1611,7 +1611,7 @@ def _dispatch_callback(call, uid, data):
             "💡 <b>ConfigFlow</b> \n"
             "👨‍💻 Developer: @Emad_Habibnia\n"
             "🌐 <a href='https://github.com/Emadhabibnia1385/ConfigFlow'>GitHub ConfigFlow</a>\n"
-            "❤️ <a href='https://t.me/EmadHabibnia/4'>doneit/a>"
+            "❤️ <a href='https://t.me/EmadHabibnia/4'>donate</a>"
         )
         send_or_edit(call, text, kb_admin_panel())
         return
