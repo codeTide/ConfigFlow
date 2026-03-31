@@ -214,7 +214,7 @@ ConfigFlow از **۵ روش پرداخت** پشتیبانی می‌کند:
 ### نصب خودکار روی سرور (پیشنهادی) ⚡
 
 ```bash
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/Emadhabibnia1385/ConfigFlow/main/install.sh)
+bash <(curl -s https://raw.githubusercontent.com/Emadhabibnia1385/ConfigFlow/main/install.sh)
 ```
 
 اسکریپت به‌صورت خودکار:
