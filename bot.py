@@ -238,6 +238,9 @@ def init_db():
             "backup_enabled":   "0",
             "backup_interval":  "24",
             "backup_target_id": "",
+            "free_test_enabled": "1",
+            "agent_test_limit": "0",
+            "agent_test_period": "day",
         }
         for coin, _ in CRYPTO_COINS:
             defaults[f"crypto_{coin}"] = ""
@@ -594,6 +597,37 @@ def user_has_test_for_type(user_id, type_id):
         ).fetchone()
     return bool(row)
 
+def user_has_any_test(user_id):
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM purchases WHERE user_id=? AND is_test=1 LIMIT 1",
+            (user_id,)
+        ).fetchone()
+    return bool(row)
+
+def reset_all_free_tests():
+    with get_conn() as conn:
+        conn.execute("DELETE FROM purchases WHERE is_test=1")
+
+def agent_test_count_in_period(user_id, period):
+    import time
+    now = datetime.now()
+    if period == "day":
+        start = now.strftime("%Y-%m-%d 00:00:00")
+    elif period == "week":
+        from datetime import timedelta
+        start = (now - timedelta(days=now.weekday())).strftime("%Y-%m-%d 00:00:00")
+    elif period == "month":
+        start = now.strftime("%Y-%m-01 00:00:00")
+    else:
+        start = now.strftime("%Y-%m-%d 00:00:00")
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM purchases WHERE user_id=? AND is_test=1 AND created_at>=?",
+            (user_id, start)
+        ).fetchone()
+    return row["cnt"] if row else 0
+
 def update_balance(user_id, delta):
     with get_conn() as conn:
         conn.execute("UPDATE users SET balance=balance+? WHERE user_id=?", (delta, user_id))
@@ -752,7 +786,8 @@ def kb_main(user_id):
         types.InlineKeyboardButton("🛒 خرید کانفیگ جدید", callback_data="buy:start"),
         types.InlineKeyboardButton("📦 کانفیگ‌های من",    callback_data="my_configs"),
     )
-    kb.add(types.InlineKeyboardButton("🎁 تست رایگان", callback_data="test:start"))
+    if setting_get("free_test_enabled", "1") == "1":
+        kb.add(types.InlineKeyboardButton("🎁 تست رایگان", callback_data="test:start"))
     kb.row(
         types.InlineKeyboardButton("👤 حساب کاربری",    callback_data="profile"),
         types.InlineKeyboardButton("💳 شارژ کیف پول",   callback_data="wallet:charge"),
@@ -1401,11 +1436,30 @@ def _dispatch_callback(call, uid, data):
 
     # ── Free test ─────────────────────────────────────────────────────────────
     if data == "test:start":
+        if setting_get("free_test_enabled", "1") != "1":
+            bot.answer_callback_query(call.id, "تست رایگان غیرفعال است.", show_alert=True)
+            return
+        user = get_user(uid)
+        is_agent_user = user and user["is_agent"]
+        if is_agent_user:
+            agent_limit = int(setting_get("agent_test_limit", "0") or "0")
+            agent_period = setting_get("agent_test_period", "day")
+            if agent_limit > 0:
+                used = agent_test_count_in_period(uid, agent_period)
+                if used >= agent_limit:
+                    period_labels = {"day": "روز", "week": "هفته", "month": "ماه"}
+                    bot.answer_callback_query(call.id,
+                        f"شما سقف تست رایگان ({agent_limit} عدد در {period_labels.get(agent_period, agent_period)}) را استفاده کرده‌اید.",
+                        show_alert=True)
+                    return
+        else:
+            if user_has_any_test(uid):
+                bot.answer_callback_query(call.id, "شما قبلاً تست رایگان خود را دریافت کرده‌اید.", show_alert=True)
+                return
         items = get_all_types()
         kb    = types.InlineKeyboardMarkup()
         has_any = False
         for item in items:
-            # Check if there's at least one free test package with stock
             packs = [p for p in get_packages(type_id=item['id'], price_only=0) if p['stock'] > 0]
             if packs:
                 kb.add(types.InlineKeyboardButton(f"🎁 {item['name']}", callback_data=f"test:t:{item['id']}"))
@@ -1419,6 +1473,26 @@ def _dispatch_callback(call, uid, data):
         return
 
     if data.startswith("test:t:"):
+        if setting_get("free_test_enabled", "1") != "1":
+            bot.answer_callback_query(call.id, "تست رایگان غیرفعال است.", show_alert=True)
+            return
+        user = get_user(uid)
+        is_agent_user = user and user["is_agent"]
+        if is_agent_user:
+            agent_limit = int(setting_get("agent_test_limit", "0") or "0")
+            agent_period = setting_get("agent_test_period", "day")
+            if agent_limit > 0:
+                used = agent_test_count_in_period(uid, agent_period)
+                if used >= agent_limit:
+                    period_labels = {"day": "روز", "week": "هفته", "month": "ماه"}
+                    bot.answer_callback_query(call.id,
+                        f"شما سقف تست رایگان ({agent_limit} عدد در {period_labels.get(agent_period, agent_period)}) را استفاده کرده‌اید.",
+                        show_alert=True)
+                    return
+        else:
+            if user_has_any_test(uid):
+                bot.answer_callback_query(call.id, "شما قبلاً تست رایگان خود را دریافت کرده‌اید.", show_alert=True)
+                return
         type_id     = int(data.split(":")[2])
         type_row    = get_type(type_id)
         package_row = None
@@ -1428,9 +1502,6 @@ def _dispatch_callback(call, uid, data):
                 break
         if not package_row:
             bot.answer_callback_query(call.id, "برای این نوع تست رایگان موجود نیست.", show_alert=True)
-            return
-        if user_has_test_for_type(uid, type_id):
-            bot.answer_callback_query(call.id, "قبلاً برای این نوع تست رایگان دریافت کرده‌اید.", show_alert=True)
             return
         config_id = reserve_first_config(package_row["id"])
         if not config_id:
@@ -2115,6 +2186,7 @@ def _dispatch_callback(call, uid, data):
         )
         kb.add(types.InlineKeyboardButton("📢 کانال قفل",        callback_data="adm:set:channel"))
         kb.add(types.InlineKeyboardButton("✏️ ویرایش متن استارت", callback_data="adm:set:start_text"))
+        kb.add(types.InlineKeyboardButton("🎁 تست رایگان",      callback_data="adm:set:freetest"))
         kb.add(types.InlineKeyboardButton("💾 بکاپ",            callback_data="admin:backup"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت",        callback_data="admin:panel"))
         bot.answer_callback_query(call.id)
@@ -2405,6 +2477,58 @@ def _dispatch_callback(call, uid, data):
             "متن جدید را ارسال کنید. می‌توانید از تگ‌های HTML استفاده کنید.\n"
             "برای بازگشت به متن پیش‌فرض، <code>-</code> بفرستید.",
             back_button("admin:settings")
+        )
+        return
+
+    # ── Admin: Free Test Settings ─────────────────────────────────────────────
+    if data == "adm:set:freetest":
+        enabled = setting_get("free_test_enabled", "1")
+        agent_limit = setting_get("agent_test_limit", "0")
+        agent_period = setting_get("agent_test_period", "day")
+        period_labels = {"day": "روز", "week": "هفته", "month": "ماه"}
+        kb = types.InlineKeyboardMarkup()
+        toggle_label = "🔴 غیرفعال کردن" if enabled == "1" else "🟢 فعال کردن"
+        kb.add(types.InlineKeyboardButton(toggle_label, callback_data="adm:ft:toggle"))
+        kb.add(types.InlineKeyboardButton("🔄 ریست تست رایگان همه کاربران", callback_data="adm:ft:reset"))
+        kb.add(types.InlineKeyboardButton(f"🤝 تعداد تست همکاران: {agent_limit} در {period_labels.get(agent_period, agent_period)}", callback_data="adm:ft:agent"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(
+            call,
+            f"🎁 <b>تنظیمات تست رایگان</b>\n\n"
+            f"وضعیت: {'🟢 فعال' if enabled == '1' else '🔴 غیرفعال'}\n"
+            f"تست همکاران: <b>{agent_limit}</b> عدد در {period_labels.get(agent_period, agent_period)}",
+            kb
+        )
+        return
+
+    if data == "adm:ft:toggle":
+        enabled = setting_get("free_test_enabled", "1")
+        setting_set("free_test_enabled", "0" if enabled == "1" else "1")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:freetest")
+        return
+
+    if data == "adm:ft:reset":
+        reset_all_free_tests()
+        bot.answer_callback_query(call.id, "✅ تست رایگان همه کاربران ریست شد.", show_alert=True)
+        _fake_call(call, "adm:set:freetest")
+        return
+
+    if data == "adm:ft:agent":
+        state_set(uid, "admin_set_agent_test_limit")
+        bot.answer_callback_query(call.id)
+        send_or_edit(
+            call,
+            "🤝 <b>تعداد تست همکاران</b>\n\n"
+            "تعداد تست رایگان همکاران را وارد کنید.\n"
+            "فرمت: <code>تعداد بازه</code>\n\n"
+            "مثال:\n"
+            "<code>5 day</code> → ۵ تست در روز\n"
+            "<code>10 week</code> → ۱۰ تست در هفته\n"
+            "<code>20 month</code> → ۲۰ تست در ماه\n\n"
+            "برای غیرفعال کردن محدودیت، <code>0</code> بفرستید.",
+            back_button("adm:set:freetest")
         )
         return
 
@@ -2918,6 +3042,29 @@ def universal_handler(message):
             setting_set("start_text", "" if val == "-" else val)
             state_clear(uid)
             bot.send_message(uid, "✅ متن استارت ذخیره شد.", reply_markup=back_button("admin:settings"))
+            return
+
+        # ── Admin: Free Test settings ──────────────────────────────────────────
+        if sn == "admin_set_agent_test_limit" and is_admin(uid):
+            val = (message.text or "").strip()
+            if val == "0":
+                setting_set("agent_test_limit", "0")
+                state_clear(uid)
+                bot.send_message(uid, "✅ محدودیت تست همکاران غیرفعال شد.", reply_markup=back_button("adm:set:freetest"))
+                return
+            parts = val.split()
+            if len(parts) != 2 or not parts[0].isdigit() or parts[1] not in ("day", "week", "month"):
+                bot.send_message(uid,
+                    "⚠️ فرمت نادرست. مثال: <code>5 day</code> یا <code>10 week</code> یا <code>20 month</code>\nبرای غیرفعال: <code>0</code>",
+                    reply_markup=back_button("adm:set:freetest"))
+                return
+            setting_set("agent_test_limit", parts[0])
+            setting_set("agent_test_period", parts[1])
+            state_clear(uid)
+            period_labels = {"day": "روز", "week": "هفته", "month": "ماه"}
+            bot.send_message(uid,
+                f"✅ تست همکاران: {parts[0]} عدد در {period_labels[parts[1]]}",
+                reply_markup=back_button("adm:set:freetest"))
             return
 
         # ── Admin: Backup settings ─────────────────────────────────────────────
