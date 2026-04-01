@@ -19,6 +19,7 @@ import traceback
 import threading
 import urllib.request
 import urllib.parse
+import urllib.error
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -452,58 +453,83 @@ def _swapwallet_crypto_line(amount_toman, api_result):
     return usd_amount, usd_unit, network
 
 def create_swapwallet_invoice(amount_toman, order_id, description="پرداخت"):
-    api_key  = setting_get("swapwallet_api_key", "")
+    api_key  = setting_get("swapwallet_api_key", "").strip()
     username = setting_get("swapwallet_username", "").strip()
     if not api_key or not username:
-        return False, {"error": "SwapWallet credentials not set"}
+        return False, {"error": "کلید API یا نام کاربری سواپ ولت تنظیم نشده است"}
+    # strip accidental "Bearer " prefix if user pasted the full header value
+    if api_key.lower().startswith("bearer "):
+        api_key = api_key[7:].strip()
     payload = json.dumps({
-        "amount":       {"number": str(amount_toman), "unit": "IRT"},
+        "amount":       {"number": str(int(amount_toman)), "unit": "IRT"},
         "network":      "TRON",
         "allowedToken": "USDT",
         "ttl":          3600,
-        "orderId":      order_id,
-        "description":  description,
-    }).encode()
+        "orderId":      str(order_id),
+        "description":  str(description),
+    }, ensure_ascii=False).encode("utf-8")
     safe_user = urllib.parse.quote(username, safe="")
     url = f"{SWAPWALLET_BASE_URL}/v2/payment/{safe_user}/invoices/temporary-wallet"
     req = urllib.request.Request(
         url, data=payload,
         headers={
-            "Content-Type":  "application/json",
+            "Content-Type":  "application/json; charset=utf-8",
             "Authorization": f"Bearer {api_key}",
             "User-Agent":    "ConfigFlow/1.0",
+            "Accept":        "application/json",
         }
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read().decode())
+            body = resp.read().decode("utf-8")
+        result = json.loads(body)
         if result.get("status") == "OK":
             return True, result.get("result", {})
-        return False, result
+        return False, {"error": str(result)}
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = e.read().decode("utf-8")
+            err_data = json.loads(err_body)
+            msg = err_data.get("message") or err_data.get("error") or err_body[:200]
+        except Exception:
+            msg = f"HTTP {e.code}: {e.reason}"
+        return False, {"error": msg}
     except Exception as e:
         return False, {"error": str(e)}
 
 def check_swapwallet_invoice(invoice_id):
-    api_key  = setting_get("swapwallet_api_key", "")
+    api_key  = setting_get("swapwallet_api_key", "").strip()
     username = setting_get("swapwallet_username", "").strip()
     if not api_key or not username:
-        return False, {"error": "SwapWallet credentials not set"}
+        return False, {"error": "کلید API یا نام کاربری سواپ ولت تنظیم نشده است"}
+    if api_key.lower().startswith("bearer "):
+        api_key = api_key[7:].strip()
     safe_user = urllib.parse.quote(username, safe="")
-    safe_inv  = urllib.parse.quote(invoice_id, safe="")
+    safe_inv  = urllib.parse.quote(str(invoice_id), safe="")
     url = f"{SWAPWALLET_BASE_URL}/v2/payment/{safe_user}/invoices/{safe_inv}"
     req = urllib.request.Request(
         url,
         headers={
             "Authorization": f"Bearer {api_key}",
             "User-Agent":    "ConfigFlow/1.0",
+            "Accept":        "application/json",
         }
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read().decode())
+            body = resp.read().decode("utf-8")
+        result = json.loads(body)
         if result.get("status") == "OK":
             return True, result.get("result", {})
-        return False, result
+        return False, {"error": str(result)}
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = e.read().decode("utf-8")
+            err_data = json.loads(err_body)
+            msg = err_data.get("message") or err_data.get("error") or err_body[:200]
+        except Exception:
+            msg = f"HTTP {e.code}: {e.reason}"
+        return False, {"error": msg}
     except Exception as e:
         return False, {"error": str(e)}
 
@@ -1945,7 +1971,8 @@ def _dispatch_callback(call, uid, data):
         order_id = f"rnw-{uid}-{package_id}-{int(datetime.now().timestamp())}"
         success, result = create_swapwallet_invoice(price, order_id, f"تمدید {package_row['name']}")
         if not success:
-            bot.answer_callback_query(call.id, "خطا در ایجاد فاکتور سواپ ولت.", show_alert=True)
+            err_msg = result.get("error", "خطای ناشناخته") if isinstance(result, dict) else str(result)
+            bot.answer_callback_query(call.id, f"❌ خطا در ایجاد فاکتور:\n{err_msg}", show_alert=True)
             return
         invoice_id     = result.get("id", "")
         wallet_address = result.get("walletAddress", "")
@@ -2396,7 +2423,8 @@ def _dispatch_callback(call, uid, data):
         order_id = f"cfg-{uid}-{package_id}-{int(datetime.now().timestamp())}"
         success, result = create_swapwallet_invoice(price, order_id, f"خرید {package_row['name']}")
         if not success:
-            bot.answer_callback_query(call.id, "خطا در ایجاد فاکتور سواپ ولت.", show_alert=True)
+            err_msg = result.get("error", "خطای ناشناخته") if isinstance(result, dict) else str(result)
+            bot.answer_callback_query(call.id, f"❌ خطا در ایجاد فاکتور:\n{err_msg}", show_alert=True)
             return
         invoice_id     = result.get("id", "")
         wallet_address = result.get("walletAddress", "")
@@ -2687,7 +2715,8 @@ def _dispatch_callback(call, uid, data):
         order_id = f"wallet-{uid}-{int(datetime.now().timestamp())}"
         success, result = create_swapwallet_invoice(amount, order_id, "شارژ کیف پول")
         if not success:
-            bot.answer_callback_query(call.id, "خطا در ایجاد فاکتور سواپ ولت.", show_alert=True)
+            err_msg = result.get("error", "خطای ناشناخته") if isinstance(result, dict) else str(result)
+            bot.answer_callback_query(call.id, f"❌ خطا در ایجاد فاکتور:\n{err_msg}", show_alert=True)
             return
         invoice_id     = result.get("id", "")
         wallet_address = result.get("walletAddress", "")
