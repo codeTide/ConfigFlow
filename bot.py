@@ -953,6 +953,13 @@ def fulfill_pending_order(pending_id):
     with get_conn() as conn:
         conn.execute("UPDATE pending_orders SET status='fulfilled' WHERE id=?", (pending_id,))
 
+def get_waiting_pending_orders_for_package(package_id):
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM pending_orders WHERE package_id=? AND status='waiting' ORDER BY created_at ASC",
+            (package_id,)
+        ).fetchall()
+
 # ── Channel lock ───────────────────────────────────────────────────────────────
 def check_channel_membership(user_id):
     channel_id = setting_get("channel_id", "").strip()
@@ -1284,6 +1291,43 @@ def _complete_pending_order(pending_id, cfg_name, cfg_text, inquiry_link):
     if pkg:
         admin_purchase_notify(p_row["payment_method"], user, pkg)
     return True
+
+def auto_fulfill_pending_orders(package_id):
+    """After new configs are added for a package, automatically fulfill waiting pending orders."""
+    pending_list = get_waiting_pending_orders_for_package(package_id)
+    if not pending_list:
+        return 0
+    fulfilled_count = 0
+    for p_row in pending_list:
+        # Get one available config
+        available = get_available_configs_for_package(package_id)
+        if not available:
+            break  # No more stock
+        cfg = available[0]
+        user_id = p_row["user_id"]
+        pending_id = p_row["id"]
+        # Assign config to user
+        purchase_id = assign_config_to_user(
+            cfg["id"], user_id, package_id,
+            p_row["amount"], p_row["payment_method"], is_test=0
+        )
+        fulfill_pending_order(pending_id)
+        # Notify user
+        try:
+            bot.send_message(
+                user_id,
+                "🎉 <b>کانفیگ شما آماده شد!</b>\n\n"
+                "سفارش شما تکمیل شد. جزئیات سرویس در ادامه ارسال می‌شود."
+            )
+        except Exception:
+            pass
+        deliver_purchase_message(user_id, purchase_id)
+        pkg = get_package(package_id)
+        user = get_user(user_id)
+        if pkg and user:
+            admin_purchase_notify(p_row["payment_method"], user, pkg)
+        fulfilled_count += 1
+    return fulfilled_count
 
 # ── Payment helpers ────────────────────────────────────────────────────────────
 def get_effective_price(user_id, package_row):
@@ -4901,8 +4945,18 @@ def universal_handler(message):
                 except Exception as e:
                     errors.append(f"کانفیگ {idx}: {str(e)}")
 
+            # Auto-fulfill any waiting pending orders for this package
+            auto_fulfilled = 0
+            if success_count > 0:
+                try:
+                    auto_fulfilled = auto_fulfill_pending_orders(package_id)
+                except Exception:
+                    pass
+
             state_clear(uid)
             result = f"✅ <b>{success_count}</b> کانفیگ از <b>{expected}</b> با موفقیت ثبت شد."
+            if auto_fulfilled > 0:
+                result += f"\n\n🚀 <b>{auto_fulfilled}</b> سفارش در انتظار به صورت خودکار تحویل داده شد."
             if len(configs) != expected:
                 result += f"\n\n⚠️ تعداد ارسال‌شده ({len(configs)}) با تعداد مورد انتظار ({expected}) متفاوت است."
             if errors:
