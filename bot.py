@@ -14,6 +14,7 @@ import os
 import re
 import html
 import json
+import uuid
 import sqlite3
 import traceback
 import threading
@@ -59,11 +60,12 @@ ADMIN_PERMS = [
     ("settings",         "⚙️ دسترسی به تنظیمات ربات"),
     ("approve_payments", "💳 تایید یا رد پرداخت‌ها"),
     ("approve_renewal",  "🔄 تایید تمدید کردن"),
+    ("manage_panels",    "🖥 مدیریت پنل‌های 3x-ui"),
 ]
 PERM_FULL_SET  = {"types_packages","register_config","view_configs","manage_configs",
                   "broadcast_all","broadcast_cust","view_users","agency","assign_config",
                   "manage_balance","user_status","full_users","settings",
-                  "approve_payments","approve_renewal"}
+                  "approve_payments","approve_renewal","manage_panels"}
 PERM_USER_FULL = {"agency", "assign_config", "manage_balance", "user_status"}
 
 CRYPTO_API_SYMBOLS = {
@@ -284,6 +286,41 @@ def init_db():
                 created_at     TEXT    NOT NULL,
                 status         TEXT    NOT NULL DEFAULT 'waiting'
             );
+            CREATE TABLE IF NOT EXISTS panels (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT    NOT NULL,
+                ip          TEXT    NOT NULL,
+                port        INTEGER NOT NULL DEFAULT 2053,
+                patch       TEXT    NOT NULL DEFAULT '',
+                username    TEXT    NOT NULL,
+                password    TEXT    NOT NULL,
+                is_active   INTEGER NOT NULL DEFAULT 1,
+                created_at  TEXT    NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS panel_packages (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                panel_id      INTEGER NOT NULL,
+                name          TEXT    NOT NULL,
+                volume_gb     INTEGER NOT NULL,
+                duration_days INTEGER NOT NULL,
+                created_at    TEXT    NOT NULL,
+                FOREIGN KEY(panel_id) REFERENCES panels(id) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS xui_jobs (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_uuid         TEXT    NOT NULL UNIQUE,
+                user_id          INTEGER NOT NULL,
+                panel_id         INTEGER NOT NULL,
+                panel_package_id INTEGER NOT NULL,
+                payment_id       INTEGER,
+                status           TEXT    NOT NULL DEFAULT 'pending',
+                result_config    TEXT,
+                result_link      TEXT,
+                error_msg        TEXT,
+                retry_count      INTEGER NOT NULL DEFAULT 0,
+                created_at       TEXT    NOT NULL,
+                updated_at       TEXT    NOT NULL
+            );
         """)
 
         defaults = {
@@ -304,6 +341,7 @@ def init_db():
             "gw_swapwallet_visibility": "public",
             "swapwallet_api_key":       "",
             "swapwallet_username":      "",
+            "swapwallet_network":       "TRON",
             "shop_open":         "1",
             "preorder_mode":     "0",
             "support_link":     "",
@@ -318,6 +356,9 @@ def init_db():
             "agent_test_period": "day",
             "purchase_rules_enabled": "0",
             "purchase_rules_text": "♨️ قوانین استفاده از خدمات ما\n\nلطفاً پیش از استفاده از سرویس‌ها، موارد زیر را با دقت مطالعه فرمایید:\n\n1️⃣ اطلاعیه‌های منتشرشده در کانال را حتماً دنبال کنید. هرگونه تغییر، بروزرسانی یا قطعی احتمالی از طریق کانال اطلاع‌رسانی خواهد شد.\n\n2️⃣ در صورتی که با مشکلی در اتصال یا عملکرد سرویس مواجه شدید و اطلاعیه‌ای در کانال منتشر نشده بود، لطفاً به پشتیبانی پیام دهید تا در سریع‌ترین زمان ممکن بررسی شود.\n\n3️⃣ از ارسال مشخصات سرویس (کانفیگ) از طریق پیامک خودداری کنید، زیرا ممکن است به درستی منتقل نشود. در صورت نیاز، از روش‌های امن‌تر مانند ایمیل استفاده نمایید.\n\n4️⃣ مسئولیت حفظ و نگهداری اطلاعات سرویس بر عهده کاربر می‌باشد. از اشتراک‌گذاری آن با دیگران خودداری کنید.\n\n5️⃣ هرگونه سوءاستفاده از خدمات، ممکن است منجر به مسدود شدن سرویس بدون اطلاع قبلی شود.\n\n🙏 با رعایت این قوانین، به ما در ارائه خدمات پایدار و بهتر کمک کنید.",
+            "worker_api_key":     "",
+            "worker_api_port":    "8080",
+            "worker_api_enabled": "0",
         }
         for coin, _ in CRYPTO_COINS:
             defaults[f"crypto_{coin}"] = ""
@@ -437,13 +478,19 @@ def verify_tetrapay_order(authority):
     except Exception as e:
         return False, {"error": str(e)}
 
+SWAPWALLET_NETWORK_LABELS = {
+    "TRON": "ترون (TRC-20)",
+    "TON":  "تون (TON)",
+    "BSC":  "بایننس (BEP-20)",
+}
+
 def _swapwallet_crypto_line(amount_toman, api_result):
-    """Return (crypto_amount_str, token, network) for display.
-    Prefers the usdValue returned by the API; falls back to live price lookup."""
+    """Return (crypto_amount_str, token, network_label) for display."""
     usd_val    = api_result.get("amount", {}).get("usdValue", {})
     usd_amount = (usd_val or {}).get("number", "").strip()
     usd_unit   = (usd_val or {}).get("unit", "USDT").strip() or "USDT"
-    network    = "ترون (TRC-20)"
+    cfg_net    = setting_get("swapwallet_network", "TRON")
+    network    = SWAPWALLET_NETWORK_LABELS.get(cfg_net, cfg_net)
     if not usd_amount:
         prices = fetch_crypto_prices()
         irt_per_usdt = prices.get("USDT", 0)
@@ -455,14 +502,18 @@ def _swapwallet_crypto_line(amount_toman, api_result):
 def create_swapwallet_invoice(amount_toman, order_id, description="پرداخت"):
     api_key  = setting_get("swapwallet_api_key", "").strip()
     username = setting_get("swapwallet_username", "").strip()
-    if not api_key or not username:
-        return False, {"error": "کلید API یا نام کاربری سواپ ولت تنظیم نشده است"}
     # strip accidental "Bearer " prefix if user pasted the full header value
     if api_key.lower().startswith("bearer "):
         api_key = api_key[7:].strip()
+    # strip leading "@" from shop username if entered incorrectly
+    if username.startswith("@"):
+        username = username[1:].strip()
+    if not api_key or not username:
+        return False, {"error": "کلید API یا نام کاربری فروشگاه سواپ ولت تنظیم نشده است. از پنل مدیریت ← تنظیمات ← درگاه‌ها اقدام کنید."}
+    cfg_net = setting_get("swapwallet_network", "TRON")
     payload = json.dumps({
         "amount":       {"number": str(int(amount_toman)), "unit": "IRT"},
-        "network":      "TRON",
+        "network":      cfg_net,
         "allowedToken": "USDT",
         "ttl":          3600,
         "orderId":      str(order_id),
@@ -500,10 +551,12 @@ def create_swapwallet_invoice(amount_toman, order_id, description="پرداخت"
 def check_swapwallet_invoice(invoice_id):
     api_key  = setting_get("swapwallet_api_key", "").strip()
     username = setting_get("swapwallet_username", "").strip()
-    if not api_key or not username:
-        return False, {"error": "کلید API یا نام کاربری سواپ ولت تنظیم نشده است"}
     if api_key.lower().startswith("bearer "):
         api_key = api_key[7:].strip()
+    if username.startswith("@"):
+        username = username[1:].strip()
+    if not api_key or not username:
+        return False, {"error": "کلید API یا نام کاربری فروشگاه سواپ ولت تنظیم نشده است."}
     safe_user = urllib.parse.quote(username, safe="")
     safe_inv  = urllib.parse.quote(str(invoice_id), safe="")
     url = f"{SWAPWALLET_BASE_URL}/v2/payment/{safe_user}/invoices/{safe_inv}"
@@ -532,6 +585,52 @@ def check_swapwallet_invoice(invoice_id):
         return False, {"error": msg}
     except Exception as e:
         return False, {"error": str(e)}
+
+def _show_swapwallet_page(call, *, amount_toman, invoice_id, wallet_address,
+                           usd_amount, usd_unit, network_label, links,
+                           payment_id, verify_cb):
+    """Render the unified SwapWallet payment page (matching reference bot format)."""
+    short_id    = invoice_id.replace("-", "")[:10] if invoice_id else "---"
+    crypto_line = f"<b>{esc(usd_amount)}</b>" if usd_amount else "—"
+    text = (
+        "✅ <b>فاکتور پرداخت ایجاد شد</b>\n\n"
+        f"🛒 کد پیگیری: <code>{short_id}</code>\n"
+        f"💲 مبلغ (تومان): <b>{fmt_price(amount_toman)}</b>\n\n"
+        f"📡 شبکه: {esc(network_label)} — {esc(usd_unit)}\n"
+        f"📬 آدرس کیف پول:\n<code>{esc(wallet_address)}</code>\n\n"
+        f"💰 مقدار دقیق ({esc(usd_unit)}): {crypto_line}\n\n"
+        "💢 <b>قبل از پرداخت بخوانید:</b>\n"
+        "❌ این فاکتور <b>۱ ساعت</b> اعتبار دارد\n"
+        "🔸 در صورت اشتباه در آدرس، تراکنش تأیید نمی‌شود و برگشت وجه ممکن نیست\n"
+        "🔹 مبلغ ارسالی نباید کمتر یا بیشتر از مقدار اعلام‌شده باشد\n"
+        "🔹 در صورت واریز بیشتر از مقدار گفته‌شده، امکان برگشت وجه وجود ندارد"
+    )
+    kb = types.InlineKeyboardMarkup()
+    for link in links:
+        ln, lu = link.get("name", ""), link.get("url", "")
+        if lu:
+            label = "💎 پرداخت با سواپ ولت" if ln == "SWAP_WALLET" else f"👛 {ln}"
+            kb.add(types.InlineKeyboardButton(label, url=lu))
+    kb.add(types.InlineKeyboardButton("✅ بررسی پرداخت", callback_data=verify_cb))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+    bot.answer_callback_query(call.id)
+    send_or_edit(call, text, kb)
+
+
+def _swapwallet_error_page(call, err_msg):
+    """Show SwapWallet error as a full readable message (not a truncated popup)."""
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+    bot.answer_callback_query(call.id)
+    send_or_edit(call,
+        "❌ <b>خطا در ایجاد فاکتور سواپ ولت</b>\n\n"
+        f"<code>{esc(str(err_msg)[:400])}</code>\n\n"
+        "⚠️ لطفاً موارد زیر را بررسی کنید:\n"
+        "• کلید API با فرمت <code>apikey-xxx</code> معتبر باشد\n"
+        "• نام کاربری فروشگاه <b>بدون @</b> وارد شده باشد\n"
+        "• فروشگاه در پنل سواپ ولت ایجاد شده باشد",
+        kb)
+
 
 def ensure_user(tg_user):
     uid = tg_user.id
@@ -978,6 +1077,103 @@ def update_admin_permissions(user_id, permissions_dict):
     with get_conn() as conn:
         conn.execute("UPDATE admin_users SET permissions=? WHERE user_id=?", (perms_json, user_id))
 
+# ── 3x-ui Panel management ─────────────────────────────────────────────────────
+def get_all_panels():
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM panels ORDER BY id DESC").fetchall()
+
+def get_panel(panel_id):
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM panels WHERE id=?", (panel_id,)).fetchone()
+
+def add_panel(name, ip, port, patch, username, password):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO panels(name,ip,port,patch,username,password,is_active,created_at)"
+            " VALUES(?,?,?,?,?,?,1,?)",
+            (name.strip(), ip.strip(), int(port), patch.strip(), username.strip(), password, now_str())
+        )
+        return conn.execute("SELECT last_insert_rowid() AS x").fetchone()["x"]
+
+def update_panel_field(panel_id, field, value):
+    allowed = {"name", "ip", "port", "patch", "username", "password", "is_active"}
+    if field not in allowed:
+        return
+    with get_conn() as conn:
+        conn.execute(f"UPDATE panels SET {field}=? WHERE id=?", (value, panel_id))
+
+def delete_panel(panel_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM panels WHERE id=?", (panel_id,))
+
+def get_panel_packages(panel_id):
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM panel_packages WHERE panel_id=? ORDER BY id ASC", (panel_id,)
+        ).fetchall()
+
+def get_panel_package(pp_id):
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM panel_packages WHERE id=?", (pp_id,)).fetchone()
+
+def add_panel_package(panel_id, name, volume_gb, duration_days):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO panel_packages(panel_id,name,volume_gb,duration_days,created_at)"
+            " VALUES(?,?,?,?,?)",
+            (panel_id, name.strip(), int(volume_gb), int(duration_days), now_str())
+        )
+        return conn.execute("SELECT last_insert_rowid() AS x").fetchone()["x"]
+
+def delete_panel_package(pp_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM panel_packages WHERE id=?", (pp_id,))
+
+def create_xui_job(user_id, panel_id, panel_package_id, payment_id=None):
+    job_uuid = str(uuid.uuid4())
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO xui_jobs(job_uuid,user_id,panel_id,panel_package_id,payment_id,"
+            "status,retry_count,created_at,updated_at) VALUES(?,?,?,?,?,'pending',0,?,?)",
+            (job_uuid, user_id, panel_id, panel_package_id, payment_id, now_str(), now_str())
+        )
+        return conn.execute("SELECT last_insert_rowid() AS x").fetchone()["x"], job_uuid
+
+def get_xui_job(job_id):
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM xui_jobs WHERE id=?", (job_id,)).fetchone()
+
+def get_pending_xui_jobs():
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT j.*, p.ip, p.port, p.patch, p.username, p.password,"
+            " pp.name AS pkg_name, pp.volume_gb, pp.duration_days"
+            " FROM xui_jobs j"
+            " JOIN panels p ON p.id=j.panel_id"
+            " JOIN panel_packages pp ON pp.id=j.panel_package_id"
+            " WHERE j.status IN ('pending','failed') AND j.retry_count < 5"
+            " ORDER BY j.created_at ASC LIMIT 20"
+        ).fetchall()
+
+def update_xui_job(job_id, status, result_config=None, result_link=None, error_msg=None):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE xui_jobs SET status=?, result_config=?, result_link=?, error_msg=?,"
+            " retry_count=retry_count+1, updated_at=? WHERE id=?",
+            (status, result_config, result_link, error_msg, now_str(), job_id)
+        )
+
+def get_user_xui_jobs(user_id):
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT j.*, pp.name AS pkg_name, pp.volume_gb, pp.duration_days, p.name AS panel_name"
+            " FROM xui_jobs j"
+            " JOIN panel_packages pp ON pp.id=j.panel_package_id"
+            " JOIN panels p ON p.id=j.panel_id"
+            " WHERE j.user_id=? ORDER BY j.created_at DESC",
+            (user_id,)
+        ).fetchall()
+
 def create_pending_order(user_id, package_id, payment_id, amount, payment_method):
     with get_conn() as conn:
         conn.execute(
@@ -1113,6 +1309,10 @@ def kb_admin_panel(uid=None):
     # Broadcast (moved below settings)
     if is_owner or (uid and (admin_has_perm(uid, "broadcast_all") or admin_has_perm(uid, "broadcast_cust"))):
         kb.add(types.InlineKeyboardButton("📣 فوروارد همگانی", callback_data="admin:broadcast"))
+
+    # 3x-ui Panel management
+    if is_owner or (uid and admin_has_perm(uid, "manage_panels")):
+        kb.add(types.InlineKeyboardButton("🖥 مدیریت پنل‌های 3x-ui", callback_data="admin:panels"))
 
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
     return kb
@@ -4404,6 +4604,183 @@ def _dispatch_callback(call, uid, data):
             back_button("admin:panel"))
         return
 
+    # ── 3x-ui Panel management ────────────────────────────────────────────────
+    if data == "admin:panels":
+        if not is_admin(uid) or not (uid in ADMIN_IDS or admin_has_perm(uid, "manage_panels")):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        _show_admin_panels(call)
+        return
+
+    if data == "adm:panel:add":
+        if not is_admin(uid) or not (uid in ADMIN_IDS or admin_has_perm(uid, "manage_panels")):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        state_set(uid, "panel_add_name")
+        bot.answer_callback_query(call.id)
+        send_or_edit(call,
+            "🖥 <b>Register Panel Config</b>\n\nStep 1/5: Enter Panel <b>Name</b>:",
+            back_button("admin:panels"))
+        return
+
+    if data.startswith("adm:panel:pkgs:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        panel_id = int(data.split(":")[3])
+        bot.answer_callback_query(call.id)
+        _show_panel_packages(call, panel_id)
+        return
+
+    if data.startswith("adm:panel:pkadd:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        panel_id = int(data.split(":")[3])
+        state_set(uid, "panel_pkg_add_name", panel_id=panel_id)
+        bot.answer_callback_query(call.id)
+        send_or_edit(call,
+            "📦 <b>Add Traffic Package</b>\n\nStep 1/3: Enter Package <b>Name</b>:",
+            back_button("admin:panels"))
+        return
+
+    if data.startswith("adm:panel:pkdel:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        pp_id = int(data.split(":")[3])
+        pp = get_panel_package(pp_id)
+        if not pp:
+            bot.answer_callback_query(call.id, "Package not found.", show_alert=True)
+            return
+        delete_panel_package(pp_id)
+        bot.answer_callback_query(call.id, "✅ Package deleted.")
+        _show_panel_packages(call, pp["panel_id"])
+        return
+
+    if data.startswith("adm:panel:edit:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        panel_id = int(data.split(":")[3])
+        bot.answer_callback_query(call.id)
+        _show_panel_edit(call, panel_id)
+        return
+
+    if data.startswith("adm:panel:ef:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        parts    = data.split(":")
+        field    = parts[3]
+        panel_id = int(parts[4])
+        state_set(uid, "panel_edit_field", field=field, panel_id=panel_id)
+        bot.answer_callback_query(call.id)
+        send_or_edit(call,
+            f"✏️ Enter new value for <b>{field}</b>:",
+            back_button("admin:panels"))
+        return
+
+    if data.startswith("adm:panel:toggle:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        parts    = data.split(":")
+        panel_id = int(parts[3])
+        new_val  = int(parts[4])
+        update_panel_field(panel_id, "is_active", new_val)
+        bot.answer_callback_query(call.id, "✅ Updated.")
+        _show_panel_edit(call, panel_id)
+        return
+
+    if data.startswith("adm:panel:del:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        panel_id = int(data.split(":")[3])
+        panel    = get_panel(panel_id)
+        if not panel:
+            bot.answer_callback_query(call.id, "Panel not found.", show_alert=True)
+            return
+        kb = types.InlineKeyboardMarkup()
+        kb.row(
+            types.InlineKeyboardButton("✅ Yes, Delete", callback_data=f"adm:panel:delok:{panel_id}"),
+            types.InlineKeyboardButton("❌ Cancel",      callback_data="admin:panels"),
+        )
+        bot.answer_callback_query(call.id)
+        send_or_edit(call,
+            f"⚠️ Delete panel <b>{esc(panel['name'])}</b>?\n"
+            "All packages and jobs linked to it will also be removed.", kb)
+        return
+
+    if data.startswith("adm:panel:delok:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        panel_id = int(data.split(":")[3])
+        delete_panel(panel_id)
+        bot.answer_callback_query(call.id, "✅ Panel deleted.")
+        _show_admin_panels(call)
+        return
+
+    if data == "adm:panel:api_settings":
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        current_key     = setting_get("worker_api_key", "")
+        current_port    = setting_get("worker_api_port", "8080")
+        current_enabled = setting_get("worker_api_enabled", "0")
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("🔑 Set API Key",  callback_data="adm:panel:set_api_key"))
+        kb.add(types.InlineKeyboardButton("🔌 Set API Port", callback_data="adm:panel:set_api_port"))
+        toggle_lbl = "🔴 Disable API" if current_enabled == "1" else "🟢 Enable API"
+        new_enabled = "0" if current_enabled == "1" else "1"
+        kb.add(types.InlineKeyboardButton(toggle_lbl, callback_data=f"adm:panel:api_toggle:{new_enabled}"))
+        kb.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin:panels"))
+        bot.answer_callback_query(call.id)
+        masked_key = (current_key[:6] + "…") if current_key else "(not set)"
+        send_or_edit(call,
+            "⚙️ <b>Worker API Settings</b>\n\n"
+            f"🔑 API Key: <code>{masked_key}</code>\n"
+            f"🔌 Port: <code>{current_port}</code>\n"
+            f"Status: {'🟢 Enabled' if current_enabled == '1' else '🔴 Disabled'}\n\n"
+            "Share the API Key with your Iran Worker's config.env",
+            kb)
+        return
+
+    if data.startswith("adm:panel:api_toggle:"):
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        new_val = data.split(":")[3]
+        setting_set("worker_api_enabled", new_val)
+        bot.answer_callback_query(call.id, "✅ Updated.")
+        _fake_call(call, "adm:panel:api_settings")
+        return
+
+    if data == "adm:panel:set_api_key":
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        state_set(uid, "panel_set_api_key")
+        bot.answer_callback_query(call.id)
+        send_or_edit(call,
+            "🔑 Enter new <b>Worker API Key</b>:\n(min 16 characters, letters and digits only)",
+            back_button("admin:panels"))
+        return
+
+    if data == "adm:panel:set_api_port":
+        if not is_admin(uid):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        state_set(uid, "panel_set_api_port")
+        bot.answer_callback_query(call.id)
+        send_or_edit(call,
+            "🔌 Enter new <b>API Server Port</b> (default 8080):",
+            back_button("admin:panels"))
+        return
+
     if data == "noop":
         bot.answer_callback_query(call.id)
         return
@@ -4612,6 +4989,74 @@ def _fake_call(call, new_data):
             self.data      = data
             self.id        = original.id
     _dispatch_callback(_FakeCall(call, new_data), call.from_user.id, new_data)
+
+# ── 3x-ui Panel admin renderers ────────────────────────────────────────────────
+def _show_admin_panels(call):
+    panels = get_all_panels()
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("➕ Register Panel Config", callback_data="adm:panel:add"))
+    for p in panels:
+        status_icon = "🟢" if p["is_active"] else "🔴"
+        kb.add(types.InlineKeyboardButton(
+            f"{status_icon} {p['name']} | {p['ip']}:{p['port']}",
+            callback_data="noop"
+        ))
+        kb.row(
+            types.InlineKeyboardButton("✏️ Edit",     callback_data=f"adm:panel:edit:{p['id']}"),
+            types.InlineKeyboardButton("🗑 Delete",   callback_data=f"adm:panel:del:{p['id']}"),
+            types.InlineKeyboardButton("📦 Packages", callback_data=f"adm:panel:pkgs:{p['id']}"),
+        )
+    kb.add(types.InlineKeyboardButton("⚙️ Worker API Settings", callback_data="adm:panel:api_settings"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:panel"))
+    send_or_edit(call, "🖥 <b>مدیریت پنل‌های 3x-ui</b>\n\nپنل‌های ثبت‌شده:", kb)
+
+def _show_panel_packages(call, panel_id):
+    panel = get_panel(panel_id)
+    if not panel:
+        bot.answer_callback_query(call.id, "Panel not found.", show_alert=True)
+        return
+    pkgs = get_panel_packages(panel_id)
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("➕ Add Traffic Package", callback_data=f"adm:panel:pkadd:{panel_id}"))
+    for pp in pkgs:
+        kb.add(types.InlineKeyboardButton(
+            f"📦 {pp['name']} | {pp['volume_gb']}GB | {pp['duration_days']}d",
+            callback_data="noop"
+        ))
+        kb.add(types.InlineKeyboardButton(
+            f"🗑 Delete {pp['name']}", callback_data=f"adm:panel:pkdel:{pp['id']}"
+        ))
+    kb.add(types.InlineKeyboardButton("🔙 Back to Panels", callback_data="admin:panels"))
+    send_or_edit(call,
+        f"📦 <b>Traffic Packages — {esc(panel['name'])}</b>\n"
+        f"🌐 {esc(panel['ip'])}:{panel['port']}\n\n"
+        "Packages assigned to this panel:", kb)
+
+def _show_panel_edit(call, panel_id):
+    panel = get_panel(panel_id)
+    if not panel:
+        bot.answer_callback_query(call.id, "Panel not found.", show_alert=True)
+        return
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("📝 Edit Name",     callback_data=f"adm:panel:ef:name:{panel_id}"))
+    kb.add(types.InlineKeyboardButton("🌐 Edit IP",       callback_data=f"adm:panel:ef:ip:{panel_id}"))
+    kb.add(types.InlineKeyboardButton("🔌 Edit Port",     callback_data=f"adm:panel:ef:port:{panel_id}"))
+    kb.add(types.InlineKeyboardButton("📄 Edit Patch",    callback_data=f"adm:panel:ef:patch:{panel_id}"))
+    kb.add(types.InlineKeyboardButton("👤 Edit Username", callback_data=f"adm:panel:ef:username:{panel_id}"))
+    kb.add(types.InlineKeyboardButton("🔑 Edit Password", callback_data=f"adm:panel:ef:password:{panel_id}"))
+    status_lbl = "🔴 Deactivate" if panel["is_active"] else "🟢 Activate"
+    new_status  = 0 if panel["is_active"] else 1
+    kb.add(types.InlineKeyboardButton(status_lbl, callback_data=f"adm:panel:toggle:{panel_id}:{new_status}"))
+    kb.add(types.InlineKeyboardButton("🔙 Back", callback_data="admin:panels"))
+    send_or_edit(call,
+        f"✏️ <b>Edit Panel — {esc(panel['name'])}</b>\n\n"
+        f"🌐 IP: <code>{esc(panel['ip'])}</code>\n"
+        f"🔌 Port: <code>{panel['port']}</code>\n"
+        f"📄 Patch: <code>{esc(panel['patch'] or '/')}</code>\n"
+        f"👤 Username: <code>{esc(panel['username'])}</code>\n"
+        f"🔑 Password: <code>{'*' * min(len(panel['password']), 8)}</code>\n"
+        f"Status: {'🟢 Active' if panel['is_active'] else '🔴 Inactive'}",
+        kb)
 
 # ── Backup ─────────────────────────────────────────────────────────────────────
 def _send_backup(target_chat_id):
@@ -5460,6 +5905,131 @@ def universal_handler(message):
             bot.send_message(uid, "✅ متن قوانین خرید ذخیره شد.", reply_markup=back_button("adm:set:rules"))
             return
 
+        # ── Panel: Register Panel Config (multi-step) ──────────────────────────
+        if sn == "panel_add_name" and is_admin(uid):
+            name = (message.text or "").strip()
+            if not name:
+                bot.send_message(uid, "⚠️ Name cannot be empty."); return
+            state_set(uid, "panel_add_ip", name=name)
+            bot.send_message(uid, f"🖥 Step 2/5: Enter Panel <b>IP</b> (default 127.0.0.1):")
+            return
+
+        if sn == "panel_add_ip" and is_admin(uid):
+            raw = (message.text or "").strip()
+            ip  = raw if raw else "127.0.0.1"
+            state_set(uid, "panel_add_port", name=sd["name"], ip=ip)
+            bot.send_message(uid, "🔌 Step 3/5: Enter Panel <b>Port</b> (default 2053):")
+            return
+
+        if sn == "panel_add_port" and is_admin(uid):
+            raw  = (message.text or "").strip()
+            port = raw if raw.isdigit() else "2053"
+            state_set(uid, "panel_add_patch", name=sd["name"], ip=sd["ip"], port=port)
+            bot.send_message(uid, "📄 Step 4/5: Enter <b>Patch</b> (optional, press / or leave blank):")
+            return
+
+        if sn == "panel_add_patch" and is_admin(uid):
+            raw   = (message.text or "").strip()
+            patch = raw if raw else ""
+            state_set(uid, "panel_add_user", name=sd["name"], ip=sd["ip"],
+                      port=sd["port"], patch=patch)
+            bot.send_message(uid, "👤 Step 5/6: Enter <b>Panel Username</b>:")
+            return
+
+        if sn == "panel_add_user" and is_admin(uid):
+            username = (message.text or "").strip()
+            if not username:
+                bot.send_message(uid, "⚠️ Username cannot be empty."); return
+            state_set(uid, "panel_add_pass", name=sd["name"], ip=sd["ip"],
+                      port=sd["port"], patch=sd["patch"], username=username)
+            bot.send_message(uid, "🔑 Step 6/6: Enter <b>Panel Password</b>:")
+            return
+
+        if sn == "panel_add_pass" and is_admin(uid):
+            password = (message.text or "").strip()
+            if not password:
+                bot.send_message(uid, "⚠️ Password cannot be empty."); return
+            state_clear(uid)
+            new_id = add_panel(sd["name"], sd["ip"], int(sd["port"]), sd["patch"], sd["username"], password)
+            bot.send_message(uid,
+                f"✅ <b>Panel Registered!</b>\n\n"
+                f"🖥 Name: {esc(sd['name'])}\n"
+                f"🌐 IP: {esc(sd['ip'])}\n"
+                f"🔌 Port: {sd['port']}\n"
+                f"📄 Patch: {esc(sd['patch'] or '/')}\n"
+                f"👤 Username: {esc(sd['username'])}\n"
+                f"🆔 Panel ID: #{new_id}",
+                reply_markup=kb_admin_panel(uid))
+            return
+
+        # ── Panel: Add Traffic Package (multi-step) ────────────────────────────
+        if sn == "panel_pkg_add_name" and is_admin(uid):
+            name = (message.text or "").strip()
+            if not name:
+                bot.send_message(uid, "⚠️ Package name cannot be empty."); return
+            state_set(uid, "panel_pkg_add_vol", panel_id=sd["panel_id"], name=name)
+            bot.send_message(uid, "📦 Step 2/3: Enter Volume in <b>GB</b> (e.g. 50):")
+            return
+
+        if sn == "panel_pkg_add_vol" and is_admin(uid):
+            raw = (message.text or "").strip()
+            if not raw.isdigit() or int(raw) <= 0:
+                bot.send_message(uid, "⚠️ Enter a valid number of GB."); return
+            state_set(uid, "panel_pkg_add_days", panel_id=sd["panel_id"],
+                      name=sd["name"], volume_gb=raw)
+            bot.send_message(uid, "⏰ Step 3/3: Enter Duration in <b>Days</b> (e.g. 30):")
+            return
+
+        if sn == "panel_pkg_add_days" and is_admin(uid):
+            raw = (message.text or "").strip()
+            if not raw.isdigit() or int(raw) <= 0:
+                bot.send_message(uid, "⚠️ Enter a valid number of days."); return
+            state_clear(uid)
+            pp_id = add_panel_package(sd["panel_id"], sd["name"], int(sd["volume_gb"]), int(raw))
+            bot.send_message(uid,
+                f"✅ <b>Package Added!</b>\n\n"
+                f"📦 Name: {esc(sd['name'])}\n"
+                f"🔋 Volume: {sd['volume_gb']} GB\n"
+                f"⏰ Duration: {raw} days\n"
+                f"🆔 Package ID: #{pp_id}",
+                reply_markup=kb_admin_panel(uid))
+            return
+
+        # ── Panel: Edit field ──────────────────────────────────────────────────
+        if sn == "panel_edit_field" and is_admin(uid):
+            value    = (message.text or "").strip()
+            field    = sd["field"]
+            panel_id = sd["panel_id"]
+            if not value:
+                bot.send_message(uid, "⚠️ Value cannot be empty."); return
+            if field == "port" and not value.isdigit():
+                bot.send_message(uid, "⚠️ Port must be numeric."); return
+            update_panel_field(panel_id, field, int(value) if field == "port" else value)
+            state_clear(uid)
+            bot.send_message(uid, f"✅ Field <b>{field}</b> updated.", reply_markup=kb_admin_panel(uid))
+            return
+
+        # ── Panel: Set Worker API Key ──────────────────────────────────────────
+        if sn == "panel_set_api_key" and is_admin(uid):
+            key = (message.text or "").strip()
+            if len(key) < 16 or not re.fullmatch(r"[A-Za-z0-9_\-]+", key):
+                bot.send_message(uid, "⚠️ API key must be at least 16 alphanumeric characters."); return
+            setting_set("worker_api_key", key)
+            state_clear(uid)
+            bot.send_message(uid, f"✅ Worker API key saved.\n\n🔑 <code>{esc(key)}</code>",
+                             reply_markup=kb_admin_panel(uid))
+            return
+
+        # ── Panel: Set Worker API Port ─────────────────────────────────────────
+        if sn == "panel_set_api_port" and is_admin(uid):
+            raw = (message.text or "").strip()
+            if not raw.isdigit() or not (1 <= int(raw) <= 65535):
+                bot.send_message(uid, "⚠️ Enter a valid port number (1-65535)."); return
+            setting_set("worker_api_port", raw)
+            state_clear(uid)
+            bot.send_message(uid, f"✅ API port set to <b>{raw}</b>.", reply_markup=kb_admin_panel(uid))
+            return
+
     except Exception as e:
         print("TEXT_HANDLER_ERROR:", e)
         traceback.print_exc()
@@ -5481,6 +6051,20 @@ def main():
     # Start backup thread
     backup_thread = threading.Thread(target=_backup_loop, daemon=True)
     backup_thread.start()
+
+    # Start worker API server if enabled
+    if setting_get("worker_api_enabled", "0") == "1":
+        try:
+            from api import app as flask_app
+            api_port = int(setting_get("worker_api_port", "8080") or "8080")
+            api_thread = threading.Thread(
+                target=lambda: flask_app.run(host="0.0.0.0", port=api_port, use_reloader=False),
+                daemon=True
+            )
+            api_thread.start()
+            print(f"✅ Worker API server started on port {api_port}")
+        except Exception as e:
+            print(f"⚠️ Could not start API server: {e}")
 
     print("✅ Bot v4 is running...")
     bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
