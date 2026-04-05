@@ -1,4 +1,14 @@
 #!/bin/bash
+
+# ── Self-download fallback for systems without /dev/fd support (e.g. OpenVZ) ──
+if [[ "${BASH_SOURCE[0]:-}" == /dev/fd/* ]] || [[ "${BASH_SOURCE[0]:-}" == "bash" ]]; then
+    _TMP=$(mktemp /tmp/configflow_install_XXXXXX.sh)
+    curl -fsSL "https://raw.githubusercontent.com/Emadhabibnia1385/ConfigFlow/main/install.sh" -o "$_TMP" \
+        || { echo "Error: failed to download install.sh"; rm -f "$_TMP"; exit 1; }
+    chmod +x "$_TMP"
+    exec bash "$_TMP" "$@"
+fi
+
 set -Eeuo pipefail
 
 REPO="https://github.com/Emadhabibnia1385/ConfigFlow.git"
@@ -7,7 +17,11 @@ BASE_DIR="/opt/configflow"
 BASE_SERVICE="configflow"
 DIR=""
 SERVICE=""
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${BASH_SOURCE[0]:-}" != /dev/fd/* ]] && [[ -f "${BASH_SOURCE[0]:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    SCRIPT_DIR="$(pwd)"
+fi
 
 R='\033[31m'; G='\033[32m'; Y='\033[33m'; C='\033[36m'; M='\033[35m'; B='\033[1m'; W='\033[97m'; N='\033[0m'
 
