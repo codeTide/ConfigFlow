@@ -1,13 +1,8 @@
 #!/bin/bash
 
-# ── Self-download fallback for systems without /dev/fd (OpenVZ) or when piped ──
-# This triggers when NOT running from a real file on disk (e.g. curl|bash, bash <(...))
-if [[ ! -f "${BASH_SOURCE[0]:-}" ]]; then
-    _TMP=$(mktemp /tmp/configflow_install_XXXXXX.sh)
-    curl -fsSL "https://raw.githubusercontent.com/Emadhabibnia1385/ConfigFlow/main/install.sh" -o "$_TMP" \
-        || { echo "Error: failed to download install.sh"; rm -f "$_TMP"; exit 1; }
-    chmod +x "$_TMP"
-    exec bash "$_TMP" "$@" </dev/tty
+# When stdin is a pipe (curl | bash), reconnect to terminal for interactive input
+if [[ ! -t 0 ]]; then
+    exec < /dev/tty
 fi
 
 set -Eeuo pipefail
