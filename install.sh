@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 REPO="https://github.com/Emadhabibnia1385/ConfigFlow.git"
+BRANCH="REFACTOR"
 BASE_DIR="/opt/configflow"
 BASE_SERVICE="configflow"
 DIR=""
@@ -94,11 +95,11 @@ clone_or_update_repo() {
     info "Repository exists. Updating..."
     cd "$DIR"
     git fetch --all --prune
-    git reset --hard origin/main
+    git reset --hard origin/${BRANCH}
   else
     rm -rf "$DIR"
     mkdir -p "$DIR"
-    git clone "$REPO" "$DIR"
+    git clone -b "$BRANCH" "$REPO" "$DIR"
     cd "$DIR"
   fi
 
