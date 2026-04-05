@@ -79,7 +79,7 @@ clone_or_update_repo() {
     cd "$DIR"
   fi
 
-  [[ -f "$DIR/bot.py" ]] || err "bot.py not found after download. Repo content missing?"
+  [[ -f "$DIR/main.py" ]] || err "main.py not found after download. Repo content missing?"
   [[ -f "$DIR/requirements.txt" ]] || err "requirements.txt not found after download."
 }
 
@@ -139,7 +139,7 @@ After=network.target
 Type=simple
 WorkingDirectory=$DIR
 EnvironmentFile=$DIR/.env
-ExecStart=$DIR/venv/bin/python $DIR/bot.py
+ExecStart=$DIR/venv/bin/python $DIR/main.py
 Restart=always
 RestartSec=5
 
