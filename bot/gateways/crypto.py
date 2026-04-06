@@ -18,7 +18,7 @@ def fetch_crypto_prices():
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode())
         prices = {}
-        for key, val in data.items():
+        for key, val in data.get("result", data).items():
             if key.endswith("/IRT"):
                 symbol = key.split("/")[0]
                 try:
