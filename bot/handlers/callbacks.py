@@ -226,37 +226,36 @@ def on_callback(call):
 
 def _swapwallet_error_inline(call, err_msg):
     """نمایش خطای SwapWallet به صورت inline با راهنمای تنظیمات."""
-    if "APPLICATION_NOT_FOUND" in err_msg or "Application not found" in err_msg:
-        detail = (
-            "⚙️ <b>راه‌حل:</b>\n"
-            "در SwapWallet باید یک <b>فروشگاه (Shop)</b> ثبت کرده باشید.\n"
-            "نام کاربری <b>فروشگاه</b> را وارد کنید، نه اکانت شخصی!\n\n"
-            "مراحل:\n"
-            "1. اپ SwapWallet را باز کنید\n"
-            "2. بخش فروشگاه/Shop را پیدا کنید\n"
-            "3. یک فروشگاه جدید بسازید\n"
-            "4. نام کاربری آن فروشگاه را در ربات وارد کنید"
+    if "APPLICATION_NOT_FOUND" in err_msg or "Application not found" in err_msg or "کسب\u200cوکار" in err_msg:
+        msg = (
+            "❌ <b>خطا: کسب\u200cوکار یافت نشد</b>\n\n"
+            "درگاه SwapWallet نیاز به یک <b>Application (کسب\u200cوکار)</b> جداگانه دارد.\n"
+            "اکانت شخصی برای دریافت پرداخت کار نمی\u200cکند.\n\n"
+            "<b>مراحل رفع:</b>\n"
+            "1\ufe0f\u20e3 ربات @SwapWalletBot را باز کنید\n"
+            "2\ufe0f\u20e3 به بخش <b>کسب\u200cوکار</b> بروید\n"
+            "3\ufe0f\u20e3 یک کسب\u200cوکار جدید بسازید\n"
+            "4\ufe0f\u20e3 <b>نام کاربری آن کسب\u200cوکار</b> را در پنل ادمین ← درگاه\u200cها وارد کنید"
         )
     else:
-        detail = "جزئیات: " + err_msg[:300]
+        msg = f"❌ <b>خطا در اتصال به SwapWallet</b>\n\n<code>{err_msg[:300]}</code>"
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("بازگشت", callback_data="nav:main"))
+    kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
     try:
         bot.answer_callback_query(call.id)
     except Exception:
         pass
     try:
         bot.edit_message_text(
-            "خطا در اتصال به SwapWallet\n\n" + detail,
+            msg,
             call.message.chat.id,
             call.message.message_id,
             reply_markup=kb,
+            parse_mode="HTML",
         )
     except Exception:
         try:
-            bot.send_message(call.message.chat.id,
-                             "خطا در اتصال به SwapWallet\n\n" + detail,
-                             reply_markup=kb)
+            bot.send_message(call.message.chat.id, msg, reply_markup=kb, parse_mode="HTML")
         except Exception:
             pass
 
@@ -3064,19 +3063,23 @@ def _dispatch_callback(call, uid, data):
         if not api_key:
             kb.add(types.InlineKeyboardButton("🌐 دریافت کلید API از سواپ ولت", url="https://swapwallet.app"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:set:gateways"))
-        key_display = f"<code>{esc(api_key[:8])}...{esc(api_key[-4:])}</code>" if api_key else "❌ <b>ثبت نشده</b>"
+        key_display = f"<code>{esc(api_key[:8])}...{esc(api_key[-4:])}</code>" if api_key else "➖ نیاز نیست (اختیاری)"
+        user_status = "✅ ثبت شده" if username else "❌ ثبت نشده"
         text = (
             "🏦 <b>درگاه پرداخت آنلاین ریالی (SwapWallet)</b>\n\n"
             f"وضعیت: {enabled_label}\n"
             f"نمایش: {vis_label}\n\n"
-            f"👤 نام کاربری فروشگاه: <code>{esc(username or 'ثبت نشده')}</code>\n"
+            f"👤 نام کاربری Application: <code>{esc(username or 'ثبت نشده')}</code> {user_status}\n"
             f"🔑 کلید API: {key_display}\n\n"
-            "📖 <b>راهنمای دریافت کلید API:</b>\n"
-            "۱. وارد اپلیکیشن <a href='https://swapwallet.app'>سواپ ولت</a> شوید\n"
-            "۲. پروفایل ← کلید API\n"
-            "۳. روی «ایجاد کلید جدید» کلیک کنید\n"
-            "۴. کلید را با فرمت <code>apikey-xxx</code> کپی کنید\n\n"
-            "ربات: @SwapWalletBot | سایت: swapwallet.app"
+            "⚠️ <b>مهم — پیش‌نیاز:</b>\n"
+            "این درگاه نیاز به یک <b>Application</b> (کسب‌وکار) جداگانه\n"
+            "در SwapWallet دارد، نه اکانت شخصی.\n\n"
+            "📖 <b>مراحل راه‌اندازی:</b>\n"
+            "۱. ربات @SwapWalletBot را باز کنید\n"
+            "۲. به بخش <b>کسب‌وکار / Business</b> بروید\n"
+            "۳. یک کسب‌وکار جدید بسازید\n"
+            "۴. <b>نام کاربری همان کسب‌وکار</b> را اینجا وارد کنید\n"
+            "۵. کلید API اختیاری است (برای این درگاه نیاز نیست)"
         )
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
@@ -3133,21 +3136,24 @@ def _dispatch_callback(call, uid, data):
         if not api_key:
             kb.add(types.InlineKeyboardButton("🌐 دریافت کلید API از سواپ ولت", url="https://swapwallet.app"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:set:gateways"))
-        key_display = f"<code>{esc(api_key[:8])}...{esc(api_key[-4:])}</code>" if api_key else "❌ <b>ثبت نشده</b>"
+        key_display = f"<code>{esc(api_key[:8])}...{esc(api_key[-4:])}</code>" if api_key else "❌ <b>ثبت نشده — الزامی</b>"
+        user_status = "✅ ثبت شده" if username else "❌ ثبت نشده"
         text = (
             "💎 <b>درگاه پرداخت کریپتو (SwapWallet)</b>\n\n"
             f"وضعیت: {enabled_label}\n"
             f"نمایش: {vis_label}\n\n"
-            f"👤 نام کاربری فروشگاه: <code>{esc(username or 'ثبت نشده')}</code>\n"
+            f"👤 نام کاربری Application: <code>{esc(username or 'ثبت نشده')}</code> {user_status}\n"
             f"🔑 کلید API: {key_display}\n\n"
-            "📖 <b>شبکه‌های پشتیبانی‌شده:</b>\n"
-            "🔵 ترون — USDT-TRC20\n"
-            "💎 تون — TON\n"
-            "🟡 بایننس — USDT-BEP20\n\n"
-            "📖 <b>راهنما:</b>\n"
-            "۱. وارد اپلیکیشن <a href='https://swapwallet.app'>سواپ ولت</a> شوید\n"
-            "۲. پروفایل ← کلید API ← «ایجاد کلید جدید»\n"
-            "۳. نام کاربری حساب خود را بدون @ وارد کنید"
+            "📖 <b>شبکه‌های پشتیبانی:</b> TRON · TON · BSC\n\n"
+            "⚠️ <b>مهم — پیش‌نیاز:</b>\n"
+            "این درگاه نیاز به یک <b>Application</b> (کسب‌وکار) جداگانه\n"
+            "در SwapWallet دارد، نه اکانت شخصی.\n\n"
+            "📖 <b>مراحل راه‌اندازی:</b>\n"
+            "۱. ربات @SwapWalletBot را باز کنید\n"
+            "۲. به بخش <b>کسب‌وکار / Business</b> بروید\n"
+            "۳. یک کسب‌وکار جدید بسازید\n"
+            "۴. <b>نام کاربری همان کسب‌وکار</b> را اینجا وارد کنید\n"
+            "۵. از پروفایل ← کلید API کلید بگیرید و وارد کنید"
         )
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
