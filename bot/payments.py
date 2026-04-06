@@ -13,10 +13,26 @@ from .db import (
     assign_config_to_user, get_conn, create_pending_order, get_purchase,
 )
 from .helpers import esc, fmt_price, display_username, back_button
+import time
 from .gateways.base import is_gateway_available, is_card_info_complete
 from .gateways.crypto import fetch_crypto_prices
 from .bot_instance import bot
 from .ui.helpers import send_or_edit
+
+# ── Price cache (60 s TTL) — both selection and payment info share the same data
+_PRICES_CACHE: dict = {}
+_PRICES_CACHE_TS: float = 0.0
+
+
+def _get_prices() -> dict:
+    global _PRICES_CACHE, _PRICES_CACHE_TS
+    if time.time() - _PRICES_CACHE_TS < 60 and _PRICES_CACHE:
+        return _PRICES_CACHE
+    data = fetch_crypto_prices()
+    if data:
+        _PRICES_CACHE    = data
+        _PRICES_CACHE_TS = time.time()
+    return _PRICES_CACHE
 
 
 # ── Pricing ────────────────────────────────────────────────────────────────────
@@ -65,7 +81,7 @@ def show_payment_method_selection(target, uid, context_data):
 def show_crypto_selection(target, amount=None):
     from .db import setting_get
     kb     = types.InlineKeyboardMarkup()
-    prices = fetch_crypto_prices() if amount else {}
+    prices = _get_prices() if amount else {}
     has_any = False
     for coin_key, coin_label in CRYPTO_COINS:
         addr = setting_get(f"crypto_{coin_key}", "")
@@ -93,7 +109,7 @@ def show_crypto_payment_info(target, uid, coin_key, amount):
         send_or_edit(target, "⚠️ آدرس این ارز هنوز توسط ادمین ثبت نشده است.", back_button("main"))
         return
     price_text = ""
-    prices = fetch_crypto_prices()
+    prices = _get_prices()
     if symbol and symbol in prices and prices[symbol] > 0:
         coin_amount = amount / prices[symbol]
         price_text  = (
