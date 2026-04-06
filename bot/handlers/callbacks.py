@@ -224,6 +224,43 @@ def on_callback(call):
             pass
 
 
+def _swapwallet_error_inline(call, err_msg):
+    """نمایش خطای SwapWallet به صورت inline با راهنمای تنظیمات."""
+    if "APPLICATION_NOT_FOUND" in err_msg or "Application not found" in err_msg:
+        detail = (
+            "⚙️ <b>راه‌حل:</b>\n"
+            "در SwapWallet باید یک <b>فروشگاه (Shop)</b> ثبت کرده باشید.\n"
+            "نام کاربری <b>فروشگاه</b> را وارد کنید، نه اکانت شخصی!\n\n"
+            "مراحل:\n"
+            "1. اپ SwapWallet را باز کنید\n"
+            "2. بخش فروشگاه/Shop را پیدا کنید\n"
+            "3. یک فروشگاه جدید بسازید\n"
+            "4. نام کاربری آن فروشگاه را در ربات وارد کنید"
+        )
+    else:
+        detail = "جزئیات: " + err_msg[:300]
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("بازگشت", callback_data="nav:main"))
+    try:
+        bot.answer_callback_query(call.id)
+    except Exception:
+        pass
+    try:
+        bot.edit_message_text(
+            "خطا در اتصال به SwapWallet\n\n" + detail,
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=kb,
+        )
+    except Exception:
+        try:
+            bot.send_message(call.message.chat.id,
+                             "خطا در اتصال به SwapWallet\n\n" + detail,
+                             reply_markup=kb)
+        except Exception:
+            pass
+
+
 def _dispatch_callback(call, uid, data):
     # Navigation
     if data.startswith("nav:"):
@@ -516,28 +553,6 @@ def _dispatch_callback(call, uid, data):
         bot.answer_callback_query(call.id)
         show_crypto_selection(call, amount=price)
         return
-
-    def _swapwallet_error_inline(call, err_msg):
-        """نمایش خطای SwapWallet به صورت inline با راهنمای تنظیمات."""
-        if "APPLICATION_NOT_FOUND" in err_msg or "Application not found" in err_msg:
-            detail = (
-                "⚙️ <b>راه‌حل:</b>\n"
-                "در SwapWallet باید یک <b>فروشگاه (Shop)</b> ثبت کرده باشید.\n"
-                "نام کاربری <u>فروشگاه</u> را وارد کنید، نه نام کاربری اکانت شخصی!\n\n"
-                "مراحل:\n"
-                "۱. اپ SwapWallet را باز کنید\n"
-                "۲. بخش <b>فروشگاه/Shop</b> را پیدا کنید\n"
-                "۳. یک فروشگاه جدید بسازید\n"
-                "۴. نام کاربری آن فروشگاه را در ربات وارد کنید"
-            )
-        else:
-            detail = f"جزئیات: <code>{esc(err_msg[:300])}</code>"
-        kb = types.InlineKeyboardMarkup()
-        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
-        bot.answer_callback_query(call.id)
-        send_or_edit(call,
-            f"❌ <b>خطا در اتصال به SwapWallet</b>\n\n{detail}",
-            kb)
 
     if data.startswith("rpay:swapwallet:verify:"):
         payment_id = int(data.split(":")[3])
