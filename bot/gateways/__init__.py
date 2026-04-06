@@ -8,6 +8,11 @@ from .swapwallet import (
     show_swapwallet_page,
     swapwallet_error_page,
 )
+from .swapwallet_crypto import (
+    create_swapwallet_crypto_invoice,
+    check_swapwallet_crypto_invoice,
+    show_swapwallet_crypto_page,
+)
 
 __all__ = [
     "is_gateway_available", "is_card_info_complete",
@@ -15,5 +20,7 @@ __all__ = [
     "create_tetrapay_order", "verify_tetrapay_order",
     "create_swapwallet_invoice", "check_swapwallet_invoice",
     "show_swapwallet_page", "swapwallet_error_page",
+    "create_swapwallet_crypto_invoice", "check_swapwallet_crypto_invoice",
+    "show_swapwallet_crypto_page",
 ]
 

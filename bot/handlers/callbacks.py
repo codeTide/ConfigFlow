@@ -35,6 +35,10 @@ from ..gateways.swapwallet import (
     create_swapwallet_invoice, check_swapwallet_invoice,
     show_swapwallet_page, swapwallet_error_page,
 )
+from ..gateways.swapwallet_crypto import (
+    create_swapwallet_crypto_invoice, check_swapwallet_crypto_invoice,
+    show_swapwallet_crypto_page,
+)
 from ..ui.helpers import send_or_edit, check_channel_membership, channel_lock_message
 from ..ui.keyboards import kb_main, kb_admin_panel
 from ..ui.menus import show_main_menu, show_profile, show_support, show_my_configs
@@ -418,6 +422,8 @@ def _dispatch_callback(call, uid, data):
             kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data=f"rpay:tetrapay:{purchase_id}:{package_id}"))
         if is_gateway_available("swapwallet", uid, price):
             kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data=f"rpay:swapwallet:{purchase_id}:{package_id}"))
+        if is_gateway_available("swapwallet_crypto", uid, price):
+            kb.add(types.InlineKeyboardButton("💎 پرداخت کریپتو (SwapWallet)", callback_data=f"rpay:swapwallet_crypto:{purchase_id}:{package_id}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"renew:{purchase_id}"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
@@ -791,6 +797,8 @@ def _dispatch_callback(call, uid, data):
             kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data=f"pay:tetrapay:{package_id}"))
         if is_gateway_available("swapwallet", uid, price):
             kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data=f"pay:swapwallet:{package_id}"))
+        if is_gateway_available("swapwallet_crypto", uid, price):
+            kb.add(types.InlineKeyboardButton("💎 پرداخت کریپتو (SwapWallet)", callback_data=f"pay:swapwallet_crypto:{package_id}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"buy:t:{package_row['type_id']}"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
@@ -1278,6 +1286,194 @@ def _dispatch_callback(call, uid, data):
         show_swapwallet_page(call, amount_toman=amount, invoice_id=invoice_id,
                              payment_links=payment_links, payment_id=payment_id,
                              verify_cb=f"pay:swapwallet:verify:{payment_id}")
+        return
+
+    # ── SwapWallet Crypto (network selection) ─────────────────────────────────
+    if data == "wallet:charge:swapwallet_crypto":
+        sd     = state_data(uid)
+        amount = sd.get("amount")
+        if not amount:
+            bot.answer_callback_query(call.id, "ابتدا مبلغ را وارد کنید.", show_alert=True)
+            return
+        from ..gateways.swapwallet_crypto import SWAPWALLET_CRYPTO_NETWORKS, NETWORK_LABELS as SW_NET_LABELS
+        state_set(uid, "swcrypto_network_select", kind="wallet_charge", amount=amount)
+        kb = types.InlineKeyboardMarkup()
+        for net, _ in SWAPWALLET_CRYPTO_NETWORKS:
+            kb.add(types.InlineKeyboardButton(SW_NET_LABELS.get(net, net), callback_data=f"swcrypto:net:{net}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, "💎 <b>پرداخت کریپتو (SwapWallet)</b>\n\nشبکه مورد نظر را انتخاب کنید:", kb)
+        return
+
+    if data.startswith("pay:swapwallet_crypto:verify:"):
+        payment_id = int(data.split(":")[3])
+        payment = get_payment(payment_id)
+        if not payment or payment["user_id"] != uid:
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        if payment["status"] != "pending":
+            bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+            return
+        invoice_id = payment["receipt_text"]
+        success, inv = check_swapwallet_crypto_invoice(invoice_id)
+        if not success:
+            bot.answer_callback_query(call.id, "خطا در بررسی وضعیت فاکتور.", show_alert=True)
+            return
+        inv_status = inv.get("status", "")
+        if inv_status in ("PAID", "COMPLETED") or inv.get("paidAt"):
+            if payment["kind"] == "wallet_charge":
+                update_balance(uid, payment["amount"])
+                complete_payment(payment_id)
+                bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+                send_or_edit(call, f"✅ پرداخت شما تأیید و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان",
+                             back_button("main"))
+                state_clear(uid)
+            else:
+                config_id  = payment["config_id"]
+                package_id = payment["package_id"]
+                package_row = get_package(package_id)
+                if not config_id:
+                    config_id = reserve_first_config(package_id, payment_id)
+                if not config_id:
+                    pending_id = create_pending_order(uid, package_id, payment_id, payment["amount"], "swapwallet_crypto")
+                    complete_payment(payment_id)
+                    bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+                    send_or_edit(call,
+                        "✅ پرداخت شما تأیید شد.\n\n"
+                        "⚠️ <b>موجودی تحویل فوری ربات به اتمام رسید.</b>\n"
+                        "درخواست شما برای ادمین ارسال شد. در کمترین فرصت کانفیگ شما تحویل داده می‌شود.\n"
+                        "🙏 از صبر شما متشکریم.", back_button("main"))
+                    notify_pending_order_to_admins(pending_id, uid, package_row, payment["amount"], "swapwallet_crypto")
+                    state_clear(uid)
+                    return
+                purchase_id = assign_config_to_user(config_id, uid, package_id, payment["amount"], "swapwallet_crypto", is_test=0)
+                complete_payment(payment_id)
+                bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+                send_or_edit(call, "✅ پرداخت شما تأیید شد و سرویس آماده است.", back_button("main"))
+                deliver_purchase_message(call.message.chat.id, purchase_id)
+                admin_purchase_notify("SwapWallet Crypto", get_user(uid), package_row)
+                state_clear(uid)
+        else:
+            bot.answer_callback_query(call.id, "❌ پرداخت هنوز تأیید نشده. لطفاً ابتدا واریز را انجام دهید.", show_alert=True)
+        return
+
+    if data.startswith("pay:swapwallet_crypto:"):
+        package_id  = int(data.split(":")[2])
+        package_row = get_package(package_id)
+        if not package_row or (setting_get("preorder_mode", "0") == "1" and package_row["stock"] <= 0):
+            bot.answer_callback_query(call.id, "موجودی این پکیج تمام شده است.", show_alert=True)
+            return
+        price = get_effective_price(uid, package_row)
+        from ..gateways.swapwallet_crypto import SWAPWALLET_CRYPTO_NETWORKS, NETWORK_LABELS as SW_NET_LABELS
+        state_set(uid, "swcrypto_network_select", kind="config_purchase", package_id=package_id, amount=price)
+        kb = types.InlineKeyboardMarkup()
+        for net, _ in SWAPWALLET_CRYPTO_NETWORKS:
+            kb.add(types.InlineKeyboardButton(SW_NET_LABELS.get(net, net), callback_data=f"swcrypto:net:{net}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"buy:p:{package_id}"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, "💎 <b>پرداخت کریپتو (SwapWallet)</b>\n\nشبکه مورد نظر را انتخاب کنید:", kb)
+        return
+
+    if data.startswith("rpay:swapwallet_crypto:verify:"):
+        payment_id = int(data.split(":")[3])
+        payment = get_payment(payment_id)
+        if not payment or payment["user_id"] != uid:
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        if payment["status"] != "pending":
+            bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+            return
+        invoice_id = payment["receipt_text"]
+        success, inv = check_swapwallet_crypto_invoice(invoice_id)
+        if not success:
+            bot.answer_callback_query(call.id, "خطا در بررسی وضعیت فاکتور.", show_alert=True)
+            return
+        if inv.get("status") in ("PAID", "COMPLETED") or inv.get("paidAt"):
+            complete_payment(payment_id)
+            package_row = get_package(payment["package_id"])
+            config_id   = payment["config_id"]
+            with get_conn() as conn:
+                row = conn.execute("SELECT purchase_id FROM configs WHERE id=?", (config_id,)).fetchone()
+            purchase_id = row["purchase_id"] if row else 0
+            item = get_purchase(purchase_id) if purchase_id else None
+            bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+            send_or_edit(call,
+                "✅ <b>درخواست تمدید ارسال شد</b>\n\n"
+                "🔄 درخواست تمدید سرویس شما با موفقیت ثبت و برای پشتیبانی ارسال شد.\n"
+                "⏳ لطفاً کمی صبر کنید، پس از انجام تمدید به شما اطلاع داده خواهد شد.\n\n"
+                "🙏 از صبر و شکیبایی شما متشکریم.",
+                back_button("main"))
+            if item:
+                admin_renewal_notify(uid, item, package_row, payment["amount"], "SwapWallet Crypto")
+            state_clear(uid)
+        else:
+            bot.answer_callback_query(call.id, "❌ پرداخت هنوز تأیید نشده. لطفاً ابتدا واریز را انجام دهید.", show_alert=True)
+        return
+
+    if data.startswith("rpay:swapwallet_crypto:"):
+        parts = data.split(":")
+        purchase_id = int(parts[2])
+        package_id  = int(parts[3])
+        item = get_purchase(purchase_id)
+        package_row = get_package(package_id)
+        if not item or item["user_id"] != uid:
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        if not package_row:
+            bot.answer_callback_query(call.id, "پکیج یافت نشد.", show_alert=True)
+            return
+        price = get_effective_price(uid, package_row)
+        from ..gateways.swapwallet_crypto import SWAPWALLET_CRYPTO_NETWORKS, NETWORK_LABELS as SW_NET_LABELS
+        state_set(uid, "swcrypto_network_select", kind="renewal",
+                  purchase_id=purchase_id, package_id=package_id,
+                  amount=price, config_id=item["config_id"])
+        kb = types.InlineKeyboardMarkup()
+        for net, _ in SWAPWALLET_CRYPTO_NETWORKS:
+            kb.add(types.InlineKeyboardButton(SW_NET_LABELS.get(net, net), callback_data=f"swcrypto:net:{net}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"renew:{purchase_id}"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, "💎 <b>پرداخت کریپتو (SwapWallet)</b>\n\nشبکه مورد نظر را انتخاب کنید:", kb)
+        return
+
+    # ── SwapWallet Crypto: network selected → create invoice ─────────────────
+    if data.startswith("swcrypto:net:"):
+        network = data.split(":")[2]
+        sd      = state_data(uid)
+        kind    = sd.get("kind", "")
+        amount  = sd.get("amount", 0)
+        if not amount:
+            bot.answer_callback_query(call.id, "خطا در اطلاعات سفارش.", show_alert=True)
+            return
+        order_id = f"swc-{uid}-{int(datetime.now().timestamp())}"
+        desc = "شارژ کیف پول" if kind == "wallet_charge" else "پرداخت کریپتو"
+        success, result = create_swapwallet_crypto_invoice(amount, order_id, network, desc)
+        if not success:
+            err_msg = result.get("error", "خطای ناشناخته") if isinstance(result, dict) else str(result)
+            bot.answer_callback_query(call.id, f"❌ خطا در ایجاد فاکتور:\n{err_msg}", show_alert=True)
+            return
+        invoice_id = result.get("id", "")
+        if kind == "wallet_charge":
+            payment_id = create_payment("wallet_charge", uid, None, amount, "swapwallet_crypto", status="pending")
+            verify_cb  = f"pay:swapwallet_crypto:verify:{payment_id}"
+        elif kind == "config_purchase":
+            package_id = sd.get("package_id")
+            payment_id = create_payment("config_purchase", uid, package_id, amount, "swapwallet_crypto", status="pending")
+            verify_cb  = f"pay:swapwallet_crypto:verify:{payment_id}"
+        elif kind == "renewal":
+            package_id  = sd.get("package_id")
+            config_id_r = sd.get("config_id")
+            payment_id  = create_payment("renewal", uid, package_id, amount, "swapwallet_crypto",
+                                          status="pending", config_id=config_id_r)
+            verify_cb   = f"rpay:swapwallet_crypto:verify:{payment_id}"
+        else:
+            bot.answer_callback_query(call.id, "خطا در نوع پرداخت.", show_alert=True)
+            return
+        with get_conn() as conn:
+            conn.execute("UPDATE payments SET receipt_text=? WHERE id=?", (invoice_id, payment_id))
+        state_set(uid, "await_swapwallet_crypto_verify", payment_id=payment_id, invoice_id=invoice_id)
+        bot.answer_callback_query(call.id)
+        show_swapwallet_crypto_page(call, amount_toman=amount, invoice_id=invoice_id,
+                                    result=result, payment_id=payment_id, verify_cb=verify_cb)
         return
 
     # ── Admin panel ────────────────────────────────────────────────────────────
@@ -2632,7 +2828,13 @@ def _dispatch_callback(call, uid, data):
     # ── Gateway settings ─────────────────────────────────────────────────────
     if data == "adm:set:gateways":
         kb = types.InlineKeyboardMarkup()
-        for gw_key, gw_label in [("card", "💳 کارت به کارت"), ("crypto", "💎 ارز دیجیتال"), ("tetrapay", "🏦 کارت به کارت آنلاین (TetraPay)"), ("swapwallet", "🏦 پرداخت آنلاین ریالی (SwapWallet)")]:
+        for gw_key, gw_label in [
+            ("card",             "💳 کارت به کارت"),
+            ("crypto",           "💎 ارز دیجیتال"),
+            ("tetrapay",         "🏦 کارت به کارت آنلاین (TetraPay)"),
+            ("swapwallet",       "🏦 پرداخت آنلاین ریالی (SwapWallet)"),
+            ("swapwallet_crypto","💎 پرداخت کریپتو (SwapWallet)"),
+        ]:
             enabled = setting_get(f"gw_{gw_key}_enabled", "0")
             status_icon = "🟢" if enabled == "1" else "🔴"
             kb.add(types.InlineKeyboardButton(f"{status_icon} {gw_label}", callback_data=f"adm:set:gw:{gw_key}"))
@@ -2873,7 +3075,79 @@ def _dispatch_callback(call, uid, data):
             back_button("adm:set:gw:swapwallet"))
         return
 
-    _GW_RANGE_LABELS = {"card": "💳 کارت به کارت", "crypto": "💎 ارز دیجیتال", "tetrapay": "🏦 TetraPay", "swapwallet": "💎 SwapWallet"}
+    if data == "adm:set:gw:swapwallet_crypto":
+        from ..gateways.swapwallet_crypto import NETWORK_LABELS as SW_CRYPTO_LABELS
+        enabled  = setting_get("gw_swapwallet_crypto_enabled", "0")
+        vis      = setting_get("gw_swapwallet_crypto_visibility", "public")
+        api_key  = setting_get("swapwallet_crypto_api_key", "")
+        username = setting_get("swapwallet_crypto_username", "")
+        enabled_label = "🟢 فعال" if enabled == "1" else "🔴 غیرفعال"
+        vis_label     = "👥 عمومی" if vis == "public" else "🔒 کاربران امن"
+        kb = types.InlineKeyboardMarkup()
+        kb.row(
+            types.InlineKeyboardButton(f"وضعیت: {enabled_label}", callback_data="adm:gw:swapwallet_crypto:toggle"),
+            types.InlineKeyboardButton(f"نمایش: {vis_label}",    callback_data="adm:gw:swapwallet_crypto:vis"),
+        )
+        range_en = setting_get("gw_swapwallet_crypto_range_enabled", "0")
+        range_label = "🟢 فعال" if range_en == "1" else "🔴 غیرفعال"
+        kb.add(types.InlineKeyboardButton(f"📊 بازه پرداختی: {range_label}", callback_data="adm:gw:swapwallet_crypto:range"))
+        kb.add(types.InlineKeyboardButton("🔑 تنظیم کلید API",        callback_data="adm:set:swapwallet_crypto_key"))
+        kb.add(types.InlineKeyboardButton("👤 نام کاربری فروشگاه",     callback_data="adm:set:swapwallet_crypto_username"))
+        if not api_key:
+            kb.add(types.InlineKeyboardButton("🌐 دریافت کلید API از سواپ ولت", url="https://swapwallet.app"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:set:gateways"))
+        key_display = f"<code>{esc(api_key[:8])}...{esc(api_key[-4:])}</code>" if api_key else "❌ <b>ثبت نشده</b>"
+        text = (
+            "💎 <b>درگاه پرداخت کریپتو (SwapWallet)</b>\n\n"
+            f"وضعیت: {enabled_label}\n"
+            f"نمایش: {vis_label}\n\n"
+            f"👤 نام کاربری فروشگاه: <code>{esc(username or 'ثبت نشده')}</code>\n"
+            f"🔑 کلید API: {key_display}\n\n"
+            "📖 <b>شبکه‌های پشتیبانی‌شده:</b>\n"
+            "🔵 ترون — USDT-TRC20\n"
+            "💎 تون — TON\n"
+            "🟡 بایننس — USDT-BEP20\n\n"
+            "📖 <b>راهنما:</b>\n"
+            "۱. وارد اپلیکیشن <a href='https://swapwallet.app'>سواپ ولت</a> شوید\n"
+            "۲. پروفایل ← کلید API ← «ایجاد کلید جدید»\n"
+            "۳. نام کاربری حساب خود را بدون @ وارد کنید"
+        )
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
+        return
+
+    if data == "adm:gw:swapwallet_crypto:toggle":
+        enabled = setting_get("gw_swapwallet_crypto_enabled", "0")
+        setting_set("gw_swapwallet_crypto_enabled", "0" if enabled == "1" else "1")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:swapwallet_crypto")
+        return
+
+    if data == "adm:gw:swapwallet_crypto:vis":
+        vis = setting_get("gw_swapwallet_crypto_visibility", "public")
+        setting_set("gw_swapwallet_crypto_visibility", "secure" if vis == "public" else "public")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:swapwallet_crypto")
+        return
+
+    if data == "adm:set:swapwallet_crypto_key":
+        state_set(uid, "admin_set_swapwallet_crypto_key")
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, "🔑 کلید API سواپ ولت (کریپتو) را ارسال کنید (مثال: <code>apikey-xxx...</code>):",
+                     back_button("adm:set:gw:swapwallet_crypto"))
+        return
+
+    if data == "adm:set:swapwallet_crypto_username":
+        state_set(uid, "admin_set_swapwallet_crypto_username")
+        bot.answer_callback_query(call.id)
+        current = setting_get("swapwallet_crypto_username", "")
+        send_or_edit(call,
+            f"👤 نام کاربری فروشگاه سواپ ولت (کریپتو) را ارسال کنید.\n"
+            f"مقدار فعلی: <code>{esc(current or 'ثبت نشده')}</code>",
+            back_button("adm:set:gw:swapwallet_crypto"))
+        return
+
+    _GW_RANGE_LABELS = {"card": "💳 کارت به کارت", "crypto": "💎 ارز دیجیتال", "tetrapay": "🏦 TetraPay", "swapwallet": "💎 SwapWallet", "swapwallet_crypto": "💎 SwapWallet کریپتو"}
 
     if data.startswith("adm:gw:") and data.endswith(":range"):
         gw_name = data.split(":")[2]

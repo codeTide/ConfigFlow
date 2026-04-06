@@ -66,6 +66,8 @@ def show_payment_method_selection(target, uid, context_data):
         kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data="pm:tetrapay"))
     if is_gateway_available("swapwallet", uid, amount):
         kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data="pm:swapwallet"))
+    if is_gateway_available("swapwallet_crypto", uid, amount):
+        kb.add(types.InlineKeyboardButton("💎 پرداخت کریپتو (SwapWallet)", callback_data="pm:swapwallet_crypto"))
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
 
     user       = get_user(uid)
