@@ -7,8 +7,6 @@ from .swapwallet import (
     check_swapwallet_invoice,
     show_swapwallet_page,
     swapwallet_error_page,
-    SWAPWALLET_NETWORK_LABELS,
-    _swapwallet_crypto_line,
 )
 
 __all__ = [
@@ -17,6 +15,5 @@ __all__ = [
     "create_tetrapay_order", "verify_tetrapay_order",
     "create_swapwallet_invoice", "check_swapwallet_invoice",
     "show_swapwallet_page", "swapwallet_error_page",
-    "SWAPWALLET_NETWORK_LABELS", "_swapwallet_crypto_line",
 ]
 
