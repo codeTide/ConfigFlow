@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import traceback
 from telebot import types
-from ..config import ADMIN_IDS, ADMIN_PERMS, PERM_FULL_SET, CRYPTO_COINS, CRYPTO_API_SYMBOLS, CONFIGS_PER_PAGE
+from ..config import ADMIN_IDS, ADMIN_PERMS, PERM_FULL_SET, PERM_USER_FULL, CRYPTO_COINS, CRYPTO_API_SYMBOLS, CONFIGS_PER_PAGE
 from ..bot_instance import bot
 from ..helpers import (
     esc, fmt_price, now_str, display_name, display_username, safe_support_url,
@@ -13,7 +13,7 @@ from ..db import (
     ensure_user, get_user, get_users, count_all_users, set_user_status,
     set_user_agent, update_balance, get_user_detail, get_user_purchases,
     get_purchase, get_available_configs_for_package,
-    get_all_types, add_type, update_type, delete_type,
+    get_all_types, get_type, add_type, update_type, update_type_description, delete_type,
     get_packages, get_package, add_package, update_package_field, delete_package,
     get_registered_packages_stock, get_configs_paginated, count_configs,
     expire_config, add_config,
