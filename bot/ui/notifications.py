@@ -48,7 +48,7 @@ def deliver_purchase_message(chat_id, purchase_id):
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
     bot.send_photo(chat_id, bio, caption=text, parse_mode="HTML", reply_markup=kb)
 
-    type_desc = item.get("type_description", "")
+    type_desc = item["type_description"] if item["type_description"] else ""
     if type_desc:
         bot.send_message(chat_id, f"📌 <b>توضیحات سرویس:</b>\n\n{esc(type_desc)}", parse_mode="HTML")
 
