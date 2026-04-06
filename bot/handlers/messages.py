@@ -106,7 +106,7 @@ def universal_handler(message):
             if is_gateway_available("tetrapay", uid, amount):
                 kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data="wallet:charge:tetrapay"))
             if is_gateway_available("swapwallet", uid, amount):
-                kb.add(types.InlineKeyboardButton("💎 پرداخت با سواپ ولت", callback_data="wallet:charge:swapwallet"))
+                kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data="wallet:charge:swapwallet"))
             kb.add(types.InlineKeyboardButton("🔙 بازگشت",            callback_data="nav:main"))
             bot.send_message(
                 uid,
