@@ -182,7 +182,8 @@ def universal_handler(message):
             try:
                 add_type(name, desc)
                 state_clear(uid)
-                bot.send_message(uid, "✅ نوع جدید ثبت شد.", reply_markup=kb_admin_panel())
+                bot.send_message(uid, "✅ نوع جدید ثبت شد.")
+                _show_admin_types(message)
             except sqlite3.IntegrityError:
                 state_clear(uid)
                 bot.send_message(uid, "⚠️ این نوع قبلاً ثبت شده است.", reply_markup=back_button("admin:types"))
@@ -195,14 +196,16 @@ def universal_handler(message):
                 return
             update_type(sd["type_id"], new_name)
             state_clear(uid)
-            bot.send_message(uid, "✅ نوع با موفقیت ویرایش شد.", reply_markup=kb_admin_panel())
+            bot.send_message(uid, "✅ نوع با موفقیت ویرایش شد.")
+            _show_admin_types(message)
             return
 
         if sn == "admin_edit_type_desc" and is_admin(uid):
             desc = (message.text or "").strip()
             update_type_description(sd["type_id"], desc)
             state_clear(uid)
-            bot.send_message(uid, "✅ توضیحات نوع با موفقیت ویرایش شد.", reply_markup=kb_admin_panel())
+            bot.send_message(uid, "✅ توضیحات با موفقیت ویرایش شد.")
+            _show_admin_types(message)
             return
 
         # ── Admin: Package add ─────────────────────────────────────────────────
@@ -244,7 +247,8 @@ def universal_handler(message):
                 return
             add_package(sd["type_id"], sd["package_name"], sd["volume"], sd["duration"], price)
             state_clear(uid)
-            bot.send_message(uid, "✅ پکیج با موفقیت ثبت شد.", reply_markup=kb_admin_panel())
+            bot.send_message(uid, "✅ پکیج با موفقیت ثبت شد.")
+            _show_admin_types(message)
             return
 
         # ── Admin: Package edit field ──────────────────────────────────────────
@@ -266,7 +270,28 @@ def universal_handler(message):
                     return
                 update_package_field(package_id, db_field, val)
             state_clear(uid)
-            bot.send_message(uid, "✅ پکیج با موفقیت ویرایش شد.", reply_markup=kb_admin_panel())
+            package_row = get_package(package_id)
+            if package_row:
+                kb = types.InlineKeyboardMarkup()
+                kb.add(types.InlineKeyboardButton("✏️ ویرایش نام",   callback_data=f"admin:pkg:ef:name:{package_id}"))
+                kb.add(types.InlineKeyboardButton("💰 ویرایش قیمت",  callback_data=f"admin:pkg:ef:price:{package_id}"))
+                kb.add(types.InlineKeyboardButton("🔋 ویرایش حجم",   callback_data=f"admin:pkg:ef:volume:{package_id}"))
+                kb.add(types.InlineKeyboardButton("⏰ ویرایش مدت",   callback_data=f"admin:pkg:ef:dur:{package_id}"))
+                kb.add(types.InlineKeyboardButton("🔢 جایگاه نمایش", callback_data=f"admin:pkg:ef:position:{package_id}"))
+                kb.add(types.InlineKeyboardButton("🔙 بازگشت",       callback_data="admin:types"))
+                cur_pos = package_row["position"] if "position" in package_row.keys() else 0
+                text = (
+                    f"✅ ویرایش انجام شد\n\n"
+                    f"📦 <b>{esc(package_row['name'])}</b>\n"
+                    f"قیمت: {fmt_price(package_row['price'])} تومان\n"
+                    f"حجم: {package_row['volume_gb']} GB\n"
+                    f"مدت: {package_row['duration_days']} روز\n"
+                    f"جایگاه: {cur_pos}"
+                )
+                send_or_edit(message, text, kb)
+            else:
+                bot.send_message(uid, "✅ پکیج با موفقیت ویرایش شد.")
+                _show_admin_types(message)
             return
 
         # ── Admin: Config add ──────────────────────────────────────────────────
