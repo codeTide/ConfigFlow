@@ -66,17 +66,22 @@ def show_crypto_selection(target, amount=None):
     from .db import setting_get
     kb     = types.InlineKeyboardMarkup()
     prices = fetch_crypto_prices() if amount else {}
+    has_any = False
     for coin_key, coin_label in CRYPTO_COINS:
         addr = setting_get(f"crypto_{coin_key}", "")
         if addr:
+            has_any = True
             symbol     = CRYPTO_API_SYMBOLS.get(coin_key, "")
             price_note = ""
-            if amount and symbol in prices and prices[symbol] > 0:
+            if amount and symbol and symbol in prices and prices[symbol] > 0:
                 coin_amount = amount / prices[symbol]
-                price_note  = f" ≈ {coin_amount:.4f} {symbol}"
+                price_note  = f"\n≈ {coin_amount:.4f} {symbol}"
             kb.add(types.InlineKeyboardButton(f"{coin_label}{price_note}", callback_data=f"pm:crypto:{coin_key}"))
+    if not has_any:
+        send_or_edit(target, "⚠️ هیچ آدرس ارز دیجیتالی توسط ادمین ثبت نشده است.", back_button("main"))
+        return
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="pm:back"))
-    send_or_edit(target, "💎 <b>ارز دیجیتال</b>\n\nنوع ارز را انتخاب کنید:", kb)
+    send_or_edit(target, "💎 <b>ارز دیجیتال</b>\n\nنوع ارز مورد نظر را انتخاب کنید:", kb)
 
 
 def show_crypto_payment_info(target, uid, coin_key, amount):
@@ -92,7 +97,7 @@ def show_crypto_payment_info(target, uid, coin_key, amount):
     if symbol and symbol in prices and prices[symbol] > 0:
         coin_amount = amount / prices[symbol]
         price_text  = (
-            f"\n\n💱 <b>معادل ارزی:</b> <code>{coin_amount:.6f}</code> {symbol}\n"
+            f"\n\n💱 <b>معادل ارزی:</b> <code>{coin_amount:.6f} {symbol}</code>\n"
             f"برای پرداخت با این ارز باید معادل <b>{coin_amount:.6f} {symbol}</b> واریز نمایید."
         )
     text = (
@@ -103,7 +108,22 @@ def show_crypto_payment_info(target, uid, coin_key, amount):
     )
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
-    send_or_edit(target, text, kb)
+    # Delete the selection message and send a fresh one so the screen
+    # always transitions — editing in-place sometimes silently fails when
+    # the previous message came from a different send path.
+    chat_id = None
+    if hasattr(target, "message"):
+        chat_id = target.message.chat.id
+        try:
+            bot.delete_message(chat_id, target.message.message_id)
+        except Exception:
+            pass
+    elif hasattr(target, "chat"):
+        chat_id = target.chat.id
+    if chat_id:
+        bot.send_message(chat_id, text, reply_markup=kb)
+    else:
+        send_or_edit(target, text, kb)
 
 
 # ── Send payment receipt to admins ─────────────────────────────────────────────
