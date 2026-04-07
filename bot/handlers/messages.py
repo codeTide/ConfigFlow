@@ -8,7 +8,7 @@ from telebot import types
 from ..config import ADMIN_IDS, ADMIN_PERMS, PERM_FULL_SET, CONFIGS_PER_PAGE, DB_NAME
 from ..bot_instance import bot
 from ..helpers import (
-    esc, fmt_price, now_str, display_name, display_username,
+    esc, fmt_price, fmt_vol, fmt_dur, now_str, display_name, display_username,
     is_admin, admin_has_perm, back_button,
     state_set, state_clear, state_name, state_data, parse_int, normalize_text_number,
 )
@@ -292,7 +292,10 @@ def universal_handler(message):
                 bot.send_message(uid, "⚠️ نام پکیج معتبر وارد کنید.", reply_markup=back_button("admin:types"))
                 return
             state_set(uid, "admin_add_package_volume", type_id=sd["type_id"], package_name=name)
-            bot.send_message(uid, "🔋 حجم پکیج را به گیگ وارد کنید:", reply_markup=back_button("admin:types"))
+            bot.send_message(uid,
+                "🔋 حجم پکیج را به گیگ وارد کنید:\n"
+                "💡 برای حجم نامحدود عدد <b>0</b> بفرستید.",
+                reply_markup=back_button("admin:types"))
             return
 
         if sn == "admin_add_package_volume" and is_admin(uid):
@@ -300,9 +303,14 @@ def universal_handler(message):
             if volume is None or volume < 0:
                 bot.send_message(uid, "⚠️ حجم معتبر وارد کنید.", reply_markup=back_button("admin:types"))
                 return
+            vol_label = "نامحدود" if volume == 0 else f"{volume} گیگ"
             state_set(uid, "admin_add_package_duration",
                       type_id=sd["type_id"], package_name=sd["package_name"], volume=volume)
-            bot.send_message(uid, "⏰ مدت پکیج را به روز وارد کنید:", reply_markup=back_button("admin:types"))
+            bot.send_message(uid,
+                f"✅ حجم: <b>{vol_label}</b>\n\n"
+                "⏰ مدت پکیج را به روز وارد کنید:\n"
+                "💡 برای بدون محدودیت زمانی عدد <b>0</b> بفرستید.",
+                reply_markup=back_button("admin:types"))
             return
 
         if sn == "admin_add_package_duration" and is_admin(uid):
@@ -310,11 +318,14 @@ def universal_handler(message):
             if duration is None or duration < 0:
                 bot.send_message(uid, "⚠️ مدت معتبر وارد کنید.", reply_markup=back_button("admin:types"))
                 return
+            dur_label = "نامحدود" if duration == 0 else f"{duration} روز"
             state_set(uid, "admin_add_package_price",
                       type_id=sd["type_id"], package_name=sd["package_name"],
                       volume=sd["volume"], duration=duration)
-            bot.send_message(uid, "💰 قیمت پکیج را به تومان وارد کنید.\nبرای تست رایگان عدد <b>0</b> بفرستید:",
-                             reply_markup=back_button("admin:types"))
+            bot.send_message(uid,
+                f"✅ مدت: <b>{dur_label}</b>\n\n"
+                "💰 قیمت پکیج را به تومان وارد کنید.\nبرای تست رایگان عدد <b>0</b> بفرستید:",
+                reply_markup=back_button("admin:types"))
             return
 
         if sn == "admin_add_package_price" and is_admin(uid):
@@ -324,7 +335,15 @@ def universal_handler(message):
                 return
             add_package(sd["type_id"], sd["package_name"], sd["volume"], sd["duration"], price)
             state_clear(uid)
-            bot.send_message(uid, "✅ پکیج با موفقیت ثبت شد.")
+            vol_label = "نامحدود" if sd["volume"] == 0 else f"{sd['volume']} گیگ"
+            dur_label = "نامحدود" if sd["duration"] == 0 else f"{sd['duration']} روز"
+            pri_label = "رایگان" if price == 0 else f"{fmt_price(price)} تومان"
+            bot.send_message(uid,
+                f"✅ پکیج با موفقیت ثبت شد.\n\n"
+                f"📦 <b>{esc(sd['package_name'])}</b>\n"
+                f"🔋 حجم: {vol_label}\n"
+                f"⏰ مدت: {dur_label}\n"
+                f"💰 قیمت: {pri_label}")
             _show_admin_types(message)
             return
 
@@ -361,8 +380,8 @@ def universal_handler(message):
                     f"✅ ویرایش انجام شد\n\n"
                     f"📦 <b>{esc(package_row['name'])}</b>\n"
                     f"قیمت: {fmt_price(package_row['price'])} تومان\n"
-                    f"حجم: {package_row['volume_gb']} GB\n"
-                    f"مدت: {package_row['duration_days']} روز\n"
+                    f"حجم: {fmt_vol(package_row['volume_gb'])}\n"
+                    f"مدت: {fmt_dur(package_row['duration_days'])}\n"
                     f"جایگاه: {cur_pos}"
                 )
                 send_or_edit(message, text, kb)

@@ -63,6 +63,16 @@ def fmt_price(a):
     return f"{int(a):,}"
 
 
+def fmt_vol(gb):
+    """Return 'نامحدود' if gb == 0, else '{gb} گیگ'."""
+    return "نامحدود" if int(gb) == 0 else f"{gb} گیگ"
+
+
+def fmt_dur(days):
+    """Return 'نامحدود' if days == 0, else '{days} روز'."""
+    return "نامحدود" if int(days) == 0 else f"{days} روز"
+
+
 def display_name(u):
     n = " ".join(p for p in [u.first_name or "", u.last_name or ""] if p).strip()
     return n or "ㅤ"

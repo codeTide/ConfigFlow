@@ -9,7 +9,7 @@ from telebot import types
 from ..config import ADMIN_IDS, ADMIN_PERMS, PERM_FULL_SET, PERM_USER_FULL, CRYPTO_COINS, CRYPTO_API_SYMBOLS, CONFIGS_PER_PAGE
 from ..bot_instance import bot
 from ..helpers import (
-    esc, fmt_price, now_str, display_name, display_username, safe_support_url,
+    esc, fmt_price, fmt_vol, fmt_dur, now_str, display_name, display_username, safe_support_url,
     is_admin, admin_has_perm, back_button,
     state_set, state_clear, state_name, state_data, parse_int, normalize_text_number,
 )
@@ -571,7 +571,7 @@ def _dispatch_callback(call, uid, data):
         user = get_user(uid)
         for p in packages:
             price = get_effective_price(uid, p)
-            title = f"{p['name']} | {p['volume_gb']} گیگ | {p['duration_days']} روز | {fmt_price(price)} ت"
+            title = f"{p['name']} | {fmt_vol(p['volume_gb'])} | {fmt_dur(p['duration_days'])} | {fmt_price(price)} ت"
             kb.add(types.InlineKeyboardButton(title, callback_data=f"renew:p:{purchase_id}:{p['id']}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"mycfg:{purchase_id}"))
         bot.answer_callback_query(call.id)
@@ -602,8 +602,8 @@ def _dispatch_callback(call, uid, data):
             "♻️ <b>تمدید سرویس</b>\n\n"
             f"🔮 سرویس فعلی: {esc(urllib.parse.unquote(item['service_name'] or ''))}\n"
             f"📦 پکیج تمدید: {esc(package_row['name'])}\n"
-            f"🔋 حجم: {package_row['volume_gb']} گیگ\n"
-            f"⏰ مدت: {package_row['duration_days']} روز\n"
+            f"🔋 حجم: {fmt_vol(package_row['volume_gb'])}\n"
+            f"⏰ مدت: {fmt_dur(package_row['duration_days'])}\n"
             f"💰 قیمت: {fmt_price(price)} تومان\n\n"
             "روش پرداخت را انتخاب کنید:"
         )
@@ -965,7 +965,7 @@ def _dispatch_callback(call, uid, data):
         for p in packages:
             price = get_effective_price(uid, p)
             stock_tag = "" if p["stock"] > 0 else " ⏳"
-            title = f"{p['name']}{stock_tag} | {p['volume_gb']} گیگ | {p['duration_days']} روز | {fmt_price(price)} ت"
+            title = f"{p['name']}{stock_tag} | {fmt_vol(p['volume_gb'])} | {fmt_dur(p['duration_days'])} | {fmt_price(price)} ت"
             kb.add(types.InlineKeyboardButton(title, callback_data=f"buy:p:{p['id']}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="buy:start"))
         bot.answer_callback_query(call.id)
@@ -990,8 +990,8 @@ def _dispatch_callback(call, uid, data):
             "💳 <b>انتخاب روش پرداخت</b>\n\n"
             f"🧩 نوع: {esc(package_row['type_name'])}\n"
             f"📦 پکیج: {esc(package_row['name'])}\n"
-            f"🔋 حجم: {package_row['volume_gb']} گیگ\n"
-            f"⏰ مدت: {package_row['duration_days']} روز\n"
+            f"🔋 حجم: {fmt_vol(package_row['volume_gb'])}\n"
+            f"⏰ مدت: {fmt_dur(package_row['duration_days'])}\n"
             f"💰 قیمت: {fmt_price(price)} تومان\n\n"
             "روش پرداخت را انتخاب کنید:"
         )
@@ -1916,8 +1916,8 @@ def _dispatch_callback(call, uid, data):
             f"📦 <b>ویرایش پکیج</b>\n\n"
             f"نام: {esc(package_row['name'])}\n"
             f"قیمت: {fmt_price(package_row['price'])} تومان\n"
-            f"حجم: {package_row['volume_gb']} GB\n"
-            f"مدت: {package_row['duration_days']} روز\n"
+            f"حجم: {fmt_vol(package_row['volume_gb'])}\n"
+            f"مدت: {fmt_dur(package_row['duration_days'])}\n"
             f"جایگاه: {cur_pos}\n"
             f"وضعیت: {pkg_status_line}"
         )
@@ -1999,7 +1999,7 @@ def _dispatch_callback(call, uid, data):
         kb      = types.InlineKeyboardMarkup()
         for p in packs:
             kb.add(types.InlineKeyboardButton(
-                f"{p['name']} | {p['volume_gb']} گیگ | {p['duration_days']} روز",
+                f"{p['name']} | {fmt_vol(p['volume_gb'])} | {fmt_dur(p['duration_days'])}",
                 callback_data=f"adm:cfg:p:{p['id']}"
             ))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:add_config"))
@@ -2345,8 +2345,8 @@ def _dispatch_callback(call, uid, data):
         text = (
             f"🔮 نام سرویس: <b>{esc(urllib.parse.unquote(row['service_name'] or ''))}</b>\n"
             f"🧩 نوع سرویس: {esc(row['type_name'])}\n"
-            f"🔋 حجم: {row['volume_gb']} گیگ\n"
-            f"⏰ مدت: {row['duration_days']} روز\n\n"
+            f"🔋 حجم: {fmt_vol(row['volume_gb'])}\n"
+            f"⏰ مدت: {fmt_dur(row['duration_days'])}\n\n"
             f"💝 Config:\n<code>{esc(row['config_text'])}</code>\n\n"
             f"🔋 Volume web: {esc(row['inquiry_link'] or '-')}\n"
             f"🗓 ثبت: {esc(row['created_at'])}"
@@ -4178,7 +4178,7 @@ def _dispatch_callback(call, uid, data):
             pkg_text = (
                 f"\n🧩 نوع: {esc(package_row['type_name'])}"
                 f"\n📦 پکیج: {esc(package_row['name'])}"
-                f"\n🔋 حجم: {package_row['volume_gb']} گیگ | ⏰ {package_row['duration_days']} روز"
+                f"\n🔋 حجم: {fmt_vol(package_row['volume_gb'])} | ⏰ {fmt_dur(package_row['duration_days'])}"
             )
         text = (
             f"✅ <b>تأیید تراکنش</b>\n\n"
@@ -4235,7 +4235,7 @@ def _dispatch_callback(call, uid, data):
             pkg_text = (
                 f"\n🧩 نوع: {esc(package_row['type_name'])}"
                 f"\n📦 پکیج: {esc(package_row['name'])}"
-                f"\n🔋 حجم: {package_row['volume_gb']} گیگ | ⏰ {package_row['duration_days']} روز"
+                f"\n🔋 حجم: {fmt_vol(package_row['volume_gb'])} | ⏰ {fmt_dur(package_row['duration_days'])}"
             )
         text = (
             f"❌ <b>رد تراکنش</b>\n\n"
@@ -4293,8 +4293,8 @@ def _dispatch_callback(call, uid, data):
                 f"\n\n📦 <b>اطلاعات پکیج:</b>\n"
                 f"🧩 نوع: {esc(pkg['type_name'])}\n"
                 f"✏️ نام: {esc(pkg['name'])}\n"
-                f"🔋 حجم: {pkg['volume_gb']} گیگ\n"
-                f"⏰ مدت: {pkg['duration_days']} روز\n"
+                f"🔋 حجم: {fmt_vol(pkg['volume_gb'])}\n"
+                f"⏰ مدت: {fmt_dur(pkg['duration_days'])}\n"
                 f"💰 قیمت: {fmt_price(pkg['price'])} تومان"
             )
         send_or_edit(call,
