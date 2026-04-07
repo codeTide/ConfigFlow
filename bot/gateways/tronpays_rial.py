@@ -4,10 +4,16 @@ TronPays Rial payment gateway — create and check invoices via REST API.
 API docs: https://api.tronpays.online/docs
 """
 import json
+import hashlib
 import urllib.request
 import urllib.error
 
 from ..db import setting_get
+
+
+def _make_hash_id(raw: str) -> str:
+    """Return a ≤20-char hash derived from raw — satisfies TronPays max-20 constraint."""
+    return hashlib.md5(raw.encode("utf-8")).hexdigest()[:20]
 
 TRONPAYS_RIAL_BASE_URL = "https://api.tronpays.online"
 
@@ -18,9 +24,10 @@ def create_tronpays_rial_invoice(amount_toman, hash_id, description=""):
     if not api_key:
         return False, {"error": "کلید API تران‌پیز ثبت نشده است. از پنل مدیریت ← تنظیمات ← درگاه‌ها اقدام کنید."}
     callback_url = setting_get("tronpays_rial_callback_url", "").strip() or "https://example.com/"
+    safe_hash_id = _make_hash_id(str(hash_id))
     payload = json.dumps({
         "api_key":      api_key,
-        "hash_id":      hash_id,
+        "hash_id":      safe_hash_id,
         "amount":       int(amount_toman),
         "callback_url": callback_url,
     }).encode("utf-8")
