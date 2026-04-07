@@ -32,7 +32,7 @@ from ..db import (
     get_all_panels, get_panel, add_panel, delete_panel,
     get_panel_packages, add_panel_package, delete_panel_package, update_panel_field,
     get_conn, create_pending_order, get_pending_order, add_config, search_users,
-    reset_all_free_tests,
+    reset_all_free_tests, user_has_any_test,
 )
 from ..gateways.base import is_gateway_available, is_card_info_complete
 from ..gateways.crypto import fetch_crypto_prices
