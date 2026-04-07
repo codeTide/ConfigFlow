@@ -16,7 +16,7 @@ R='\033[31m'; G='\033[32m'; Y='\033[33m'; C='\033[36m'; M='\033[35m'; B='\033[1m
 header() {
   clear 2>/dev/null || true
   echo ""
- -29,49 +34,83 @@ header() {
+header() {
   echo -e "${C}║${N}          ${W}${B}⚡ ConfigFlow — Telegram Config Sales Bot ⚡${N}                  ${C}║${N}"
   echo -e "${C}║${N}                                                                          ${C}║${N}"
   echo -e "${C}╠══════════════════════════════════════════════════════════════════════════╣${N}"
