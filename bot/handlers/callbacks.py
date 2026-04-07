@@ -3491,12 +3491,61 @@ def _dispatch_callback(call, uid, data):
             return
         bot.answer_callback_query(call.id)
         kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("� اعلان‌های اونر",   callback_data="adm:notif:own"))
+        kb.add(types.InlineKeyboardButton("🤖 اعلان‌های ربات",   callback_data="adm:notif:bot"))
         kb.add(types.InlineKeyboardButton("📢 اعلان‌های گروه",  callback_data="adm:notif:grp"))
-        kb.add(types.InlineKeyboardButton("🤖 اعلان‌های ربات",  callback_data="adm:notif:bot"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
         send_or_edit(call,
             "🔔 <b>مدیریت اعلان‌ها</b>\n\n"
-            "انتخاب کنید کدام اعلان‌ها از کجا ارسال شوند:",
+            "👑 <b>اونر</b>: اعلان مستقیم برای ADMIN_IDS (ایدهای ثابت config.py)\n"
+            "🤖 <b>ربات</b>: اعلان برای ادمین‌های فرعی (بر اساس دسترسی)\n"
+            "📢 <b>گروه</b>: اعلان در تاپیک‌های گروه",
+            kb)
+        return
+
+    if data == "adm:notif:own":
+        if not admin_has_perm(uid, "settings"):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        kb = types.InlineKeyboardMarkup()
+        for key, label in _NOTIF_TYPES:
+            on = setting_get(f"notif_own_{key}", "1") == "1"
+            icon = "✅" if on else "❌"
+            kb.add(types.InlineKeyboardButton(
+                f"{icon} {label}",
+                callback_data=f"adm:notif:otg:{key}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:notif"))
+        send_or_edit(call,
+            "👑 <b>اعلان‌های اونر</b>\n\n"
+            "اعلان‌هایی که مستقیماً برای <b>ADMIN_IDS</b> (اید ثابت تو config.py) ارسال می‌شن:"
+            "\n✅ = فعال  |  ❌ = غیرفعال",
+            kb)
+        return
+
+    if data.startswith("adm:notif:otg:"):
+        if not admin_has_perm(uid, "settings"):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        key = data[len("adm:notif:otg:"):]
+        cur = setting_get(f"notif_own_{key}", "1")
+        new = "0" if cur == "1" else "1"
+        setting_set(f"notif_own_{key}", new)
+        label_map = dict(_NOTIF_TYPES)
+        lbl = label_map.get(key, key)
+        bot.answer_callback_query(call.id, f"{'\u0641\u0639\u0627\u0644' if new=='1' else '\u063a\u06cc\u0631\u0641\u0639\u0627\u0644'} شد: {lbl}")
+        kb = types.InlineKeyboardMarkup()
+        for k, l in _NOTIF_TYPES:
+            on = setting_get(f"notif_own_{k}", "1") == "1"
+            icon = "✅" if on else "❌"
+            kb.add(types.InlineKeyboardButton(
+                f"{icon} {l}",
+                callback_data=f"adm:notif:otg:{k}"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:notif"))
+        send_or_edit(call,
+            "👑 <b>اعلان‌های اونر</b>\n\n"
+            "اعلان‌هایی که مستقیماً برای <b>ADMIN_IDS</b> ارسال می‌شن:"
+            "\n✅ = فعال  |  ❌ = غیرفعال",
             kb)
         return
 

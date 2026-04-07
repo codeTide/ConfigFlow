@@ -325,13 +325,25 @@ def notify_first_start_if_needed(tg_user):
         f"نام کاربری: {display_username(tg_user.username)}\n"
         f"آیدی عددی: <code>{tg_user.id}</code>"
     )
-    for admin_id in ADMIN_IDS:
-        if setting_get("notif_bot_new_users", "1") != "1":
-            break
-        try:
-            bot.send_message(admin_id, text)
-        except Exception:
-            pass
+    if setting_get("notif_own_new_users", "1") == "1":
+        for admin_id in ADMIN_IDS:
+            try:
+                bot.send_message(admin_id, text)
+            except Exception:
+                pass
+    if setting_get("notif_bot_new_users", "1") == "1":
+        import json as _json
+        for row in get_all_admin_users():
+            sub_id = row["user_id"]
+            if sub_id in ADMIN_IDS:
+                continue
+            perms = _json.loads(row["permissions"] or "{}")
+            if not (perms.get("full") or perms.get("approve_payments")):
+                continue
+            try:
+                bot.send_message(sub_id, text)
+            except Exception:
+                pass
     from .group_manager import send_to_topic as _send_to_topic
     _send_to_topic("new_users", text)
 

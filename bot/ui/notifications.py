@@ -22,8 +22,13 @@ from ..group_manager import send_to_topic
 
 
 def _bot_notif_on(key: str) -> bool:
-    """Return True if bot notifications for this key are enabled."""
+    """Return True if bot (sub-admin) notifications for this key are enabled."""
     return setting_get(f"notif_bot_{key}", "1") == "1"
+
+
+def _own_notif_on(key: str) -> bool:
+    """Return True if owner (ADMIN_IDS) notifications for this key are enabled."""
+    return setting_get(f"notif_own_{key}", "1") == "1"
 
 
 # ── Purchase delivery ──────────────────────────────────────────────────────────
@@ -83,12 +88,12 @@ def admin_purchase_notify(method_label, user_row, package_row):
         f"🔋 حجم: {package_row['volume_gb']} گیگ\n"
         f"⏰ مدت: {package_row['duration_days']} روز"
     )
-    for admin_id in ADMIN_IDS:
-        if not _bot_notif_on("purchase_log"): break
-        try:
-            bot.send_message(admin_id, text)
-        except Exception:
-            pass
+    if _own_notif_on("purchase_log"):
+        for admin_id in ADMIN_IDS:
+            try:
+                bot.send_message(admin_id, text)
+            except Exception:
+                pass
     if _bot_notif_on("purchase_log"):
         for row in get_all_admin_users():
             sub_id = row["user_id"]
@@ -124,12 +129,12 @@ def admin_renewal_notify(user_id, purchase_item, package_row, amount, method_lab
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("✅ تمدید انجام شد",
                                        callback_data=f"renew:confirm:{config_id}:{user_id}"))
-    for admin_id in ADMIN_IDS:
-        if not _bot_notif_on("renewal_request"): break
-        try:
-            bot.send_message(admin_id, text, reply_markup=kb)
-        except Exception:
-            pass
+    if _own_notif_on("renewal_request"):
+        for admin_id in ADMIN_IDS:
+            try:
+                bot.send_message(admin_id, text, reply_markup=kb)
+            except Exception:
+                pass
     if _bot_notif_on("renewal_request"):
         for row in get_all_admin_users():
             sub_id = row["user_id"]
@@ -165,12 +170,12 @@ def notify_pending_order_to_admins(pending_id, user_id, package_row, amount, met
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("📝 ثبت کانفیگ برای این سفارش",
                                        callback_data=f"adm:pending:addcfg:{pending_id}"))
-    for admin_id in ADMIN_IDS:
-        if not _bot_notif_on("payment_approval"): break
-        try:
-            bot.send_message(admin_id, text, reply_markup=kb)
-        except Exception:
-            pass
+    if _own_notif_on("payment_approval"):
+        for admin_id in ADMIN_IDS:
+            try:
+                bot.send_message(admin_id, text, reply_markup=kb)
+            except Exception:
+                pass
     if _bot_notif_on("payment_approval"):
         for row in get_all_admin_users():
             sub_id = row["user_id"]
