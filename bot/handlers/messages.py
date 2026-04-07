@@ -10,7 +10,7 @@ from ..bot_instance import bot
 from ..helpers import (
     esc, fmt_price, fmt_vol, fmt_dur, now_str, display_name, display_username,
     is_admin, admin_has_perm, back_button,
-    state_set, state_clear, state_name, state_data, parse_int, normalize_text_number,
+    state_set, state_clear, state_name, state_data, parse_int, parse_volume, normalize_text_number,
 )
 from ..db import (
     setting_get, setting_set,
@@ -296,16 +296,17 @@ def universal_handler(message):
             state_set(uid, "admin_add_package_volume", type_id=sd["type_id"], package_name=name)
             bot.send_message(uid,
                 "🔋 حجم پکیج را به گیگ وارد کنید:\n"
-                "💡 برای حجم نامحدود عدد <b>0</b> بفرستید.",
+                "💡 برای حجم نامحدود عدد <b>0</b> بفرستید.\n"
+                "💡 برای کمتر از ۱ گیگ اعشار وارد کنید (مثلاً <b>0.5</b>).",
                 reply_markup=back_button("admin:types"))
             return
 
         if sn == "admin_add_package_volume" and is_admin(uid):
-            volume = parse_int(message.text or "")
-            if volume is None or volume < 0:
+            volume = parse_volume(message.text or "")
+            if volume is None:
                 bot.send_message(uid, "⚠️ حجم معتبر وارد کنید.", reply_markup=back_button("admin:types"))
                 return
-            vol_label = "حجم نامحدود" if volume == 0 else f"{volume} گیگ"
+            vol_label = "حجم نامحدود" if volume == 0 else fmt_vol(volume)
             state_set(uid, "admin_add_package_duration",
                       type_id=sd["type_id"], package_name=sd["package_name"], volume=volume)
             bot.send_message(uid,
@@ -337,7 +338,7 @@ def universal_handler(message):
                 return
             add_package(sd["type_id"], sd["package_name"], sd["volume"], sd["duration"], price)
             state_clear(uid)
-            vol_label = "حجم نامحدود" if sd["volume"] == 0 else f"{sd['volume']} گیگ"
+            vol_label = "حجم نامحدود" if sd["volume"] == 0 else fmt_vol(sd["volume"])
             dur_label = "زمان نامحدود" if sd["duration"] == 0 else f"{sd['duration']} روز"
             pri_label = "رایگان" if price == 0 else f"{fmt_price(price)} تومان"
             bot.send_message(uid,
@@ -361,6 +362,12 @@ def universal_handler(message):
                     bot.send_message(uid, "⚠️ نام معتبر وارد کنید.", reply_markup=back_button("admin:types"))
                     return
                 update_package_field(package_id, db_field, raw)
+            elif field_key == "volume":
+                val = parse_volume(raw)
+                if val is None:
+                    bot.send_message(uid, "⚠️ حجم معتبر وارد کنید (مثلاً <b>0.5</b> یا <b>10</b>).", reply_markup=back_button("admin:types"))
+                    return
+                update_package_field(package_id, db_field, val)
             else:
                 val = parse_int(raw)
                 if val is None or (field_key != "position" and val < 0) or (field_key == "position" and val < 1):
