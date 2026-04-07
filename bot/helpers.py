@@ -59,13 +59,33 @@ def parse_int(v):
     return int(c)
 
 
+def parse_volume(v):
+    """Parse a volume string that may be integer or decimal (e.g. 0.5, 10).
+    Returns float or None. Accepts both . and , as decimal separator."""
+    c = normalize_text_number(v)
+    if not c:
+        return None
+    c = c.replace(",", ".")
+    try:
+        num = float(c)
+    except ValueError:
+        return None
+    if num < 0:
+        return None
+    return num
+
+
 def fmt_price(a):
     return f"{int(a):,}"
 
 
 def fmt_vol(gb):
     """Return 'حجم نامحدود' if gb == 0, else '{gb} گیگ'."""
-    return "حجم نامحدود" if int(gb) == 0 else f"{gb} گیگ"
+    if float(gb) == 0:
+        return "حجم نامحدود"
+    # Show as integer if whole number, otherwise show up to 3 decimal places
+    f = float(gb)
+    return f"{int(f)} گیگ" if f == int(f) else f"{f:g} گیگ"
 
 
 def fmt_dur(days):
