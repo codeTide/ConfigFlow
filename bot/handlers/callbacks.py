@@ -3059,7 +3059,7 @@ def _dispatch_callback(call, uid, data):
         return
 
     # ── Agency price config (3-mode) ──────────────────────────────────────────
-    if data.startswith("adm:agcfg:") and not data.count(":") > 3:
+    if data.startswith("adm:agcfg:") and data.count(":") == 2:
         # adm:agcfg:{target_id}  — show mode selector
         parts     = data.split(":")
         target_id = int(parts[2])
