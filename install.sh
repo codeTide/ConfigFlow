@@ -693,7 +693,7 @@ show_bot_menu() {
   echo -e "${C}│${N}  ${B}${M}w)${N} 📋 Worker log                                ${C}│${N}"
   echo -e "${C}│${N}  ${B}${M}W)${N} 🔁 Restart                  Worker              ${C}│${N}"
   echo -e "${C}│${N}  ${B}${R}b)${N} 🔙 Back to main menu               ${C}│${N}"
-  echo -e "${C}└──────────────────────────────────────┘${N}"
+  echo -e "${C}└───────────────────────────────────────────────────────────┘${N}"
   echo ""
 }
 
