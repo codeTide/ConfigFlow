@@ -716,7 +716,7 @@ def universal_handler(message):
                 agent_icon  = "🤝 " if row["is_agent"] else ""
                 uname       = f"@{row['username']}" if row["username"] else str(row["user_id"])
                 name_part   = row["full_name"] or f"(آیدی: {row['user_id']})"
-                buy_tag     = f" 🛍{row['purchase_count']}" if row.get("purchase_count") else ""
+                buy_tag     = f" 🛍{row['purchase_count']}" if row["purchase_count"] else ""
                 label = f"{status_icon} {agent_icon}{name_part} | {uname}{buy_tag}"
                 kb.add(types.InlineKeyboardButton(label, callback_data=f"adm:usr:v:{row['user_id']}"))
             kb.add(types.InlineKeyboardButton("🔍 جستجوی جدید", callback_data="adm:usr:search"))
