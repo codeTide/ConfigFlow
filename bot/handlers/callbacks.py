@@ -45,6 +45,9 @@ from ..gateways.swapwallet_crypto import (
     create_swapwallet_crypto_invoice, check_swapwallet_crypto_invoice,
     show_swapwallet_crypto_page,
 )
+from ..gateways.tronpays_rial import (
+    create_tronpays_rial_invoice, check_tronpays_rial_invoice, is_tronpays_paid,
+)
 from ..ui.helpers import send_or_edit, check_channel_membership, channel_lock_message
 from ..ui.keyboards import kb_main, kb_admin_panel
 from ..ui.menus import show_main_menu, show_profile, show_support, show_my_configs
@@ -402,6 +405,130 @@ def _start_tetrapay_auto_verify(payment_id, authority, uid, chat_id, message_id,
     t.start()
 
 
+# ── TronPays Rial auto-verify thread ──────────────────────────────────────────
+def _tronpays_rial_auto_verify(payment_id, invoice_id, uid, chat_id, message_id, kind,
+                               package_id=None):
+    """Background thread: polls TronPays every 10s for up to 60 minutes."""
+    max_tries = 360  # 360 × 10s = 60 minutes
+    for _ in range(max_tries):
+        time.sleep(10)
+        payment = get_payment(payment_id)
+        if not payment or payment["status"] != "pending":
+            return
+        ok, status = check_tronpays_rial_invoice(invoice_id)
+        if not ok or not is_tronpays_paid(status):
+            continue
+        try:
+            if kind == "wallet_charge":
+                update_balance(uid, payment["amount"])
+                complete_payment(payment_id)
+                state_clear(uid)
+                try:
+                    bot.edit_message_text(
+                        f"✅ پرداخت شما تأیید شد و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان",
+                        chat_id, message_id, parse_mode="HTML",
+                        reply_markup=back_button("main"))
+                except Exception:
+                    bot.send_message(uid,
+                        f"✅ پرداخت شما تأیید شد و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان",
+                        parse_mode="HTML", reply_markup=back_button("main"))
+
+            elif kind == "config_purchase":
+                pkg_row = get_package(package_id)
+                cfg_id = payment["config_id"]
+                if not cfg_id:
+                    cfg_id = reserve_first_config(package_id, payment_id)
+                if not cfg_id:
+                    pending_id = create_pending_order(uid, package_id, payment_id, payment["amount"], "tronpays_rial")
+                    complete_payment(payment_id)
+                    state_clear(uid)
+                    msg_text = (
+                        "✅ پرداخت شما تأیید شد.\n\n"
+                        "⚠️ <b>موجودی تحویل فوری ربات به اتمام رسید.</b>\n"
+                        "درخواست شما برای ادمین ارسال شد. در کمترین فرصت کانفیگ شما تحویل داده می‌شود.\n"
+                        "🙏 از صبر شما متشکریم."
+                    )
+                    try:
+                        bot.edit_message_text(msg_text, chat_id, message_id, parse_mode="HTML",
+                                              reply_markup=back_button("main"))
+                    except Exception:
+                        bot.send_message(uid, msg_text, parse_mode="HTML", reply_markup=back_button("main"))
+                    notify_pending_order_to_admins(pending_id, uid, pkg_row, payment["amount"], "tronpays_rial")
+                    return
+                purchase_id_new = assign_config_to_user(cfg_id, uid, package_id, payment["amount"], "tronpays_rial", is_test=0)
+                complete_payment(payment_id)
+                state_clear(uid)
+                try:
+                    bot.edit_message_text("✅ پرداخت شما تأیید شد و سرویس آماده است.",
+                                          chat_id, message_id, parse_mode="HTML",
+                                          reply_markup=back_button("main"))
+                except Exception:
+                    bot.send_message(uid, "✅ پرداخت شما تأیید شد و سرویس آماده است.",
+                                     reply_markup=back_button("main"))
+                deliver_purchase_message(chat_id, purchase_id_new)
+                admin_purchase_notify("TronPays", get_user(uid), pkg_row)
+
+            elif kind == "renewal":
+                pkg_row = get_package(package_id)
+                cfg_id = payment["config_id"]
+                with get_conn() as conn:
+                    row = conn.execute("SELECT purchase_id FROM configs WHERE id=?", (cfg_id,)).fetchone()
+                pid = row["purchase_id"] if row else 0
+                item = get_purchase(pid) if pid else None
+                complete_payment(payment_id)
+                state_clear(uid)
+                msg_text = (
+                    "✅ <b>درخواست تمدید ارسال شد</b>\n\n"
+                    "🔄 درخواست تمدید سرویس شما با موفقیت ثبت و برای پشتیبانی ارسال شد.\n"
+                    "⏳ لطفاً کمی صبر کنید، پس از انجام تمدید به شما اطلاع داده خواهد شد.\n\n"
+                    "🙏 از صبر و شکیبایی شما متشکریم."
+                )
+                try:
+                    bot.edit_message_text(msg_text, chat_id, message_id, parse_mode="HTML",
+                                          reply_markup=back_button("main"))
+                except Exception:
+                    bot.send_message(uid, msg_text, parse_mode="HTML", reply_markup=back_button("main"))
+                if item:
+                    admin_renewal_notify(uid, item, pkg_row, payment["amount"], "TronPays")
+
+        except Exception as e:
+            print("TRONPAYS_RIAL_AUTO_VERIFY_ERROR:", e)
+        return
+
+    # Timeout
+    payment = get_payment(payment_id)
+    if payment and payment["status"] == "pending":
+        state_clear(uid)
+        verify_cb = f"rpay:tronpays_rial:verify:{payment_id}" if kind == "renewal" else f"pay:tronpays_rial:verify:{payment_id}"
+        timeout_msg = (
+            "⏰ <b>بررسی خودکار پرداخت پایان یافت</b>\n\n"
+            "وقتی پرداخت‌تون تو TronPays تایید شد، دکمه <b>بررسی پرداخت</b> زیر را بزنید "
+            "تا پرداخت تأیید شده و ادامه عملیات انجام شود.\n\n"
+            "اگر مبلغ از حساب شما کسر شده و پرداخت تأیید نشده، لطفاً با پشتیبانی تماس بگیرید."
+        )
+        timeout_kb = types.InlineKeyboardMarkup()
+        timeout_kb.add(types.InlineKeyboardButton("🔍 بررسی پرداخت", callback_data=verify_cb))
+        try:
+            bot.edit_message_text(timeout_msg, chat_id, message_id, parse_mode="HTML",
+                                  reply_markup=timeout_kb)
+        except Exception:
+            try:
+                bot.send_message(uid, timeout_msg, parse_mode="HTML", reply_markup=timeout_kb)
+            except Exception:
+                pass
+
+
+def _start_tronpays_rial_auto_verify(payment_id, invoice_id, uid, chat_id, message_id,
+                                     kind, package_id=None):
+    t = threading.Thread(
+        target=_tronpays_rial_auto_verify,
+        args=(payment_id, invoice_id, uid, chat_id, message_id, kind),
+        kwargs={"package_id": package_id},
+        daemon=True,
+    )
+    t.start()
+
+
 def _dispatch_callback(call, uid, data):
     # Navigation
     if data.startswith("nav:"):
@@ -619,6 +746,8 @@ def _dispatch_callback(call, uid, data):
             kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data=f"rpay:swapwallet:{purchase_id}:{package_id}"))
         if is_gateway_available("swapwallet_crypto", uid, price):
             kb.add(types.InlineKeyboardButton("💎 پرداخت کریپتو (SwapWallet)", callback_data=f"rpay:swapwallet_crypto:{purchase_id}:{package_id}"))
+        if is_gateway_available("tronpays_rial", uid, price):
+            kb.add(types.InlineKeyboardButton("💳 پرداخت ریالی (TronPays)", callback_data=f"rpay:tronpays_rial:{purchase_id}:{package_id}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"renew:{purchase_id}"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
@@ -866,6 +995,88 @@ def _dispatch_callback(call, uid, data):
         bot.answer_callback_query(call.id)
         return
 
+    # ── TronPays Rial: renewal ────────────────────────────────────────────────
+    if data.startswith("rpay:tronpays_rial:verify:"):
+        payment_id = int(data.split(":")[3])
+        payment = get_payment(payment_id)
+        if not payment or payment["user_id"] != uid:
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        if payment["status"] != "pending":
+            bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+            return
+        invoice_id = payment["receipt_text"]
+        ok, status = check_tronpays_rial_invoice(invoice_id)
+        if not ok:
+            bot.answer_callback_query(call.id, "خطا در بررسی وضعیت فاکتور.", show_alert=True)
+            return
+        if is_tronpays_paid(status):
+            complete_payment(payment_id)
+            package_row = get_package(payment["package_id"])
+            config_id   = payment["config_id"]
+            with get_conn() as conn:
+                row = conn.execute("SELECT purchase_id FROM configs WHERE id=?", (config_id,)).fetchone()
+            purchase_id = row["purchase_id"] if row else 0
+            item = get_purchase(purchase_id) if purchase_id else None
+            bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+            send_or_edit(call,
+                "✅ <b>درخواست تمدید ارسال شد</b>\n\n"
+                "🔄 درخواست تمدید سرویس شما با موفقیت ثبت و برای پشتیبانی ارسال شد.\n"
+                "⏳ لطفاً کمی صبر کنید، پس از انجام تمدید به شما اطلاع داده خواهد شد.\n\n"
+                "🙏 از صبر و شکیبایی شما متشکریم.",
+                back_button("main"))
+            if item:
+                admin_renewal_notify(uid, item, package_row, payment["amount"], "TronPays")
+            state_clear(uid)
+        else:
+            bot.answer_callback_query(call.id, "❌ پرداخت هنوز تأیید نشده. لطفاً ابتدا پرداخت را انجام دهید.", show_alert=True)
+        return
+
+    if data.startswith("rpay:tronpays_rial:"):
+        parts = data.split(":")
+        purchase_id = int(parts[2])
+        package_id  = int(parts[3])
+        item = get_purchase(purchase_id)
+        package_row = get_package(package_id)
+        if not item or item["user_id"] != uid:
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        if not package_row:
+            bot.answer_callback_query(call.id, "پکیج یافت نشد.", show_alert=True)
+            return
+        price = get_effective_price(uid, package_row)
+        hash_id = f"rnw-{uid}-{package_id}-{int(datetime.now().timestamp())}"
+        success, result = create_tronpays_rial_invoice(price, hash_id, f"تمدید {package_row['name']}")
+        if not success:
+            err_msg = result.get("error", "خطای ناشناخته") if isinstance(result, dict) else str(result)
+            bot.answer_callback_query(call.id, f"خطا: {err_msg[:100]}", show_alert=True)
+            return
+        invoice_id = result  # plain string returned by TronPays
+        payment_id = create_payment("renewal", uid, package_id, price, "tronpays_rial", status="pending",
+                                    config_id=item["config_id"])
+        with get_conn() as conn:
+            conn.execute("UPDATE payments SET receipt_text=? WHERE id=?", (invoice_id, payment_id))
+        state_set(uid, "await_renewal_tronpays_rial_verify", payment_id=payment_id,
+                  invoice_id=invoice_id, purchase_id=purchase_id)
+        text = (
+            "💳 <b>پرداخت ریالی (TronPays) — تمدید</b>\n\n"
+            f"💰 مبلغ: <b>{fmt_price(price)}</b> تومان\n\n"
+            "از لینک زیر پرداخت را انجام دهید.\n\n"
+            "⏳ <b>تا یک ساعت</b> پرداخت به صورت خودکار بررسی می‌شود.\n"
+            "در غیر این صورت دکمه «بررسی پرداخت» را بزنید."
+        )
+        kb = types.InlineKeyboardMarkup()
+        if invoice_id.startswith("http"):
+            kb.add(types.InlineKeyboardButton("💳 پرداخت از درگاه TronPays", url=invoice_id))
+        kb.add(types.InlineKeyboardButton("🔍 بررسی پرداخت", callback_data=f"rpay:tronpays_rial:verify:{payment_id}"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
+        _start_tronpays_rial_auto_verify(
+            payment_id, invoice_id, uid,
+            call.message.chat.id, call.message.message_id,
+            "renewal", package_id=package_id)
+        return
+
     # ── Admin: Confirm renewal ────────────────────────────────────────────────
     if data.startswith("renew:confirm:"):
         if not admin_has_perm(uid, "approve_renewal"):
@@ -1007,6 +1218,8 @@ def _dispatch_callback(call, uid, data):
             kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data=f"pay:swapwallet:{package_id}"))
         if is_gateway_available("swapwallet_crypto", uid, price):
             kb.add(types.InlineKeyboardButton("💎 پرداخت کریپتو (SwapWallet)", callback_data=f"pay:swapwallet_crypto:{package_id}"))
+        if is_gateway_available("tronpays_rial", uid, price):
+            kb.add(types.InlineKeyboardButton("💳 پرداخت ریالی (TronPays)", callback_data=f"pay:tronpays_rial:{package_id}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"buy:t:{package_row['type_id']}"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
@@ -1315,6 +1528,95 @@ def _dispatch_callback(call, uid, data):
             "config_purchase", package_id=package_id)
         return
 
+    # ── TronPays Rial: purchase ───────────────────────────────────────────────
+    if data.startswith("pay:tronpays_rial:verify:"):
+        payment_id = int(data.split(":")[3])
+        payment = get_payment(payment_id)
+        if not payment or payment["user_id"] != uid:
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        if payment["status"] != "pending":
+            bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+            return
+        invoice_id = payment["receipt_text"]
+        ok, status = check_tronpays_rial_invoice(invoice_id)
+        if not ok:
+            bot.answer_callback_query(call.id, "خطا در بررسی وضعیت فاکتور.", show_alert=True)
+            return
+        if is_tronpays_paid(status):
+            if payment["kind"] == "wallet_charge":
+                update_balance(uid, payment["amount"])
+                complete_payment(payment_id)
+                bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+                send_or_edit(call, f"✅ پرداخت شما تأیید و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان",
+                             back_button("main"))
+                state_clear(uid)
+            else:
+                config_id  = payment["config_id"]
+                package_id = payment["package_id"]
+                package_row = get_package(package_id)
+                if not config_id:
+                    config_id = reserve_first_config(package_id, payment_id)
+                if not config_id:
+                    pending_id = create_pending_order(uid, package_id, payment_id, payment["amount"], "tronpays_rial")
+                    complete_payment(payment_id)
+                    bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+                    send_or_edit(call,
+                        "✅ پرداخت شما تأیید شد.\n\n"
+                        "⚠️ <b>موجودی تحویل فوری ربات به اتمام رسید.</b>\n"
+                        "درخواست شما برای ادمین ارسال شد. در کمترین فرصت کانفیگ شما تحویل داده می‌شود.\n"
+                        "🙏 از صبر شما متشکریم.", back_button("main"))
+                    notify_pending_order_to_admins(pending_id, uid, package_row, payment["amount"], "tronpays_rial")
+                    state_clear(uid)
+                    return
+                purchase_id = assign_config_to_user(config_id, uid, package_id, payment["amount"], "tronpays_rial", is_test=0)
+                complete_payment(payment_id)
+                bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
+                send_or_edit(call, "✅ پرداخت شما تأیید شد و سرویس آماده است.", back_button("main"))
+                deliver_purchase_message(call.message.chat.id, purchase_id)
+                admin_purchase_notify("TronPays", get_user(uid), package_row)
+                state_clear(uid)
+        else:
+            bot.answer_callback_query(call.id, "❌ پرداخت هنوز تأیید نشده. لطفاً ابتدا پرداخت را انجام دهید.", show_alert=True)
+        return
+
+    if data.startswith("pay:tronpays_rial:"):
+        package_id  = int(data.split(":")[2])
+        package_row = get_package(package_id)
+        if not package_row or (setting_get("preorder_mode", "0") == "1" and package_row["stock"] <= 0):
+            bot.answer_callback_query(call.id, "موجودی این پکیج تمام شده است.", show_alert=True)
+            return
+        price   = get_effective_price(uid, package_row)
+        hash_id = f"cfg-{uid}-{package_id}-{int(datetime.now().timestamp())}"
+        success, result = create_tronpays_rial_invoice(price, hash_id, f"خرید {package_row['name']}")
+        if not success:
+            err_msg = result.get("error", "خطای ناشناخته") if isinstance(result, dict) else str(result)
+            bot.answer_callback_query(call.id, f"خطا: {err_msg[:100]}", show_alert=True)
+            return
+        invoice_id = result  # plain string returned by TronPays
+        payment_id = create_payment("config_purchase", uid, package_id, price, "tronpays_rial", status="pending")
+        with get_conn() as conn:
+            conn.execute("UPDATE payments SET receipt_text=? WHERE id=?", (invoice_id, payment_id))
+        state_set(uid, "await_tronpays_rial_verify", payment_id=payment_id, invoice_id=invoice_id)
+        text = (
+            "💳 <b>پرداخت ریالی (TronPays)</b>\n\n"
+            f"💰 مبلغ: <b>{fmt_price(price)}</b> تومان\n\n"
+            "از لینک زیر پرداخت را انجام دهید.\n\n"
+            "⏳ <b>تا یک ساعت</b> پرداخت به صورت خودکار بررسی می‌شود.\n"
+            "در غیر این صورت دکمه «بررسی پرداخت» را بزنید."
+        )
+        kb = types.InlineKeyboardMarkup()
+        if invoice_id.startswith("http"):
+            kb.add(types.InlineKeyboardButton("💳 پرداخت از درگاه TronPays", url=invoice_id))
+        kb.add(types.InlineKeyboardButton("🔍 بررسی پرداخت", callback_data=f"pay:tronpays_rial:verify:{payment_id}"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
+        _start_tronpays_rial_auto_verify(
+            payment_id, invoice_id, uid,
+            call.message.chat.id, call.message.message_id,
+            "config_purchase", package_id=package_id)
+        return
+
     # ── Free test ─────────────────────────────────────────────────────────────
     if data == "test:start":
         if setting_get("free_test_enabled", "1") != "1":
@@ -1519,6 +1821,42 @@ def _dispatch_callback(call, uid, data):
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, "💎 <b>پرداخت کریپتو (SwapWallet)</b>\n\nشبکه مورد نظر را انتخاب کنید:", kb)
+        return
+
+    if data == "wallet:charge:tronpays_rial":
+        sd     = state_data(uid)
+        amount = sd.get("amount")
+        if not amount:
+            bot.answer_callback_query(call.id, "ابتدا مبلغ را وارد کنید.", show_alert=True)
+            return
+        order_id = f"wallet-{uid}-{int(datetime.now().timestamp())}"
+        success, result = create_tronpays_rial_invoice(amount, order_id, "شارژ کیف پول")
+        if not success:
+            err_msg = result.get("error", "خطای ناشناخته") if isinstance(result, dict) else str(result)
+            bot.answer_callback_query(call.id, f"خطا: {err_msg[:100]}", show_alert=True)
+            return
+        invoice_id = result
+        payment_id = create_payment("wallet_charge", uid, None, amount, "tronpays_rial", status="pending")
+        with get_conn() as conn:
+            conn.execute("UPDATE payments SET receipt_text=? WHERE id=?", (invoice_id, payment_id))
+        state_set(uid, "await_tronpays_rial_verify", payment_id=payment_id, invoice_id=invoice_id)
+        text = (
+            "💳 <b>شارژ کیف پول — TronPays</b>\n\n"
+            f"💰 مبلغ: <b>{fmt_price(amount)}</b> تومان\n\n"
+            "از لینک زیر پرداخت را انجام دهید.\n\n"
+            "⏳ <b>تا یک ساعت</b> پرداخت به صورت خودکار بررسی می‌شود.\n"
+            "در غیر این صورت دکمه «بررسی پرداخت» را بزنید."
+        )
+        kb = types.InlineKeyboardMarkup()
+        if invoice_id.startswith("http"):
+            kb.add(types.InlineKeyboardButton("💳 پرداخت از درگاه TronPays", url=invoice_id))
+        kb.add(types.InlineKeyboardButton("🔍 بررسی پرداخت", callback_data=f"pay:tronpays_rial:verify:{payment_id}"))
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
+        _start_tronpays_rial_auto_verify(
+            payment_id, invoice_id, uid,
+            call.message.chat.id, call.message.message_id,
+            "wallet_charge")
         return
 
     if data.startswith("pay:swapwallet_crypto:verify:"):
@@ -3491,14 +3829,14 @@ def _dispatch_callback(call, uid, data):
             return
         bot.answer_callback_query(call.id)
         kb = types.InlineKeyboardMarkup()
-        kb.add(types.InlineKeyboardButton("� اعلان‌های اونر",   callback_data="adm:notif:own"))
-        kb.add(types.InlineKeyboardButton("🤖 اعلان‌های ربات",   callback_data="adm:notif:bot"))
-        kb.add(types.InlineKeyboardButton("📢 اعلان‌های گروه",  callback_data="adm:notif:grp"))
+        kb.add(types.InlineKeyboardButton("👑 اعلان های ربات اونر",   callback_data="adm:notif:own"))
+        kb.add(types.InlineKeyboardButton("🤖 اعلان های ربات ادمین",   callback_data="adm:notif:bot"))
+        kb.add(types.InlineKeyboardButton("📢 گروه",  callback_data="adm:notif:grp"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
         send_or_edit(call,
             "🔔 <b>مدیریت اعلان‌ها</b>\n\n"
-            "👑 <b>اونر</b>: اعلان مستقیم برای ADMIN_IDS (ایدهای ثابت config.py)\n"
-            "🤖 <b>ربات</b>: اعلان برای ادمین‌های فرعی (بر اساس دسترسی)\n"
+            "👑 <b>اعلان های ربات اونر</b>: اعلان برای اونر در ربات\n"
+            "🤖 <b>اعلان های ربات ادمین</b>: اعلان برای ادمین‌های فرعی (بر اساس دسترسی)\n"
             "📢 <b>گروه</b>: اعلان در تاپیک‌های گروه",
             kb)
         return
@@ -3517,7 +3855,7 @@ def _dispatch_callback(call, uid, data):
                 callback_data=f"adm:notif:otg:{key}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:notif"))
         send_or_edit(call,
-            "👑 <b>اعلان‌های اونر</b>\n\n"
+            "👑 <b>اعلان های ربات اونر</b>\n\n"
             "اعلان‌هایی که مستقیماً برای <b>ADMIN_IDS</b> (اید ثابت تو config.py) ارسال می‌شن:"
             "\n✅ = فعال  |  ❌ = غیرفعال",
             kb)
@@ -3543,7 +3881,7 @@ def _dispatch_callback(call, uid, data):
                 callback_data=f"adm:notif:otg:{k}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:notif"))
         send_or_edit(call,
-            "👑 <b>اعلان‌های اونر</b>\n\n"
+            "👑 <b>اعلان های ربات اونر</b>\n\n"
             "اعلان‌هایی که مستقیماً برای <b>ADMIN_IDS</b> ارسال می‌شن:"
             "\n✅ = فعال  |  ❌ = غیرفعال",
             kb)
@@ -3563,7 +3901,7 @@ def _dispatch_callback(call, uid, data):
                 callback_data=f"adm:notif:gtg:{key}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:notif"))
         send_or_edit(call,
-            "📢 <b>اعلان‌های گروه</b>\n\n"
+            "📢 <b>گروه</b>\n\n"
             "انتخاب کنید کدام اعلان‌ها در تاپیک‌های گروه ارسال شوند:\n"
             "✅ = فعال  |  ❌ = غیرفعال",
             kb)
@@ -3583,7 +3921,7 @@ def _dispatch_callback(call, uid, data):
                 callback_data=f"adm:notif:btg:{key}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:notif"))
         send_or_edit(call,
-            "🤖 <b>اعلان‌های ربات</b>\n\n"
+            "🤖 <b>اعلان های ربات ادمین</b>\n\n"
             "انتخاب کنید کدام اعلان‌ها به صورت مستقیم برای ادمین‌ها ارسال شوند:\n"
             "✅ = فعال  |  ❌ = غیرفعال",
             kb)
@@ -3610,7 +3948,7 @@ def _dispatch_callback(call, uid, data):
                 callback_data=f"adm:notif:gtg:{k}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:notif"))
         send_or_edit(call,
-            "📢 <b>اعلان‌های گروه</b>\n\n"
+            "📢 <b>گروه</b>\n\n"
             "انتخاب کنید کدام اعلان‌ها در تاپیک‌های گروه ارسال شوند:\n"
             "✅ = فعال  |  ❌ = غیرفعال",
             kb)
@@ -3637,7 +3975,7 @@ def _dispatch_callback(call, uid, data):
                 callback_data=f"adm:notif:btg:{k}"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:notif"))
         send_or_edit(call,
-            "🤖 <b>اعلان‌های ربات</b>\n\n"
+            "🤖 <b>اعلان های ربات ادمین</b>\n\n"
             "انتخاب کنید کدام اعلان‌ها به صورت مستقیم برای ادمین‌ها ارسال شوند:\n"
             "✅ = فعال  |  ❌ = غیرفعال",
             kb)
@@ -3739,6 +4077,7 @@ def _dispatch_callback(call, uid, data):
             ("tetrapay",         "🏦 کارت به کارت آنلاین (TetraPay)"),
             ("swapwallet",       "🏦 پرداخت آنلاین ریالی (SwapWallet)"),
             ("swapwallet_crypto","💎 پرداخت کریپتو (SwapWallet)"),
+            ("tronpays_rial",    "💳 پرداخت ریالی (TronPays)"),
         ]:
             enabled = setting_get(f"gw_{gw_key}_enabled", "0")
             status_icon = "🟢" if enabled == "1" else "🔴"
@@ -4059,7 +4398,61 @@ def _dispatch_callback(call, uid, data):
             back_button("adm:set:gw:swapwallet_crypto"))
         return
 
-    _GW_RANGE_LABELS = {"card": "💳 کارت به کارت", "crypto": "💎 ارز دیجیتال", "tetrapay": "🏦 TetraPay", "swapwallet": "💎 SwapWallet", "swapwallet_crypto": "💎 SwapWallet کریپتو"}
+    if data == "adm:set:gw:tronpays_rial":
+        enabled = setting_get("gw_tronpays_rial_enabled", "0")
+        vis     = setting_get("gw_tronpays_rial_visibility", "public")
+        api_key = setting_get("tronpays_rial_api_key", "")
+        enabled_label = "🟢 فعال" if enabled == "1" else "🔴 غیرفعال"
+        vis_label     = "👥 عمومی" if vis == "public" else "🔒 کاربران امن"
+        range_en      = setting_get("gw_tronpays_rial_range_enabled", "0")
+        range_label   = "🟢 فعال" if range_en == "1" else "🔴 غیرفعال"
+        kb = types.InlineKeyboardMarkup()
+        kb.row(
+            types.InlineKeyboardButton(f"وضعیت: {enabled_label}", callback_data="adm:gw:tronpays_rial:toggle"),
+            types.InlineKeyboardButton(f"نمایش: {vis_label}",     callback_data="adm:gw:tronpays_rial:vis"),
+        )
+        kb.add(types.InlineKeyboardButton(f"📊 بازه پرداختی: {range_label}", callback_data="adm:gw:tronpays_rial:range"))
+        kb.add(types.InlineKeyboardButton("🔑 تنظیم کلید API", callback_data="adm:set:tronpays_rial_key"))
+        if not api_key:
+            kb.add(types.InlineKeyboardButton("🤖 دریافت API Key از @TronPaysBot", url="https://t.me/TronPaysBot"))
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="adm:set:gateways"))
+        key_display = (f"<code>{esc(api_key[:8])}...{esc(api_key[-4:])}</code>"
+                       if api_key else "❌ <b>ثبت نشده</b> — ابتدا از ربات @TronPaysBot کلید API دریافت کنید")
+        text = (
+            "💳 <b>درگاه پرداخت ریالی (TronPays)</b>\n\n"
+            f"وضعیت: {enabled_label}\n"
+            f"نمایش: {vis_label}\n\n"
+            f"🔑 کلید API: {key_display}\n\n"
+            "📋 <b>راهنمای دریافت API Key:</b>\n"
+            "۱. ربات @TronPaysBot را استارت کنید\n"
+            "۲. ثبت‌نام و احراز هویت را تکمیل کنید\n"
+            "۳. کلید API را از پروفایل دریافت کنید"
+        )
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, text, kb)
+        return
+
+    if data == "adm:gw:tronpays_rial:toggle":
+        enabled = setting_get("gw_tronpays_rial_enabled", "0")
+        setting_set("gw_tronpays_rial_enabled", "0" if enabled == "1" else "1")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:tronpays_rial")
+        return
+
+    if data == "adm:gw:tronpays_rial:vis":
+        vis = setting_get("gw_tronpays_rial_visibility", "public")
+        setting_set("gw_tronpays_rial_visibility", "secure" if vis == "public" else "public")
+        bot.answer_callback_query(call.id, "تغییر یافت.")
+        _fake_call(call, "adm:set:gw:tronpays_rial")
+        return
+
+    if data == "adm:set:tronpays_rial_key":
+        state_set(uid, "admin_set_tronpays_rial_key")
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, "🔑 کلید API TronPays را ارسال کنید:", back_button("adm:set:gw:tronpays_rial"))
+        return
+
+    _GW_RANGE_LABELS = {"card": "💳 کارت به کارت", "crypto": "💎 ارز دیجیتال", "tetrapay": "🏦 TetraPay", "swapwallet": "💎 SwapWallet", "swapwallet_crypto": "💎 SwapWallet کریپتو", "tronpays_rial": "💳 TronPays"}
 
     if data.startswith("adm:gw:") and data.endswith(":range"):
         gw_name = data.split(":")[2]

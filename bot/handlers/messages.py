@@ -181,6 +181,8 @@ def universal_handler(message):
                 kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data="wallet:charge:swapwallet"))
             if is_gateway_available("swapwallet_crypto", uid, amount):
                 kb.add(types.InlineKeyboardButton("💎 پرداخت کریپتو (SwapWallet)", callback_data="wallet:charge:swapwallet_crypto"))
+            if is_gateway_available("tronpays_rial", uid, amount):
+                kb.add(types.InlineKeyboardButton("💳 پرداخت ریالی (TronPays)", callback_data="wallet:charge:tronpays_rial"))
             kb.add(types.InlineKeyboardButton("🔙 بازگشت",            callback_data="nav:main"))
             bot.send_message(
                 uid,
@@ -674,6 +676,13 @@ def universal_handler(message):
             setting_set("swapwallet_crypto_username", "" if val == "-" else val)
             state_clear(uid)
             bot.send_message(uid, "✅ نام کاربری فروشگاه سواپ ولت (کریپتو) ذخیره شد.", reply_markup=back_button("adm:set:gw:swapwallet_crypto"))
+            return
+
+        if sn == "admin_set_tronpays_rial_key" and is_admin(uid):
+            val = (message.text or "").strip()
+            setting_set("tronpays_rial_api_key", val)
+            state_clear(uid)
+            bot.send_message(uid, "✅ کلید API TronPays ذخیره شد.", reply_markup=back_button("adm:set:gw:tronpays_rial"))
             return
 
         if sn == "admin_gw_range_min" and is_admin(uid):

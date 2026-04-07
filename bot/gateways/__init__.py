@@ -13,6 +13,11 @@ from .swapwallet_crypto import (
     check_swapwallet_crypto_invoice,
     show_swapwallet_crypto_page,
 )
+from .tronpays_rial import (
+    create_tronpays_rial_invoice,
+    check_tronpays_rial_invoice,
+    is_tronpays_paid,
+)
 
 __all__ = [
     "is_gateway_available", "is_card_info_complete",
@@ -22,5 +27,7 @@ __all__ = [
     "show_swapwallet_page", "swapwallet_error_page",
     "create_swapwallet_crypto_invoice", "check_swapwallet_crypto_invoice",
     "show_swapwallet_crypto_page",
+    "create_tronpays_rial_invoice", "check_tronpays_rial_invoice",
+    "is_tronpays_paid",
 ]
 
