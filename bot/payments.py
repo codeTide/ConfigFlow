@@ -79,16 +79,22 @@ def show_payment_method_selection(target, uid, context_data):
     amount = context_data["amount"]
 
     kb = types.InlineKeyboardMarkup()
+    from .db import setting_get as _sg
     if is_gateway_available("card", uid, amount) and is_card_info_complete():
-        kb.add(types.InlineKeyboardButton("💳 کارت به کارت", callback_data="pm:card"))
+        _lbl = _sg("gw_card_display_name", "").strip() or "💳 کارت به کارت"
+        kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:card"))
     if is_gateway_available("crypto", uid, amount):
-        kb.add(types.InlineKeyboardButton("💎 ارز دیجیتال", callback_data="pm:crypto"))
+        _lbl = _sg("gw_crypto_display_name", "").strip() or "💎 ارز دیجیتال"
+        kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:crypto"))
     if is_gateway_available("tetrapay", uid, amount):
-        kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data="pm:tetrapay"))
-    if is_gateway_available("swapwallet", uid, amount):
-        kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data="pm:swapwallet"))
+        _lbl = _sg("gw_tetrapay_display_name", "").strip() or "💳 درگاه کارت به کارت (TetraPay)"
+        kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:tetrapay"))
     if is_gateway_available("swapwallet_crypto", uid, amount):
-        kb.add(types.InlineKeyboardButton("💎 پرداخت کریپتو (SwapWallet)", callback_data="pm:swapwallet_crypto"))
+        _lbl = _sg("gw_swapwallet_crypto_display_name", "").strip() or "💳 درگاه کارت به کارت و ارز دیجیتال (SwapWallet)"
+        kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:swapwallet_crypto"))
+    if is_gateway_available("tronpays_rial", uid, amount):
+        _lbl = _sg("gw_tronpays_rial_display_name", "").strip() or "💳 درگاه کارت به کارت (TronsPay)"
+        kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:tronpays_rial"))
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
 
     user       = get_user(uid)

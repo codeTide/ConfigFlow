@@ -186,17 +186,15 @@ def universal_handler(message):
             state_set(uid, "wallet_charge_method", amount=amount)
             kb = types.InlineKeyboardMarkup()
             if is_gateway_available("card", uid, amount) and is_card_info_complete():
-                kb.add(types.InlineKeyboardButton("💳 کارت به کارت",  callback_data="wallet:charge:card"))
+                kb.add(types.InlineKeyboardButton(setting_get("gw_card_display_name", "").strip() or "💳 کارت به کارت", callback_data="wallet:charge:card"))
             if is_gateway_available("crypto", uid, amount):
-                kb.add(types.InlineKeyboardButton("💎 ارز دیجیتال",       callback_data="wallet:charge:crypto"))
+                kb.add(types.InlineKeyboardButton(setting_get("gw_crypto_display_name", "").strip() or "💎 ارز دیجیتال", callback_data="wallet:charge:crypto"))
             if is_gateway_available("tetrapay", uid, amount):
-                kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین (TetraPay)", callback_data="wallet:charge:tetrapay"))
-            if is_gateway_available("swapwallet", uid, amount):
-                kb.add(types.InlineKeyboardButton("🏦 پرداخت آنلاین ریالی (SwapWallet)", callback_data="wallet:charge:swapwallet"))
+                kb.add(types.InlineKeyboardButton(setting_get("gw_tetrapay_display_name", "").strip() or "💳 درگاه کارت به کارت (TetraPay)", callback_data="wallet:charge:tetrapay"))
             if is_gateway_available("swapwallet_crypto", uid, amount):
-                kb.add(types.InlineKeyboardButton("💎 پرداخت کریپتو (SwapWallet)", callback_data="wallet:charge:swapwallet_crypto"))
+                kb.add(types.InlineKeyboardButton(setting_get("gw_swapwallet_crypto_display_name", "").strip() or "💳 درگاه کارت به کارت و ارز دیجیتال (SwapWallet)", callback_data="wallet:charge:swapwallet_crypto"))
             if is_gateway_available("tronpays_rial", uid, amount):
-                kb.add(types.InlineKeyboardButton("💳 پرداخت ریالی (TronPays)", callback_data="wallet:charge:tronpays_rial"))
+                kb.add(types.InlineKeyboardButton(setting_get("gw_tronpays_rial_display_name", "").strip() or "💳 درگاه کارت به کارت (TronsPay)", callback_data="wallet:charge:tronpays_rial"))
             kb.add(types.InlineKeyboardButton("🔙 بازگشت",            callback_data="nav:main"))
             bot.send_message(
                 uid,
@@ -702,20 +700,6 @@ def universal_handler(message):
             bot.send_message(uid, "✅ کلید API تتراپی ذخیره شد.", reply_markup=back_button("adm:set:gw:tetrapay"))
             return
 
-        if sn == "admin_set_swapwallet_key" and is_admin(uid):
-            val = (message.text or "").strip()
-            setting_set("swapwallet_api_key", val)
-            state_clear(uid)
-            bot.send_message(uid, "✅ کلید API سواپ ولت ذخیره شد.", reply_markup=back_button("adm:set:gw:swapwallet"))
-            return
-
-        if sn == "admin_set_swapwallet_username" and is_admin(uid):
-            val = (message.text or "").strip()
-            setting_set("swapwallet_username", "" if val == "-" else val)
-            state_clear(uid)
-            bot.send_message(uid, "✅ نام کاربری فروشگاه سواپ ولت ذخیره شد.", reply_markup=back_button("adm:set:gw:swapwallet"))
-            return
-
         if sn == "admin_set_swapwallet_crypto_key" and is_admin(uid):
             val = (message.text or "").strip()
             setting_set("swapwallet_crypto_api_key", val)
@@ -728,6 +712,15 @@ def universal_handler(message):
             setting_set("swapwallet_crypto_username", "" if val == "-" else val)
             state_clear(uid)
             bot.send_message(uid, "✅ نام کاربری فروشگاه سواپ ولت (کریپتو) ذخیره شد.", reply_markup=back_button("adm:set:gw:swapwallet_crypto"))
+            return
+
+        if sn == "admin_set_gw_display_name" and is_admin(uid):
+            gw = sd.get("gw", "")
+            val = (message.text or "").strip()
+            setting_set(f"gw_{gw}_display_name", "" if val == "-" else val)
+            state_clear(uid)
+            msg = "✅ نام نمایشی درگاه ذخیره شد." if val != "-" else "✅ نام نمایشی به پیش‌فرض بازگشت داده شد."
+            bot.send_message(uid, msg, reply_markup=back_button(f"adm:set:gw:{gw}"))
             return
 
         if sn == "admin_set_tronpays_rial_key" and is_admin(uid):
