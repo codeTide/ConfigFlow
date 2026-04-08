@@ -166,6 +166,11 @@ def init_db():
                 created_at       TEXT    NOT NULL,
                 updated_at       TEXT    NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS pinned_messages (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                text       TEXT    NOT NULL,
+                created_at TEXT    NOT NULL
+            );
         """)
 
         defaults = {
@@ -938,11 +943,14 @@ def reject_payment(payment_id, admin_note):
 
 
 def complete_payment(payment_id):
+    """Mark payment completed. Returns True if this call won the race, False if already processed."""
     with get_conn() as conn:
         conn.execute(
-            "UPDATE payments SET status='completed', approved_at=? WHERE id=?",
+            "UPDATE payments SET status='completed', approved_at=? WHERE id=? AND status='pending'",
             (now_str(), payment_id)
         )
+        changed = conn.execute("SELECT changes() AS c").fetchone()["c"]
+        return changed > 0
 
 
 # ── Admin Users ────────────────────────────────────────────────────────────────
@@ -1138,3 +1146,40 @@ def get_waiting_pending_orders_for_package(package_id):
             "ORDER BY created_at ASC",
             (package_id,)
         ).fetchall()
+
+
+#  Pinned Messages 
+def get_all_pinned_messages():
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM pinned_messages ORDER BY id ASC"
+        ).fetchall()
+
+
+def get_pinned_message(pin_id):
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM pinned_messages WHERE id=?", (pin_id,)
+        ).fetchone()
+
+
+def add_pinned_message(text):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO pinned_messages(text, created_at) VALUES(?, ?)",
+            (text, now_str())
+        )
+        return conn.execute("SELECT last_insert_rowid() AS x").fetchone()["x"]
+
+
+def update_pinned_message(pin_id, text):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE pinned_messages SET text=? WHERE id=?",
+            (text, pin_id)
+        )
+
+
+def delete_pinned_message(pin_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM pinned_messages WHERE id=?", (pin_id,))

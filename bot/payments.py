@@ -273,8 +273,9 @@ def finish_card_payment_approval(payment_id, admin_note, approved):
     if approved:
         approve_payment(payment_id, admin_note)
         if payment["kind"] == "wallet_charge":
+            if not complete_payment(payment_id):
+                return False  # already processed
             update_balance(user_id, payment["amount"])
-            complete_payment(payment_id)
             bot.send_message(user_id, f"✅ واریزی شما تأیید شد.\n\n{esc(admin_note)}")
             user_row = get_user(user_id)
             send_to_topic("wallet_log",

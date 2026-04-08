@@ -31,6 +31,7 @@ from ..db import (
     get_panel_packages, add_panel_package, delete_panel_package, update_panel_field,
     get_conn, create_pending_order, get_pending_order, search_users,
     notify_first_start_if_needed, update_config_field,
+    add_pinned_message, update_pinned_message,
 )
 from ..gateways.base import is_gateway_available, is_card_info_complete
 from ..gateways.tetrapay import create_tetrapay_order, verify_tetrapay_order
@@ -1304,6 +1305,57 @@ def universal_handler(message):
                 f"👤 Username: {esc(sd['username'])}\n"
                 f"🆔 Panel ID: #{new_id}",
                 reply_markup=kb_admin_panel(uid))
+            return
+
+        # ── Pinned Messages ───────────────────────────────────────────────────
+        if sn == "admin_pin_add" and admin_has_perm(uid, "settings"):
+            text = (message.text or "").strip()
+            if not text:
+                bot.send_message(uid, "⚠️ متن پیام نمی‌تواند خالی باشد.")
+                return
+            add_pinned_message(text)
+            state_clear(uid)
+            from ..db import get_all_pinned_messages
+            from telebot import types as _types
+            pins = get_all_pinned_messages()
+            kb = _types.InlineKeyboardMarkup()
+            kb.add(_types.InlineKeyboardButton("➕ افزودن پیام پین", callback_data="adm:pin:add"))
+            for p in pins:
+                preview = (p["text"] or "")[:30].replace("\n", " ")
+                kb.row(
+                    _types.InlineKeyboardButton(f"📌 {preview}", callback_data="noop"),
+                    _types.InlineKeyboardButton("✏️", callback_data=f"adm:pin:edit:{p['id']}"),
+                    _types.InlineKeyboardButton("🗑", callback_data=f"adm:pin:del:{p['id']}"),
+                )
+            kb.add(_types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
+            count_text = f"{len(pins)} پیام" if pins else "هیچ پیامی ثبت نشده"
+            bot.send_message(uid, f"✅ پیام پین اضافه شد.\n\n📌 <b>پیام‌های پین شده</b>\n\n{count_text}", reply_markup=kb, parse_mode="HTML")
+            return
+
+        if sn == "admin_pin_edit" and admin_has_perm(uid, "settings"):
+            text = (message.text or "").strip()
+            if not text:
+                bot.send_message(uid, "⚠️ متن پیام نمی‌تواند خالی باشد.")
+                return
+            pin_id = sd.get("pin_id")
+            if pin_id:
+                update_pinned_message(pin_id, text)
+            state_clear(uid)
+            from ..db import get_all_pinned_messages
+            from telebot import types as _types
+            pins = get_all_pinned_messages()
+            kb = _types.InlineKeyboardMarkup()
+            kb.add(_types.InlineKeyboardButton("➕ افزودن پیام پین", callback_data="adm:pin:add"))
+            for p in pins:
+                preview = (p["text"] or "")[:30].replace("\n", " ")
+                kb.row(
+                    _types.InlineKeyboardButton(f"📌 {preview}", callback_data="noop"),
+                    _types.InlineKeyboardButton("✏️", callback_data=f"adm:pin:edit:{p['id']}"),
+                    _types.InlineKeyboardButton("🗑", callback_data=f"adm:pin:del:{p['id']}"),
+                )
+            kb.add(_types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
+            count_text = f"{len(pins)} پیام" if pins else "هیچ پیامی ثبت نشده"
+            bot.send_message(uid, f"✅ پیام پین ویرایش شد.\n\n📌 <b>پیام‌های پین شده</b>\n\n{count_text}", reply_markup=kb, parse_mode="HTML")
             return
 
         # ── Panel: Add Traffic Package (multi-step) ────────────────────────────

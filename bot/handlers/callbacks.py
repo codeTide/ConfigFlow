@@ -34,6 +34,8 @@ from ..db import (
     get_panel_packages, add_panel_package, delete_panel_package, update_panel_field,
     get_conn, create_pending_order, get_pending_order, add_config, search_users,
     reset_all_free_tests, user_has_any_test,
+    get_all_pinned_messages, get_pinned_message, add_pinned_message,
+    update_pinned_message, delete_pinned_message,
 )
 from ..gateways.base import is_gateway_available, is_card_info_complete
 from ..gateways.crypto import fetch_crypto_prices
@@ -297,8 +299,9 @@ def _tetrapay_auto_verify(payment_id, authority, uid, chat_id, message_id, kind,
         # Payment confirmed — process it
         try:
             if kind == "wallet_charge":
+                if not complete_payment(payment_id):  # atomic: only one thread wins
+                    return
                 update_balance(uid, payment["amount"])
-                complete_payment(payment_id)
                 state_clear(uid)
                 try:
                     bot.edit_message_text(
@@ -421,8 +424,9 @@ def _tronpays_rial_auto_verify(payment_id, invoice_id, uid, chat_id, message_id,
             continue
         try:
             if kind == "wallet_charge":
+                if not complete_payment(payment_id):  # atomic: only one thread wins
+                    return
                 update_balance(uid, payment["amount"])
-                complete_payment(payment_id)
                 state_clear(uid)
                 try:
                     bot.edit_message_text(
@@ -1388,8 +1392,10 @@ def _dispatch_callback(call, uid, data):
             return
         if inv.get("status") in ("PAID", "COMPLETED") or inv.get("paidAt"):
             if payment["kind"] == "wallet_charge":
+                if not complete_payment(payment_id):  # atomic: only one path wins
+                    bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+                    return
                 update_balance(uid, payment["amount"])
-                complete_payment(payment_id)
                 bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
                 send_or_edit(call, f"✅ پرداخت شما تأیید و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان", back_button("main"))
                 state_clear(uid)
@@ -1460,8 +1466,10 @@ def _dispatch_callback(call, uid, data):
         success, result = verify_tetrapay_order(authority)
         if success:
             if payment["kind"] == "wallet_charge":
+                if not complete_payment(payment_id):  # atomic: only one path wins
+                    bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+                    return
                 update_balance(uid, payment["amount"])
-                complete_payment(payment_id)
                 bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
                 send_or_edit(call, f"✅ پرداخت شما تأیید و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان", back_button("main"))
                 state_clear(uid)
@@ -1551,8 +1559,10 @@ def _dispatch_callback(call, uid, data):
             return
         if is_tronpays_paid(status):
             if payment["kind"] == "wallet_charge":
+                if not complete_payment(payment_id):  # atomic: only one path wins
+                    bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+                    return
                 update_balance(uid, payment["amount"])
-                complete_payment(payment_id)
                 bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
                 send_or_edit(call, f"✅ پرداخت شما تأیید و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان",
                              back_button("main"))
@@ -1892,8 +1902,10 @@ def _dispatch_callback(call, uid, data):
         inv_status = inv.get("status", "")
         if inv_status in ("PAID", "COMPLETED") or inv.get("paidAt"):
             if payment["kind"] == "wallet_charge":
+                if not complete_payment(payment_id):  # atomic: only one path wins
+                    bot.answer_callback_query(call.id, "این پرداخت قبلاً پردازش شده.", show_alert=True)
+                    return
                 update_balance(uid, payment["amount"])
-                complete_payment(payment_id)
                 bot.answer_callback_query(call.id, "✅ پرداخت تأیید شد!")
                 send_or_edit(call, f"✅ پرداخت شما تأیید و کیف پول شارژ شد.\n\n💰 مبلغ: {fmt_price(payment['amount'])} تومان",
                              back_button("main"))
@@ -3853,6 +3865,7 @@ def _dispatch_callback(call, uid, data):
         kb.add(types.InlineKeyboardButton("📜 قوانین خرید",     callback_data="adm:set:rules"))
         kb.add(types.InlineKeyboardButton("🏪 مدیریت فروش",    callback_data="adm:set:shop"))
         kb.add(types.InlineKeyboardButton("🏢 مدیریت گروه",    callback_data="admin:group"))
+        kb.add(types.InlineKeyboardButton("📌 پیام‌های پین شده", callback_data="adm:pin"))
         kb.add(types.InlineKeyboardButton("� مدیریت اعلان‌ها",  callback_data="adm:notif"))
         kb.add(types.InlineKeyboardButton("�💾 بکاپ",            callback_data="admin:backup"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت",        callback_data="admin:panel"))
@@ -3890,6 +3903,7 @@ def _dispatch_callback(call, uid, data):
             kb.add(types.InlineKeyboardButton("📜 قوانین خرید",     callback_data="adm:set:rules"))
             kb.add(types.InlineKeyboardButton("🏷 تنظیمات فروش",    callback_data="adm:set:shop"))
             kb.add(types.InlineKeyboardButton("🏢 مدیریت گروه",    callback_data="admin:group"))
+            kb.add(types.InlineKeyboardButton("📌 پیام‌های پین شده", callback_data="adm:pin"))
             kb.add(types.InlineKeyboardButton(f"{agency_icon} درخواست نمایندگی", callback_data="adm:set:agency_toggle"))
             kb.add(types.InlineKeyboardButton("📊 تخفیف پیش‌فرض نمایندگی", callback_data="adm:set:agency_defpct"))
             kb.add(types.InlineKeyboardButton("� مدیریت اعلان‌ها",  callback_data="adm:notif"))
@@ -4792,6 +4806,62 @@ def _dispatch_callback(call, uid, data):
         bot.answer_callback_query(call.id)
         # Proceed to buy flow
         _fake_call(call, "buy:start_real")
+        return
+
+    # ── Admin: Pinned Messages ─────────────────────────────────────────────────
+    if data == "adm:pin":
+        if not admin_has_perm(uid, "settings"):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        pins = get_all_pinned_messages()
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("➕ افزودن پیام پین", callback_data="adm:pin:add"))
+        for p in pins:
+            preview = (p["text"] or "")[:30].replace("\n", " ")
+            kb.row(
+                types.InlineKeyboardButton(f"📌 {preview}", callback_data="noop"),
+                types.InlineKeyboardButton("✏️", callback_data=f"adm:pin:edit:{p['id']}"),
+                types.InlineKeyboardButton("🗑", callback_data=f"adm:pin:del:{p['id']}"),
+            )
+        kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
+        count_text = f"{len(pins)} پیام" if pins else "هیچ پیامی ثبت نشده"
+        send_or_edit(call, f"📌 <b>پیام‌های پین شده</b>\n\n{count_text}", kb)
+        return
+
+    if data == "adm:pin:add":
+        if not admin_has_perm(uid, "settings"):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        state_set(uid, "admin_pin_add")
+        bot.answer_callback_query(call.id)
+        send_or_edit(call, "📌 <b>افزودن پیام پین</b>\n\nمتن پیام را ارسال کنید:", back_button("adm:pin"))
+        return
+
+    if data.startswith("adm:pin:del:"):
+        if not admin_has_perm(uid, "settings"):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        pin_id = int(data.split(":")[3])
+        delete_pinned_message(pin_id)
+        bot.answer_callback_query(call.id, "🗑 پیام حذف شد.")
+        _fake_call(call, "adm:pin")
+        return
+
+    if data.startswith("adm:pin:edit:"):
+        if not admin_has_perm(uid, "settings"):
+            bot.answer_callback_query(call.id, "دسترسی مجاز نیست.", show_alert=True)
+            return
+        pin_id = int(data.split(":")[3])
+        pin = get_pinned_message(pin_id)
+        if not pin:
+            bot.answer_callback_query(call.id, "پیام یافت نشد.", show_alert=True)
+            return
+        state_set(uid, "admin_pin_edit", pin_id=pin_id)
+        bot.answer_callback_query(call.id)
+        send_or_edit(call,
+            f"✏️ <b>ویرایش پیام پین</b>\n\nمتن فعلی:\n<code>{esc(pin['text'])}</code>\n\nمتن جدید را ارسال کنید:",
+            back_button("adm:pin"))
         return
 
     # ── Admin: Backup ─────────────────────────────────────────────────────────
