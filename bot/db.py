@@ -954,7 +954,7 @@ def complete_payment(payment_id):
     """Mark payment completed. Returns True if this call won the race, False if already processed."""
     with get_conn() as conn:
         conn.execute(
-            "UPDATE payments SET status='completed', approved_at=? WHERE id=? AND status='pending'",
+            "UPDATE payments SET status='completed', approved_at=? WHERE id=? AND status IN ('pending', 'approved')",
             (now_str(), payment_id)
         )
         changed = conn.execute("SELECT changes() AS c").fetchone()["c"]
