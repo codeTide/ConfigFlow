@@ -97,12 +97,19 @@ def universal_handler(message):
 
     try:
         # ── Broadcast ─────────────────────────────────────────────────────────
+        def _bc_send(target_id):
+            """Forward if admin forwarded something, copy if admin wrote directly."""
+            if message.forward_date:
+                bot.forward_message(target_id, message.chat.id, message.message_id)
+            else:
+                bot.copy_message(target_id, message.chat.id, message.message_id)
+
         if sn == "admin_broadcast_all" and is_admin(uid):
             users = get_users()
             sent  = 0
             for u in users:
                 try:
-                    bot.copy_message(u["user_id"], message.chat.id, message.message_id)
+                    _bc_send(u["user_id"])
                     sent += 1
                 except Exception:
                     pass
@@ -117,7 +124,7 @@ def universal_handler(message):
             sent  = 0
             for u in users:
                 try:
-                    bot.copy_message(u["user_id"], message.chat.id, message.message_id)
+                    _bc_send(u["user_id"])
                     sent += 1
                 except Exception:
                     pass
@@ -140,7 +147,7 @@ def universal_handler(message):
                 if u["is_agent"]:
                     continue
                 try:
-                    bot.copy_message(u["user_id"], message.chat.id, message.message_id)
+                    _bc_send(u["user_id"])
                     sent += 1
                 except Exception:
                     pass
@@ -157,7 +164,7 @@ def universal_handler(message):
                 if not u["is_agent"]:
                     continue
                 try:
-                    bot.copy_message(u["user_id"], message.chat.id, message.message_id)
+                    _bc_send(u["user_id"])
                     sent += 1
                 except Exception:
                     pass
@@ -173,7 +180,7 @@ def universal_handler(message):
             # ADMIN_IDS
             for aid in ADMIN_IDS:
                 try:
-                    bot.copy_message(aid, message.chat.id, message.message_id)
+                    _bc_send(aid)
                     sent += 1
                 except Exception:
                     pass
@@ -182,7 +189,7 @@ def universal_handler(message):
                 if _ar["user_id"] in ADMIN_IDS:
                     continue
                 try:
-                    bot.copy_message(_ar["user_id"], message.chat.id, message.message_id)
+                    _bc_send(_ar["user_id"])
                     sent += 1
                 except Exception:
                     pass
