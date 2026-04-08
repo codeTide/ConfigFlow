@@ -1214,7 +1214,13 @@ def _dispatch_callback(call, uid, data):
             state_clear(uid)
             return
         update_balance(uid, -price)
-        purchase_id = assign_config_to_user(config_id, uid, package_id, price, "wallet", is_test=0)
+        try:
+            purchase_id = assign_config_to_user(config_id, uid, package_id, price, "wallet", is_test=0)
+        except Exception:
+            update_balance(uid, price)
+            release_reserved_config(config_id)
+            bot.answer_callback_query(call.id, "⚠️ خطایی رخ داد، مبلغ به کیف پول بازگردانده شد.", show_alert=True)
+            return
         payment_id  = create_payment("config_purchase", uid, package_id, price, "wallet",
                                      status="completed", config_id=config_id)
         complete_payment(payment_id)
@@ -1578,7 +1584,12 @@ def _dispatch_callback(call, uid, data):
         if not config_id:
             bot.answer_callback_query(call.id, "تست رایگان این نوع تمام شده است.", show_alert=True)
             return
-        purchase_id = assign_config_to_user(config_id, uid, package_row["id"], 0, "free_test", is_test=1)
+        try:
+            purchase_id = assign_config_to_user(config_id, uid, package_row["id"], 0, "free_test", is_test=1)
+        except Exception:
+            release_reserved_config(config_id)
+            bot.answer_callback_query(call.id, "⚠️ خطایی رخ داد، لطفاً دوباره تلاش کنید.", show_alert=True)
+            return
         bot.answer_callback_query(call.id, "تست رایگان ارسال شد.")
         send_or_edit(call, f"✅ تست رایگان نوع <b>{esc(type_row['name'])}</b> آماده شد.", back_button("main"))
         deliver_purchase_message(call.message.chat.id, purchase_id)
@@ -4055,12 +4066,12 @@ def _dispatch_callback(call, uid, data):
         renewal_label = renewal_map.get(renewal_enabled, "✅ فعال")
         ops_kb = types.InlineKeyboardMarkup(row_width=2)
         ops_kb.row(
-            types.InlineKeyboardButton("🤖 وضعیت ربات",        callback_data="adm:ops:noop"),
-            types.InlineKeyboardButton("♻️ تمدید دستی",          callback_data="adm:ops:noop"),
+            types.InlineKeyboardButton(status_label,  callback_data="adm:ops:status"),
+            types.InlineKeyboardButton("🤖 وضعیت ربات", callback_data="adm:ops:noop"),
         )
         ops_kb.row(
-            types.InlineKeyboardButton(status_label,  callback_data="adm:ops:status"),
             types.InlineKeyboardButton(renewal_label, callback_data="adm:ops:renewal"),
+            types.InlineKeyboardButton("♻️ تمدید کانفیگ‌های ثبت دستی", callback_data="adm:ops:noop"),
         )
         ops_kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="admin:settings"))
         return ops_kb

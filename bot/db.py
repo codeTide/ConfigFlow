@@ -686,34 +686,28 @@ def get_available_configs_for_package(package_id):
 
 def reserve_first_config(package_id, payment_id=None):
     with get_conn() as conn:
-        if payment_id:
-            # Atomic single-statement UPDATE: find + reserve in one shot.
-            # SQLite serialises writes, so no two threads can claim the same row.
-            conn.execute(
-                "UPDATE configs SET reserved_payment_id=? "
-                "WHERE id=("
-                "  SELECT id FROM configs "
-                "  WHERE package_id=? AND sold_to IS NULL "
-                "  AND reserved_payment_id IS NULL AND is_expired=0 "
-                "  ORDER BY id ASC LIMIT 1"
-                ")",
-                (payment_id, package_id),
-            )
-            changed = conn.execute("SELECT changes() AS c").fetchone()["c"]
-            if changed == 0:
-                return None
-            row = conn.execute(
-                "SELECT id FROM configs WHERE reserved_payment_id=? AND sold_to IS NULL",
-                (payment_id,),
-            ).fetchone()
-            return row["id"] if row else None
-        else:
-            row = conn.execute(
-                "SELECT id FROM configs WHERE package_id=? AND sold_to IS NULL "
-                "AND reserved_payment_id IS NULL AND is_expired=0 ORDER BY id ASC LIMIT 1",
-                (package_id,),
-            ).fetchone()
-            return row["id"] if row else None
+        # Always use atomic single-statement UPDATE to prevent race conditions.
+        # When no payment_id is supplied (e.g. wallet / free-test), generate a
+        # temporary unique key so the UPDATE still locks the row atomically.
+        reserve_key = payment_id or f"tmp_{uuid.uuid4().hex}"
+        conn.execute(
+            "UPDATE configs SET reserved_payment_id=? "
+            "WHERE id=("
+            "  SELECT id FROM configs "
+            "  WHERE package_id=? AND sold_to IS NULL "
+            "  AND reserved_payment_id IS NULL AND is_expired=0 "
+            "  ORDER BY id ASC LIMIT 1"
+            ")",
+            (reserve_key, package_id),
+        )
+        changed = conn.execute("SELECT changes() AS c").fetchone()["c"]
+        if changed == 0:
+            return None
+        row = conn.execute(
+            "SELECT id FROM configs WHERE reserved_payment_id=? AND sold_to IS NULL",
+            (reserve_key,),
+        ).fetchone()
+        return row["id"] if row else None
 
 
 def release_reserved_config(config_id):
