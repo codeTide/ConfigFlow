@@ -40,7 +40,7 @@ from ..db import (
     save_payment_admin_message, get_payment_admin_messages, delete_payment_admin_messages,
     save_agency_request_message, get_agency_request_messages, delete_agency_request_messages,
 )
-from ..gateways.base import is_gateway_available, is_card_info_complete
+from ..gateways.base import is_gateway_available, is_card_info_complete, get_gateway_range_text
 from ..gateways.crypto import fetch_crypto_prices
 from ..gateways.tetrapay import create_tetrapay_order, verify_tetrapay_order
 from ..gateways.swapwallet_crypto import (
@@ -826,18 +826,23 @@ def _dispatch_callback(call, uid, data):
         if is_gateway_available("card", uid, price) and is_card_info_complete():
             _lbl = setting_get("gw_card_display_name", "").strip() or "💳 کارت به کارت"
             kb.add(types.InlineKeyboardButton(_lbl, callback_data=f"rpay:card:{purchase_id}:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('card')}", callback_data="noop"))
         if is_gateway_available("crypto", uid, price):
             _lbl = setting_get("gw_crypto_display_name", "").strip() or "💎 ارز دیجیتال"
             kb.add(types.InlineKeyboardButton(_lbl, callback_data=f"rpay:crypto:{purchase_id}:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('crypto')}", callback_data="noop"))
         if is_gateway_available("tetrapay", uid, price):
             _lbl = setting_get("gw_tetrapay_display_name", "").strip() or "💳 درگاه کارت به کارت (TetraPay)"
             kb.add(types.InlineKeyboardButton(_lbl, callback_data=f"rpay:tetrapay:{purchase_id}:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('tetrapay')}", callback_data="noop"))
         if is_gateway_available("swapwallet_crypto", uid, price):
             _lbl = setting_get("gw_swapwallet_crypto_display_name", "").strip() or "💳 درگاه کارت به کارت و ارز دیجیتال (SwapWallet)"
             kb.add(types.InlineKeyboardButton(_lbl, callback_data=f"rpay:swapwallet_crypto:{purchase_id}:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('swapwallet_crypto')}", callback_data="noop"))
         if is_gateway_available("tronpays_rial", uid, price):
             _lbl = setting_get("gw_tronpays_rial_display_name", "").strip() or "💳 درگاه کارت به کارت (TronsPay)"
             kb.add(types.InlineKeyboardButton(_lbl, callback_data=f"rpay:tronpays_rial:{purchase_id}:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('tronpays_rial')}", callback_data="noop"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"renew:{purchase_id}"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)
@@ -1265,14 +1270,19 @@ def _dispatch_callback(call, uid, data):
         kb.add(types.InlineKeyboardButton("💰 پرداخت از موجودی", callback_data=f"pay:wallet:{package_id}"))
         if is_gateway_available("card", uid, price) and is_card_info_complete():
             kb.add(types.InlineKeyboardButton(setting_get("gw_card_display_name", "").strip() or "💳 کارت به کارت", callback_data=f"pay:card:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('card')}", callback_data="noop"))
         if is_gateway_available("crypto", uid, price):
             kb.add(types.InlineKeyboardButton(setting_get("gw_crypto_display_name", "").strip() or "💎 ارز دیجیتال", callback_data=f"pay:crypto:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('crypto')}", callback_data="noop"))
         if is_gateway_available("tetrapay", uid, price):
             kb.add(types.InlineKeyboardButton(setting_get("gw_tetrapay_display_name", "").strip() or "💳 درگاه کارت به کارت (TetraPay)", callback_data=f"pay:tetrapay:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('tetrapay')}", callback_data="noop"))
         if is_gateway_available("swapwallet_crypto", uid, price):
             kb.add(types.InlineKeyboardButton(setting_get("gw_swapwallet_crypto_display_name", "").strip() or "💳 درگاه کارت به کارت و ارز دیجیتال (SwapWallet)", callback_data=f"pay:swapwallet_crypto:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('swapwallet_crypto')}", callback_data="noop"))
         if is_gateway_available("tronpays_rial", uid, price):
             kb.add(types.InlineKeyboardButton(setting_get("gw_tronpays_rial_display_name", "").strip() or "💳 درگاه کارت به کارت (TronsPay)", callback_data=f"pay:tronpays_rial:{package_id}"))
+            kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('tronpays_rial')}", callback_data="noop"))
         kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data=f"buy:t:{package_row['type_id']}"))
         bot.answer_callback_query(call.id)
         send_or_edit(call, text, kb)

@@ -124,7 +124,7 @@ def admin_purchase_notify(method_label, user_row, package_row):
                 pass
     send_to_topic("purchase_log", text)
     # If the buyer is an agent, also mirror to agency_log
-    if user_row.get("is_agent"):
+    if user_row["is_agent"]:
         send_to_topic("agency_log", text)
 
 
@@ -168,7 +168,7 @@ def admin_renewal_notify(user_id, purchase_item, package_row, amount, method_lab
                 pass
     send_to_topic("renewal_request", text, reply_markup=kb)
     # If the user is an agent, also mirror to agency_log
-    if user_row and user_row.get("is_agent"):
+    if user_row and user_row["is_agent"]:
         send_to_topic("agency_log", text, reply_markup=kb)
 
 

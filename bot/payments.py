@@ -18,7 +18,7 @@ from .db import (
 )
 from .helpers import esc, fmt_price, display_username, back_button
 import time
-from .gateways.base import is_gateway_available, is_card_info_complete
+from .gateways.base import is_gateway_available, is_card_info_complete, get_gateway_range_text
 from .gateways.crypto import fetch_crypto_prices
 from .bot_instance import bot
 from .ui.helpers import send_or_edit
@@ -84,18 +84,23 @@ def show_payment_method_selection(target, uid, context_data):
     if is_gateway_available("card", uid, amount) and is_card_info_complete():
         _lbl = _sg("gw_card_display_name", "").strip() or "💳 کارت به کارت"
         kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:card"))
+        kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('card')}", callback_data="noop"))
     if is_gateway_available("crypto", uid, amount):
         _lbl = _sg("gw_crypto_display_name", "").strip() or "💎 ارز دیجیتال"
         kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:crypto"))
+        kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('crypto')}", callback_data="noop"))
     if is_gateway_available("tetrapay", uid, amount):
         _lbl = _sg("gw_tetrapay_display_name", "").strip() or "💳 درگاه کارت به کارت (TetraPay)"
         kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:tetrapay"))
+        kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('tetrapay')}", callback_data="noop"))
     if is_gateway_available("swapwallet_crypto", uid, amount):
         _lbl = _sg("gw_swapwallet_crypto_display_name", "").strip() or "💳 درگاه کارت به کارت و ارز دیجیتال (SwapWallet)"
         kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:swapwallet_crypto"))
+        kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('swapwallet_crypto')}", callback_data="noop"))
     if is_gateway_available("tronpays_rial", uid, amount):
         _lbl = _sg("gw_tronpays_rial_display_name", "").strip() or "💳 درگاه کارت به کارت (TronsPay)"
         kb.add(types.InlineKeyboardButton(_lbl, callback_data="pm:tronpays_rial"))
+        kb.add(types.InlineKeyboardButton(f"   📊 {get_gateway_range_text('tronpays_rial')}", callback_data="noop"))
     kb.add(types.InlineKeyboardButton("🔙 بازگشت", callback_data="nav:main"))
 
     user       = get_user(uid)
