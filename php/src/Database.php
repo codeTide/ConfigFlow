@@ -317,4 +317,121 @@ final class Database
             return ['ok' => false, 'error' => 'db_error'];
         }
     }
+
+    public function createPendingOrder(array $data): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO pending_orders (user_id, package_id, payment_id, amount, payment_method, created_at, status)
+             VALUES (:user_id, :package_id, :payment_id, :amount, :payment_method, :created_at, :status)'
+        );
+        $stmt->execute($data);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function listPendingDeliveries(int $limit = 20): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, user_id, package_id, payment_id, amount, created_at
+             FROM pending_orders
+             WHERE status = 'paid_waiting_delivery'
+             ORDER BY id ASC
+             LIMIT :limit"
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function deliverPendingOrder(int $orderId): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $orderStmt = $this->pdo->prepare(
+                "SELECT id, user_id, package_id, payment_id, amount, payment_method, status
+                 FROM pending_orders
+                 WHERE id = :id
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $orderStmt->execute(['id' => $orderId]);
+            $order = $orderStmt->fetch();
+            if (!is_array($order)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_found'];
+            }
+            if (($order['status'] ?? '') !== 'paid_waiting_delivery') {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_actionable'];
+            }
+
+            $configStmt = $this->pdo->prepare(
+                "SELECT id, service_name, config_text, inquiry_link
+                 FROM configs
+                 WHERE package_id = :package_id
+                   AND sold_to IS NULL
+                   AND reserved_payment_id IS NULL
+                   AND is_expired = 0
+                 ORDER BY id ASC
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $configStmt->execute(['package_id' => (int) $order['package_id']]);
+            $config = $configStmt->fetch();
+            if (!is_array($config)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'no_stock'];
+            }
+
+            $purchaseStmt = $this->pdo->prepare(
+                'INSERT INTO purchases (user_id, package_id, config_id, amount, payment_method, created_at, is_test)
+                 VALUES (:user_id, :package_id, :config_id, :amount, :payment_method, :created_at, 0)'
+            );
+            $purchaseStmt->execute([
+                'user_id' => (int) $order['user_id'],
+                'package_id' => (int) $order['package_id'],
+                'config_id' => (int) $config['id'],
+                'amount' => (int) $order['amount'],
+                'payment_method' => (string) $order['payment_method'],
+                'created_at' => gmdate('Y-m-d H:i:s'),
+            ]);
+            $purchaseId = (int) $this->pdo->lastInsertId();
+
+            $cfgUpdate = $this->pdo->prepare(
+                'UPDATE configs
+                 SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at
+                 WHERE id = :id'
+            );
+            $cfgUpdate->execute([
+                'sold_to' => (int) $order['user_id'],
+                'purchase_id' => $purchaseId,
+                'sold_at' => gmdate('Y-m-d H:i:s'),
+                'id' => (int) $config['id'],
+            ]);
+
+            $ordUpdate = $this->pdo->prepare("UPDATE pending_orders SET status = 'delivered' WHERE id = :id");
+            $ordUpdate->execute(['id' => $orderId]);
+
+            if (!empty($order['payment_id'])) {
+                $payUpdate = $this->pdo->prepare("UPDATE payments SET status = 'completed', approved_at = :approved_at WHERE id = :id");
+                $payUpdate->execute([
+                    'approved_at' => gmdate('Y-m-d H:i:s'),
+                    'id' => (int) $order['payment_id'],
+                ]);
+            }
+
+            $this->pdo->commit();
+            return [
+                'ok' => true,
+                'user_id' => (int) $order['user_id'],
+                'config_text' => (string) $config['config_text'],
+                'service_name' => (string) ($config['service_name'] ?? ''),
+                'inquiry_link' => (string) ($config['inquiry_link'] ?? ''),
+            ];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
 }

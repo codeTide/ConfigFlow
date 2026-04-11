@@ -44,6 +44,24 @@ CREATE TABLE IF NOT EXISTS packages (
     INDEX idx_packages_type (type_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS configs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    type_id BIGINT NOT NULL,
+    package_id BIGINT NOT NULL,
+    service_name VARCHAR(255) NOT NULL,
+    config_text TEXT NOT NULL,
+    inquiry_link TEXT NULL,
+    created_at DATETIME NOT NULL,
+    reserved_payment_id BIGINT NULL,
+    sold_to BIGINT NULL,
+    purchase_id BIGINT NULL,
+    sold_at DATETIME NULL,
+    is_expired TINYINT(1) NOT NULL DEFAULT 0,
+    INDEX idx_configs_package (package_id),
+    INDEX idx_configs_sold (sold_to),
+    INDEX idx_configs_available (package_id, sold_to, reserved_payment_id, is_expired)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS purchases (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,

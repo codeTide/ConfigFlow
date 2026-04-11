@@ -22,7 +22,7 @@ $sqlite = new PDO('sqlite:' . $sqlitePath);
 $sqlite->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $sqlite->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
-$tables = ['users', 'settings', 'referrals', 'config_types', 'packages', 'purchases', 'payments', 'pending_orders'];
+$tables = ['users', 'settings', 'referrals', 'config_types', 'packages', 'configs', 'purchases', 'payments', 'pending_orders'];
 
 $mysql->beginTransaction();
 
