@@ -581,6 +581,15 @@ final class Database
         $stmt->execute(['gateway_ref' => $gatewayRef, 'id' => $paymentId]);
     }
 
+    public function setPaymentProviderPayload(int $paymentId, array $payload): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE payments SET provider_payload = :provider_payload WHERE id = :id');
+        $stmt->execute([
+            'provider_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'id' => $paymentId,
+        ]);
+    }
+
     public function attachPaymentReceipt(int $paymentId, ?string $fileId, ?string $text): void
     {
         $stmt = $this->pdo->prepare(
@@ -623,11 +632,17 @@ final class Database
             $update = $this->pdo->prepare(
                 "UPDATE payments
                  SET tx_hash = :tx_hash,
+                     provider_payload = :provider_payload,
                      status = 'waiting_admin'
                  WHERE id = :id"
             );
             $update->execute([
                 'tx_hash' => $txHash,
+                'provider_payload' => json_encode([
+                    'source' => 'user_tx_hash',
+                    'tx_hash' => $txHash,
+                    'submitted_at' => gmdate('c'),
+                ], JSON_UNESCAPED_UNICODE),
                 'id' => $paymentId,
             ]);
 

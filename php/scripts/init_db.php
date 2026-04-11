@@ -22,6 +22,15 @@ if ($schema === false) {
 
 $pdo->exec($schema);
 
+// Lightweight forward-compatible column migrations for existing installations
+$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_ref VARCHAR(191) NULL");
+$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS tx_hash VARCHAR(255) NULL");
+$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS provider_payload TEXT NULL");
+$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS receipt_file_id VARCHAR(255) NULL");
+$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS receipt_text TEXT NULL");
+$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS admin_note TEXT NULL");
+$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS verified_at DATETIME NULL");
+
 $defaults = [
     'bot_status' => 'on',
     'start_text' => '',

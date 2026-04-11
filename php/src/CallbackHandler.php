@@ -469,6 +469,10 @@ final class CallbackHandler
                     if ($authority !== '') {
                         $this->database->setPaymentGatewayRef($paymentId, $authority);
                     }
+                    $this->database->setPaymentProviderPayload($paymentId, [
+                        'source' => 'tetrapay_create',
+                        'response' => $tp,
+                    ]);
                     $text = "🏧 <b>پرداخت TetraPay</b>\n\n"
                         . "سفارش: <code>{$pendingId}</code>\n"
                         . "برای پرداخت آنلاین روی لینک زیر بزنید:\n"
@@ -510,6 +514,12 @@ final class CallbackHandler
             }
             $gatewayRef = (string) ($payment['gateway_ref'] ?? '');
             $verify = $this->gateways->verifyTetrapay($gatewayRef);
+            if (($verify['ok'] ?? false)) {
+                $this->database->setPaymentProviderPayload($paymentId, [
+                    'source' => 'tetrapay_verify',
+                    'response' => $verify,
+                ]);
+            }
             if (($verify['ok'] ?? false) && ($verify['paid'] ?? false)) {
                 $changed = $this->database->markPaymentAndPendingPaidIfWaitingGateway($paymentId);
                 if ($changed) {
