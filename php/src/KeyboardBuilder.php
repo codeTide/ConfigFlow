@@ -60,6 +60,10 @@ final class KeyboardBuilder
     {
         return [
             'inline_keyboard' => [
+                [['text' => '🧩 مدیریت نوع/پکیج', 'callback_data' => 'admin:types']],
+                [['text' => '📚 مدیریت موجودی کانفیگ', 'callback_data' => 'admin:stock']],
+                [['text' => '👥 مدیریت کاربران', 'callback_data' => 'admin:users']],
+                [['text' => '⚙️ تنظیمات', 'callback_data' => 'admin:settings']],
                 [['text' => '💳 مدیریت درخواست‌های شارژ', 'callback_data' => 'admin:payments']],
                 [['text' => '📦 صف تحویل سفارش‌ها', 'callback_data' => 'admin:deliveries']],
                 [['text' => '🗂 مدیریت درخواست‌ها (تست/نمایندگی)', 'callback_data' => 'admin:requests']],
