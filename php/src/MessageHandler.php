@@ -61,6 +61,25 @@ final class MessageHandler
                 . "مبلغ: <b>{$amount}</b> تومان\n\n"
                 . 'بعد از تایید ادمین موجودی شما شارژ می‌شود.'
             );
+
+            $adminKeyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
+                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
+                    ],
+                ],
+            ];
+            foreach (Config::adminIds() as $adminId) {
+                $this->telegram->sendMessage(
+                    (int) $adminId,
+                    "💳 <b>درخواست شارژ کیف پول جدید</b>\n\n"
+                    . "شماره: <code>{$paymentId}</code>\n"
+                    . "کاربر: <code>{$userId}</code>\n"
+                    . "مبلغ: <b>{$amount}</b> تومان",
+                    $adminKeyboard
+                );
+            }
         }
     }
 }

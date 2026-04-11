@@ -41,6 +41,8 @@ final class CallbackHandler
             return;
         }
 
+        $isAdmin = in_array($userId, Config::adminIds(), true);
+
         if ($data === 'nav:main') {
             $this->telegram->editMessageText(
                 $chatId,
@@ -49,6 +51,110 @@ final class CallbackHandler
                 $this->menus->mainMenuKeyboard($userId)
             );
             $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:panel') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                '⚙️ <b>پنل مدیریت</b>',
+                KeyboardBuilder::adminPanel()
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:payments') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $items = $this->database->listWaitingWalletChargePayments();
+            if ($items === []) {
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    '📭 درخواست شارژ در انتظار تایید وجود ندارد.',
+                    KeyboardBuilder::adminPanel()
+                );
+                $this->telegram->answerCallbackQuery($callbackId);
+                return;
+            }
+
+            $rows = [];
+            foreach ($items as $item) {
+                $rows[] = [[
+                    'text' => sprintf('#%d | U:%d | %d تومان', (int) $item['id'], (int) $item['user_id'], (int) $item['amount']),
+                    'callback_data' => 'admin:payment:view:' . (int) $item['id'],
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                '💳 <b>درخواست‌های شارژ در انتظار تایید</b>',
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:payment:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $paymentId = (int) substr($data, strlen('admin:payment:view:'));
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
+                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
+                    ],
+                    [['text' => '🔙 بازگشت', 'callback_data' => 'admin:payments']],
+                ],
+            ];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "درخواست شارژ شماره <code>{$paymentId}</code>\nیک عملیات را انتخاب کنید:",
+                $keyboard
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'pay:approve:') || str_starts_with($data, 'pay:reject:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $approve = str_starts_with($data, 'pay:approve:');
+            $paymentId = (int) substr($data, $approve ? strlen('pay:approve:') : strlen('pay:reject:'));
+            $result = $this->database->applyWalletChargeDecision($paymentId, $approve);
+            if (!($result['ok'] ?? false)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'این درخواست قابل پردازش نیست.');
+                return;
+            }
+
+            $statusText = $approve ? '✅ تایید شد' : '❌ رد شد';
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "درخواست <code>{$paymentId}</code> {$statusText}.",
+                KeyboardBuilder::adminPanel()
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+
+            $userNotice = $approve
+                ? "✅ درخواست شارژ کیف پول شما تایید شد.\nمبلغ: <b>{$result['amount']}</b> تومان"
+                : "❌ درخواست شارژ کیف پول شما رد شد.";
+            $this->telegram->sendMessage((int) $result['user_id'], $userNotice);
             return;
         }
 

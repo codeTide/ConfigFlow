@@ -242,4 +242,79 @@ final class Database
             return ['ok' => false, 'error' => 'db_error'];
         }
     }
+
+    public function listWaitingWalletChargePayments(int $limit = 20): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, user_id, amount, created_at
+             FROM payments
+             WHERE kind = 'wallet_charge' AND status = 'waiting_admin'
+             ORDER BY id ASC
+             LIMIT :limit"
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function applyWalletChargeDecision(int $paymentId, bool $approve): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, user_id, amount, status, kind
+                 FROM payments
+                 WHERE id = :id
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $stmt->execute(['id' => $paymentId]);
+            $payment = $stmt->fetch();
+            if (!is_array($payment)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_found'];
+            }
+
+            if (($payment['kind'] ?? '') !== 'wallet_charge' || ($payment['status'] ?? '') !== 'waiting_admin') {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_actionable'];
+            }
+
+            $newStatus = $approve ? 'approved' : 'rejected';
+            $update = $this->pdo->prepare(
+                "UPDATE payments
+                 SET status = :status, approved_at = :approved_at
+                 WHERE id = :id"
+            );
+            $update->execute([
+                'status' => $newStatus,
+                'approved_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $paymentId,
+            ]);
+
+            if ($approve) {
+                $amount = (int) $payment['amount'];
+                $balanceUpdate = $this->pdo->prepare(
+                    'UPDATE users SET balance = balance + :amount WHERE user_id = :user_id'
+                );
+                $balanceUpdate->execute([
+                    'amount' => $amount,
+                    'user_id' => (int) $payment['user_id'],
+                ]);
+            }
+
+            $this->pdo->commit();
+            return [
+                'ok' => true,
+                'status' => $newStatus,
+                'user_id' => (int) $payment['user_id'],
+                'amount' => (int) $payment['amount'],
+            ];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
 }

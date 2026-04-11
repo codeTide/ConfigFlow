@@ -55,4 +55,14 @@ final class KeyboardBuilder
 
         return ['inline_keyboard' => $rows];
     }
+
+    public static function adminPanel(): array
+    {
+        return [
+            'inline_keyboard' => [
+                [['text' => '💳 مدیریت درخواست‌های شارژ', 'callback_data' => 'admin:payments']],
+                [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']],
+            ],
+        ];
+    }
 }
