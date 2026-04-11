@@ -9,6 +9,8 @@ final class StartHandler
     public function __construct(
         private Database $database,
         private TelegramClient $telegram,
+        private SettingsRepository $settings,
+        private MenuService $menus,
     ) {
     }
 
@@ -33,6 +35,20 @@ final class StartHandler
         }
 
         $this->database->ensureUser($fromUser);
+        $botStatus = $this->settings->get('bot_status', 'on');
+
+        if ($botStatus === 'off') {
+            return;
+        }
+
+        if ($botStatus === 'update') {
+            $this->telegram->sendMessage(
+                $chatId,
+                "🔄 <b>ربات در حال بروزرسانی است</b>\n\nفعلاً ربات در حال بروزرسانی می‌باشد، لطفاً بعداً اقدام نمایید."
+            );
+
+            return;
+        }
 
         if ($this->database->userStatus($userId) === 'restricted') {
             $this->telegram->sendMessage(
@@ -45,7 +61,8 @@ final class StartHandler
 
         $this->telegram->sendMessage(
             $chatId,
-            "👋 به <b>ConfigFlow</b> خوش اومدی.\n\nنسخه PHP فاز ۱ فعال شد."
+            $this->menus->mainMenuText(),
+            $this->menus->mainMenuKeyboard($userId)
         );
     }
 }

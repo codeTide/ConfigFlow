@@ -255,6 +255,19 @@ DB_NAME=ConfigFlow.db
 php -S 0.0.0.0:8080 -t php/public
 ```
 
+```bash
+# ساخت اسکیمای MySQL (فاز ۲)
+php php/scripts/init_db.php
+
+# انتقال داده‌های اصلی از SQLite به MySQL (فاز ۲)
+php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
+```
+
+فاز ۳ مهاجرت (فعلی) در نسخه PHP:
+- روت کردن آپدیت‌ها با `UpdateRouter`
+- پشتیبانی از Callback Query برای `nav:main`, `profile`, `support`, `my_configs`
+- منوی اصلی داینامیک و نمایش پروفایل/پشتیبانی/کانفیگ‌های من در PHP
+
 ---
 
 ## 📁 ساختار پروژه
@@ -265,12 +278,20 @@ ConfigFlow/
 │   ├── public/
 │   │   └── webhook.php      # ورودی اصلی Webhook تلگرام
 │   ├── scripts/
-│   │   └── init_db.php      # ساخت جداول اولیه در MySQL
+│   │   ├── init_db.php      # ساخت جداول اولیه در MySQL
+│   │   ├── migrate_sqlite_to_mysql.php
+│   │   └── schema.sql
 │   ├── src/
+│   │   ├── Bootstrap.php    # بارگذاری env
 │   │   ├── Config.php       # خواندن تنظیمات محیطی
 │   │   ├── Database.php     # اتصال PDO و عملیات پایه کاربر
+│   │   ├── CallbackHandler.php
+│   │   ├── KeyboardBuilder.php
+│   │   ├── MenuService.php
+│   │   ├── SettingsRepository.php
 │   │   ├── StartHandler.php # معادل /start در PHP
-│   │   └── TelegramClient.php
+│   │   ├── TelegramClient.php
+│   │   └── UpdateRouter.php
 │   └── .env.example
 ├── api.py                   # Flask API — سرویس Worker API
 ├── worker.py                # ورکر سرور ایران (اتصال به 3x-ui)

@@ -3,25 +3,33 @@
 declare(strict_types=1);
 
 use ConfigFlow\Bot\Database;
+use ConfigFlow\Bot\Bootstrap;
 
+require_once __DIR__ . '/../src/Bootstrap.php';
 require_once __DIR__ . '/../src/Config.php';
 require_once __DIR__ . '/../src/Database.php';
+
+Bootstrap::loadEnv(__DIR__ . '/../.env');
 
 $db = new Database();
 $pdo = $db->pdo();
 
-$pdo->exec(
-    "CREATE TABLE IF NOT EXISTS users (
-        user_id BIGINT PRIMARY KEY,
-        full_name VARCHAR(255) NULL,
-        username VARCHAR(255) NULL,
-        balance INT NOT NULL DEFAULT 0,
-        joined_at DATETIME NOT NULL,
-        last_seen_at DATETIME NOT NULL,
-        first_start_notified TINYINT(1) NOT NULL DEFAULT 0,
-        status VARCHAR(32) NOT NULL DEFAULT 'unsafe',
-        is_agent TINYINT(1) NOT NULL DEFAULT 0
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
-);
+$schemaPath = __DIR__ . '/schema.sql';
+$schema = file_get_contents($schemaPath);
+if ($schema === false) {
+    throw new RuntimeException('Could not read schema.sql');
+}
+
+$pdo->exec($schema);
+
+$defaults = [
+    'bot_status' => 'on',
+    'start_text' => '',
+];
+
+$stmt = $pdo->prepare('INSERT IGNORE INTO settings (`key`, `value`) VALUES (:key, :value)');
+foreach ($defaults as $key => $value) {
+    $stmt->execute(['key' => $key, 'value' => $value]);
+}
 
 echo "MySQL schema initialized.\n";
