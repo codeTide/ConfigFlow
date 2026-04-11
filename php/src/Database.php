@@ -172,30 +172,56 @@ final class Database
 
     public function listPendingFreeTestRequests(int $limit = 30): array
     {
+        return $this->listFreeTestRequestsByStatus('pending', $limit, 0);
+    }
+
+    public function listFreeTestRequestsByStatus(string $status, int $limit = 30, int $offset = 0): array
+    {
         $limit = max(1, min($limit, 100));
+        $offset = max(0, $offset);
         $stmt = $this->pdo->prepare(
             'SELECT id, user_id, note, created_at
              FROM free_test_requests
              WHERE status = :status
              ORDER BY id DESC
-             LIMIT ' . $limit
+             LIMIT ' . $limit . ' OFFSET ' . $offset
         );
-        $stmt->execute(['status' => 'pending']);
+        $stmt->execute(['status' => $status]);
         return $stmt->fetchAll();
     }
 
     public function listPendingAgencyRequests(int $limit = 30): array
     {
+        return $this->listAgencyRequestsByStatus('pending', $limit, 0);
+    }
+
+    public function listAgencyRequestsByStatus(string $status, int $limit = 30, int $offset = 0): array
+    {
         $limit = max(1, min($limit, 100));
+        $offset = max(0, $offset);
         $stmt = $this->pdo->prepare(
             'SELECT id, user_id, note, created_at
              FROM agency_requests
              WHERE status = :status
              ORDER BY id DESC
-             LIMIT ' . $limit
+             LIMIT ' . $limit . ' OFFSET ' . $offset
         );
-        $stmt->execute(['status' => 'pending']);
+        $stmt->execute(['status' => $status]);
         return $stmt->fetchAll();
+    }
+
+    public function countFreeTestRequestsByStatus(string $status): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_requests WHERE status = :status');
+        $stmt->execute(['status' => $status]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function countAgencyRequestsByStatus(string $status): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM agency_requests WHERE status = :status');
+        $stmt->execute(['status' => $status]);
+        return (int) $stmt->fetchColumn();
     }
 
     public function getFreeTestRequestById(int $requestId): ?array

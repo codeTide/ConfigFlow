@@ -44,6 +44,11 @@ final class CallbackHandler
 
         $isAdmin = in_array($userId, Config::adminIds(), true);
 
+        if ($data === 'noop') {
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
         if ($data === 'nav:main') {
             $this->telegram->editMessageText(
                 $chatId,
@@ -161,22 +166,50 @@ final class CallbackHandler
             return;
         }
 
-        if ($data === 'admin:req:free:list' || $data === 'admin:req:agency:list') {
+        if (str_starts_with($data, 'admin:req:free:list') || str_starts_with($data, 'admin:req:agency:list')) {
             if (!$isAdmin) {
                 $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
                 return;
             }
-            $isFree = $data === 'admin:req:free:list';
+            $isFree = str_starts_with($data, 'admin:req:free:list');
+            $raw = substr($data, strlen($isFree ? 'admin:req:free:list' : 'admin:req:agency:list'));
+            $parts = array_values(array_filter(explode(':', ltrim($raw, ':')), static fn ($x) => $x !== ''));
+            $status = (string) ($parts[0] ?? 'pending');
+            if (!in_array($status, ['pending', 'approved', 'rejected'], true)) {
+                $status = 'pending';
+            }
+            $page = isset($parts[1]) ? max(1, (int) $parts[1]) : 1;
+            $perPage = 10;
+            $offset = ($page - 1) * $perPage;
+
             $items = $isFree
-                ? $this->database->listPendingFreeTestRequests(30)
-                : $this->database->listPendingAgencyRequests(30);
+                ? $this->database->listFreeTestRequestsByStatus($status, $perPage, $offset)
+                : $this->database->listAgencyRequestsByStatus($status, $perPage, $offset);
+            $total = $isFree
+                ? $this->database->countFreeTestRequestsByStatus($status)
+                : $this->database->countAgencyRequestsByStatus($status);
+            $totalPages = max(1, (int) ceil($total / $perPage));
+            if ($page > $totalPages) {
+                $page = $totalPages;
+            }
+
+            $statusLabel = $status === 'approved' ? 'approved' : ($status === 'rejected' ? 'rejected' : 'pending');
             if ($items === []) {
                 $this->telegram->editMessageText(
                     $chatId,
                     $messageId,
-                    $isFree ? '📭 درخواست تست رایگان در انتظار بررسی وجود ندارد.' : '📭 درخواست نمایندگی در انتظار بررسی وجود ندارد.',
+                    $isFree
+                        ? "📭 در وضعیت {$statusLabel} درخواستی برای تست رایگان وجود ندارد."
+                        : "📭 در وضعیت {$statusLabel} درخواستی برای نمایندگی وجود ندارد.",
                     [
-                        'inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']]],
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '⏳ pending', 'callback_data' => ($isFree ? 'admin:req:free:list:pending:1' : 'admin:req:agency:list:pending:1')],
+                                ['text' => '✅ approved', 'callback_data' => ($isFree ? 'admin:req:free:list:approved:1' : 'admin:req:agency:list:approved:1')],
+                                ['text' => '❌ rejected', 'callback_data' => ($isFree ? 'admin:req:free:list:rejected:1' : 'admin:req:agency:list:rejected:1')],
+                            ],
+                            [['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']],
+                        ],
                     ]
                 );
                 $this->telegram->answerCallbackQuery($callbackId);
@@ -191,11 +224,37 @@ final class CallbackHandler
                     'callback_data' => $prefix . (int) $item['id'],
                 ]];
             }
+            $prefix = $isFree ? 'admin:req:free:list:' : 'admin:req:agency:list:';
+            $rows[] = [[
+                'text' => (($status === 'pending') ? '⏳' : (($status === 'approved') ? '✅' : '❌')) . ' وضعیت فعلی: ' . $statusLabel,
+                'callback_data' => 'noop',
+            ]];
+            $rows[] = [[
+                'text' => '⏳ pending',
+                'callback_data' => $prefix . 'pending:1',
+            ], [
+                'text' => '✅ approved',
+                'callback_data' => $prefix . 'approved:1',
+            ], [
+                'text' => '❌ rejected',
+                'callback_data' => $prefix . 'rejected:1',
+            ]];
+            $nav = [];
+            if ($page > 1) {
+                $nav[] = ['text' => '⬅️ قبلی', 'callback_data' => $prefix . $status . ':' . ($page - 1)];
+            }
+            $nav[] = ['text' => "📄 {$page}/{$totalPages}", 'callback_data' => 'noop'];
+            if ($page < $totalPages) {
+                $nav[] = ['text' => 'بعدی ➡️', 'callback_data' => $prefix . $status . ':' . ($page + 1)];
+            }
+            $rows[] = $nav;
             $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']];
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
-                $isFree ? '🎁 <b>درخواست‌های تست رایگان (pending)</b>' : '🤝 <b>درخواست‌های نمایندگی (pending)</b>',
+                $isFree
+                    ? "🎁 <b>درخواست‌های تست رایگان ({$statusLabel})</b>"
+                    : "🤝 <b>درخواست‌های نمایندگی ({$statusLabel})</b>",
                 ['inline_keyboard' => $rows]
             );
             $this->telegram->answerCallbackQuery($callbackId);
@@ -259,29 +318,34 @@ final class CallbackHandler
                 ? ($approve ? 'admin:req:free:approve:' : 'admin:req:free:reject:')
                 : ($approve ? 'admin:req:agency:approve:' : 'admin:req:agency:reject:');
             $requestId = (int) substr($data, strlen($prefix));
-
-            $result = $isFree
-                ? $this->database->reviewFreeTestRequest($requestId, $approve)
-                : $this->database->reviewAgencyRequest($requestId, $approve);
-            if (!($result['ok'] ?? false)) {
-                $msg = (($result['error'] ?? '') === 'already_reviewed') ? 'این درخواست قبلاً بررسی شده است.' : 'بررسی درخواست انجام نشد.';
-                $this->telegram->answerCallbackQuery($callbackId, $msg);
+            $exists = $isFree
+                ? $this->database->getFreeTestRequestById($requestId)
+                : $this->database->getAgencyRequestById($requestId);
+            if (!is_array($exists)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'درخواست یافت نشد.');
+                return;
+            }
+            if (($exists['status'] ?? '') !== 'pending') {
+                $this->telegram->answerCallbackQuery($callbackId, 'این درخواست قبلاً بررسی شده است.');
                 return;
             }
 
-            $statusText = $approve ? '✅ تایید شد' : '❌ رد شد';
+            $this->database->setUserState($userId, 'await_admin_request_note', [
+                'request_kind' => $isFree ? 'free' : 'agency',
+                'request_id' => $requestId,
+                'approve' => $approve ? 1 : 0,
+                'source_chat_id' => $chatId,
+                'source_message_id' => $messageId,
+            ]);
+            $actionText = $approve ? 'تایید' : 'رد';
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
-                ($isFree ? 'درخواست تست رایگان' : 'درخواست نمایندگی') . " <code>{$requestId}</code> {$statusText}.",
+                "📝 برای {$actionText} درخواست <code>{$requestId}</code> یک نوت ادمین بفرستید.\n"
+                . "اگر نوت لازم ندارید، یک «-» ارسال کنید.",
                 ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']]]]
             );
             $this->telegram->answerCallbackQuery($callbackId);
-
-            $userNotice = $approve
-                ? (($isFree ? "✅ درخواست تست رایگان شما تایید شد." : "✅ درخواست نمایندگی شما تایید شد."))
-                : (($isFree ? "❌ درخواست تست رایگان شما رد شد." : "❌ درخواست نمایندگی شما رد شد."));
-            $this->telegram->sendMessage((int) ($result['user_id'] ?? 0), $userNotice);
             return;
         }
 

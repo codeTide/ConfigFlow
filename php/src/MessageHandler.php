@@ -253,5 +253,66 @@ final class MessageHandler
             }
             return;
         }
+
+        if ($state['state_name'] === 'await_admin_request_note') {
+            if (!in_array($userId, Config::adminIds(), true)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+
+            $payload = $state['payload'] ?? [];
+            $requestKind = (string) ($payload['request_kind'] ?? '');
+            $requestId = (int) ($payload['request_id'] ?? 0);
+            $approve = ((int) ($payload['approve'] ?? 0)) === 1;
+            $sourceChatId = (int) ($payload['source_chat_id'] ?? 0);
+            $sourceMessageId = (int) ($payload['source_message_id'] ?? 0);
+            if ($requestId <= 0 || ($requestKind !== 'free' && $requestKind !== 'agency')) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, '❌ اطلاعات درخواست نامعتبر است.');
+                return;
+            }
+            if ($text === '' || str_starts_with($text, '/')) {
+                $this->telegram->sendMessage($chatId, '⚠️ لطفاً نوت ادمین را ارسال کنید یا «-» بفرستید.');
+                return;
+            }
+            $adminNote = trim($text) === '-' ? null : trim($text);
+
+            $result = $requestKind === 'free'
+                ? $this->database->reviewFreeTestRequest($requestId, $approve, $adminNote)
+                : $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
+            if (!($result['ok'] ?? false)) {
+                $msg = (($result['error'] ?? '') === 'already_reviewed')
+                    ? 'این درخواست قبلاً بررسی شده است.'
+                    : 'ثبت نتیجه بررسی انجام نشد.';
+                $this->telegram->sendMessage($chatId, '❌ ' . $msg);
+                $this->database->clearUserState($userId);
+                return;
+            }
+
+            $this->database->clearUserState($userId);
+            $statusText = $approve ? '✅ تایید شد' : '❌ رد شد';
+            $label = $requestKind === 'free' ? 'درخواست تست رایگان' : 'درخواست نمایندگی';
+            if ($sourceChatId !== 0 && $sourceMessageId !== 0) {
+                $this->telegram->editMessageText(
+                    $sourceChatId,
+                    $sourceMessageId,
+                    "{$label} <code>{$requestId}</code> {$statusText}.",
+                    ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']]]]
+                );
+            }
+            $this->telegram->sendMessage(
+                $chatId,
+                "{$label} <code>{$requestId}</code> {$statusText}."
+            );
+
+            $userNotice = $approve
+                ? ($requestKind === 'free' ? "✅ درخواست تست رایگان شما تایید شد." : "✅ درخواست نمایندگی شما تایید شد.")
+                : ($requestKind === 'free' ? "❌ درخواست تست رایگان شما رد شد." : "❌ درخواست نمایندگی شما رد شد.");
+            if ($adminNote !== null && $adminNote !== '') {
+                $userNotice .= "\n\n📝 توضیح ادمین:\n" . htmlspecialchars($adminNote);
+            }
+            $this->telegram->sendMessage((int) ($result['user_id'] ?? 0), $userNotice);
+            return;
+        }
     }
 }
