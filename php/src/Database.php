@@ -138,6 +138,38 @@ final class Database
         ];
     }
 
+    public function createFreeTestRequest(int $userId, string $note): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO free_test_requests (user_id, note, status, created_at)
+             VALUES (:user_id, :note, :status, :created_at)'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'note' => $note,
+            'status' => 'pending',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function createAgencyRequest(int $userId, string $note): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO agency_requests (user_id, note, status, created_at)
+             VALUES (:user_id, :note, :status, :created_at)'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'note' => $note,
+            'status' => 'pending',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
     public function setUserState(int $userId, string $stateName, array $payload = []): void
     {
         $stmt = $this->pdo->prepare(

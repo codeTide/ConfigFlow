@@ -281,6 +281,35 @@ php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
 - افزودن amount/rate validation برای تایید کریپتو (با tolerance)
 - استفاده از مقدار on-chain در amount-check (در صورت دسترسی) با fallback به claimed amount کاربر
 - تکمیل اولیه `test:start` و `agency:request` با ثبت درخواست متنی و ارسال برای ادمین
+- DB-backed tracking برای `free_test_requests` و `agency_requests` با وضعیت `pending/approved/rejected`
+- نمایش خلاصه آخرین خریدها در `my_configs`
+
+```bash
+# ساخت اسکیمای MySQL (فاز ۲)
+php php/scripts/init_db.php
+
+# انتقال داده‌های اصلی از SQLite به MySQL (فاز ۲)
+php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
+```
+
+فاز ۳ مهاجرت (فعلی) در نسخه PHP:
+- روت کردن آپدیت‌ها با `UpdateRouter`
+- پشتیبانی از Callback Query برای `nav:main`, `profile`, `support`, `my_configs`
+- پشتیبانی از Callback Query برای `referral:menu` + لینک اشتراک‌گذاری دعوت
+- منوی اصلی داینامیک و نمایش پروفایل/پشتیبانی/کانفیگ‌های من در PHP
+- فلو اولیه `wallet charge` و `buy flow` (انتخاب نوع/پکیج و پرداخت کیف پول)
+- مدیریت ادمین برای تایید/رد درخواست شارژ کیف پول در PHP
+- اضافه شدن مسیرهای پرداخت `card/crypto/tetrapay` (نسخه اولیه) در PHP
+- تکمیل تحویل سفارش از `pending_orders` با صف تحویل ادمین
+- اتصال اولیه API برای TetraPay + انتخاب ارز در پرداخت کریپتو
+- Card receipt flow در PHP (state + ثبت رسید + بررسی ادمین)
+- Crypto TX Hash flow در PHP + بررسی ادمین
+- بهبود idempotency برای بررسی پرداخت TetraPay
+- ثبت payload درگاه‌ها (TetraPay/crypto) در payment برای دیباگ و audit
+- verify on-chain برای crypto در مسیر ادمین (LTC / TRON / TON / USDT(BEP20) / USDC(BEP20))
+- افزودن amount/rate validation برای تایید کریپتو (با tolerance)
+- استفاده از مقدار on-chain در amount-check (در صورت دسترسی) با fallback به claimed amount کاربر
+- تکمیل اولیه `test:start` و `agency:request` با ثبت درخواست متنی و ارسال برای ادمین
 - نمایش خلاصه آخرین خریدها در `my_configs`
 
 ```bash
@@ -585,6 +614,21 @@ ConfigFlow/
 | `BOT_TOKEN` | توکن ربات از @BotFather | `123456789:ABC...` |
 | `ADMIN_IDS` | آیدی عددی ادمین‌ها (با کاما جدا) | `111,222,333` |
 | `DB_NAME` | نام فایل دیتابیس | `ConfigFlow.db` |
+
+### `php/.env.example` — تنظیمات فاز ۱ PHP
+
+| متغیر | توضیحات | مثال |
+|-------|---------|------|
+| `BOT_TOKEN` | توکن ربات تلگرام | `123456789:ABC...` |
+| `BOT_USERNAME` | یوزرنیم ربات (برای لینک دعوت) | `MyConfigFlowBot` |
+| `ADMIN_IDS` | آیدی ادمین‌ها | `111,222` |
+| `DB_HOST` | آدرس MySQL | `127.0.0.1` |
+| `DB_PORT` | پورت MySQL | `3306` |
+| `DB_NAME` | نام دیتابیس MySQL | `configflow` |
+| `DB_USER` | نام کاربری دیتابیس | `root` |
+| `DB_PASS` | رمز عبور دیتابیس | `secret` |
+| `TETRAPAY_CREATE_URL` | آدرس ساخت سفارش تتراپی | `https://tetra98.com/api/create_order` |
+| `TETRAPAY_VERIFY_URL` | آدرس بررسی سفارش تتراپی | `https://tetra98.com/api/verify` |
 
 ### `php/.env.example` — تنظیمات فاز ۱ PHP
 

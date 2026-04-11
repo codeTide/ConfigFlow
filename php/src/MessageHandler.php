@@ -197,15 +197,18 @@ final class MessageHandler
             }
 
             $this->database->clearUserState($userId);
+            $requestId = $this->database->createFreeTestRequest($userId, $text);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید."
+                "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید.\n"
+                . "شناسه درخواست: <code>{$requestId}</code>"
             );
 
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     "🎁 <b>درخواست تست رایگان جدید</b>\n\n"
+                    . "شناسه: <code>{$requestId}</code>\n"
                     . "کاربر: <code>{$userId}</code>\n"
                     . "توضیح:\n" . htmlspecialchars($text)
                 );
@@ -220,15 +223,18 @@ final class MessageHandler
             }
 
             $this->database->clearUserState($userId);
+            $requestId = $this->database->createAgencyRequest($userId, $text);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ درخواست نمایندگی ثبت شد و برای بررسی ادمین ارسال گردید."
+                "✅ درخواست نمایندگی ثبت شد و برای بررسی ادمین ارسال گردید.\n"
+                . "شناسه درخواست: <code>{$requestId}</code>"
             );
 
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     "🤝 <b>درخواست نمایندگی جدید</b>\n\n"
+                    . "شناسه: <code>{$requestId}</code>\n"
                     . "کاربر: <code>{$userId}</code>\n"
                     . "متن درخواست:\n" . htmlspecialchars($text)
                 );

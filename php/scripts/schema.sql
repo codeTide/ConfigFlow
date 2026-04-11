@@ -74,6 +74,30 @@ CREATE TABLE IF NOT EXISTS purchases (
     INDEX idx_purchases_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS free_test_requests (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    note TEXT NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    admin_note TEXT NULL,
+    created_at DATETIME NOT NULL,
+    reviewed_at DATETIME NULL,
+    INDEX idx_free_test_user (user_id),
+    INDEX idx_free_test_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agency_requests (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    note TEXT NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    admin_note TEXT NULL,
+    created_at DATETIME NOT NULL,
+    reviewed_at DATETIME NULL,
+    INDEX idx_agency_user (user_id),
+    INDEX idx_agency_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS payments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     kind VARCHAR(32) NOT NULL,
