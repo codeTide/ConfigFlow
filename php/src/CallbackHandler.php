@@ -178,8 +178,12 @@ final class CallbackHandler
                 return;
             }
             $paymentId = (int) substr($data, strlen('admin:payment:view:'));
+            $payment = $this->database->getPaymentById($paymentId);
             $keyboard = [
                 'inline_keyboard' => [
+                    ...((is_array($payment) && str_starts_with((string) ($payment['payment_method'] ?? ''), 'crypto:')) ? [[
+                        ['text' => '🔎 بررسی on-chain', 'callback_data' => 'pay:crypto:verify:' . $paymentId],
+                    ]] : []),
                     [
                         ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
                         ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
@@ -194,6 +198,54 @@ final class CallbackHandler
                 $keyboard
             );
             $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'pay:crypto:verify:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $paymentId = (int) substr($data, strlen('pay:crypto:verify:'));
+            $payment = $this->database->getPaymentById($paymentId);
+            if (!is_array($payment)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پرداخت یافت نشد.');
+                return;
+            }
+            $pm = (string) ($payment['payment_method'] ?? '');
+            if (!str_starts_with($pm, 'crypto:')) {
+                $this->telegram->answerCallbackQuery($callbackId, 'این پرداخت کریپتو نیست.');
+                return;
+            }
+
+            $coin = trim(substr($pm, strlen('crypto:')));
+            $txHash = trim((string) ($payment['tx_hash'] ?? ''));
+            if ($txHash === '') {
+                $this->telegram->answerCallbackQuery($callbackId, 'TX Hash ثبت نشده است.');
+                return;
+            }
+
+            $verify = $this->gateways->verifyCryptoTransaction($coin, $txHash);
+            $this->database->setPaymentProviderPayload($paymentId, [
+                'source' => 'crypto_verify',
+                'response' => $verify,
+            ]);
+            if (($verify['ok'] ?? false) && ($verify['confirmed'] ?? false)) {
+                $result = $this->database->applyAdminPaymentDecision($paymentId, true);
+                if ($result['ok'] ?? false) {
+                    $this->telegram->editMessageText(
+                        $chatId,
+                        $messageId,
+                        "✅ پرداخت کریپتو تایید on-chain شد و سفارش در صف تحویل قرار گرفت.",
+                        KeyboardBuilder::adminPanel()
+                    );
+                    $this->telegram->answerCallbackQuery($callbackId);
+                    $this->telegram->sendMessage((int) $payment['user_id'], "✅ پرداخت کریپتوی شما تایید شد.");
+                    return;
+                }
+            }
+
+            $this->telegram->answerCallbackQuery($callbackId, 'تراکنش تایید نشد یا شبکه پشتیبانی نمی‌شود.');
             return;
         }
 

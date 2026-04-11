@@ -528,7 +528,7 @@ final class Database
 
     public function getPaymentById(int $paymentId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, user_id, package_id, amount, payment_method, gateway_ref, status FROM payments WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, user_id, package_id, amount, payment_method, gateway_ref, tx_hash, status FROM payments WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $paymentId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;

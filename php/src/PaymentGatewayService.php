@@ -67,6 +67,39 @@ final class PaymentGatewayService
         return trim($this->settings->get('crypto_wallet_' . $coin, ''));
     }
 
+    public function verifyCryptoTransaction(string $coin, string $txHash): array
+    {
+        $coin = strtolower(trim($coin));
+        $txHash = trim($txHash);
+        if ($txHash === '') {
+            return ['ok' => false, 'error' => 'missing_tx_hash'];
+        }
+
+        if ($coin === 'ltc') {
+            $url = 'https://api.blockcypher.com/v1/ltc/main/txs/' . rawurlencode($txHash);
+            $res = $this->getJson($url);
+            if (!($res['ok'] ?? false)) {
+                return ['ok' => false, 'error' => 'request_failed'];
+            }
+            $data = $res['data'] ?? [];
+            $confirmed = ((int) ($data['confirmations'] ?? 0)) > 0;
+            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
+        }
+
+        if ($coin === 'tron') {
+            $url = 'https://apilist.tronscanapi.com/api/transaction-info?hash=' . rawurlencode($txHash);
+            $res = $this->getJson($url);
+            if (!($res['ok'] ?? false)) {
+                return ['ok' => false, 'error' => 'request_failed'];
+            }
+            $data = $res['data'] ?? [];
+            $confirmed = (bool) ($data['confirmed'] ?? false);
+            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
+        }
+
+        return ['ok' => false, 'error' => 'coin_not_supported_yet'];
+    }
+
     private function postJson(string $url, array $payload): array
     {
         $ch = curl_init($url);
@@ -78,6 +111,29 @@ final class PaymentGatewayService
             CURLOPT_TIMEOUT => 15,
         ]);
 
+        $raw = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false || $err !== '') {
+            return ['ok' => false];
+        }
+
+        $decoded = json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            return ['ok' => false];
+        }
+
+        return ['ok' => true, 'data' => $decoded];
+    }
+
+    private function getJson(string $url): array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+        ]);
         $raw = curl_exec($ch);
         $err = curl_error($ch);
         curl_close($ch);
