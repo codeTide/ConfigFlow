@@ -207,6 +207,21 @@ final class CallbackHandler
                 return;
             }
             $paymentId = (int) substr($data, strlen('pay:crypto:verify:'));
+            $attempt = $this->database->registerVerifyAttempt($paymentId);
+            if (!(bool) ($attempt['ok'] ?? false)) {
+                $error = (string) ($attempt['error'] ?? '');
+                if ($error === 'cooldown') {
+                    $this->telegram->answerCallbackQuery($callbackId, '⏳ لطفاً چند ثانیه بعد دوباره بررسی کنید.');
+                    return;
+                }
+                if ($error === 'max_attempts') {
+                    $this->telegram->answerCallbackQuery($callbackId, '🚫 سقف دفعات بررسی این پرداخت تکمیل شده است.');
+                    return;
+                }
+                $this->telegram->answerCallbackQuery($callbackId, 'بررسی این پرداخت فعلاً ممکن نیست.');
+                return;
+            }
+
             $payment = $this->database->getPaymentById($paymentId);
             if (!is_array($payment)) {
                 $this->telegram->answerCallbackQuery($callbackId, 'پرداخت یافت نشد.');
