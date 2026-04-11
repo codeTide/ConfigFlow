@@ -8,6 +8,7 @@ use ConfigFlow\Bot\Bootstrap;
 use ConfigFlow\Bot\CallbackHandler;
 use ConfigFlow\Bot\MenuService;
 use ConfigFlow\Bot\MessageHandler;
+use ConfigFlow\Bot\PaymentGatewayService;
 use ConfigFlow\Bot\SettingsRepository;
 use ConfigFlow\Bot\StartHandler;
 use ConfigFlow\Bot\TelegramClient;
@@ -23,6 +24,7 @@ require_once __DIR__ . '/../src/TelegramClient.php';
 require_once __DIR__ . '/../src/StartHandler.php';
 require_once __DIR__ . '/../src/CallbackHandler.php';
 require_once __DIR__ . '/../src/MessageHandler.php';
+require_once __DIR__ . '/../src/PaymentGatewayService.php';
 require_once __DIR__ . '/../src/UpdateRouter.php';
 
 Bootstrap::loadEnv(__DIR__ . '/../.env');
@@ -43,9 +45,10 @@ if (!is_array($update)) {
 $database = new Database();
 $telegram = new TelegramClient($token);
 $settings = new SettingsRepository($database);
+$gateways = new PaymentGatewayService($settings);
 $menus = new MenuService($settings, $database);
 $startHandler = new StartHandler($database, $telegram, $settings, $menus);
-$callbackHandler = new CallbackHandler($database, $telegram, $settings, $menus);
+$callbackHandler = new CallbackHandler($database, $telegram, $settings, $menus, $gateways);
 $messageHandler = new MessageHandler($database, $telegram);
 
 $router = new UpdateRouter($startHandler, $callbackHandler, $messageHandler);

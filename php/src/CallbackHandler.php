@@ -11,6 +11,7 @@ final class CallbackHandler
         private TelegramClient $telegram,
         private SettingsRepository $settings,
         private MenuService $menus,
+        private PaymentGatewayService $gateways,
     ) {
     }
 
@@ -370,9 +371,43 @@ final class CallbackHandler
             return;
         }
 
-        if (str_starts_with($data, 'buy:card:') || str_starts_with($data, 'buy:crypto:') || str_starts_with($data, 'buy:tetrapay:')) {
-            $method = str_starts_with($data, 'buy:card:') ? 'card' : (str_starts_with($data, 'buy:crypto:') ? 'crypto' : 'tetrapay');
+        if (str_starts_with($data, 'buy:crypto:coins:')) {
+            $packageId = (int) substr($data, strlen('buy:crypto:coins:'));
+            $coins = [
+                'tron' => 'TRON',
+                'ton' => 'TON',
+                'usdt_bep20' => 'USDT(BEP20)',
+                'usdc_bep20' => 'USDC(BEP20)',
+                'ltc' => 'LTC',
+            ];
+            $rows = [];
+            foreach ($coins as $coinKey => $label) {
+                $rows[] = [[
+                    'text' => '💠 ' . $label,
+                    'callback_data' => 'buy:crypto:pay:' . $packageId . ':' . $coinKey,
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'buy:pkg:' . $packageId]];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                '💎 ارز موردنظر را انتخاب کنید:',
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'buy:card:') || str_starts_with($data, 'buy:crypto:pay:') || str_starts_with($data, 'buy:tetrapay:')) {
+            $method = str_starts_with($data, 'buy:card:') ? 'card' : (str_starts_with($data, 'buy:crypto:pay:') ? 'crypto' : 'tetrapay');
             $packageId = (int) substr($data, strlen('buy:' . $method . ':'));
+            $coin = null;
+            if ($method === 'crypto') {
+                $payload = substr($data, strlen('buy:crypto:pay:'));
+                [$pkgRaw, $coinRaw] = array_pad(explode(':', $payload, 2), 2, '');
+                $packageId = (int) $pkgRaw;
+                $coin = trim($coinRaw);
+            }
             $package = $this->database->getPackage($packageId);
             if ($package === null) {
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیج پیدا نشد.');
@@ -385,8 +420,9 @@ final class CallbackHandler
                 'user_id' => $userId,
                 'package_id' => $packageId,
                 'amount' => $amount,
-                'payment_method' => $method,
+                'payment_method' => $method === 'crypto' ? ('crypto:' . ($coin ?: 'unknown')) : $method,
                 'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
+                'gateway_ref' => null,
                 'created_at' => gmdate('Y-m-d H:i:s'),
             ]);
             $pendingId = $this->database->createPendingOrder([
@@ -394,7 +430,7 @@ final class CallbackHandler
                 'package_id' => $packageId,
                 'payment_id' => $paymentId,
                 'amount' => $amount,
-                'payment_method' => $method,
+                'payment_method' => $method === 'crypto' ? ('crypto:' . ($coin ?: 'unknown')) : $method,
                 'created_at' => gmdate('Y-m-d H:i:s'),
                 'status' => 'waiting_payment',
             ]);
@@ -411,11 +447,37 @@ final class CallbackHandler
                     . "مبلغ: <b>{$amount}</b> تومان\n\n"
                     . "پس از واریز، رسید را برای ادمین ارسال کنید.";
             } elseif ($method === 'crypto') {
+                $address = htmlspecialchars($this->gateways->cryptoAddress((string) $coin));
                 $text = "💎 <b>پرداخت کریپتو</b>\n\n"
                     . "شناسه سفارش: <code>{$pendingId}</code>\n"
+                    . "ارز: <b>" . htmlspecialchars((string) strtoupper((string) $coin)) . "</b>\n"
                     . "مبلغ معادل ریالی: <b>{$amount}</b> تومان\n\n"
-                    . "درگاه کریپتو در فاز بعدی تکمیل API می‌شود. فعلاً با ادمین هماهنگ کنید.";
+                    . ($address !== '' ? "آدرس کیف پول:\n<code>{$address}</code>\n\n" : '')
+                    . "پس از پرداخت، شناسه سفارش را به ادمین اعلام کنید.";
             } else {
+                $tp = $this->gateways->createTetrapayOrder($amount, (string) $pendingId);
+                if (($tp['ok'] ?? false) === true) {
+                    $authority = (string) ($tp['authority'] ?? '');
+                    if ($authority !== '') {
+                        $this->database->setPaymentGatewayRef($paymentId, $authority);
+                    }
+                    $text = "🏧 <b>پرداخت TetraPay</b>\n\n"
+                        . "سفارش: <code>{$pendingId}</code>\n"
+                        . "برای پرداخت آنلاین روی لینک زیر بزنید:\n"
+                        . htmlspecialchars((string) $tp['pay_url']) . "\n\n"
+                        . "بعد از پرداخت، دکمه بررسی را بزنید.";
+                    $this->telegram->editMessageText(
+                        $chatId,
+                        $messageId,
+                        $text,
+                        ['inline_keyboard' => [
+                            [['text' => '🔄 بررسی پرداخت', 'callback_data' => 'buy:tetrapay:check:' . $paymentId]],
+                            [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']],
+                        ]]
+                    );
+                    $this->telegram->answerCallbackQuery($callbackId);
+                    return;
+                }
                 $text = "🏧 <b>پرداخت TetraPay</b>\n\n"
                     . "شناسه سفارش: <code>{$pendingId}</code>\n"
                     . "مبلغ: <b>{$amount}</b> تومان\n\n"
@@ -424,6 +486,34 @@ final class CallbackHandler
 
             $this->telegram->editMessageText($chatId, $messageId, $text, KeyboardBuilder::backToMain());
             $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'buy:tetrapay:check:')) {
+            $paymentId = (int) substr($data, strlen('buy:tetrapay:check:'));
+            $payment = $this->database->getPaymentById($paymentId);
+            if ($payment === null) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پرداخت پیدا نشد.');
+                return;
+            }
+            if (($payment['status'] ?? '') === 'paid' || ($payment['status'] ?? '') === 'completed') {
+                $this->telegram->answerCallbackQuery($callbackId, 'پرداخت قبلاً تایید شده.');
+                return;
+            }
+            $gatewayRef = (string) ($payment['gateway_ref'] ?? '');
+            $verify = $this->gateways->verifyTetrapay($gatewayRef);
+            if (($verify['ok'] ?? false) && ($verify['paid'] ?? false)) {
+                $this->database->markPaymentAndPendingPaid($paymentId);
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    "✅ پرداخت تتراپی تایید شد.\nسفارش شما در صف تحویل قرار گرفت.",
+                    KeyboardBuilder::backToMain()
+                );
+                $this->telegram->answerCallbackQuery($callbackId);
+                return;
+            }
+            $this->telegram->answerCallbackQuery($callbackId, 'پرداخت هنوز تایید نشده است.');
             return;
         }
 

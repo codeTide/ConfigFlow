@@ -180,10 +180,19 @@ final class Database
     public function createPayment(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO payments (kind, user_id, package_id, amount, payment_method, status, created_at)
-             VALUES (:kind, :user_id, :package_id, :amount, :payment_method, :status, :created_at)'
+            'INSERT INTO payments (kind, user_id, package_id, amount, payment_method, gateway_ref, status, created_at)
+             VALUES (:kind, :user_id, :package_id, :amount, :payment_method, :gateway_ref, :status, :created_at)'
         );
-        $stmt->execute($data);
+        $stmt->execute([
+            'kind' => $data['kind'],
+            'user_id' => $data['user_id'],
+            'package_id' => $data['package_id'],
+            'amount' => $data['amount'],
+            'payment_method' => $data['payment_method'],
+            'gateway_ref' => $data['gateway_ref'] ?? null,
+            'status' => $data['status'],
+            'created_at' => $data['created_at'],
+        ]);
         return (int) $this->pdo->lastInsertId();
     }
 
@@ -433,5 +442,28 @@ final class Database
             }
             return ['ok' => false, 'error' => 'db_error'];
         }
+    }
+
+    public function getPaymentById(int $paymentId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, user_id, package_id, amount, payment_method, gateway_ref, status FROM payments WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $paymentId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function markPaymentAndPendingPaid(int $paymentId): void
+    {
+        $payStmt = $this->pdo->prepare("UPDATE payments SET status = 'paid', approved_at = :approved_at WHERE id = :id");
+        $payStmt->execute(['approved_at' => gmdate('Y-m-d H:i:s'), 'id' => $paymentId]);
+
+        $orderStmt = $this->pdo->prepare("UPDATE pending_orders SET status = 'paid_waiting_delivery' WHERE payment_id = :payment_id");
+        $orderStmt->execute(['payment_id' => $paymentId]);
+    }
+
+    public function setPaymentGatewayRef(int $paymentId, string $gatewayRef): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE payments SET gateway_ref = :gateway_ref WHERE id = :id');
+        $stmt->execute(['gateway_ref' => $gatewayRef, 'id' => $paymentId]);
     }
 }

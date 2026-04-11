@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS payments (
     package_id BIGINT NULL,
     amount INT NOT NULL,
     payment_method VARCHAR(64) NOT NULL,
+    gateway_ref VARCHAR(191) NULL,
     status VARCHAR(64) NOT NULL,
     created_at DATETIME NOT NULL,
     approved_at DATETIME NULL,

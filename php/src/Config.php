@@ -48,4 +48,14 @@ final class Config
     {
         return trim((string) getenv('BOT_USERNAME'));
     }
+
+    public static function tetrapayCreateUrl(): string
+    {
+        return (string) getenv('TETRAPAY_CREATE_URL') ?: 'https://tetra98.com/api/create_order';
+    }
+
+    public static function tetrapayVerifyUrl(): string
+    {
+        return (string) getenv('TETRAPAY_VERIFY_URL') ?: 'https://tetra98.com/api/verify';
+    }
 }
