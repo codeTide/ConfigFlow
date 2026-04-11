@@ -132,5 +132,55 @@ final class MessageHandler
                 );
             }
         }
+
+        if ($state['state_name'] === 'await_crypto_tx') {
+            $payload = $state['payload'] ?? [];
+            $paymentId = (int) ($payload['payment_id'] ?? 0);
+            if ($paymentId <= 0) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+
+            $txHash = trim((string) ($message['text'] ?? ''));
+            if ($txHash === '' || str_starts_with($txHash, '/')) {
+                $this->telegram->sendMessage($chatId, '⚠️ لطفاً TX Hash معتبر ارسال کنید.');
+                return;
+            }
+            if (strlen($txHash) < 10) {
+                $this->telegram->sendMessage($chatId, '⚠️ طول TX Hash معتبر نیست.');
+                return;
+            }
+
+            $ok = $this->database->submitCryptoTxHash($paymentId, $txHash);
+            if (!$ok) {
+                $this->telegram->sendMessage($chatId, '❌ ثبت TX Hash انجام نشد. لطفاً دوباره تلاش کنید.');
+                return;
+            }
+
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage(
+                $chatId,
+                "✅ TX Hash ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
+            );
+
+            $adminKeyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
+                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
+                    ],
+                ],
+            ];
+            foreach (Config::adminIds() as $adminId) {
+                $this->telegram->sendMessage(
+                    (int) $adminId,
+                    "💎 <b>TX Hash جدید</b>\n\n"
+                    . "پرداخت: <code>{$paymentId}</code>\n"
+                    . "کاربر: <code>{$userId}</code>\n"
+                    . "TX: <code>" . htmlspecialchars($txHash) . "</code>",
+                    $adminKeyboard
+                );
+            }
+        }
     }
 }

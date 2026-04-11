@@ -543,6 +543,38 @@ final class Database
         $orderStmt->execute(['payment_id' => $paymentId]);
     }
 
+    public function markPaymentAndPendingPaidIfWaitingGateway(int $paymentId): bool
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $rowStmt = $this->pdo->prepare('SELECT status FROM payments WHERE id = :id LIMIT 1 FOR UPDATE');
+            $rowStmt->execute(['id' => $paymentId]);
+            $row = $rowStmt->fetch();
+            if (!is_array($row)) {
+                $this->pdo->rollBack();
+                return false;
+            }
+            if (($row['status'] ?? '') !== 'waiting_gateway') {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            $payStmt = $this->pdo->prepare("UPDATE payments SET status = 'paid', verified_at = :verified_at WHERE id = :id");
+            $payStmt->execute(['verified_at' => gmdate('Y-m-d H:i:s'), 'id' => $paymentId]);
+
+            $orderStmt = $this->pdo->prepare("UPDATE pending_orders SET status = 'paid_waiting_delivery' WHERE payment_id = :payment_id");
+            $orderStmt->execute(['payment_id' => $paymentId]);
+
+            $this->pdo->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return false;
+        }
+    }
+
     public function setPaymentGatewayRef(int $paymentId, string $gatewayRef): void
     {
         $stmt = $this->pdo->prepare('UPDATE payments SET gateway_ref = :gateway_ref WHERE id = :id');
@@ -570,5 +602,45 @@ final class Database
             'status' => 'waiting_admin',
             'payment_id' => $paymentId,
         ]);
+    }
+
+    public function submitCryptoTxHash(int $paymentId, string $txHash): bool
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $paymentStmt = $this->pdo->prepare('SELECT status FROM payments WHERE id = :id LIMIT 1 FOR UPDATE');
+            $paymentStmt->execute(['id' => $paymentId]);
+            $row = $paymentStmt->fetch();
+            if (!is_array($row)) {
+                $this->pdo->rollBack();
+                return false;
+            }
+            if (($row['status'] ?? '') !== 'waiting_admin' && ($row['status'] ?? '') !== 'waiting_payment') {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            $update = $this->pdo->prepare(
+                "UPDATE payments
+                 SET tx_hash = :tx_hash,
+                     status = 'waiting_admin'
+                 WHERE id = :id"
+            );
+            $update->execute([
+                'tx_hash' => $txHash,
+                'id' => $paymentId,
+            ]);
+
+            $pending = $this->pdo->prepare("UPDATE pending_orders SET status = 'waiting_admin' WHERE payment_id = :payment_id");
+            $pending->execute(['payment_id' => $paymentId]);
+
+            $this->pdo->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return false;
+        }
     }
 }

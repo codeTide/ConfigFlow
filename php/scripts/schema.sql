@@ -82,12 +82,15 @@ CREATE TABLE IF NOT EXISTS payments (
     amount INT NOT NULL,
     payment_method VARCHAR(64) NOT NULL,
     gateway_ref VARCHAR(191) NULL,
+    tx_hash VARCHAR(255) NULL,
+    provider_payload TEXT NULL,
     status VARCHAR(64) NOT NULL,
     receipt_file_id VARCHAR(255) NULL,
     receipt_text TEXT NULL,
     admin_note TEXT NULL,
     created_at DATETIME NOT NULL,
     approved_at DATETIME NULL,
+    verified_at DATETIME NULL,
     INDEX idx_payments_user (user_id),
     INDEX idx_payments_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

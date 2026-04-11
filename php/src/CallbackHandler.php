@@ -460,7 +460,8 @@ final class CallbackHandler
                     . "ارز: <b>" . htmlspecialchars((string) strtoupper((string) $coin)) . "</b>\n"
                     . "مبلغ معادل ریالی: <b>{$amount}</b> تومان\n\n"
                     . ($address !== '' ? "آدرس کیف پول:\n<code>{$address}</code>\n\n" : '')
-                    . "پس از پرداخت، شناسه سفارش را به ادمین اعلام کنید.";
+                    . "پس از پرداخت، TX Hash تراکنش را همینجا ارسال کنید.";
+                $this->database->setUserState($userId, 'await_crypto_tx', ['payment_id' => $paymentId]);
             } else {
                 $tp = $this->gateways->createTetrapayOrder($amount, (string) $pendingId);
                 if (($tp['ok'] ?? false) === true) {
@@ -510,14 +511,18 @@ final class CallbackHandler
             $gatewayRef = (string) ($payment['gateway_ref'] ?? '');
             $verify = $this->gateways->verifyTetrapay($gatewayRef);
             if (($verify['ok'] ?? false) && ($verify['paid'] ?? false)) {
-                $this->database->markPaymentAndPendingPaid($paymentId);
-                $this->telegram->editMessageText(
-                    $chatId,
-                    $messageId,
-                    "✅ پرداخت تتراپی تایید شد.\nسفارش شما در صف تحویل قرار گرفت.",
-                    KeyboardBuilder::backToMain()
-                );
-                $this->telegram->answerCallbackQuery($callbackId);
+                $changed = $this->database->markPaymentAndPendingPaidIfWaitingGateway($paymentId);
+                if ($changed) {
+                    $this->telegram->editMessageText(
+                        $chatId,
+                        $messageId,
+                        "✅ پرداخت تتراپی تایید شد.\nسفارش شما در صف تحویل قرار گرفت.",
+                        KeyboardBuilder::backToMain()
+                    );
+                    $this->telegram->answerCallbackQuery($callbackId);
+                    return;
+                }
+                $this->telegram->answerCallbackQuery($callbackId, 'این پرداخت قبلاً پردازش شده است.');
                 return;
             }
             $this->telegram->answerCallbackQuery($callbackId, 'پرداخت هنوز تایید نشده است.');
