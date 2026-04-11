@@ -528,7 +528,7 @@ final class Database
 
     public function getPaymentById(int $paymentId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, user_id, package_id, amount, payment_method, gateway_ref, tx_hash, status FROM payments WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, user_id, package_id, amount, payment_method, gateway_ref, tx_hash, crypto_amount_claimed, status, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $paymentId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
@@ -590,6 +590,54 @@ final class Database
         ]);
     }
 
+    public function registerVerifyAttempt(int $paymentId, int $cooldownSeconds = 20, int $maxAttempts = 15): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare('SELECT verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1 FOR UPDATE');
+            $stmt->execute(['id' => $paymentId]);
+            $row = $stmt->fetch();
+            if (!is_array($row)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_found'];
+            }
+
+            $attempts = (int) ($row['verify_attempts'] ?? 0);
+            $lastAt = (string) ($row['last_verify_at'] ?? '');
+            if ($attempts >= $maxAttempts) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'max_attempts'];
+            }
+
+            if ($lastAt !== '') {
+                $lastTs = strtotime($lastAt);
+                if ($lastTs !== false && (time() - $lastTs) < $cooldownSeconds) {
+                    $this->pdo->rollBack();
+                    return ['ok' => false, 'error' => 'cooldown'];
+                }
+            }
+
+            $update = $this->pdo->prepare(
+                'UPDATE payments
+                 SET verify_attempts = verify_attempts + 1,
+                     last_verify_at = :last_verify_at
+                 WHERE id = :id'
+            );
+            $update->execute([
+                'last_verify_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $paymentId,
+            ]);
+
+            $this->pdo->commit();
+            return ['ok' => true, 'attempts' => $attempts + 1];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
     public function attachPaymentReceipt(int $paymentId, ?string $fileId, ?string $text): void
     {
         $stmt = $this->pdo->prepare(
@@ -613,7 +661,7 @@ final class Database
         ]);
     }
 
-    public function submitCryptoTxHash(int $paymentId, string $txHash): bool
+    public function submitCryptoTxHash(int $paymentId, string $txHash, ?float $claimedAmount = null): bool
     {
         $this->pdo->beginTransaction();
         try {
@@ -632,15 +680,18 @@ final class Database
             $update = $this->pdo->prepare(
                 "UPDATE payments
                  SET tx_hash = :tx_hash,
+                     crypto_amount_claimed = :crypto_amount_claimed,
                      provider_payload = :provider_payload,
                      status = 'waiting_admin'
                  WHERE id = :id"
             );
             $update->execute([
                 'tx_hash' => $txHash,
+                'crypto_amount_claimed' => $claimedAmount,
                 'provider_payload' => json_encode([
                     'source' => 'user_tx_hash',
                     'tx_hash' => $txHash,
+                    'claimed_amount' => $claimedAmount,
                     'submitted_at' => gmdate('c'),
                 ], JSON_UNESCAPED_UNICODE),
                 'id' => $paymentId,

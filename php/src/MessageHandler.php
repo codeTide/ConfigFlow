@@ -141,7 +141,13 @@ final class MessageHandler
                 return;
             }
 
-            $txHash = trim((string) ($message['text'] ?? ''));
+            $raw = trim((string) ($message['text'] ?? ''));
+            $parts = preg_split('/\s+/', $raw) ?: [];
+            $txHash = trim((string) ($parts[0] ?? ''));
+            $claimedAmount = null;
+            if (isset($parts[1]) && is_numeric(str_replace(',', '.', (string) $parts[1]))) {
+                $claimedAmount = (float) str_replace(',', '.', (string) $parts[1]);
+            }
             if ($txHash === '' || str_starts_with($txHash, '/')) {
                 $this->telegram->sendMessage($chatId, '⚠️ لطفاً TX Hash معتبر ارسال کنید.');
                 return;
@@ -151,7 +157,7 @@ final class MessageHandler
                 return;
             }
 
-            $ok = $this->database->submitCryptoTxHash($paymentId, $txHash);
+            $ok = $this->database->submitCryptoTxHash($paymentId, $txHash, $claimedAmount);
             if (!$ok) {
                 $this->telegram->sendMessage($chatId, '❌ ثبت TX Hash انجام نشد. لطفاً دوباره تلاش کنید.');
                 return;
@@ -177,7 +183,8 @@ final class MessageHandler
                     "💎 <b>TX Hash جدید</b>\n\n"
                     . "پرداخت: <code>{$paymentId}</code>\n"
                     . "کاربر: <code>{$userId}</code>\n"
-                    . "TX: <code>" . htmlspecialchars($txHash) . "</code>",
+                    . "TX: <code>" . htmlspecialchars($txHash) . "</code>\n"
+                    . ($claimedAmount !== null ? "Amount: <b>{$claimedAmount}</b>\n" : ''),
                     $adminKeyboard
                 );
             }

@@ -97,7 +97,66 @@ final class PaymentGatewayService
             return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
         }
 
+        if ($coin === 'ton') {
+            $url = 'https://tonapi.io/v2/blockchain/transactions/' . rawurlencode($txHash);
+            $res = $this->getJson($url);
+            if (!($res['ok'] ?? false)) {
+                return ['ok' => false, 'error' => 'request_failed'];
+            }
+            $data = $res['data'] ?? [];
+            $confirmed = (bool) ($data['success'] ?? false);
+            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
+        }
+
+        if ($coin === 'usdt_bep20' || $coin === 'usdc_bep20') {
+            $apiKey = trim($this->settings->get('bscscan_api_key', ''));
+            $query = http_build_query([
+                'module' => 'proxy',
+                'action' => 'eth_getTransactionReceipt',
+                'txhash' => $txHash,
+                'apikey' => $apiKey,
+            ]);
+            $url = 'https://api.bscscan.com/api?' . $query;
+            $res = $this->getJson($url);
+            if (!($res['ok'] ?? false)) {
+                return ['ok' => false, 'error' => 'request_failed'];
+            }
+            $data = $res['data'] ?? [];
+            $receipt = $data['result'] ?? [];
+            $confirmed = is_array($receipt) && (($receipt['status'] ?? '') === '0x1');
+            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
+        }
+
         return ['ok' => false, 'error' => 'coin_not_supported_yet'];
+    }
+
+    public function validateClaimedAmount(string $coin, int $amountToman, ?float $claimedAmountCoin): array
+    {
+        if ($claimedAmountCoin === null || $claimedAmountCoin <= 0) {
+            return ['ok' => false, 'error' => 'claimed_amount_missing'];
+        }
+
+        $usdtToman = (int) ($this->settings->get('crypto_usdt_toman_rate', '90000') ?: '90000');
+        if ($usdtToman <= 0) {
+            return ['ok' => false, 'error' => 'invalid_usdt_rate'];
+        }
+
+        $priceUsdt = $this->coinPriceUsdt($coin);
+        if ($priceUsdt <= 0) {
+            return ['ok' => false, 'error' => 'price_unavailable'];
+        }
+
+        $expectedCoin = ($amountToman / $usdtToman) / $priceUsdt;
+        $tolerance = max($expectedCoin * 0.05, 0.000001); // 5%
+        $delta = abs($claimedAmountCoin - $expectedCoin);
+
+        return [
+            'ok' => true,
+            'expected_coin' => $expectedCoin,
+            'claimed_coin' => $claimedAmountCoin,
+            'delta' => $delta,
+            'amount_match' => $delta <= $tolerance,
+        ];
     }
 
     private function postJson(string $url, array $payload): array
@@ -129,24 +188,57 @@ final class PaymentGatewayService
 
     private function getJson(string $url): array
     {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 15,
-        ]);
-        $raw = curl_exec($ch);
-        $err = curl_error($ch);
-        curl_close($ch);
+        $lastErr = '';
+        for ($i = 0; $i < 3; $i++) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 15,
+            ]);
+            $raw = curl_exec($ch);
+            $err = curl_error($ch);
+            curl_close($ch);
 
-        if ($raw === false || $err !== '') {
-            return ['ok' => false];
+            if ($raw !== false && $err === '') {
+                $decoded = json_decode((string) $raw, true);
+                if (is_array($decoded)) {
+                    return ['ok' => true, 'data' => $decoded];
+                }
+                $lastErr = 'decode_error';
+            } else {
+                $lastErr = $err;
+            }
+
+            usleep(250000); // 250ms retry backoff
         }
 
-        $decoded = json_decode((string) $raw, true);
-        if (!is_array($decoded)) {
-            return ['ok' => false];
+        return ['ok' => false, 'error' => $lastErr];
+    }
+
+    private function coinPriceUsdt(string $coin): float
+    {
+        $map = [
+            'tron' => 'TRXUSDT',
+            'ton' => 'TONUSDT',
+            'ltc' => 'LTCUSDT',
+            'usdt_bep20' => 'USDTUSDT',
+            'usdc_bep20' => 'USDCUSDT',
+        ];
+        $symbol = $map[strtolower($coin)] ?? '';
+        if ($symbol === '') {
+            return 0.0;
+        }
+        if ($symbol === 'USDTUSDT') {
+            return 1.0;
+        }
+        if ($symbol === 'USDCUSDT') {
+            return 1.0;
         }
 
-        return ['ok' => true, 'data' => $decoded];
+        $res = $this->getJson('https://api.binance.com/api/v3/ticker/price?symbol=' . rawurlencode($symbol));
+        if (!($res['ok'] ?? false)) {
+            return 0.0;
+        }
+        return (float) (($res['data']['price'] ?? 0));
     }
 }

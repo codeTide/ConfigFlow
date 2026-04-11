@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS payments (
     payment_method VARCHAR(64) NOT NULL,
     gateway_ref VARCHAR(191) NULL,
     tx_hash VARCHAR(255) NULL,
+    crypto_amount_claimed DECIMAL(24,8) NULL,
     provider_payload TEXT NULL,
     status VARCHAR(64) NOT NULL,
     receipt_file_id VARCHAR(255) NULL,
@@ -91,6 +92,8 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at DATETIME NOT NULL,
     approved_at DATETIME NULL,
     verified_at DATETIME NULL,
+    verify_attempts INT NOT NULL DEFAULT 0,
+    last_verify_at DATETIME NULL,
     INDEX idx_payments_user (user_id),
     INDEX idx_payments_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

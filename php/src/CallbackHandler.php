@@ -220,23 +220,32 @@ final class CallbackHandler
 
             $coin = trim(substr($pm, strlen('crypto:')));
             $txHash = trim((string) ($payment['tx_hash'] ?? ''));
+            $claimedCoin = isset($payment['crypto_amount_claimed']) ? (float) $payment['crypto_amount_claimed'] : null;
             if ($txHash === '') {
                 $this->telegram->answerCallbackQuery($callbackId, 'TX Hash ثبت نشده است.');
                 return;
             }
 
             $verify = $this->gateways->verifyCryptoTransaction($coin, $txHash);
+            $amountCheck = $this->gateways->validateClaimedAmount($coin, (int) ($payment['amount'] ?? 0), $claimedCoin);
             $this->database->setPaymentProviderPayload($paymentId, [
                 'source' => 'crypto_verify',
                 'response' => $verify,
+                'amount_check' => $amountCheck,
             ]);
-            if (($verify['ok'] ?? false) && ($verify['confirmed'] ?? false)) {
+
+            $chainConfirmed = (($verify['ok'] ?? false) && ($verify['confirmed'] ?? false));
+            $amountMatched = (($amountCheck['ok'] ?? false) && ($amountCheck['amount_match'] ?? false));
+            $canApprove = $chainConfirmed || (($verify['error'] ?? '') === 'coin_not_supported_yet' && $amountMatched);
+
+            if ($canApprove) {
                 $result = $this->database->applyAdminPaymentDecision($paymentId, true);
                 if ($result['ok'] ?? false) {
+                    $note = $chainConfirmed ? 'on-chain' : 'amount-check';
                     $this->telegram->editMessageText(
                         $chatId,
                         $messageId,
-                        "✅ پرداخت کریپتو تایید on-chain شد و سفارش در صف تحویل قرار گرفت.",
+                        "✅ پرداخت کریپتو تایید شد ({$note}) و سفارش در صف تحویل قرار گرفت.",
                         KeyboardBuilder::adminPanel()
                     );
                     $this->telegram->answerCallbackQuery($callbackId);
@@ -245,7 +254,7 @@ final class CallbackHandler
                 }
             }
 
-            $this->telegram->answerCallbackQuery($callbackId, 'تراکنش تایید نشد یا شبکه پشتیبانی نمی‌شود.');
+            $this->telegram->answerCallbackQuery($callbackId, 'تراکنش تایید نشد یا مقدار اعلامی معتبر نیست.');
             return;
         }
 
@@ -512,7 +521,8 @@ final class CallbackHandler
                     . "ارز: <b>" . htmlspecialchars((string) strtoupper((string) $coin)) . "</b>\n"
                     . "مبلغ معادل ریالی: <b>{$amount}</b> تومان\n\n"
                     . ($address !== '' ? "آدرس کیف پول:\n<code>{$address}</code>\n\n" : '')
-                    . "پس از پرداخت، TX Hash تراکنش را همینجا ارسال کنید.";
+                    . "پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\n"
+                    . "مثال: <code>TX_HASH 12.345</code>";
                 $this->database->setUserState($userId, 'await_crypto_tx', ['payment_id' => $paymentId]);
             } else {
                 $tp = $this->gateways->createTetrapayOrder($amount, (string) $pendingId);
