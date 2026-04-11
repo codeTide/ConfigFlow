@@ -85,6 +85,22 @@ final class CallbackHandler
             return;
         }
 
+        if ($data === 'referral:menu') {
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                $this->menus->referralText($userId),
+                KeyboardBuilder::referral($this->menus->referralShareUrl($userId))
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'wallet:charge' || $data === 'buy:start' || $data === 'test:start' || $data === 'agency:request') {
+            $this->telegram->answerCallbackQuery($callbackId, 'این بخش در فاز بعدی مهاجرت تکمیل می‌شود.');
+            return;
+        }
+
         $this->telegram->answerCallbackQuery($callbackId, 'این بخش در فاز بعدی مهاجرت تکمیل می‌شود.');
     }
 }

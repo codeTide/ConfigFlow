@@ -97,4 +97,26 @@ final class Database
 
         return (int) $stmt->fetchColumn();
     }
+
+    public function referralStats(int $userId): array
+    {
+        $refCountStmt = $this->pdo->prepare('SELECT COUNT(*) FROM referrals WHERE referrer_id = :user_id');
+        $refCountStmt->execute(['user_id' => $userId]);
+        $refCount = (int) $refCountStmt->fetchColumn();
+
+        $purchaseStatsStmt = $this->pdo->prepare(
+            'SELECT COUNT(p.id) AS purchase_count, COALESCE(SUM(p.amount), 0) AS total_amount
+             FROM referrals r
+             LEFT JOIN purchases p ON p.user_id = r.referee_id
+             WHERE r.referrer_id = :user_id'
+        );
+        $purchaseStatsStmt->execute(['user_id' => $userId]);
+        $purchaseStats = $purchaseStatsStmt->fetch();
+
+        return [
+            'total_referrals' => $refCount,
+            'purchase_count' => (int) ($purchaseStats['purchase_count'] ?? 0),
+            'total_purchase_amount' => (int) ($purchaseStats['total_amount'] ?? 0),
+        ];
+    }
 }

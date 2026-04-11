@@ -70,4 +70,34 @@ final class MenuService
         return "📦 شما <b>{$count}</b> کانفیگ خریداری کرده‌اید.\n"
             . 'نمایش جزئیات کامل در فاز بعدی مهاجرت تکمیل می‌شود.';
     }
+
+    public function referralText(int $userId): string
+    {
+        if ($this->settings->get('referral_enabled', '1') !== '1') {
+            return '⚠️ سیستم دعوت دوستان در حال حاضر غیرفعال است.';
+        }
+
+        $stats = $this->database->referralStats($userId);
+        $botUsername = Config::botUsername();
+        $refLink = $botUsername !== '' ? "https://t.me/{$botUsername}?start=ref_{$userId}" : "ref_{$userId}";
+
+        return "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>\n\n"
+            . "📊 زیرمجموعه‌ها: <b>{$stats['total_referrals']}</b>\n"
+            . "🛒 خریدهای زیرمجموعه: <b>{$stats['purchase_count']}</b>\n"
+            . "💵 مجموع خرید زیرمجموعه: <b>{$stats['total_purchase_amount']}</b> تومان\n\n"
+            . "🔗 لینک دعوت شما:\n<code>{$refLink}</code>";
+    }
+
+    public function referralShareUrl(int $userId): string
+    {
+        $botUsername = Config::botUsername();
+        if ($botUsername === '') {
+            return '';
+        }
+
+        $refLink = "https://t.me/{$botUsername}?start=ref_{$userId}";
+        $text = "از لینک من وارد شو:\n{$refLink}";
+
+        return 'https://t.me/share/url?url=' . rawurlencode($refLink) . '&text=' . rawurlencode($text);
+    }
 }

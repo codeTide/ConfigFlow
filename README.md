@@ -266,6 +266,20 @@ php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
 فاز ۳ مهاجرت (فعلی) در نسخه PHP:
 - روت کردن آپدیت‌ها با `UpdateRouter`
 - پشتیبانی از Callback Query برای `nav:main`, `profile`, `support`, `my_configs`
+- پشتیبانی از Callback Query برای `referral:menu` + لینک اشتراک‌گذاری دعوت
+- منوی اصلی داینامیک و نمایش پروفایل/پشتیبانی/کانفیگ‌های من در PHP
+
+```bash
+# ساخت اسکیمای MySQL (فاز ۲)
+php php/scripts/init_db.php
+
+# انتقال داده‌های اصلی از SQLite به MySQL (فاز ۲)
+php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
+```
+
+فاز ۳ مهاجرت (فعلی) در نسخه PHP:
+- روت کردن آپدیت‌ها با `UpdateRouter`
+- پشتیبانی از Callback Query برای `nav:main`, `profile`, `support`, `my_configs`
 - منوی اصلی داینامیک و نمایش پروفایل/پشتیبانی/کانفیگ‌های من در PHP
 
 ---
@@ -302,9 +316,8 @@ ConfigFlow/
 ├── .env                     # تنظیمات ربات (ساخته می‌شود)
 │
 └── bot/                     # پکیج اصلی ربات
-    ├── __init__.py          # راه‌اندازی هندلرها
+    ├── __init__.py          # ماژول‌های legacy پایتون (درحال حذف تدریجی)
     ├── config.py            # تمام ثابت‌ها و تنظیمات محیطی
-    ├── bot_instance.py      # نمونه TeleBot و USER_STATE
     ├── helpers.py           # توابع کمکی (esc، fmt_price، is_admin، ...)
     ├── db.py                # تمام توابع دیتابیس SQLite
     ├── payments.py          # منطق انتخاب و پردازش پرداخت
@@ -316,22 +329,12 @@ ConfigFlow/
     │   ├── tetrapay.py      # ایجاد و تأیید سفارش TetraPay
     │   └── swapwallet.py    # ایجاد، بررسی و نمایش صفحه SwapWallet
     │
-    ├── ui/                  # لایه رابط کاربری
-    │   ├── __init__.py
-    │   ├── helpers.py       # send_or_edit، set_bot_commands، قفل کانال
-    │   ├── keyboards.py     # منوهای اینلاین (kb_main، kb_admin_panel)
-    │   ├── menus.py         # نمایش منوهای اصلی (پروفایل، خرید، ...)
-    │   └── notifications.py # اطلاع‌رسانی خرید، تحویل کانفیگ، QR Code
-    │
     ├── admin/               # ابزارهای پنل ادمین
     │   ├── __init__.py
     │   ├── renderers.py     # نمایش صفحات ادمین (کاربران، پکیج‌ها، ...)
     │   └── backup.py        # بکاپ دستی و خودکار دیتابیس
     │
-    └── handlers/            # هندلرهای تلگرام
-        ├── __init__.py      # ثبت تمام هندلرها
-        ├── callbacks.py     # پردازش Callback Query (on_callback)
-        └── messages.py      # پردازش پیام‌های متنی (universal_handler)
+    └── (Python bot handlers/ui removed after PHP migration phases)
 ```
 
 ---
@@ -345,6 +348,19 @@ ConfigFlow/
 | `BOT_TOKEN` | توکن ربات از @BotFather | `123456789:ABC...` |
 | `ADMIN_IDS` | آیدی عددی ادمین‌ها (با کاما جدا) | `111,222,333` |
 | `DB_NAME` | نام فایل دیتابیس | `ConfigFlow.db` |
+
+### `php/.env.example` — تنظیمات فاز ۱ PHP
+
+| متغیر | توضیحات | مثال |
+|-------|---------|------|
+| `BOT_TOKEN` | توکن ربات تلگرام | `123456789:ABC...` |
+| `BOT_USERNAME` | یوزرنیم ربات (برای لینک دعوت) | `MyConfigFlowBot` |
+| `ADMIN_IDS` | آیدی ادمین‌ها | `111,222` |
+| `DB_HOST` | آدرس MySQL | `127.0.0.1` |
+| `DB_PORT` | پورت MySQL | `3306` |
+| `DB_NAME` | نام دیتابیس MySQL | `configflow` |
+| `DB_USER` | نام کاربری دیتابیس | `root` |
+| `DB_PASS` | رمز عبور دیتابیس | `secret` |
 
 ### `php/.env.example` — تنظیمات فاز ۱ PHP
 

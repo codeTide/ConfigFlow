@@ -43,4 +43,9 @@ final class Config
     {
         return (string) getenv('DB_PASS');
     }
+
+    public static function botUsername(): string
+    {
+        return trim((string) getenv('BOT_USERNAME'));
+    }
 }

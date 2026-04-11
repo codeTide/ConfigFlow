@@ -21,8 +21,9 @@ final class KeyboardBuilder
 
         $keyboard[] = [
             ['text' => '👤 حساب کاربری', 'callback_data' => 'profile'],
-            ['text' => '🎧 ارتباط با پشتیبانی', 'callback_data' => 'support'],
+            ['text' => '💳 شارژ کیف پول', 'callback_data' => 'wallet:charge'],
         ];
+        $keyboard[] = [['text' => '🎧 ارتباط با پشتیبانی', 'callback_data' => 'support']];
 
         if ($referralEnabled) {
             $keyboard[] = [['text' => '🎁 دعوت دوستان', 'callback_data' => 'referral:menu']];
@@ -42,5 +43,16 @@ final class KeyboardBuilder
     public static function backToMain(): array
     {
         return ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']]]];
+    }
+
+    public static function referral(string $shareUrl): array
+    {
+        $rows = [];
+        if ($shareUrl !== '') {
+            $rows[] = [['text' => '📤 اشتراک‌گذاری لینک دعوت', 'url' => $shareUrl]];
+        }
+        $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']];
+
+        return ['inline_keyboard' => $rows];
     }
 }
