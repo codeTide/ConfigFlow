@@ -251,9 +251,38 @@ DB_NAME=ConfigFlow.db
 > برای چند ادمین، آیدی‌ها را با کاما جدا کنید: `ADMIN_IDS=111,222,333`
 
 ```bash
-# اجرای ربات
-python3 main.py
+# اجرای فاز ۱ نسخه PHP (Webhook)
+php -S 0.0.0.0:8080 -t php/public
 ```
+
+```bash
+# ساخت اسکیمای MySQL (فاز ۲)
+php php/scripts/init_db.php
+
+# انتقال داده‌های اصلی از SQLite به MySQL (فاز ۲)
+php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
+```
+
+فاز ۳ مهاجرت (فعلی) در نسخه PHP:
+- روت کردن آپدیت‌ها با `UpdateRouter`
+- پشتیبانی از Callback Query برای `nav:main`, `profile`, `support`, `my_configs`
+- پشتیبانی از Callback Query برای `referral:menu` + لینک اشتراک‌گذاری دعوت
+- منوی اصلی داینامیک و نمایش پروفایل/پشتیبانی/کانفیگ‌های من در PHP
+- فلو اولیه `wallet charge` و `buy flow` (انتخاب نوع/پکیج و پرداخت کیف پول)
+- مدیریت ادمین برای تایید/رد درخواست شارژ کیف پول در PHP
+- اضافه شدن مسیرهای پرداخت `card/crypto/tetrapay` (نسخه اولیه) در PHP
+- تکمیل تحویل سفارش از `pending_orders` با صف تحویل ادمین
+- اتصال اولیه API برای TetraPay + انتخاب ارز در پرداخت کریپتو
+- Card receipt flow در PHP (state + ثبت رسید + بررسی ادمین)
+- Crypto TX Hash flow در PHP + بررسی ادمین
+- بهبود idempotency برای بررسی پرداخت TetraPay
+- ثبت payload درگاه‌ها (TetraPay/crypto) در payment برای دیباگ و audit
+- verify on-chain برای crypto در مسیر ادمین (LTC / TRON / TON / USDT(BEP20) / USDC(BEP20))
+- افزودن amount/rate validation برای تایید کریپتو (با tolerance)
+- استفاده از مقدار on-chain در amount-check (در صورت دسترسی) با fallback به claimed amount کاربر
+- تکمیل اولیه `test:start` و `agency:request` با ثبت درخواست متنی و ارسال برای ادمین
+- DB-backed tracking برای `free_test_requests` و `agency_requests` با وضعیت `pending/approved/rejected`
+- نمایش خلاصه آخرین خریدها در `my_configs`
 
 ---
 
@@ -261,7 +290,27 @@ python3 main.py
 
 ```
 ConfigFlow/
-├── main.py                  # نقطه ورود — ربات را راه‌اندازی می‌کند
+├── php/                     # نسخه درحال مهاجرت PHP (فاز ۱)
+│   ├── public/
+│   │   └── webhook.php      # ورودی اصلی Webhook تلگرام
+│   ├── scripts/
+│   │   ├── init_db.php      # ساخت جداول اولیه در MySQL
+│   │   ├── migrate_sqlite_to_mysql.php
+│   │   └── schema.sql
+│   ├── src/
+│   │   ├── Bootstrap.php    # بارگذاری env
+│   │   ├── Config.php       # خواندن تنظیمات محیطی
+│   │   ├── Database.php     # اتصال PDO و عملیات پایه کاربر
+│   │   ├── CallbackHandler.php
+│   │   ├── KeyboardBuilder.php
+│   │   ├── MessageHandler.php
+│   │   ├── MenuService.php
+│   │   ├── PaymentGatewayService.php
+│   │   ├── SettingsRepository.php
+│   │   ├── StartHandler.php # معادل /start در PHP
+│   │   ├── TelegramClient.php
+│   │   └── UpdateRouter.php
+│   └── .env.example
 ├── api.py                   # Flask API — سرویس Worker API
 ├── worker.py                # ورکر سرور ایران (اتصال به 3x-ui)
 ├── requirements.txt         # وابستگی‌های Python
@@ -271,9 +320,8 @@ ConfigFlow/
 ├── .env                     # تنظیمات ربات (ساخته می‌شود)
 │
 └── bot/                     # پکیج اصلی ربات
-    ├── __init__.py          # راه‌اندازی هندلرها
+    ├── __init__.py          # ماژول‌های legacy پایتون (درحال حذف تدریجی)
     ├── config.py            # تمام ثابت‌ها و تنظیمات محیطی
-    ├── bot_instance.py      # نمونه TeleBot و USER_STATE
     ├── helpers.py           # توابع کمکی (esc، fmt_price، is_admin، ...)
     ├── db.py                # تمام توابع دیتابیس SQLite
     ├── payments.py          # منطق انتخاب و پردازش پرداخت
@@ -285,23 +333,12 @@ ConfigFlow/
     │   ├── tetrapay.py      # ایجاد و تأیید سفارش TetraPay
     │   └── swapwallet.py    # ایجاد، بررسی و نمایش صفحه SwapWallet
     │
-    ├── ui/                  # لایه رابط کاربری
-    │   ├── __init__.py
-    │   ├── helpers.py       # send_or_edit، set_bot_commands، قفل کانال
-    │   ├── keyboards.py     # منوهای اینلاین (kb_main، kb_admin_panel)
-    │   ├── menus.py         # نمایش منوهای اصلی (پروفایل، خرید، ...)
-    │   └── notifications.py # اطلاع‌رسانی خرید، تحویل کانفیگ، QR Code
-    │
     ├── admin/               # ابزارهای پنل ادمین
     │   ├── __init__.py
     │   ├── renderers.py     # نمایش صفحات ادمین (کاربران، پکیج‌ها، ...)
     │   └── backup.py        # بکاپ دستی و خودکار دیتابیس
     │
-    └── handlers/            # هندلرهای تلگرام
-        ├── __init__.py      # ثبت تمام هندلرها
-        ├── start.py         # دستور /start
-        ├── callbacks.py     # پردازش Callback Query (on_callback)
-        └── messages.py      # پردازش پیام‌های متنی (universal_handler)
+    └── (Python bot handlers/ui removed after PHP migration phases)
 ```
 
 ---
@@ -315,6 +352,21 @@ ConfigFlow/
 | `BOT_TOKEN` | توکن ربات از @BotFather | `123456789:ABC...` |
 | `ADMIN_IDS` | آیدی عددی ادمین‌ها (با کاما جدا) | `111,222,333` |
 | `DB_NAME` | نام فایل دیتابیس | `ConfigFlow.db` |
+
+### `php/.env.example` — تنظیمات فاز ۱ PHP
+
+| متغیر | توضیحات | مثال |
+|-------|---------|------|
+| `BOT_TOKEN` | توکن ربات تلگرام | `123456789:ABC...` |
+| `BOT_USERNAME` | یوزرنیم ربات (برای لینک دعوت) | `MyConfigFlowBot` |
+| `ADMIN_IDS` | آیدی ادمین‌ها | `111,222` |
+| `DB_HOST` | آدرس MySQL | `127.0.0.1` |
+| `DB_PORT` | پورت MySQL | `3306` |
+| `DB_NAME` | نام دیتابیس MySQL | `configflow` |
+| `DB_USER` | نام کاربری دیتابیس | `root` |
+| `DB_PASS` | رمز عبور دیتابیس | `secret` |
+| `TETRAPAY_CREATE_URL` | آدرس ساخت سفارش تتراپی | `https://tetra98.com/api/create_order` |
+| `TETRAPAY_VERIFY_URL` | آدرس بررسی سفارش تتراپی | `https://tetra98.com/api/verify` |
 
 ### `config.env` — تنظیمات ورکر ایران
 
@@ -335,14 +387,14 @@ ConfigFlow/
 ## 🖥️ اجرا
 
 ```bash
-# اجرای مستقیم ربات
-python3 main.py
-
 # اجرای ورکر ایران (روی سرور ایران)
 python3 worker.py
 
 # اجرای API (برای ورکر)
 python3 api.py
+
+# اجرای webhook فاز ۱ PHP
+php -S 0.0.0.0:8080 -t php/public
 ```
 
 ---
