@@ -210,7 +210,13 @@ final class MessageHandler
                     "🎁 <b>درخواست تست رایگان جدید</b>\n\n"
                     . "شناسه: <code>{$requestId}</code>\n"
                     . "کاربر: <code>{$userId}</code>\n"
-                    . "توضیح:\n" . htmlspecialchars($text)
+                    . "توضیح:\n" . htmlspecialchars($text),
+                    [
+                        'inline_keyboard' => [
+                            [['text' => '👀 مشاهده درخواست', 'callback_data' => 'admin:req:free:view:' . $requestId]],
+                            [['text' => '🗂 مدیریت درخواست‌ها', 'callback_data' => 'admin:requests']],
+                        ],
+                    ]
                 );
             }
             return;
@@ -236,7 +242,13 @@ final class MessageHandler
                     "🤝 <b>درخواست نمایندگی جدید</b>\n\n"
                     . "شناسه: <code>{$requestId}</code>\n"
                     . "کاربر: <code>{$userId}</code>\n"
-                    . "متن درخواست:\n" . htmlspecialchars($text)
+                    . "متن درخواست:\n" . htmlspecialchars($text),
+                    [
+                        'inline_keyboard' => [
+                            [['text' => '👀 مشاهده درخواست', 'callback_data' => 'admin:req:agency:view:' . $requestId]],
+                            [['text' => '🗂 مدیریت درخواست‌ها', 'callback_data' => 'admin:requests']],
+                        ],
+                    ]
                 );
             }
             return;

@@ -62,6 +62,7 @@ final class KeyboardBuilder
             'inline_keyboard' => [
                 [['text' => '💳 مدیریت درخواست‌های شارژ', 'callback_data' => 'admin:payments']],
                 [['text' => '📦 صف تحویل سفارش‌ها', 'callback_data' => 'admin:deliveries']],
+                [['text' => '🗂 مدیریت درخواست‌ها (تست/نمایندگی)', 'callback_data' => 'admin:requests']],
                 [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']],
             ],
         ];

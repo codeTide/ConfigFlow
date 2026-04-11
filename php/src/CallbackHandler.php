@@ -140,6 +140,151 @@ final class CallbackHandler
             return;
         }
 
+        if ($data === 'admin:requests') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "🗂 <b>مدیریت درخواست‌ها</b>\n\nنوع درخواست را انتخاب کنید:",
+                [
+                    'inline_keyboard' => [
+                        [['text' => '🎁 درخواست‌های تست رایگان', 'callback_data' => 'admin:req:free:list']],
+                        [['text' => '🤝 درخواست‌های نمایندگی', 'callback_data' => 'admin:req:agency:list']],
+                        [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']],
+                    ],
+                ]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:req:free:list' || $data === 'admin:req:agency:list') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $isFree = $data === 'admin:req:free:list';
+            $items = $isFree
+                ? $this->database->listPendingFreeTestRequests(30)
+                : $this->database->listPendingAgencyRequests(30);
+            if ($items === []) {
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    $isFree ? '📭 درخواست تست رایگان در انتظار بررسی وجود ندارد.' : '📭 درخواست نمایندگی در انتظار بررسی وجود ندارد.',
+                    [
+                        'inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']]],
+                    ]
+                );
+                $this->telegram->answerCallbackQuery($callbackId);
+                return;
+            }
+
+            $rows = [];
+            foreach ($items as $item) {
+                $prefix = $isFree ? 'admin:req:free:view:' : 'admin:req:agency:view:';
+                $rows[] = [[
+                    'text' => sprintf('#%d | U:%d | %s', (int) $item['id'], (int) $item['user_id'], (string) ($item['created_at'] ?? '-')),
+                    'callback_data' => $prefix . (int) $item['id'],
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                $isFree ? '🎁 <b>درخواست‌های تست رایگان (pending)</b>' : '🤝 <b>درخواست‌های نمایندگی (pending)</b>',
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:req:free:view:') || str_starts_with($data, 'admin:req:agency:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $isFree = str_starts_with($data, 'admin:req:free:view:');
+            $requestId = (int) substr($data, strlen($isFree ? 'admin:req:free:view:' : 'admin:req:agency:view:'));
+            $request = $isFree
+                ? $this->database->getFreeTestRequestById($requestId)
+                : $this->database->getAgencyRequestById($requestId);
+            if (!is_array($request)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'درخواست یافت نشد.');
+                return;
+            }
+
+            $status = (string) ($request['status'] ?? 'pending');
+            $statusText = $status === 'approved' ? '✅ approved' : ($status === 'rejected' ? '❌ rejected' : '⏳ pending');
+            $text = ($isFree ? "🎁 <b>درخواست تست رایگان</b>\n\n" : "🤝 <b>درخواست نمایندگی</b>\n\n")
+                . "شناسه: <code>{$requestId}</code>\n"
+                . "کاربر: <code>" . (int) ($request['user_id'] ?? 0) . "</code>\n"
+                . "وضعیت: {$statusText}\n"
+                . "زمان ثبت: " . htmlspecialchars((string) ($request['created_at'] ?? '-')) . "\n\n"
+                . "متن:\n" . htmlspecialchars((string) ($request['note'] ?? ''));
+
+            $reviewPrefix = $isFree ? 'admin:req:free:' : 'admin:req:agency:';
+            $backKey = $isFree ? 'admin:req:free:list' : 'admin:req:agency:list';
+            $buttons = [
+                [['text' => '✅ تایید', 'callback_data' => $reviewPrefix . 'approve:' . $requestId]],
+                [['text' => '❌ رد', 'callback_data' => $reviewPrefix . 'reject:' . $requestId]],
+                [['text' => '🔙 بازگشت', 'callback_data' => $backKey]],
+            ];
+            if ($status !== 'pending') {
+                $buttons = [[['text' => '🔙 بازگشت', 'callback_data' => $backKey]]];
+            }
+
+            $this->telegram->editMessageText($chatId, $messageId, $text, ['inline_keyboard' => $buttons]);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (
+            str_starts_with($data, 'admin:req:free:approve:')
+            || str_starts_with($data, 'admin:req:free:reject:')
+            || str_starts_with($data, 'admin:req:agency:approve:')
+            || str_starts_with($data, 'admin:req:agency:reject:')
+        ) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+
+            $isFree = str_starts_with($data, 'admin:req:free:');
+            $approve = str_contains($data, ':approve:');
+            $prefix = $isFree
+                ? ($approve ? 'admin:req:free:approve:' : 'admin:req:free:reject:')
+                : ($approve ? 'admin:req:agency:approve:' : 'admin:req:agency:reject:');
+            $requestId = (int) substr($data, strlen($prefix));
+
+            $result = $isFree
+                ? $this->database->reviewFreeTestRequest($requestId, $approve)
+                : $this->database->reviewAgencyRequest($requestId, $approve);
+            if (!($result['ok'] ?? false)) {
+                $msg = (($result['error'] ?? '') === 'already_reviewed') ? 'این درخواست قبلاً بررسی شده است.' : 'بررسی درخواست انجام نشد.';
+                $this->telegram->answerCallbackQuery($callbackId, $msg);
+                return;
+            }
+
+            $statusText = $approve ? '✅ تایید شد' : '❌ رد شد';
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                ($isFree ? 'درخواست تست رایگان' : 'درخواست نمایندگی') . " <code>{$requestId}</code> {$statusText}.",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+
+            $userNotice = $approve
+                ? (($isFree ? "✅ درخواست تست رایگان شما تایید شد." : "✅ درخواست نمایندگی شما تایید شد."))
+                : (($isFree ? "❌ درخواست تست رایگان شما رد شد." : "❌ درخواست نمایندگی شما رد شد."));
+            $this->telegram->sendMessage((int) ($result['user_id'] ?? 0), $userNotice);
+            return;
+        }
+
         if (str_starts_with($data, 'admin:deliver:')) {
             if (!$isAdmin) {
                 $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');

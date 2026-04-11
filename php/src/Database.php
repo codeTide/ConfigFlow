@@ -170,6 +170,140 @@ final class Database
         return (int) $this->pdo->lastInsertId();
     }
 
+    public function listPendingFreeTestRequests(int $limit = 30): array
+    {
+        $limit = max(1, min($limit, 100));
+        $stmt = $this->pdo->prepare(
+            'SELECT id, user_id, note, created_at
+             FROM free_test_requests
+             WHERE status = :status
+             ORDER BY id DESC
+             LIMIT ' . $limit
+        );
+        $stmt->execute(['status' => 'pending']);
+        return $stmt->fetchAll();
+    }
+
+    public function listPendingAgencyRequests(int $limit = 30): array
+    {
+        $limit = max(1, min($limit, 100));
+        $stmt = $this->pdo->prepare(
+            'SELECT id, user_id, note, created_at
+             FROM agency_requests
+             WHERE status = :status
+             ORDER BY id DESC
+             LIMIT ' . $limit
+        );
+        $stmt->execute(['status' => 'pending']);
+        return $stmt->fetchAll();
+    }
+
+    public function getFreeTestRequestById(int $requestId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, user_id, note, status, created_at, reviewed_at, admin_note
+             FROM free_test_requests
+             WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute(['id' => $requestId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function getAgencyRequestById(int $requestId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, user_id, note, status, created_at, reviewed_at, admin_note
+             FROM agency_requests
+             WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute(['id' => $requestId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function reviewFreeTestRequest(int $requestId, bool $approve, ?string $adminNote = null): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $lockStmt = $this->pdo->prepare('SELECT id, user_id, status FROM free_test_requests WHERE id = :id LIMIT 1 FOR UPDATE');
+            $lockStmt->execute(['id' => $requestId]);
+            $row = $lockStmt->fetch();
+            if (!is_array($row)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_found'];
+            }
+            if (($row['status'] ?? '') !== 'pending') {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'already_reviewed'];
+            }
+
+            $status = $approve ? 'approved' : 'rejected';
+            $update = $this->pdo->prepare(
+                'UPDATE free_test_requests
+                 SET status = :status,
+                     admin_note = :admin_note,
+                     reviewed_at = :reviewed_at
+                 WHERE id = :id'
+            );
+            $update->execute([
+                'status' => $status,
+                'admin_note' => $adminNote,
+                'reviewed_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $requestId,
+            ]);
+
+            $this->pdo->commit();
+            return ['ok' => true, 'status' => $status, 'user_id' => (int) $row['user_id']];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
+    public function reviewAgencyRequest(int $requestId, bool $approve, ?string $adminNote = null): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $lockStmt = $this->pdo->prepare('SELECT id, user_id, status FROM agency_requests WHERE id = :id LIMIT 1 FOR UPDATE');
+            $lockStmt->execute(['id' => $requestId]);
+            $row = $lockStmt->fetch();
+            if (!is_array($row)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_found'];
+            }
+            if (($row['status'] ?? '') !== 'pending') {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'already_reviewed'];
+            }
+
+            $status = $approve ? 'approved' : 'rejected';
+            $update = $this->pdo->prepare(
+                'UPDATE agency_requests
+                 SET status = :status,
+                     admin_note = :admin_note,
+                     reviewed_at = :reviewed_at
+                 WHERE id = :id'
+            );
+            $update->execute([
+                'status' => $status,
+                'admin_note' => $adminNote,
+                'reviewed_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $requestId,
+            ]);
+
+            $this->pdo->commit();
+            return ['ok' => true, 'status' => $status, 'user_id' => (int) $row['user_id']];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
     public function setUserState(int $userId, string $stateName, array $payload = []): void
     {
         $stmt = $this->pdo->prepare(
