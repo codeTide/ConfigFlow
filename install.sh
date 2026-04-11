@@ -253,6 +253,7 @@ create_systemd_service() {
 [Unit]
 Description=ConfigFlow Telegram Bot — ${BOT_NAME}
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -277,6 +278,7 @@ create_worker_service() {
 [Unit]
 Description=ConfigFlow Iran Worker — ${BOT_NAME}
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple

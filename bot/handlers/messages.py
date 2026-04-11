@@ -1034,8 +1034,30 @@ def universal_handler(message):
             try:
                 file_info = bot.get_file(message.document.file_id)
                 downloaded = bot.download_file(file_info.file_path)
+
+                # بررسی صحت فایل بکاپ قبل از جایگزینی
+                import tempfile, shutil
+                tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
+                try:
+                    with os.fdopen(tmp_fd, "wb") as tmp_f:
+                        tmp_f.write(downloaded)
+                    # اعتبارسنجی: آیا فایل یک دیتابیس SQLite سالم است؟
+                    check_conn = sqlite3.connect(tmp_path)
+                    result = check_conn.execute("PRAGMA integrity_check").fetchone()
+                    check_conn.close()
+                    if result[0] != "ok":
+                        os.unlink(tmp_path)
+                        bot.send_message(uid, "❌ فایل بکاپ خراب است (integrity check failed).", reply_markup=back_button("admin:backup"))
+                        return
+                except sqlite3.DatabaseError:
+                    os.unlink(tmp_path)
+                    bot.send_message(uid, "❌ فایل ارسال‌شده یک دیتابیس SQLite معتبر نیست.", reply_markup=back_button("admin:backup"))
+                    return
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+
                 # ابتدا بکاپ از دیتابیس فعلی
-                import shutil
                 backup_ts = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
                 pre_restore_backup = f"{DB_NAME}.pre_restore_{backup_ts}"
                 if os.path.exists(DB_NAME):
@@ -1043,10 +1065,16 @@ def universal_handler(message):
                 # جایگزینی دیتابیس
                 with open(DB_NAME, "wb") as f:
                     f.write(downloaded)
+                # حذف فایل‌های WAL و SHM قدیمی تا دیتابیس جدید خراب نشود
+                for ext in ("-wal", "-shm"):
+                    wal_path = DB_NAME + ext
+                    if os.path.exists(wal_path):
+                        os.remove(wal_path)
                 state_clear(uid)
                 bot.send_message(uid,
                     f"✅ بکاپ با موفقیت بازیابی شد.\n\n"
-                    f"💾 نسخه قبلی در <code>{esc(pre_restore_backup)}</code> ذخیره شد.",
+                    f"💾 نسخه قبلی در <code>{esc(pre_restore_backup)}</code> ذخیره شد.\n"
+                    f"⚠️ برای اعمال کامل، ربات را ریستارت کنید.",
                     reply_markup=back_button("admin:backup"))
             except Exception as e:
                 bot.send_message(uid, f"❌ خطا در بازیابی بکاپ: {esc(str(e))}", reply_markup=back_button("admin:backup"))
