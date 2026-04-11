@@ -1,2 +1,2 @@
-# bot package — import handlers to trigger their registration
-from . import handlers  # noqa: F401
+# Legacy Python package kept only for shared non-bot modules
+# (worker/api helpers during migration to PHP webhook).
