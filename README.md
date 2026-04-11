@@ -251,9 +251,22 @@ DB_NAME=ConfigFlow.db
 > برای چند ادمین، آیدی‌ها را با کاما جدا کنید: `ADMIN_IDS=111,222,333`
 
 ```bash
-# اجرای ربات
-python3 main.py
+# اجرای فاز ۱ نسخه PHP (Webhook)
+php -S 0.0.0.0:8080 -t php/public
 ```
+
+```bash
+# ساخت اسکیمای MySQL (فاز ۲)
+php php/scripts/init_db.php
+
+# انتقال داده‌های اصلی از SQLite به MySQL (فاز ۲)
+php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
+```
+
+فاز ۳ مهاجرت (فعلی) در نسخه PHP:
+- روت کردن آپدیت‌ها با `UpdateRouter`
+- پشتیبانی از Callback Query برای `nav:main`, `profile`, `support`, `my_configs`
+- منوی اصلی داینامیک و نمایش پروفایل/پشتیبانی/کانفیگ‌های من در PHP
 
 ---
 
@@ -261,7 +274,25 @@ python3 main.py
 
 ```
 ConfigFlow/
-├── main.py                  # نقطه ورود — ربات را راه‌اندازی می‌کند
+├── php/                     # نسخه درحال مهاجرت PHP (فاز ۱)
+│   ├── public/
+│   │   └── webhook.php      # ورودی اصلی Webhook تلگرام
+│   ├── scripts/
+│   │   ├── init_db.php      # ساخت جداول اولیه در MySQL
+│   │   ├── migrate_sqlite_to_mysql.php
+│   │   └── schema.sql
+│   ├── src/
+│   │   ├── Bootstrap.php    # بارگذاری env
+│   │   ├── Config.php       # خواندن تنظیمات محیطی
+│   │   ├── Database.php     # اتصال PDO و عملیات پایه کاربر
+│   │   ├── CallbackHandler.php
+│   │   ├── KeyboardBuilder.php
+│   │   ├── MenuService.php
+│   │   ├── SettingsRepository.php
+│   │   ├── StartHandler.php # معادل /start در PHP
+│   │   ├── TelegramClient.php
+│   │   └── UpdateRouter.php
+│   └── .env.example
 ├── api.py                   # Flask API — سرویس Worker API
 ├── worker.py                # ورکر سرور ایران (اتصال به 3x-ui)
 ├── requirements.txt         # وابستگی‌های Python
@@ -299,7 +330,6 @@ ConfigFlow/
     │
     └── handlers/            # هندلرهای تلگرام
         ├── __init__.py      # ثبت تمام هندلرها
-        ├── start.py         # دستور /start
         ├── callbacks.py     # پردازش Callback Query (on_callback)
         └── messages.py      # پردازش پیام‌های متنی (universal_handler)
 ```
@@ -315,6 +345,18 @@ ConfigFlow/
 | `BOT_TOKEN` | توکن ربات از @BotFather | `123456789:ABC...` |
 | `ADMIN_IDS` | آیدی عددی ادمین‌ها (با کاما جدا) | `111,222,333` |
 | `DB_NAME` | نام فایل دیتابیس | `ConfigFlow.db` |
+
+### `php/.env.example` — تنظیمات فاز ۱ PHP
+
+| متغیر | توضیحات | مثال |
+|-------|---------|------|
+| `BOT_TOKEN` | توکن ربات تلگرام | `123456789:ABC...` |
+| `ADMIN_IDS` | آیدی ادمین‌ها | `111,222` |
+| `DB_HOST` | آدرس MySQL | `127.0.0.1` |
+| `DB_PORT` | پورت MySQL | `3306` |
+| `DB_NAME` | نام دیتابیس MySQL | `configflow` |
+| `DB_USER` | نام کاربری دیتابیس | `root` |
+| `DB_PASS` | رمز عبور دیتابیس | `secret` |
 
 ### `config.env` — تنظیمات ورکر ایران
 
@@ -335,14 +377,14 @@ ConfigFlow/
 ## 🖥️ اجرا
 
 ```bash
-# اجرای مستقیم ربات
-python3 main.py
-
 # اجرای ورکر ایران (روی سرور ایران)
 python3 worker.py
 
 # اجرای API (برای ورکر)
 python3 api.py
+
+# اجرای webhook فاز ۱ PHP
+php -S 0.0.0.0:8080 -t php/public
 ```
 
 ---
