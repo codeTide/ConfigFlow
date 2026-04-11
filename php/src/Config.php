@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ConfigFlow\Bot;
+
+final class Config
+{
+    public static function botToken(): string
+    {
+        return trim((string) getenv('BOT_TOKEN'));
+    }
+
+    public static function adminIds(): array
+    {
+        $raw = (string) getenv('ADMIN_IDS');
+        $ids = array_filter(array_map('trim', explode(',', $raw)), static fn($item) => $item !== '');
+
+        return array_values(array_map('intval', $ids));
+    }
+
+    public static function dbHost(): string
+    {
+        return (string) getenv('DB_HOST') ?: '127.0.0.1';
+    }
+
+    public static function dbPort(): int
+    {
+        return (int) ((string) getenv('DB_PORT') ?: '3306');
+    }
+
+    public static function dbName(): string
+    {
+        return (string) getenv('DB_NAME') ?: 'configflow';
+    }
+
+    public static function dbUser(): string
+    {
+        return (string) getenv('DB_USER') ?: 'root';
+    }
+
+    public static function dbPass(): string
+    {
+        return (string) getenv('DB_PASS');
+    }
+}

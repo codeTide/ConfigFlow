@@ -1,0 +1,83 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ConfigFlow\Bot;
+
+use PDO;
+
+final class Database
+{
+    private PDO $pdo;
+
+    public function __construct()
+    {
+        $dsn = sprintf(
+            'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
+            Config::dbHost(),
+            Config::dbPort(),
+            Config::dbName()
+        );
+
+        $this->pdo = new PDO($dsn, Config::dbUser(), Config::dbPass(), [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+    }
+
+    public function pdo(): PDO
+    {
+        return $this->pdo;
+    }
+
+    public function ensureUser(array $fromUser): bool
+    {
+        $userId = (int) ($fromUser['id'] ?? 0);
+        $fullName = trim((string) (($fromUser['first_name'] ?? '') . ' ' . ($fromUser['last_name'] ?? '')));
+        $username = (string) ($fromUser['username'] ?? '');
+        $now = gmdate('Y-m-d H:i:s');
+
+        $select = $this->pdo->prepare('SELECT user_id FROM users WHERE user_id = :user_id');
+        $select->execute(['user_id' => $userId]);
+        $exists = (bool) $select->fetchColumn();
+
+        if (!$exists) {
+            $insert = $this->pdo->prepare(
+                'INSERT INTO users (user_id, full_name, username, balance, joined_at, last_seen_at, first_start_notified, status, is_agent)
+                 VALUES (:user_id, :full_name, :username, 0, :joined_at, :last_seen_at, 0, :status, 0)'
+            );
+            $insert->execute([
+                'user_id' => $userId,
+                'full_name' => $fullName,
+                'username' => $username,
+                'joined_at' => $now,
+                'last_seen_at' => $now,
+                'status' => 'unsafe',
+            ]);
+
+            return true;
+        }
+
+        $update = $this->pdo->prepare(
+            'UPDATE users SET full_name = :full_name, username = :username, last_seen_at = :last_seen_at WHERE user_id = :user_id'
+        );
+        $update->execute([
+            'full_name' => $fullName,
+            'username' => $username,
+            'last_seen_at' => $now,
+            'user_id' => $userId,
+        ]);
+
+        return false;
+    }
+
+    public function userStatus(int $userId): ?string
+    {
+        $stmt = $this->pdo->prepare('SELECT status FROM users WHERE user_id = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
+
+        $row = $stmt->fetch();
+
+        return $row['status'] ?? null;
+    }
+}
