@@ -119,4 +119,127 @@ final class Database
             'total_purchase_amount' => (int) ($purchaseStats['total_amount'] ?? 0),
         ];
     }
+
+    public function setUserState(int $userId, string $stateName, array $payload = []): void
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO user_states (user_id, state_name, state_payload, updated_at)
+             VALUES (:user_id, :state_name, :state_payload, :updated_at)
+             ON DUPLICATE KEY UPDATE state_name = VALUES(state_name), state_payload = VALUES(state_payload), updated_at = VALUES(updated_at)'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'state_name' => $stateName,
+            'state_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+    }
+
+    public function getUserState(int $userId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT state_name, state_payload FROM user_states WHERE user_id = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return null;
+        }
+
+        $payload = json_decode((string) ($row['state_payload'] ?? '{}'), true);
+        return [
+            'state_name' => (string) ($row['state_name'] ?? ''),
+            'payload' => is_array($payload) ? $payload : [],
+        ];
+    }
+
+    public function clearUserState(int $userId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM user_states WHERE user_id = :user_id');
+        $stmt->execute(['user_id' => $userId]);
+    }
+
+    public function getActiveTypes(): array
+    {
+        return $this->pdo->query('SELECT id, name FROM config_types WHERE is_active = 1 ORDER BY id ASC')->fetchAll();
+    }
+
+    public function getActivePackagesByType(int $typeId): array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, name, price, volume_gb, duration_days FROM packages WHERE type_id = :type_id AND active = 1 ORDER BY id ASC');
+        $stmt->execute(['type_id' => $typeId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getPackage(int $packageId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, type_id, name, price, volume_gb, duration_days FROM packages WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $packageId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function createPayment(array $data): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO payments (kind, user_id, package_id, amount, payment_method, status, created_at)
+             VALUES (:kind, :user_id, :package_id, :amount, :payment_method, :status, :created_at)'
+        );
+        $stmt->execute($data);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function walletPayPackage(int $userId, int $packageId): array
+    {
+        $package = $this->getPackage($packageId);
+        if ($package === null) {
+            return ['ok' => false, 'error' => 'package_not_found'];
+        }
+
+        $price = (int) $package['price'];
+        $this->pdo->beginTransaction();
+        try {
+            $user = $this->getUser($userId);
+            $balance = (int) ($user['balance'] ?? 0);
+            if ($balance < $price) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'insufficient_balance', 'price' => $price, 'balance' => $balance];
+            }
+
+            $newBalance = $balance - $price;
+            $update = $this->pdo->prepare('UPDATE users SET balance = :balance WHERE user_id = :user_id');
+            $update->execute(['balance' => $newBalance, 'user_id' => $userId]);
+
+            $paymentId = $this->createPayment([
+                'kind' => 'purchase',
+                'user_id' => $userId,
+                'package_id' => $packageId,
+                'amount' => $price,
+                'payment_method' => 'wallet',
+                'status' => 'paid',
+                'created_at' => gmdate('Y-m-d H:i:s'),
+            ]);
+
+            $pendingStmt = $this->pdo->prepare(
+                'INSERT INTO pending_orders (user_id, package_id, payment_id, amount, payment_method, created_at, status)
+                 VALUES (:user_id, :package_id, :payment_id, :amount, :payment_method, :created_at, :status)'
+            );
+            $pendingStmt->execute([
+                'user_id' => $userId,
+                'package_id' => $packageId,
+                'payment_id' => $paymentId,
+                'amount' => $price,
+                'payment_method' => 'wallet',
+                'created_at' => gmdate('Y-m-d H:i:s'),
+                'status' => 'paid_waiting_delivery',
+            ]);
+
+            $pendingId = (int) $this->pdo->lastInsertId();
+            $this->pdo->commit();
+            return ['ok' => true, 'payment_id' => $paymentId, 'pending_order_id' => $pendingId, 'price' => $price, 'new_balance' => $newBalance];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
 }

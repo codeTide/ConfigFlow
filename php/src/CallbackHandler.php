@@ -97,7 +97,122 @@ final class CallbackHandler
         }
 
         if ($data === 'wallet:charge' || $data === 'buy:start' || $data === 'test:start' || $data === 'agency:request') {
+            if ($data === 'wallet:charge') {
+                $this->database->setUserState($userId, 'await_wallet_amount');
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    "💳 <b>شارژ کیف پول</b>\n\nلطفاً مبلغ موردنظر را به تومان ارسال کنید.",
+                    KeyboardBuilder::backToMain()
+                );
+                $this->telegram->answerCallbackQuery($callbackId);
+                return;
+            }
+
+            if ($data === 'buy:start') {
+                $types = $this->database->getActiveTypes();
+                if ($types === []) {
+                    $this->telegram->answerCallbackQuery($callbackId, 'فعلاً سرویسی برای خرید فعال نیست.');
+                    return;
+                }
+
+                $rows = [];
+                foreach ($types as $type) {
+                    $rows[] = [[
+                        'text' => (string) ($type['name'] ?? '—'),
+                        'callback_data' => 'buy:type:' . (int) $type['id'],
+                    ]];
+                }
+                $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']];
+
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    "🛒 <b>خرید کانفیگ</b>\n\nنوع سرویس موردنظر را انتخاب کنید:",
+                    ['inline_keyboard' => $rows]
+                );
+                $this->telegram->answerCallbackQuery($callbackId);
+                return;
+            }
+
             $this->telegram->answerCallbackQuery($callbackId, 'این بخش در فاز بعدی مهاجرت تکمیل می‌شود.');
+            return;
+        }
+
+        if (str_starts_with($data, 'buy:type:')) {
+            $typeId = (int) substr($data, strlen('buy:type:'));
+            $packages = $this->database->getActivePackagesByType($typeId);
+            if ($packages === []) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پکیجی برای این نوع سرویس یافت نشد.');
+                return;
+            }
+
+            $rows = [];
+            foreach ($packages as $pkg) {
+                $label = sprintf('%s | %sGB | %s روز | %s تومان', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $pkg['price']);
+                $rows[] = [[
+                    'text' => $label,
+                    'callback_data' => 'buy:pkg:' . (int) $pkg['id'],
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'buy:start']];
+
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                '📦 یک پکیج را انتخاب کنید:',
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'buy:pkg:')) {
+            $packageId = (int) substr($data, strlen('buy:pkg:'));
+            $package = $this->database->getPackage($packageId);
+            if ($package === null) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پکیج پیدا نشد.');
+                return;
+            }
+
+            $text = "💰 <b>پرداخت سفارش</b>\n\n"
+                . "پکیج: <b>" . htmlspecialchars((string) $package['name']) . "</b>\n"
+                . "قیمت: <b>" . (int) $package['price'] . "</b> تومان\n\n"
+                . "روش پرداخت را انتخاب کنید:";
+            $keyboard = [
+                'inline_keyboard' => [
+                    [['text' => '💳 پرداخت با کیف پول', 'callback_data' => 'buy:wallet:' . $packageId]],
+                    [['text' => '🔙 بازگشت', 'callback_data' => 'buy:type:' . (int) $package['type_id']]],
+                ],
+            ];
+            $this->telegram->editMessageText($chatId, $messageId, $text, $keyboard);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'buy:wallet:')) {
+            $packageId = (int) substr($data, strlen('buy:wallet:'));
+            $result = $this->database->walletPayPackage($userId, $packageId);
+            if (!($result['ok'] ?? false)) {
+                if (($result['error'] ?? '') === 'insufficient_balance') {
+                    $this->telegram->answerCallbackQuery($callbackId, 'موجودی کیف پول کافی نیست.');
+                    return;
+                }
+                $this->telegram->answerCallbackQuery($callbackId, 'خطا در ثبت سفارش. دوباره تلاش کنید.');
+                return;
+            }
+
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "✅ خرید با کیف پول ثبت شد.\n\n"
+                . "شناسه پرداخت: <code>" . (int) $result['payment_id'] . "</code>\n"
+                . "مبلغ: <b>" . (int) $result['price'] . "</b> تومان\n"
+                . "موجودی جدید: <b>" . (int) $result['new_balance'] . "</b> تومان\n\n"
+                . "سفارش شما در صف تحویل قرار گرفت.",
+                KeyboardBuilder::backToMain()
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
 

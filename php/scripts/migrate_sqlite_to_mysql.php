@@ -22,12 +22,18 @@ $sqlite = new PDO('sqlite:' . $sqlitePath);
 $sqlite->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $sqlite->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
-$tables = ['users', 'settings', 'referrals', 'config_types', 'packages', 'purchases'];
+$tables = ['users', 'settings', 'referrals', 'config_types', 'packages', 'purchases', 'payments', 'pending_orders'];
 
 $mysql->beginTransaction();
 
 try {
     foreach ($tables as $table) {
+        $exists = $sqlite->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = :name");
+        $exists->execute(['name' => $table]);
+        if ($exists->fetchColumn() === false) {
+            continue;
+        }
+
         $rows = $sqlite->query("SELECT * FROM {$table}")->fetchAll();
         if ($rows === []) {
             continue;

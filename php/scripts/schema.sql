@@ -55,3 +55,37 @@ CREATE TABLE IF NOT EXISTS purchases (
     is_test TINYINT(1) NOT NULL DEFAULT 0,
     INDEX idx_purchases_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payments (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    kind VARCHAR(32) NOT NULL,
+    user_id BIGINT NOT NULL,
+    package_id BIGINT NULL,
+    amount INT NOT NULL,
+    payment_method VARCHAR(64) NOT NULL,
+    status VARCHAR(64) NOT NULL,
+    created_at DATETIME NOT NULL,
+    approved_at DATETIME NULL,
+    INDEX idx_payments_user (user_id),
+    INDEX idx_payments_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pending_orders (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    package_id BIGINT NOT NULL,
+    payment_id BIGINT NULL,
+    amount INT NOT NULL,
+    payment_method VARCHAR(64) NOT NULL,
+    created_at DATETIME NOT NULL,
+    status VARCHAR(64) NOT NULL DEFAULT 'waiting',
+    INDEX idx_pending_user (user_id),
+    INDEX idx_pending_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_states (
+    user_id BIGINT PRIMARY KEY,
+    state_name VARCHAR(128) NOT NULL,
+    state_payload JSON NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -9,6 +9,7 @@ final class UpdateRouter
     public function __construct(
         private StartHandler $startHandler,
         private CallbackHandler $callbackHandler,
+        private MessageHandler $messageHandler,
     ) {
     }
 
@@ -16,6 +17,7 @@ final class UpdateRouter
     {
         if (isset($update['message'])) {
             $this->startHandler->handle($update);
+            $this->messageHandler->handle($update);
         }
 
         if (isset($update['callback_query'])) {
