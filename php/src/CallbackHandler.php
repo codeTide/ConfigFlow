@@ -75,7 +75,7 @@ final class CallbackHandler
                 $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
                 return;
             }
-            $items = $this->database->listWaitingWalletChargePayments();
+            $items = $this->database->listWaitingAdminPayments();
             if ($items === []) {
                 $this->telegram->editMessageText(
                     $chatId,
@@ -90,7 +90,7 @@ final class CallbackHandler
             $rows = [];
             foreach ($items as $item) {
                 $rows[] = [[
-                    'text' => sprintf('#%d | U:%d | %d تومان', (int) $item['id'], (int) $item['user_id'], (int) $item['amount']),
+                    'text' => sprintf('#%d | %s | U:%d | %d تومان', (int) $item['id'], (string) $item['kind'], (int) $item['user_id'], (int) $item['amount']),
                     'callback_data' => 'admin:payment:view:' . (int) $item['id'],
                 ]];
             }
@@ -204,7 +204,7 @@ final class CallbackHandler
             }
             $approve = str_starts_with($data, 'pay:approve:');
             $paymentId = (int) substr($data, $approve ? strlen('pay:approve:') : strlen('pay:reject:'));
-            $result = $this->database->applyWalletChargeDecision($paymentId, $approve);
+            $result = $this->database->applyAdminPaymentDecision($paymentId, $approve);
             if (!($result['ok'] ?? false)) {
                 $this->telegram->answerCallbackQuery($callbackId, 'این درخواست قابل پردازش نیست.');
                 return;
@@ -219,9 +219,15 @@ final class CallbackHandler
             );
             $this->telegram->answerCallbackQuery($callbackId);
 
-            $userNotice = $approve
-                ? "✅ درخواست شارژ کیف پول شما تایید شد.\nمبلغ: <b>{$result['amount']}</b> تومان"
-                : "❌ درخواست شارژ کیف پول شما رد شد.";
+            if (($result['kind'] ?? '') === 'wallet_charge') {
+                $userNotice = $approve
+                    ? "✅ درخواست شارژ کیف پول شما تایید شد.\nمبلغ: <b>{$result['amount']}</b> تومان"
+                    : "❌ درخواست شارژ کیف پول شما رد شد.";
+            } else {
+                $userNotice = $approve
+                    ? "✅ پرداخت سفارش شما تایید شد و در صف تحویل قرار گرفت."
+                    : "❌ پرداخت سفارش شما رد شد.";
+            }
             $this->telegram->sendMessage((int) $result['user_id'], $userNotice);
             return;
         }
@@ -445,7 +451,8 @@ final class CallbackHandler
                     . ($owner !== '' ? "به نام: {$owner}\n" : '')
                     . "\nشناسه سفارش: <code>{$pendingId}</code>\n"
                     . "مبلغ: <b>{$amount}</b> تومان\n\n"
-                    . "پس از واریز، رسید را برای ادمین ارسال کنید.";
+                    . "پس از واریز، رسید را همینجا (عکس/فایل/متن) ارسال کنید.";
+                $this->database->setUserState($userId, 'await_card_receipt', ['payment_id' => $paymentId]);
             } elseif ($method === 'crypto') {
                 $address = htmlspecialchars($this->gateways->cryptoAddress((string) $coin));
                 $text = "💎 <b>پرداخت کریپتو</b>\n\n"

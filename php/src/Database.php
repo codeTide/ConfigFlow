@@ -266,6 +266,20 @@ final class Database
         return $stmt->fetchAll();
     }
 
+    public function listWaitingAdminPayments(int $limit = 20): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, kind, user_id, amount, payment_method, created_at
+             FROM payments
+             WHERE status = 'waiting_admin'
+             ORDER BY id ASC
+             LIMIT :limit"
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
     public function applyWalletChargeDecision(int $paymentId, bool $approve): array
     {
         $this->pdo->beginTransaction();
@@ -316,6 +330,74 @@ final class Database
             return [
                 'ok' => true,
                 'status' => $newStatus,
+                'user_id' => (int) $payment['user_id'],
+                'amount' => (int) $payment['amount'],
+            ];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
+    public function applyAdminPaymentDecision(int $paymentId, bool $approve): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, user_id, amount, status, kind
+                 FROM payments
+                 WHERE id = :id
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $stmt->execute(['id' => $paymentId]);
+            $payment = $stmt->fetch();
+            if (!is_array($payment)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_found'];
+            }
+            if (($payment['status'] ?? '') !== 'waiting_admin') {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_actionable'];
+            }
+
+            $newStatus = $approve ? 'approved' : 'rejected';
+            $update = $this->pdo->prepare(
+                "UPDATE payments
+                 SET status = :status, approved_at = :approved_at
+                 WHERE id = :id"
+            );
+            $update->execute([
+                'status' => $newStatus,
+                'approved_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $paymentId,
+            ]);
+
+            $kind = (string) ($payment['kind'] ?? '');
+            if ($kind === 'wallet_charge') {
+                if ($approve) {
+                    $balanceUpdate = $this->pdo->prepare('UPDATE users SET balance = balance + :amount WHERE user_id = :user_id');
+                    $balanceUpdate->execute([
+                        'amount' => (int) $payment['amount'],
+                        'user_id' => (int) $payment['user_id'],
+                    ]);
+                }
+            } elseif ($kind === 'purchase') {
+                $pendingStatus = $approve ? 'paid_waiting_delivery' : 'cancelled';
+                $pendingUpdate = $this->pdo->prepare('UPDATE pending_orders SET status = :status WHERE payment_id = :payment_id');
+                $pendingUpdate->execute([
+                    'status' => $pendingStatus,
+                    'payment_id' => $paymentId,
+                ]);
+            }
+
+            $this->pdo->commit();
+            return [
+                'ok' => true,
+                'status' => $newStatus,
+                'kind' => $kind,
                 'user_id' => (int) $payment['user_id'],
                 'amount' => (int) $payment['amount'],
             ];
@@ -465,5 +547,28 @@ final class Database
     {
         $stmt = $this->pdo->prepare('UPDATE payments SET gateway_ref = :gateway_ref WHERE id = :id');
         $stmt->execute(['gateway_ref' => $gatewayRef, 'id' => $paymentId]);
+    }
+
+    public function attachPaymentReceipt(int $paymentId, ?string $fileId, ?string $text): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE payments
+             SET receipt_file_id = :receipt_file_id,
+                 receipt_text = :receipt_text,
+                 status = :status
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'receipt_file_id' => $fileId,
+            'receipt_text' => $text,
+            'status' => 'waiting_admin',
+            'id' => $paymentId,
+        ]);
+
+        $pending = $this->pdo->prepare('UPDATE pending_orders SET status = :status WHERE payment_id = :payment_id');
+        $pending->execute([
+            'status' => 'waiting_admin',
+            'payment_id' => $paymentId,
+        ]);
     }
 }

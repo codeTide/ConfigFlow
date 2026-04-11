@@ -19,11 +19,6 @@ final class MessageHandler
             return;
         }
 
-        $text = trim((string) ($message['text'] ?? ''));
-        if ($text === '' || str_starts_with($text, '/')) {
-            return;
-        }
-
         $fromUser = $message['from'] ?? [];
         $chatId = (int) ($message['chat']['id'] ?? 0);
         $userId = (int) ($fromUser['id'] ?? 0);
@@ -36,7 +31,12 @@ final class MessageHandler
             return;
         }
 
+        $text = trim((string) ($message['text'] ?? ''));
+
         if ($state['state_name'] === 'await_wallet_amount') {
+            if ($text === '' || str_starts_with($text, '/')) {
+                return;
+            }
             $amount = (int) preg_replace('/\D+/', '', $text);
             if ($amount <= 0) {
                 $this->telegram->sendMessage($chatId, '⚠️ لطفاً مبلغ معتبر وارد کنید.');
@@ -77,6 +77,57 @@ final class MessageHandler
                     . "شماره: <code>{$paymentId}</code>\n"
                     . "کاربر: <code>{$userId}</code>\n"
                     . "مبلغ: <b>{$amount}</b> تومان",
+                    $adminKeyboard
+                );
+            }
+            return;
+        }
+
+        if ($state['state_name'] === 'await_card_receipt') {
+            $payload = $state['payload'] ?? [];
+            $paymentId = (int) ($payload['payment_id'] ?? 0);
+            if ($paymentId <= 0) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+
+            $fileId = null;
+            if (isset($message['photo']) && is_array($message['photo']) && $message['photo'] !== []) {
+                $last = end($message['photo']);
+                $fileId = is_array($last) ? (string) ($last['file_id'] ?? '') : null;
+            } elseif (isset($message['document']) && is_array($message['document'])) {
+                $fileId = (string) ($message['document']['file_id'] ?? '');
+            }
+            $caption = trim((string) ($message['caption'] ?? ''));
+            $receiptText = $caption !== '' ? $caption : ($text !== '' ? $text : null);
+
+            if (($fileId === null || $fileId === '') && ($receiptText === null || $receiptText === '')) {
+                $this->telegram->sendMessage($chatId, '⚠️ لطفاً رسید را به‌صورت عکس/فایل یا متن ارسال کنید.');
+                return;
+            }
+
+            $this->database->attachPaymentReceipt($paymentId, $fileId ?: null, $receiptText);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage(
+                $chatId,
+                "✅ رسید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
+            );
+
+            $adminKeyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
+                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
+                    ],
+                ],
+            ];
+            foreach (Config::adminIds() as $adminId) {
+                $this->telegram->sendMessage(
+                    (int) $adminId,
+                    "🧾 <b>رسید کارت‌به‌کارت جدید</b>\n\n"
+                    . "پرداخت: <code>{$paymentId}</code>\n"
+                    . "کاربر: <code>{$userId}</code>\n"
+                    . ($receiptText ? "توضیح: " . htmlspecialchars($receiptText) . "\n" : ''),
                     $adminKeyboard
                 );
             }
