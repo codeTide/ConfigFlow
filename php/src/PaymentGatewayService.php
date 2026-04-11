@@ -94,7 +94,14 @@ final class PaymentGatewayService
             }
             $data = $res['data'] ?? [];
             $confirmed = (bool) ($data['confirmed'] ?? false);
-            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
+            $amount = null;
+            if (isset($data['contractData']) && is_array($data['contractData'])) {
+                $sunAmount = (float) ($data['contractData']['amount'] ?? 0);
+                if ($sunAmount > 0) {
+                    $amount = $sunAmount / 1000000.0;
+                }
+            }
+            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data, 'transfer_amount' => $amount];
         }
 
         if ($coin === 'ton') {
@@ -105,7 +112,15 @@ final class PaymentGatewayService
             }
             $data = $res['data'] ?? [];
             $confirmed = (bool) ($data['success'] ?? false);
-            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
+            $amount = null;
+            $inMsg = $data['in_msg'] ?? [];
+            if (is_array($inMsg)) {
+                $nano = (float) ($inMsg['value'] ?? 0);
+                if ($nano > 0) {
+                    $amount = $nano / 1000000000.0;
+                }
+            }
+            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data, 'transfer_amount' => $amount];
         }
 
         if ($coin === 'usdt_bep20' || $coin === 'usdc_bep20') {
@@ -124,7 +139,29 @@ final class PaymentGatewayService
             $data = $res['data'] ?? [];
             $receipt = $data['result'] ?? [];
             $confirmed = is_array($receipt) && (($receipt['status'] ?? '') === '0x1');
-            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
+            $transferAmount = null;
+            $tokenQuery = http_build_query([
+                'module' => 'account',
+                'action' => 'tokentx',
+                'txhash' => $txHash,
+                'page' => 1,
+                'offset' => 1,
+                'sort' => 'desc',
+                'apikey' => $apiKey,
+            ]);
+            $tokenRes = $this->getJson('https://api.bscscan.com/api?' . $tokenQuery);
+            if (($tokenRes['ok'] ?? false) && is_array($tokenRes['data'] ?? null)) {
+                $rows = $tokenRes['data']['result'] ?? [];
+                if (is_array($rows) && isset($rows[0]) && is_array($rows[0])) {
+                    $row = $rows[0];
+                    $valueRaw = (string) ($row['value'] ?? '0');
+                    $decimals = (int) ($row['tokenDecimal'] ?? 18);
+                    if ($valueRaw !== '' && ctype_digit($valueRaw) && $decimals >= 0 && $decimals <= 36) {
+                        $transferAmount = ((float) $valueRaw) / (10 ** $decimals);
+                    }
+                }
+            }
+            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data, 'transfer_amount' => $transferAmount];
         }
 
         return ['ok' => false, 'error' => 'coin_not_supported_yet'];
@@ -157,6 +194,23 @@ final class PaymentGatewayService
             'delta' => $delta,
             'amount_match' => $delta <= $tolerance,
         ];
+    }
+
+    public function resolveEffectivePaidAmount(array $verifyResult, ?float $claimedAmountCoin): ?float
+    {
+        $onChain = $verifyResult['transfer_amount'] ?? null;
+        if (is_numeric($onChain)) {
+            $value = (float) $onChain;
+            if ($value > 0) {
+                return $value;
+            }
+        }
+
+        if ($claimedAmountCoin !== null && $claimedAmountCoin > 0) {
+            return $claimedAmountCoin;
+        }
+
+        return null;
     }
 
     private function postJson(string $url, array $payload): array

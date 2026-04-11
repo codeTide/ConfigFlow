@@ -67,8 +67,28 @@ final class MenuService
             return '📭 هنوز کانفیگی برای حساب شما ثبت نشده است.';
         }
 
-        return "📦 شما <b>{$count}</b> کانفیگ خریداری کرده‌اید.\n"
-            . 'نمایش جزئیات کامل در فاز بعدی مهاجرت تکمیل می‌شود.';
+        $items = $this->database->listUserPurchasesSummary($userId, 8);
+        $lines = [];
+        foreach ($items as $item) {
+            $packageName = trim((string) ($item['package_name'] ?? '—'));
+            $serviceName = trim((string) ($item['service_name'] ?? '—'));
+            $amount = (int) ($item['amount'] ?? 0);
+            $createdAt = (string) ($item['created_at'] ?? '');
+            $isTest = ((int) ($item['is_test'] ?? 0)) === 1 ? ' (تست)' : '';
+            $lines[] = sprintf(
+                "• #%d | %s | %s | %d تومان%s\n  ⏱ %s",
+                (int) ($item['id'] ?? 0),
+                htmlspecialchars($packageName),
+                htmlspecialchars($serviceName),
+                $amount,
+                $isTest,
+                htmlspecialchars($createdAt !== '' ? $createdAt : '-')
+            );
+        }
+
+        return "📦 شما <b>{$count}</b> کانفیگ خریداری کرده‌اید.\n\n"
+            . "آخرین سفارش‌ها:\n"
+            . implode("\n", $lines);
     }
 
     public function referralText(int $userId): string

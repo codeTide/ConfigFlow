@@ -98,6 +98,24 @@ final class Database
         return (int) $stmt->fetchColumn();
     }
 
+    public function listUserPurchasesSummary(int $userId, int $limit = 8): array
+    {
+        $limit = max(1, min($limit, 20));
+        $stmt = $this->pdo->prepare(
+            'SELECT p.id, p.amount, p.created_at, p.is_test,
+                    pkg.name AS package_name,
+                    cfg.service_name AS service_name
+             FROM purchases p
+             LEFT JOIN packages pkg ON pkg.id = p.package_id
+             LEFT JOIN configs cfg ON cfg.id = p.config_id
+             WHERE p.user_id = :user_id
+             ORDER BY p.id DESC
+             LIMIT ' . $limit
+        );
+        $stmt->execute(['user_id' => $userId]);
+        return $stmt->fetchAll();
+    }
+
     public function referralStats(int $userId): array
     {
         $refCountStmt = $this->pdo->prepare('SELECT COUNT(*) FROM referrals WHERE referrer_id = :user_id');

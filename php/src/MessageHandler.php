@@ -189,5 +189,51 @@ final class MessageHandler
                 );
             }
         }
+
+        if ($state['state_name'] === 'await_free_test_note') {
+            if ($text === '' || str_starts_with($text, '/')) {
+                $this->telegram->sendMessage($chatId, '⚠️ لطفاً توضیح کوتاه تست را ارسال کنید.');
+                return;
+            }
+
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage(
+                $chatId,
+                "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید."
+            );
+
+            foreach (Config::adminIds() as $adminId) {
+                $this->telegram->sendMessage(
+                    (int) $adminId,
+                    "🎁 <b>درخواست تست رایگان جدید</b>\n\n"
+                    . "کاربر: <code>{$userId}</code>\n"
+                    . "توضیح:\n" . htmlspecialchars($text)
+                );
+            }
+            return;
+        }
+
+        if ($state['state_name'] === 'await_agency_request') {
+            if ($text === '' || str_starts_with($text, '/')) {
+                $this->telegram->sendMessage($chatId, '⚠️ لطفاً متن درخواست نمایندگی را ارسال کنید.');
+                return;
+            }
+
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage(
+                $chatId,
+                "✅ درخواست نمایندگی ثبت شد و برای بررسی ادمین ارسال گردید."
+            );
+
+            foreach (Config::adminIds() as $adminId) {
+                $this->telegram->sendMessage(
+                    (int) $adminId,
+                    "🤝 <b>درخواست نمایندگی جدید</b>\n\n"
+                    . "کاربر: <code>{$userId}</code>\n"
+                    . "متن درخواست:\n" . htmlspecialchars($text)
+                );
+            }
+            return;
+        }
     }
 }

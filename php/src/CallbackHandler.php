@@ -242,10 +242,12 @@ final class CallbackHandler
             }
 
             $verify = $this->gateways->verifyCryptoTransaction($coin, $txHash);
-            $amountCheck = $this->gateways->validateClaimedAmount($coin, (int) ($payment['amount'] ?? 0), $claimedCoin);
+            $effectivePaidCoin = $this->gateways->resolveEffectivePaidAmount($verify, $claimedCoin);
+            $amountCheck = $this->gateways->validateClaimedAmount($coin, (int) ($payment['amount'] ?? 0), $effectivePaidCoin);
             $this->database->setPaymentProviderPayload($paymentId, [
                 'source' => 'crypto_verify',
                 'response' => $verify,
+                'effective_paid_coin' => $effectivePaidCoin,
                 'amount_check' => $amountCheck,
             ]);
 
@@ -352,7 +354,7 @@ final class CallbackHandler
             return;
         }
 
-        if ($data === 'wallet:charge' || $data === 'buy:start' || $data === 'test:start' || $data === 'agency:request') {
+        if ($data === 'wallet:charge' || $data === 'buy:start') {
             if ($data === 'wallet:charge') {
                 $this->database->setUserState($userId, 'await_wallet_amount');
                 $this->telegram->editMessageText(
@@ -391,7 +393,35 @@ final class CallbackHandler
                 return;
             }
 
-            $this->telegram->answerCallbackQuery($callbackId, 'این بخش در فاز بعدی مهاجرت تکمیل می‌شود.');
+            $this->telegram->answerCallbackQuery($callbackId, 'این بخش فعلاً در دست توسعه است.');
+            return;
+        }
+
+        if ($data === 'test:start') {
+            $this->database->setUserState($userId, 'await_free_test_note');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "🎁 <b>درخواست تست رایگان</b>\n\n"
+                . "لطفاً یک توضیح کوتاه ارسال کنید (مثلاً نوع مصرف/مدت موردنیاز).\n"
+                . "درخواست شما برای ادمین ارسال می‌شود.",
+                KeyboardBuilder::backToMain()
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'agency:request') {
+            $this->database->setUserState($userId, 'await_agency_request');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "🤝 <b>درخواست نمایندگی</b>\n\n"
+                . "لطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید.\n"
+                . "پیام شما برای تیم ادمین ثبت می‌شود.",
+                KeyboardBuilder::backToMain()
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
 
