@@ -269,6 +269,19 @@ php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
 - پشتیبانی از Callback Query برای `referral:menu` + لینک اشتراک‌گذاری دعوت
 - منوی اصلی داینامیک و نمایش پروفایل/پشتیبانی/کانفیگ‌های من در PHP
 
+```bash
+# ساخت اسکیمای MySQL (فاز ۲)
+php php/scripts/init_db.php
+
+# انتقال داده‌های اصلی از SQLite به MySQL (فاز ۲)
+php php/scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
+```
+
+فاز ۳ مهاجرت (فعلی) در نسخه PHP:
+- روت کردن آپدیت‌ها با `UpdateRouter`
+- پشتیبانی از Callback Query برای `nav:main`, `profile`, `support`, `my_configs`
+- منوی اصلی داینامیک و نمایش پروفایل/پشتیبانی/کانفیگ‌های من در PHP
+
 ---
 
 ## 📁 ساختار پروژه
@@ -342,6 +355,18 @@ ConfigFlow/
 |-------|---------|------|
 | `BOT_TOKEN` | توکن ربات تلگرام | `123456789:ABC...` |
 | `BOT_USERNAME` | یوزرنیم ربات (برای لینک دعوت) | `MyConfigFlowBot` |
+| `ADMIN_IDS` | آیدی ادمین‌ها | `111,222` |
+| `DB_HOST` | آدرس MySQL | `127.0.0.1` |
+| `DB_PORT` | پورت MySQL | `3306` |
+| `DB_NAME` | نام دیتابیس MySQL | `configflow` |
+| `DB_USER` | نام کاربری دیتابیس | `root` |
+| `DB_PASS` | رمز عبور دیتابیس | `secret` |
+
+### `php/.env.example` — تنظیمات فاز ۱ PHP
+
+| متغیر | توضیحات | مثال |
+|-------|---------|------|
+| `BOT_TOKEN` | توکن ربات تلگرام | `123456789:ABC...` |
 | `ADMIN_IDS` | آیدی ادمین‌ها | `111,222` |
 | `DB_HOST` | آدرس MySQL | `127.0.0.1` |
 | `DB_PORT` | پورت MySQL | `3306` |
