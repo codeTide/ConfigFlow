@@ -162,38 +162,27 @@ php scripts/InitDb.php
 
 Installer needs permission to write `.env` in project root.
 
-Typical Linux fix (Debian/Ubuntu with nginx/apache user):
+Typical Linux fix (replace `www-data` with your PHP runtime user):
 
 ```bash
 sudo chown -R www-data:www-data /path/to/ConfigFlow
 sudo chmod -R u+rwX /path/to/ConfigFlow
 ```
 
-If your webserver user is different (for example `nginx`), replace `www-data`.
-
-How to find your **PHP runtime user** (important: often this is php-fpm user, not nginx):
+How to find your **PHP runtime user** (usually php-fpm):
 
 ```bash
-# Nginx worker user
-ps -o user= -C nginx | head -n 1
-
-# Apache worker user (Debian/Ubuntu)
-ps -o user= -C apache2 | head -n 1
-
-# Apache worker user (RHEL/CentOS)
-ps -o user= -C httpd | head -n 1
-
 # PHP-FPM process user (common on many hosts)
 ps aux | grep php-fpm | grep -v grep
 
-# PHP-FPM pool config user (Debian/Ubuntu)
+# PHP-FPM pool user (Debian/Ubuntu)
 grep -R "^[[:space:]]*user[[:space:]]*=" /etc/php/*/fpm/pool.d/
 
-# PHP-FPM pool config user (aaPanel/custom layouts)
+# PHP-FPM pool user (aaPanel/custom layouts)
 grep -R "^[[:space:]]*user[[:space:]]*=" /www/server/php/*/etc/php-fpm.d/ /www/server/php/*/etc/php-fpm.conf 2>/dev/null
 ```
 
-If these return empty, ask host support for the PHP-FPM/web user and use that user/group in `chown`.
+If these return empty, ask host support for the PHP-FPM user and use that user/group in `chown`.
 
 Recommended permission reset (replace `www-data` with detected PHP runtime user):
 
