@@ -51,6 +51,36 @@ final class TelegramClient
         $this->request('answerCallbackQuery', $payload);
     }
 
+    public function copyMessage(int $chatId, int $fromChatId, int $messageId): void
+    {
+        $payload = [
+            'chat_id' => $chatId,
+            'from_chat_id' => $fromChatId,
+            'message_id' => $messageId,
+        ];
+        $this->request('copyMessage', $payload);
+    }
+
+    public function forwardMessage(int $chatId, int $fromChatId, int $messageId): void
+    {
+        $payload = [
+            'chat_id' => $chatId,
+            'from_chat_id' => $fromChatId,
+            'message_id' => $messageId,
+        ];
+        $this->request('forwardMessage', $payload);
+    }
+
+    public function getChatMember(string $chatId, int $userId): ?array
+    {
+        $result = $this->requestWithResult('getChatMember', [
+            'chat_id' => $chatId,
+            'user_id' => $userId,
+        ]);
+
+        return is_array($result) ? $result : null;
+    }
+
     private function request(string $method, array $payload): void
     {
         $ch = curl_init($this->baseUrl . $method);
@@ -62,5 +92,29 @@ final class TelegramClient
         ]);
         curl_exec($ch);
         curl_close($ch);
+    }
+
+    private function requestWithResult(string $method, array $payload): ?array
+    {
+        $ch = curl_init($this->baseUrl . $method);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($payload),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || !($decoded['ok'] ?? false) || !isset($decoded['result']) || !is_array($decoded['result'])) {
+            return null;
+        }
+
+        return $decoded['result'];
     }
 }

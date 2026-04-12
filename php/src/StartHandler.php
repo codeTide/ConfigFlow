@@ -59,10 +59,57 @@ final class StartHandler
             return;
         }
 
+        if (!$this->checkChannelMembership($userId)) {
+            $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
+            return;
+        }
+
         $this->telegram->sendMessage(
             $chatId,
             $this->menus->mainMenuText(),
             $this->menus->mainMenuKeyboard($userId)
         );
+    }
+
+    private function checkChannelMembership(int $userId): bool
+    {
+        $channelId = trim($this->settings->get('channel_id', ''));
+        if ($channelId === '') {
+            return true;
+        }
+
+        $member = $this->telegram->getChatMember($channelId, $userId);
+        if (!is_array($member)) {
+            return true;
+        }
+
+        $status = (string) ($member['status'] ?? '');
+        return in_array($status, ['member', 'administrator', 'creator'], true);
+    }
+
+    private function channelLockText(): string
+    {
+        return "🔒 برای استفاده از ربات، ابتدا باید در کانال ما عضو شوید.\n\nپس از عضویت، روی «عضو شدم» بزنید.";
+    }
+
+    private function channelLockKeyboard(): array
+    {
+        $channelId = trim($this->settings->get('channel_id', ''));
+        $channelUrl = $this->channelJoinUrl($channelId);
+        return ['inline_keyboard' => [
+            [['text' => '📢 عضویت در کانال', 'url' => $channelUrl]],
+            [['text' => '✅ عضو شدم', 'callback_data' => 'check_channel']],
+        ]];
+    }
+
+    private function channelJoinUrl(string $channelId): string
+    {
+        if (str_starts_with($channelId, '@')) {
+            return 'https://t.me/' . ltrim($channelId, '@');
+        }
+        if (str_starts_with($channelId, '-100')) {
+            return 'https://t.me/c/' . substr($channelId, 4);
+        }
+        return 'https://t.me/' . ltrim($channelId, '@');
     }
 }

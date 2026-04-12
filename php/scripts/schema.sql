@@ -141,3 +141,65 @@ CREATE TABLE IF NOT EXISTS user_states (
     state_payload JSON NULL,
     updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS admin_users (
+    user_id BIGINT PRIMARY KEY,
+    added_by BIGINT NOT NULL,
+    added_at DATETIME NOT NULL,
+    permissions TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agency_prices (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    package_id BIGINT NOT NULL,
+    price INT NOT NULL,
+    UNIQUE KEY uniq_agency_price (user_id, package_id),
+    INDEX idx_agency_user (user_id),
+    INDEX idx_agency_package (package_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS panels (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    ip VARCHAR(191) NOT NULL,
+    port INT NOT NULL,
+    patch VARCHAR(191) NULL,
+    username VARCHAR(191) NOT NULL,
+    password VARCHAR(191) NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS panel_packages (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    panel_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    volume_gb DECIMAL(10,2) NOT NULL,
+    duration_days INT NOT NULL,
+    inbound_id INT NOT NULL DEFAULT 1,
+    FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE CASCADE,
+    INDEX idx_panel_packages_panel (panel_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS xui_jobs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    job_uuid VARCHAR(191) NOT NULL UNIQUE,
+    order_id BIGINT NULL,
+    user_id BIGINT NOT NULL,
+    panel_id BIGINT NOT NULL,
+    panel_package_id BIGINT NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    retry_count INT NOT NULL DEFAULT 0,
+    result_config TEXT NULL,
+    result_link TEXT NULL,
+    error_msg TEXT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uniq_xui_jobs_order (order_id),
+    FOREIGN KEY (order_id) REFERENCES pending_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE CASCADE,
+    FOREIGN KEY (panel_package_id) REFERENCES panel_packages(id) ON DELETE CASCADE,
+    INDEX idx_xui_jobs_status (status),
+    INDEX idx_xui_jobs_panel (panel_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
