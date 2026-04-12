@@ -13,7 +13,7 @@ Bootstrap::loadEnv(__DIR__ . '/../.env');
 
 $sqlitePath = $argv[1] ?? null;
 if ($sqlitePath === null || !is_file($sqlitePath)) {
-    fwrite(STDERR, "Usage: php scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db\n");
+    fwrite(STDERR, "Usage: php scripts/MigrateSqliteToMysql.php /path/to/configflow.db\n");
     exit(1);
 }
 
