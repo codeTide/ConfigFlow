@@ -24,8 +24,8 @@ ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-b
 
 ```text
 ConfigFlow/
+├── webhook.php
 ├── public/
-│   ├── webhook.php
 │   └── worker_api.php
 ├── scripts/
 │   ├── init_db.php
@@ -36,8 +36,7 @@ ConfigFlow/
 ├── src/
 ├── tests/
 ├── env.example
-├── config.env.example
-└── install.sh
+└── config.env.example
 ```
 
 ## Environment
@@ -96,12 +95,12 @@ php scripts/init_db.php
 #### Option A: Quick dev server
 
 ```bash
-php -S 0.0.0.0:8080 -t public
+php -S 0.0.0.0:8080
 ```
 
 #### Option B: Nginx/Apache (recommended production)
 
-Point your web root to `public/` and expose `https://YOUR_DOMAIN/webhook.php`.
+Keep normal web root (project root) and expose `https://YOUR_DOMAIN/webhook.php`.
 
 ### 5) Set Telegram webhook
 
@@ -136,16 +135,14 @@ This project can run on most shared hosts if they support PHP 8.1+ and MySQL.
 
 - Upload project files to your host (Git deploy or File Manager).
 - Keep project files in a private app directory if possible.
-- Expose `public/` via your domain/subdomain document root.
+- Keep files in your normal web root (or your host's default project root).
 
-### 2) Configure document root
+### 2) Document root
 
-Set your domain/subdomain root to the `public` folder, for example:
+No special document-root change is required for the Telegram webhook because `webhook.php` is now at the repository root.
 
-- cPanel: **Domains → Manage → Document Root** => `.../ConfigFlow/public`
-- aaPanel: **Website → Site Directory** => `.../ConfigFlow/public`
-
-If you cannot point root directly to `public/`, use a subdomain that points to `public/`.
+- cPanel / aaPanel / shared hosting can keep the default site root as-is.
+- Ensure your domain serves `https://YOUR_DOMAIN/webhook.php`.
 
 ### 3) Create database + `.env`
 
