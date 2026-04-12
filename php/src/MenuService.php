@@ -24,7 +24,7 @@ final class MenuService
 
     public function mainMenuKeyboard(int $userId): array
     {
-        $isAdmin = in_array($userId, Config::adminIds(), true);
+        $isAdmin = $this->database->isAdminUser($userId);
         return KeyboardBuilder::main(
             $isAdmin,
             $this->settings->get('referral_enabled', '1') === '1',
