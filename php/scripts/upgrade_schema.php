@@ -45,22 +45,34 @@ if (!is_string($sql) || trim($sql) === '') {
     exit(1);
 }
 
-$parts = array_filter(array_map('trim', explode(';', $sql)));
-foreach ($parts as $stmt) {
-    if ($stmt === '') {
-        continue;
-    }
-    $pdo->exec($stmt);
-}
+try {
+    $pdo->beginTransaction();
 
-$defaults = [
-    'worker_api_enabled' => '0',
-    'worker_api_port' => '8080',
-    'worker_api_key' => '',
-];
-$upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
-foreach ($defaults as $k => $v) {
-    $upsert->execute(['k' => $k, 'v' => $v]);
+    $parts = array_filter(array_map('trim', explode(';', $sql)));
+    foreach ($parts as $stmt) {
+        if ($stmt === '') {
+            continue;
+        }
+        $pdo->exec($stmt);
+    }
+
+    $defaults = [
+        'worker_api_enabled' => '0',
+        'worker_api_port' => '8080',
+        'worker_api_key' => '',
+    ];
+    $upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
+    foreach ($defaults as $k => $v) {
+        $upsert->execute(['k' => $k, 'v' => $v]);
+    }
+
+    $pdo->commit();
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    fwrite(STDERR, "Schema upgrade failed: " . $e->getMessage() . PHP_EOL);
+    exit(1);
 }
 
 echo "✅ Schema upgrade completed successfully.\n";
