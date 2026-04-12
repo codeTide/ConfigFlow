@@ -1541,7 +1541,7 @@ final class CallbackHandler
                 . "Key: <code>" . htmlspecialchars($key !== '' ? substr($key, 0, 8) . '...' : '-') . "</code>\n"
                 . "PHP Runtime: <b>" . ($phpRuntime === '1' ? 'ON' : 'OFF') . "</b>\n"
                 . "Poll: <code>" . htmlspecialchars($phpPoll) . "s</code>\n\n"
-                . "<i>CLI:</i> <code>php scripts/php_worker_runtime.php</code>",
+                . "<i>CLI:</i> <code>php scripts/PhpWorkerRuntime.php</code>",
                 ['inline_keyboard' => $rows]
             );
             $this->telegram->answerCallbackQuery($callbackId);
