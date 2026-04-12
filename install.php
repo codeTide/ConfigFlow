@@ -2,6 +2,73 @@
 
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+}
+
+function cf_auth_file(): string
+{
+    return __DIR__ . '/.installer_auth.json';
+}
+
+/** @return array{username:string,password_hash:string}|null */
+function cf_load_installer_auth(): ?array
+{
+    $path = cf_auth_file();
+    if (!is_file($path)) {
+        return null;
+    }
+    $raw = file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        return null;
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    $username = trim((string) ($decoded['username'] ?? ''));
+    $passwordHash = trim((string) ($decoded['password_hash'] ?? ''));
+    if ($username === '' || $passwordHash === '') {
+        return null;
+    }
+    return ['username' => $username, 'password_hash' => $passwordHash];
+}
+
+function cf_save_installer_auth(string $username, string $password): void
+{
+    $payload = [
+        'username' => trim($username),
+        'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+        'updated_at' => gmdate('c'),
+    ];
+    file_put_contents(cf_auth_file(), json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
+}
+
+function cf_is_installer_authenticated(): bool
+{
+    if (PHP_SAPI === 'cli') {
+        return true;
+    }
+    $auth = cf_load_installer_auth();
+    if ($auth === null) {
+        return false;
+    }
+    $user = (string) ($_SESSION['installer_user'] ?? '');
+    $last = (int) ($_SESSION['installer_last'] ?? 0);
+    $now = time();
+    if ($user === '' || $last <= 0 || ($now - $last) > 1800) {
+        unset($_SESSION['installer_user'], $_SESSION['installer_last']);
+        return false;
+    }
+    if (!hash_equals($auth['username'], $user)) {
+        return false;
+    }
+    $_SESSION['installer_last'] = $now;
+    return true;
+}
+
 function cf_validate(array $input): array
 {
     $errors = [];
@@ -199,21 +266,6 @@ function cf_mark_installed(string $root): void
     @file_put_contents($lockPath, $stamp, LOCK_EX);
 }
 
-function cf_read_env_value(string $path, string $key): string
-{
-    if (!is_file($path)) {
-        return '';
-    }
-    $raw = file_get_contents($path);
-    if (!is_string($raw) || $raw === '') {
-        return '';
-    }
-    if (preg_match('/^' . preg_quote($key, '/') . '=(.*)$/m', $raw, $m) === 1) {
-        return trim((string) ($m[1] ?? ''));
-    }
-    return '';
-}
-
 function cf_reset_database(array $env): void
 {
     $dsn = sprintf(
@@ -251,14 +303,6 @@ function cf_install(array $input): array
     if ($isLocked && !$allowReinstall) {
         return ['ok' => false, 'messages' => ['Installation blocked: this project is locked (.install.lock). Enable reinstall mode to continue.']];
     }
-    if ($isLocked && $allowReinstall) {
-        $currentBotToken = cf_read_env_value(__DIR__ . '/.env', 'BOT_TOKEN');
-        $adminConfirmToken = trim((string) ($input['ADMIN_CONFIRM_TOKEN'] ?? ''));
-        if ($currentBotToken !== '' && !hash_equals($currentBotToken, $adminConfirmToken)) {
-            return ['ok' => false, 'messages' => ['Installation blocked: admin confirmation token is invalid.']];
-        }
-    }
-
     if (!function_exists('putenv')) {
         return ['ok' => false, 'messages' => ['Installation failed: putenv() is disabled in PHP. Please enable putenv to continue.']];
     }
@@ -377,6 +421,41 @@ if (PHP_SAPI === 'cli') {
 }
 
 $result = null;
+$authError = '';
+$needsAuthSetup = cf_load_installer_auth() === null;
+$isAuthenticated = cf_is_installer_authenticated();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['auth_action'])) {
+    $action = (string) ($_POST['auth_action'] ?? '');
+    if ($action === 'setup' && $needsAuthSetup) {
+        $u = trim((string) ($_POST['auth_username'] ?? ''));
+        $p = (string) ($_POST['auth_password'] ?? '');
+        if ($u === '' || mb_strlen($p) < 8) {
+            $authError = 'Setup failed: username is required and password must be at least 8 characters.';
+        } else {
+            cf_save_installer_auth($u, $p);
+            $_SESSION['installer_user'] = $u;
+            $_SESSION['installer_last'] = time();
+            $isAuthenticated = true;
+            $needsAuthSetup = false;
+        }
+    } elseif ($action === 'login' && !$needsAuthSetup) {
+        $auth = cf_load_installer_auth();
+        $u = trim((string) ($_POST['auth_username'] ?? ''));
+        $p = (string) ($_POST['auth_password'] ?? '');
+        if ($auth === null || !hash_equals($auth['username'], $u) || !password_verify($p, $auth['password_hash'])) {
+            $authError = 'Login failed: invalid username or password.';
+        } else {
+            $_SESSION['installer_user'] = $u;
+            $_SESSION['installer_last'] = time();
+            $isAuthenticated = true;
+        }
+    } elseif ($action === 'logout') {
+        unset($_SESSION['installer_user'], $_SESSION['installer_last']);
+        $isAuthenticated = false;
+    }
+}
+
 $isInstalled = cf_has_existing_installation(__DIR__);
 $values = [
     'BOT_TOKEN' => '',
@@ -390,10 +469,9 @@ $values = [
     'TETRAPAY_VERIFY_URL' => 'https://tetra98.com/api/verify',
     'ALLOW_REINSTALL' => '0',
     'REINSTALL_MODE' => 'preserve',
-    'ADMIN_CONFIRM_TOKEN' => '',
 ];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['auth_action']) && $isAuthenticated) {
     foreach (array_keys($values) as $k) {
         $values[$k] = trim((string) ($_POST[$k] ?? $values[$k]));
     }
@@ -449,9 +527,20 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
   <div class="card">
     <div class="topbar">
       <h1>⚙️ ConfigFlow Installer</h1>
-      <button type="button" id="themeToggle" class="theme-btn">🌙 Dark</button>
+      <div class="inline">
+        <button type="button" id="themeToggle" class="theme-btn">🌙 Dark</button>
+        <?php if ($isAuthenticated): ?>
+          <form method="post" style="margin:0;">
+            <input type="hidden" name="auth_action" value="logout">
+            <button type="submit" class="theme-btn">Logout</button>
+          </form>
+        <?php endif; ?>
+      </div>
     </div>
     <p>Fill your bot and database settings, then click install.</p>
+    <?php if ($authError !== ''): ?>
+      <div class="err"><?= htmlspecialchars($authError) ?></div>
+    <?php endif; ?>
     <?php if ($result !== null): ?>
       <?php foreach ($result['messages'] as $message): ?>
         <?php
@@ -467,6 +556,28 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
     <?php endif; ?>
   </div>
 
+  <?php if (!$isAuthenticated): ?>
+    <div class="card">
+      <h3 style="margin-top:0;"><?= $needsAuthSetup ? 'Setup installer login' : 'Installer login' ?></h3>
+      <form method="post" class="grid">
+        <input type="hidden" name="auth_action" value="<?= $needsAuthSetup ? 'setup' : 'login' ?>">
+        <div>
+          <label for="auth_username">Username</label>
+          <input id="auth_username" name="auth_username" autocomplete="off">
+        </div>
+        <div>
+          <label for="auth_password">Password</label>
+          <input id="auth_password" name="auth_password" type="password" autocomplete="off">
+        </div>
+        <div class="full" style="margin-top:8px;">
+          <button class="btn" type="submit"><?= $needsAuthSetup ? 'Create login' : 'Login' ?></button>
+        </div>
+      </form>
+      <?php if ($needsAuthSetup): ?>
+        <p class="hint">First run: create installer username/password. Session auto-logout after 30 minutes of inactivity.</p>
+      <?php endif; ?>
+    </div>
+  <?php else: ?>
   <?php if ($showInstalledCard): ?>
     <div class="card">
       <div class="ok">ConfigFlow is already installed on this path (.install.lock found).</div>
@@ -477,19 +588,19 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
       <?php if ($isInstalled): ?>
       <div class="full" style="margin-bottom:12px;">
         <label class="inline"><input style="width:auto" id="allowReinstall" type="checkbox" name="ALLOW_REINSTALL" value="1"> Enable reinstall</label>
-        <label for="ADMIN_CONFIRM_TOKEN" style="margin-top:8px;">Admin confirmation token (current BOT_TOKEN)</label>
-        <input id="ADMIN_CONFIRM_TOKEN" name="ADMIN_CONFIRM_TOKEN" type="password" autocomplete="off">
+        <div id="reinstallAdvanced" style="display:none;margin-top:10px;">
         <label for="REINSTALL_MODE" style="margin-top:8px;">Reinstall mode</label>
-        <select id="REINSTALL_MODE" name="REINSTALL_MODE">
+        <select id="REINSTALL_MODE" name="REINSTALL_MODE" disabled>
           <option value="preserve">Preserve database data</option>
           <option value="reset_db">Reset database (drop all tables)</option>
         </select>
+        </div>
       </div>
       <?php endif; ?>
       <fieldset id="mainFields" class="<?= $isInstalled ? 'disabled' : '' ?>" <?= $isInstalled ? 'disabled' : '' ?>>
       <div class="grid">
         <?php foreach ($values as $key => $val): ?>
-          <?php if (in_array($key, ['ALLOW_REINSTALL','REINSTALL_MODE','ADMIN_CONFIRM_TOKEN'], true)) { continue; } ?>
+          <?php if (in_array($key, ['ALLOW_REINSTALL','REINSTALL_MODE'], true)) { continue; } ?>
           <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
             <label for="<?= $key ?>"><?= $key ?></label>
             <input
@@ -503,8 +614,11 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
       </div>
       </fieldset>
 
-      <button class="btn" type="submit">Install ConfigFlow</button>
+      <div style="margin-top:16px;">
+        <button class="btn" id="installBtn" type="submit">Install ConfigFlow</button>
+      </div>
     </form>
+  <?php endif; ?>
 </div>
 <script>
   (function () {
@@ -529,11 +643,17 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
   const installerForm = document.getElementById('installerForm');
   const allowReinstall = document.getElementById('allowReinstall');
   const mainFields = document.getElementById('mainFields');
+  const reinstallAdvanced = document.getElementById('reinstallAdvanced');
+  const reinstallMode = document.getElementById('REINSTALL_MODE');
+  const installBtn = document.getElementById('installBtn');
   if (allowReinstall && mainFields) {
     const syncState = () => {
       const enabled = allowReinstall.checked;
       mainFields.disabled = !enabled;
       mainFields.classList.toggle('disabled', !enabled);
+      if (reinstallMode) reinstallMode.disabled = !enabled;
+      if (installBtn) installBtn.disabled = !enabled;
+      if (reinstallAdvanced) reinstallAdvanced.style.display = enabled ? 'block' : 'none';
     };
     syncState();
     allowReinstall.addEventListener('change', syncState);
