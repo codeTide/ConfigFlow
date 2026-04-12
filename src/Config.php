@@ -6,6 +6,8 @@ namespace ConfigFlow\Bot;
 
 final class Config
 {
+    private static ?string $cachedBotUsername = null;
+
     public static function botToken(): string
     {
         return trim((string) getenv('BOT_TOKEN'));
@@ -46,7 +48,43 @@ final class Config
 
     public static function botUsername(): string
     {
-        return trim((string) getenv('BOT_USERNAME'));
+        if (self::$cachedBotUsername !== null) {
+            return self::$cachedBotUsername;
+        }
+
+        if (!function_exists('curl_init')) {
+            self::$cachedBotUsername = '';
+            return self::$cachedBotUsername;
+        }
+
+        $token = self::botToken();
+        if ($token === '') {
+            self::$cachedBotUsername = '';
+            return self::$cachedBotUsername;
+        }
+
+        $endpoint = "https://api.telegram.org/bot{$token}/getMe";
+        $ch = curl_init($endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+        ]);
+
+        $raw = curl_exec($ch);
+        curl_close($ch);
+        if (!is_string($raw) || $raw === '') {
+            self::$cachedBotUsername = '';
+            return self::$cachedBotUsername;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || ($decoded['ok'] ?? false) !== true) {
+            self::$cachedBotUsername = '';
+            return self::$cachedBotUsername;
+        }
+
+        self::$cachedBotUsername = trim((string) ($decoded['result']['username'] ?? ''));
+        return self::$cachedBotUsername;
     }
 
     public static function tetrapayCreateUrl(): string
