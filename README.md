@@ -172,7 +172,7 @@ php scripts/InitDb.php
 ### 4) Permissions (important on shared/VPS hosts)
 
 Installer needs permission to write `.env` in project root.
-Installer will also try to auto-fix owner/permissions for project root, `.env`, and `.user.ini` (if present).
+Installer will also try to auto-fix owner/permissions for project root and `.env`.
 For that auto-fix to work, `chown`/`chmod` must be allowed in PHP and the PHP runtime user must have enough privileges.
 
 Typical Linux fix (replace `www-data` with your PHP runtime user):
@@ -213,16 +213,6 @@ touch /path/to/ConfigFlow/.env
 chown www-data:www-data /path/to/ConfigFlow/.env
 chmod 600 /path/to/ConfigFlow/.env
 ```
-
-If you get `Operation not permitted` on `.user.ini`:
-
-```bash
-lsattr /path/to/ConfigFlow/.user.ini
-# if immutable flag is set (i), remove it:
-chattr -i /path/to/ConfigFlow/.user.ini
-```
-
-Then re-run `chown/chmod` for `.user.ini` (or skip it if your panel manages it and project still works).
 
 ### 5) Serve webhook endpoint
 

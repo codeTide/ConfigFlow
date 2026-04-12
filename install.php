@@ -193,11 +193,6 @@ function cf_auto_fix_permissions(string $projectRoot): array
     $runtimeUser = cf_runtime_user();
     $targets = [$projectRoot, $projectRoot . '/.env'];
 
-    $userIni = $projectRoot . '/.user.ini';
-    if (is_file($userIni)) {
-        $targets[] = $userIni;
-    }
-
     foreach ($targets as $target) {
         if (!file_exists($target)) {
             continue;
@@ -221,9 +216,6 @@ function cf_auto_fix_permissions(string $projectRoot): array
                 $messages[] = "✓ Permission set on {$target}";
             } else {
                 $extra = $chmodErr !== '' ? " ({$chmodErr})" : '';
-                if (str_ends_with($target, '/.user.ini')) {
-                    $extra .= $extra === '' ? ' (file may be immutable or panel-managed)' : ', file may be immutable or panel-managed';
-                }
                 $messages[] = "⚠ Could not chmod {$target}{$extra}";
             }
         }
@@ -240,9 +232,6 @@ function cf_auto_fix_permissions(string $projectRoot): array
                 $messages[] = "✓ Owner set to {$runtimeUser} for {$target}";
             } else {
                 $extra = $chownErr !== '' ? " ({$chownErr})" : '';
-                if (str_ends_with($target, '/.user.ini')) {
-                    $extra .= $extra === '' ? ' (file may be immutable or panel-managed)' : ', file may be immutable or panel-managed';
-                }
                 $messages[] = "⚠ Could not chown {$target} to {$runtimeUser}{$extra}";
             }
         }
@@ -502,6 +491,15 @@ if ($justInstalled) {
     }
 }
 $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
+$justInstalled = $result !== null && ($result['ok'] ?? false) === true;
+$botDeepLink = '';
+if ($justInstalled) {
+    $botUser = cf_get_bot_username((string) ($values['BOT_TOKEN'] ?? ''));
+    if ($botUser !== '') {
+        $botDeepLink = 'https://t.me/' . $botUser;
+    }
+}
+$showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
 ?>
 <!doctype html>
 <html lang="en">
@@ -534,6 +532,7 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
     input,select{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}
     input:focus,select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
     .btn{background:var(--btn);color:#fff;border:none;padding:12px 16px;border-radius:10px;cursor:pointer;font-weight:bold}
+    .btn-link{display:block;width:100%;text-align:center;text-decoration:none;margin-top:8px}
     .theme-btn{background:transparent;color:var(--fg);border:1px solid var(--card-border);padding:8px 12px;border-radius:10px;cursor:pointer}
     .ok{background:var(--ok-bg);border:1px solid var(--ok-border);color:var(--ok-fg);padding:10px;border-radius:10px;margin:8px 0}
     .warn{background:#fef3c7;border:1px solid #f59e0b;color:#7c2d12;padding:10px;border-radius:10px;margin:8px 0}
@@ -606,14 +605,9 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
     </div>
   <?php endif; ?>
   <?php if ($justInstalled): ?>
-    <div class="card">
-      <div class="ok">✅ Installation completed successfully.</div>
-      <?php if ($botDeepLink !== ''): ?>
-        <a class="btn" href="<?= htmlspecialchars($botDeepLink) ?>" target="_blank" rel="noopener">Open Telegram Bot</a>
-      <?php else: ?>
-        <p class="hint">Bot link is not available yet. You can open it manually from Telegram.</p>
-      <?php endif; ?>
-    </div>
+    <?php if ($botDeepLink !== ''): ?>
+      <a class="btn btn-link" href="<?= htmlspecialchars($botDeepLink) ?>" target="_blank" rel="noopener">Open Telegram Bot</a>
+    <?php endif; ?>
   <?php else: ?>
   <form method="post" class="card" id="installerForm">
       <?php if ($isInstalled): ?>
