@@ -61,9 +61,9 @@ final class CallbackHandler
                 $this->telegram->editMessageText(
                     $chatId,
                     $messageId,
-                    $this->menus->mainMenuText(),
-                    $this->menus->mainMenuKeyboard($userId)
+                    $this->menus->mainMenuText()
                 );
+                $this->telegram->sendMessage($chatId, 'منوی اصلی:', $this->menus->mainMenuReplyKeyboard($userId));
             } else {
                 $this->telegram->answerCallbackQuery($callbackId, '❌ هنوز عضو کانال نشده‌اید.');
                 $this->telegram->editMessageText($chatId, $messageId, $this->channelLockText(), $this->channelLockKeyboard());
@@ -89,13 +89,19 @@ final class CallbackHandler
             }
         }
 
+        if ($this->isDeprecatedUserInlineAction($data)) {
+            $this->telegram->answerCallbackQuery($callbackId, 'این مسیر به دکمه‌های معمولی منتقل شده است.');
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+
         if ($data === 'nav:main') {
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
-                $this->menus->mainMenuText(),
-                $this->menus->mainMenuKeyboard($userId)
+                $this->menus->mainMenuText()
             );
+            $this->telegram->sendMessage($chatId, 'منوی اصلی:', $this->menus->mainMenuReplyKeyboard($userId));
             $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
@@ -3341,6 +3347,19 @@ final class CallbackHandler
         }
 
         return true;
+    }
+
+    private function isDeprecatedUserInlineAction(string $data): bool
+    {
+        if (in_array($data, ['profile', 'support', 'my_configs', 'wallet:charge', 'buy:start', 'test:start', 'agency:request'], true)) {
+            return true;
+        }
+        foreach (['referral:', 'buy:', 'renew:', 'rpay:', 'pay:swapwallet_crypto:', 'pay:tronpays_rial:'] as $prefix) {
+            if (str_starts_with($data, $prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function isGatewayAmountAllowed(string $gateway, int $amount): bool

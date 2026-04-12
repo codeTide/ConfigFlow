@@ -51,7 +51,7 @@ $gateways = new PaymentGatewayService($settings);
 $menus = new MenuService($settings, $database);
 $startHandler = new StartHandler($database, $telegram, $settings, $menus);
 $callbackHandler = new CallbackHandler($database, $telegram, $settings, $menus, $gateways);
-$messageHandler = new MessageHandler($database, $telegram, $settings);
+$messageHandler = new MessageHandler($database, $telegram, $settings, $menus, $gateways, $callbackHandler);
 
 $router = new UpdateRouter($startHandler, $callbackHandler, $messageHandler);
 $router->route($update);

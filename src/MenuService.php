@@ -33,6 +33,25 @@ final class MenuService
         );
     }
 
+    public function mainMenuReplyKeyboard(int $userId): array
+    {
+        $isAdmin = $this->database->isAdminUser($userId);
+        return KeyboardBuilder::mainReply(
+            $isAdmin,
+            $this->settings->get('referral_enabled', '1') === '1',
+            $this->settings->get('agency_request_enabled', '1') === '1',
+            $this->settings->get('free_test_enabled', '1') === '1',
+        );
+    }
+
+    public function accountMenuReplyKeyboard(): array
+    {
+        return KeyboardBuilder::accountReply(
+            $this->settings->get('referral_enabled', '1') === '1',
+            $this->settings->get('agency_request_enabled', '1') === '1',
+        );
+    }
+
     public function profileText(int $userId): string
     {
         $user = $this->database->getUser($userId);
@@ -49,9 +68,10 @@ final class MenuService
 
         return "👤 <b>پروفایل کاربری</b>\n\n"
             . "📱 نام: " . htmlspecialchars((string) ($user['full_name'] ?? '-')) . "\n"
-            . "🆔 نام کاربری: " . htmlspecialchars((string) $username) . "\n"
+            . "🏷 نام کاربری: " . htmlspecialchars((string) $username) . "\n"
             . "🔢 آیدی: <code>{$userId}</code>\n\n"
-            . "💰 موجودی: <b>{$balance}</b> تومان";
+            . "💰 موجودی: <b>{$balance}</b> تومان\n\n"
+            . "> حساب شما امن نگه داشته شده؛ برای شارژ، دعوت یا نمایندگی از دکمه‌های همین بخش استفاده کنید.";
     }
 
     public function supportText(): string

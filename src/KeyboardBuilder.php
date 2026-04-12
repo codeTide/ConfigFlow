@@ -6,38 +6,87 @@ namespace ConfigFlow\Bot;
 
 final class KeyboardBuilder
 {
+    public const BTN_BUY = '🛒 خرید';
+    public const BTN_MY_CONFIGS = '📦 کانفیگ‌هام';
+    public const BTN_FREE_TEST = '🎁 تست رایگان';
+    public const BTN_PROFILE = '👤 حساب';
+    public const BTN_WALLET = '💳 شارژ حساب';
+    public const BTN_SUPPORT = '🎧 پشتیبانی';
+    public const BTN_REFERRAL = '🎁 دعوت';
+    public const BTN_AGENCY = '🤝 نمایندگی';
+    public const BTN_ADMIN = '⚙️ پنل مدیریت';
+    public const BTN_BACK_MAIN = '🏠 منوی اصلی';
+    public const BTN_BACK_TYPES = '🔙 بازگشت به سرویس‌ها';
+    public const BTN_BACK_PURCHASES = '🔙 بازگشت به سفارش‌ها';
+
     public static function main(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
     {
         $keyboard = [
             [
-                ['text' => '🛒 خرید کانفیگ جدید', 'callback_data' => 'buy:start'],
-                ['text' => '📦 کانفیگ‌های من', 'callback_data' => 'my_configs'],
+                ['text' => self::BTN_BUY, 'callback_data' => 'buy:start'],
+                ['text' => self::BTN_MY_CONFIGS, 'callback_data' => 'my_configs'],
             ],
         ];
 
         if ($freeTestEnabled) {
-            $keyboard[] = [['text' => '🎁 تست رایگان', 'callback_data' => 'test:start']];
+            $keyboard[] = [['text' => self::BTN_FREE_TEST, 'callback_data' => 'test:start']];
         }
 
         $keyboard[] = [
-            ['text' => '👤 حساب کاربری', 'callback_data' => 'profile'],
-            ['text' => '💳 شارژ کیف پول', 'callback_data' => 'wallet:charge'],
+            ['text' => self::BTN_PROFILE, 'callback_data' => 'profile'],
+            ['text' => self::BTN_WALLET, 'callback_data' => 'wallet:charge'],
         ];
-        $keyboard[] = [['text' => '🎧 ارتباط با پشتیبانی', 'callback_data' => 'support']];
+        $keyboard[] = [['text' => self::BTN_SUPPORT, 'callback_data' => 'support']];
 
         if ($referralEnabled) {
-            $keyboard[] = [['text' => '🎁 دعوت دوستان', 'callback_data' => 'referral:menu']];
+            $keyboard[] = [['text' => self::BTN_REFERRAL, 'callback_data' => 'referral:menu']];
         }
 
         if ($agencyEnabled) {
-            $keyboard[] = [['text' => '🤝 درخواست نمایندگی', 'callback_data' => 'agency:request']];
+            $keyboard[] = [['text' => self::BTN_AGENCY, 'callback_data' => 'agency:request']];
         }
 
         if ($isAdmin) {
-            $keyboard[] = [['text' => '⚙️ ورود به پنل مدیریت', 'callback_data' => 'admin:panel']];
+            $keyboard[] = [['text' => self::BTN_ADMIN, 'callback_data' => 'admin:panel']];
         }
 
         return ['inline_keyboard' => $keyboard];
+    }
+
+    public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
+    {
+        $keyboard = [];
+        if ($isAdmin) {
+            $keyboard[] = [self::BTN_ADMIN];
+        }
+        $keyboard[] = [self::BTN_MY_CONFIGS, self::BTN_BUY, self::BTN_PROFILE];
+        $keyboard[] = $freeTestEnabled ? [self::BTN_FREE_TEST, self::BTN_SUPPORT] : [self::BTN_SUPPORT];
+
+        return [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+        ];
+    }
+
+    public static function accountReply(bool $referralEnabled, bool $agencyEnabled): array
+    {
+        $keyboard = [
+            [self::BTN_WALLET, self::BTN_REFERRAL],
+        ];
+        if (!$referralEnabled) {
+            $keyboard = [[self::BTN_WALLET]];
+        }
+        if ($agencyEnabled) {
+            $keyboard[] = [self::BTN_AGENCY];
+        }
+        $keyboard[] = [self::BTN_BACK_MAIN];
+
+        return [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+        ];
     }
 
     public static function backToMain(): array
@@ -75,6 +124,83 @@ final class KeyboardBuilder
                 [['text' => '🗃 بکاپ / تاپیک گروه', 'callback_data' => 'admin:groupops']],
                 [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']],
             ],
+        ];
+    }
+
+    public static function adminPanelReply(): array
+    {
+        $buttons = [
+            '🧩 نوع/پکیج',
+            '📚 موجودی',
+            '👥 کاربران',
+            '⚙️ تنظیمات',
+            '👮 ادمین‌ها',
+            '📣 همگانی',
+            '📌 پین‌ها',
+            '🤝 نماینده‌ها',
+            '🖥 پنل‌های 3x-ui',
+            '💳 شارژها',
+            '📦 تحویل سفارش',
+            '🗂 درخواست‌ها',
+            '🗃 بکاپ/تاپیک',
+        ];
+        $keyboard = self::smartKeyboardRows($buttons, [3, 2, 1], 12, 20);
+        $keyboard[] = [self::BTN_BACK_MAIN];
+
+        return [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+        ];
+    }
+
+    public static function smartKeyboardRows(
+        array $buttonTexts,
+        array $layoutPattern = [3, 2, 1],
+        int $limitThreeCols = 14,
+        int $limitTwoCols = 20
+    ): array {
+        $threeCols = [];
+        $twoCols = [];
+        $singleCol = [];
+        foreach ($buttonTexts as $buttonText) {
+            $text = trim((string) $buttonText);
+            if ($text === '') {
+                continue;
+            }
+            $length = function_exists('mb_strlen') ? mb_strlen($text) : strlen($text);
+            if ($length <= $limitThreeCols) {
+                $threeCols[] = $text;
+            } elseif ($length <= $limitTwoCols) {
+                $twoCols[] = $text;
+            } else {
+                $singleCol[] = $text;
+            }
+        }
+
+        $groups = [
+            3 => &$threeCols,
+            2 => &$twoCols,
+            1 => &$singleCol,
+        ];
+        $rows = [];
+        foreach ($layoutPattern as $cols) {
+            $cols = (int) $cols;
+            if (!isset($groups[$cols])) {
+                continue;
+            }
+            while (count($groups[$cols]) >= $cols) {
+                $rows[] = array_splice($groups[$cols], 0, $cols);
+            }
+        }
+
+        $remaining = array_merge($threeCols, $twoCols, $singleCol);
+        while ($remaining !== []) {
+            $rows[] = array_splice($remaining, 0, 2);
+        }
+
+        return [
+            ...$rows,
         ];
     }
 }

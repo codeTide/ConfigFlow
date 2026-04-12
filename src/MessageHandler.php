@@ -6,10 +6,22 @@ namespace ConfigFlow\Bot;
 
 final class MessageHandler
 {
+    private const PAY_WALLET = '💰 پرداخت با کیف پول';
+    private const PAY_CARD = '🏦 کارت به کارت';
+    private const PAY_CRYPTO = '💎 پرداخت کریپتو';
+    private const PAY_TETRAPAY = '🏧 پرداخت TetraPay';
+    private const PAY_SWAPWALLET = '💠 SwapWallet Crypto';
+    private const PAY_TRONPAYS = '🧾 TronPays Rial';
+    private const PAY_VERIFY = '🔄 بررسی پرداخت';
+    private const ACCEPT_RULES = '✅ قوانین را می‌پذیرم';
+
     public function __construct(
         private Database $database,
         private TelegramClient $telegram,
         private SettingsRepository $settings,
+        private MenuService $menus,
+        private PaymentGatewayService $gateways,
+        private CallbackHandler $callbackHandler,
     ) {
     }
 
@@ -22,8 +34,9 @@ final class MessageHandler
 
         $fromUser = $message['from'] ?? [];
         $chatId = (int) ($message['chat']['id'] ?? 0);
+        $messageId = (int) ($message['message_id'] ?? 0);
         $userId = (int) ($fromUser['id'] ?? 0);
-        if ($chatId === 0 || $userId === 0) {
+        if ($chatId === 0 || $userId === 0 || $messageId === 0) {
             return;
         }
 
@@ -35,11 +48,54 @@ final class MessageHandler
 
         $state = $this->database->getUserState($userId);
         if ($state === null) {
+            if ($this->handleMainReplyKeyboardInput($chatId, $messageId, $userId, $fromUser, $text)) {
+                return;
+            }
             return;
         }
 
         if ($text !== '' && str_starts_with($text, '/start')) {
             $this->database->clearUserState($userId);
+            return;
+        }
+
+        if ($state['state_name'] === 'await_buy_type_selection') {
+            $this->handleBuyTypeSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'await_buy_package_selection') {
+            $this->handleBuyPackageSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'await_renew_purchase_selection') {
+            $this->handleRenewPurchaseSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'await_renew_package_selection') {
+            $this->handleRenewPackageSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'await_buy_payment_selection') {
+            $this->handleBuyPaymentSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'await_renew_payment_selection') {
+            $this->handleRenewPaymentSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'await_gateway_verify') {
+            $this->handleGatewayVerifyState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'await_purchase_rules_accept') {
+            $this->handlePurchaseRulesAcceptState($chatId, $userId, $text, $state);
             return;
         }
 
@@ -869,6 +925,958 @@ ID: <code>{$pinId}</code>");
             $this->sendToGroupTopic('broadcast_report', "📣 گزارش ارسال همگانی\nادمین: <code>{$userId}</code>\nscope: <b>" . htmlspecialchars($scope) . "</b>\nموفق: <b>{$sent}</b>");
             return;
         }
+    }
+
+    private function handleMainReplyKeyboardInput(int $chatId, int $messageId, int $userId, array $fromUser, string $text): bool
+    {
+        if ($text === '' || str_starts_with($text, '/')) {
+            return false;
+        }
+
+        if ($text === KeyboardBuilder::BTN_PROFILE) {
+            $this->telegram->sendMessage($chatId, $this->menus->profileText($userId), $this->menus->accountMenuReplyKeyboard());
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_SUPPORT) {
+            $this->telegram->sendMessage($chatId, $this->menus->supportText());
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_MY_CONFIGS) {
+            $this->showMyConfigsWithReplyFlow($chatId, $userId);
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_REFERRAL) {
+            if ($this->settings->get('referral_enabled', '1') !== '1') {
+                return false;
+            }
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->menus->referralText($userId),
+                KeyboardBuilder::referral($this->menus->referralShareUrl($userId))
+            );
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_WALLET) {
+            $this->database->setUserState($userId, 'await_wallet_amount');
+            $this->telegram->sendMessage(
+                $chatId,
+                "💳 <b>شارژ کیف پول</b>\n\nلطفاً مبلغ موردنظر را به تومان ارسال کنید.",
+                null
+            );
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_BUY) {
+            $this->startBuyTypeReplyFlow($chatId, $userId);
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_FREE_TEST) {
+            if ($this->settings->get('free_test_enabled', '1') !== '1') {
+                return false;
+            }
+            $this->database->setUserState($userId, 'await_free_test_note');
+            $this->telegram->sendMessage(
+                $chatId,
+                "🎁 <b>درخواست تست رایگان</b>\n\n"
+                . "لطفاً یک توضیح کوتاه ارسال کنید (مثلاً نوع مصرف/مدت موردنیاز).\n"
+                . "درخواست شما برای ادمین ارسال می‌شود."
+            );
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_AGENCY) {
+            if ($this->settings->get('agency_request_enabled', '1') !== '1') {
+                return false;
+            }
+            $this->database->setUserState($userId, 'await_agency_request');
+            $this->telegram->sendMessage(
+                $chatId,
+                "🤝 <b>درخواست نمایندگی</b>\n\n"
+                . "لطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید.\n"
+                . "پیام شما برای تیم ادمین ثبت می‌شود."
+            );
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_ADMIN) {
+            if (!$this->database->isAdminUser($userId)) {
+                return false;
+            }
+            $this->telegram->sendMessage($chatId, '⚙️ <b>پنل مدیریت</b>', KeyboardBuilder::adminPanelReply());
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return true;
+        }
+
+        if ($this->database->isAdminUser($userId)) {
+            $adminRouteMap = [
+                '🧩 نوع/پکیج' => 'admin:types',
+                '📚 موجودی' => 'admin:stock',
+                '👥 کاربران' => 'admin:users',
+                '⚙️ تنظیمات' => 'admin:settings',
+                '👮 ادمین‌ها' => 'admin:admins',
+                '📣 همگانی' => 'admin:broadcast',
+                '📌 پین‌ها' => 'admin:pins',
+                '🤝 نماینده‌ها' => 'admin:agents',
+                '🖥 پنل‌های 3x-ui' => 'admin:panels',
+                '💳 شارژها' => 'admin:payments',
+                '📦 تحویل سفارش' => 'admin:deliveries',
+                '🗂 درخواست‌ها' => 'admin:requests',
+                '🗃 بکاپ/تاپیک' => 'admin:groupops',
+            ];
+            $route = $adminRouteMap[$text] ?? '';
+            if ($route !== '') {
+                $this->dispatchReplyAsCallback($chatId, $messageId, $fromUser, $route);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function startBuyTypeReplyFlow(int $chatId, int $userId): void
+    {
+        if ($this->settings->get('shop_open', '1') !== '1') {
+            $this->telegram->sendMessage($chatId, 'فروشگاه در حال حاضر بسته است.');
+            return;
+        }
+        $types = $this->database->getActiveTypes();
+        if ($types === []) {
+            $this->telegram->sendMessage($chatId, 'فعلاً سرویسی برای خرید فعال نیست.');
+            return;
+        }
+
+        $lines = [];
+        $optionMap = [];
+        $buttons = [];
+        foreach (array_values($types) as $idx => $type) {
+            $num = (string) ($idx + 1);
+            $typeId = (int) ($type['id'] ?? 0);
+            if ($typeId <= 0) {
+                continue;
+            }
+            $name = trim((string) ($type['name'] ?? '—'));
+            $lines[] = "{$num}) " . htmlspecialchars($name);
+            $optionMap[$num] = $typeId;
+            $buttons[] = [$num . ' - ' . $name];
+        }
+
+        if ($optionMap === []) {
+            $this->telegram->sendMessage($chatId, 'فعلاً سرویسی برای خرید فعال نیست.');
+            return;
+        }
+
+        $buttons[] = [KeyboardBuilder::BTN_BACK_MAIN];
+        $this->database->setUserState($userId, 'await_buy_type_selection', ['options' => $optionMap]);
+        $this->telegram->sendMessage(
+            $chatId,
+            "🛒 <b>خرید کانفیگ</b>\n\nنوع سرویس موردنظر را انتخاب کنید:\n" . implode("\n", $lines),
+            $this->replyKeyboard($buttons)
+        );
+    }
+
+    private function handleBuyTypeSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+
+        $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
+        $selected = $this->extractOptionKey($text);
+        $typeId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        if ($typeId <= 0) {
+            $this->telegram->sendMessage($chatId, '⚠️ گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید.');
+            return;
+        }
+
+        $stockOnly = $this->settings->get('preorder_mode', '0') === '1';
+        $packages = $this->database->getActivePackagesByTypeWithStock($typeId, $stockOnly);
+        if ($packages === []) {
+            $this->telegram->sendMessage($chatId, 'پکیجی برای این نوع سرویس یافت نشد.');
+            return;
+        }
+
+        $lines = [];
+        $optionMap = [];
+        $buttons = [];
+        foreach (array_values($packages) as $idx => $pkg) {
+            $num = (string) ($idx + 1);
+            $pkgId = (int) ($pkg['id'] ?? 0);
+            if ($pkgId <= 0) {
+                continue;
+            }
+            $price = $this->database->effectivePackagePrice($userId, $pkg);
+            $stockText = isset($pkg['stock']) ? (' | موجودی: ' . (int) $pkg['stock']) : '';
+            $label = sprintf('%s | %sGB | %s روز | %s تومان%s', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $price, $stockText);
+            $lines[] = "{$num}) " . htmlspecialchars($label);
+            $optionMap[$num] = $pkgId;
+            $buttons[] = [$num . ' - ' . (string) ($pkg['name'] ?? 'پکیج')];
+        }
+
+        $buttons[] = [KeyboardBuilder::BTN_BACK_TYPES];
+        $this->database->setUserState($userId, 'await_buy_package_selection', ['options' => $optionMap, 'type_id' => $typeId]);
+        $this->telegram->sendMessage(
+            $chatId,
+            "📦 <b>انتخاب پکیج</b>\n\nیک پکیج را انتخاب کنید:\n" . implode("\n", $lines),
+            $this->replyKeyboard($buttons)
+        );
+    }
+
+    private function handleBuyPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === KeyboardBuilder::BTN_BACK_TYPES) {
+            $this->startBuyTypeReplyFlow($chatId, $userId);
+            return;
+        }
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+
+        $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
+        $selected = $this->extractOptionKey($text);
+        $packageId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        if ($packageId <= 0) {
+            $this->telegram->sendMessage($chatId, '⚠️ گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید.');
+            return;
+        }
+
+        if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
+            $rulesText = trim($this->settings->get('purchase_rules_text', ''));
+            $rulesText = $rulesText !== '' ? $rulesText : 'لطفاً قوانین خرید را بپذیرید.';
+            $this->database->setUserState($userId, 'await_purchase_rules_accept', ['package_id' => $packageId]);
+            $this->telegram->sendMessage(
+                $chatId,
+                "📜 <b>قوانین خرید</b>\n\n" . $rulesText,
+                $this->replyKeyboard([[self::ACCEPT_RULES], [KeyboardBuilder::BTN_BACK_TYPES], [KeyboardBuilder::BTN_BACK_MAIN]])
+            );
+            return;
+        }
+
+        $this->database->clearUserState($userId);
+        $package = $this->database->getPackage($packageId);
+        if ($package === null) {
+            $this->telegram->sendMessage($chatId, 'پکیج پیدا نشد.');
+            return;
+        }
+        $textOut = "💰 <b>پرداخت سفارش</b>\n\n"
+            . "پکیج: <b>" . htmlspecialchars((string) $package['name']) . "</b>\n"
+            . "قیمت: <b>" . (int) $this->database->effectivePackagePrice($userId, $package) . "</b> تومان\n\n"
+            . "روش پرداخت را از دکمه‌های عادی انتخاب کنید:";
+        $buttons = [[self::PAY_WALLET]];
+        if ($this->settings->get('gw_card_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_CARD];
+        }
+        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_CRYPTO];
+        }
+        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_TETRAPAY];
+        }
+        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_SWAPWALLET];
+        }
+        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_TRONPAYS];
+        }
+        $buttons[] = [KeyboardBuilder::BTN_BACK_MAIN];
+        $this->database->setUserState($userId, 'await_buy_payment_selection', ['package_id' => $packageId]);
+        $this->telegram->sendMessage($chatId, $textOut, $this->replyKeyboard($buttons));
+    }
+
+    private function showMyConfigsWithReplyFlow(int $chatId, int $userId): void
+    {
+        $items = $this->database->listUserPurchasesSummary($userId, 8);
+        $this->telegram->sendMessage($chatId, $this->menus->myConfigsText($userId));
+
+        if ($this->settings->get('manual_renewal_enabled', '1') !== '1' || $items === []) {
+            return;
+        }
+
+        $lines = [];
+        $optionMap = [];
+        $buttons = [];
+        foreach (array_values($items) as $idx => $item) {
+            $num = (string) ($idx + 1);
+            $purchaseId = (int) ($item['id'] ?? 0);
+            if ($purchaseId <= 0) {
+                continue;
+            }
+            $service = trim((string) ($item['service_name'] ?? '-'));
+            $lines[] = "{$num}) سفارش #{$purchaseId} - " . htmlspecialchars($service);
+            $optionMap[$num] = $purchaseId;
+            $buttons[] = ['♻️ تمدید ' . $num];
+        }
+
+        if ($optionMap === []) {
+            return;
+        }
+
+        $buttons[] = [KeyboardBuilder::BTN_BACK_MAIN];
+        $this->database->setUserState($userId, 'await_renew_purchase_selection', ['options' => $optionMap]);
+        $this->telegram->sendMessage(
+            $chatId,
+            "♻️ <b>تمدید سرویس</b>\n\nبرای تمدید، یکی از سفارش‌های زیر را انتخاب کنید:\n" . implode("\n", $lines),
+            $this->replyKeyboard($buttons)
+        );
+    }
+
+    private function handleRenewPurchaseSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+
+        $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
+        $selected = $this->extractOptionKey($text);
+        $purchaseId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        if ($purchaseId <= 0) {
+            $this->telegram->sendMessage($chatId, '⚠️ گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید.');
+            return;
+        }
+
+        $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
+        if (!is_array($purchase)) {
+            $this->telegram->sendMessage($chatId, 'سفارش پیدا نشد.');
+            return;
+        }
+        if ((int) ($purchase['is_test'] ?? 0) === 1) {
+            $this->telegram->sendMessage($chatId, 'تمدید برای سرویس تست ممکن نیست.');
+            return;
+        }
+
+        $typeId = (int) ($purchase['type_id'] ?? 0);
+        $packages = $this->database->getActivePackagesByType($typeId);
+        if ($packages === []) {
+            $this->telegram->sendMessage($chatId, 'پکیج تمدید یافت نشد.');
+            return;
+        }
+
+        $lines = [];
+        $optionMap = [];
+        $buttons = [];
+        foreach (array_values($packages) as $idx => $pkg) {
+            $num = (string) ($idx + 1);
+            $pkgId = (int) ($pkg['id'] ?? 0);
+            if ($pkgId <= 0) {
+                continue;
+            }
+            $label = sprintf('%s | %sGB | %s روز | %s تومان', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $pkg['price']);
+            $lines[] = "{$num}) " . htmlspecialchars($label);
+            $optionMap[$num] = $pkgId;
+            $buttons[] = ['📦 پکیج ' . $num];
+        }
+
+        $buttons[] = [KeyboardBuilder::BTN_BACK_PURCHASES];
+        $this->database->setUserState($userId, 'await_renew_package_selection', ['options' => $optionMap, 'purchase_id' => $purchaseId]);
+        $this->telegram->sendMessage(
+            $chatId,
+            "♻️ <b>انتخاب پکیج تمدید</b>\n\n"
+            . "سفارش: <code>#{$purchaseId}</code>\n"
+            . "سرویس فعلی: <b>" . htmlspecialchars((string) ($purchase['service_name'] ?? '-')) . "</b>\n"
+            . "پکیج فعلی: <b>" . htmlspecialchars((string) ($purchase['package_name'] ?? '-')) . "</b>\n\n"
+            . "پکیج تمدید را انتخاب کنید:\n" . implode("\n", $lines),
+            $this->replyKeyboard($buttons)
+        );
+    }
+
+    private function handleRenewPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === KeyboardBuilder::BTN_BACK_PURCHASES) {
+            $this->showMyConfigsWithReplyFlow($chatId, $userId);
+            return;
+        }
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+
+        $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
+        $selected = $this->extractOptionKey($text);
+        $packageId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        $purchaseId = (int) ($state['payload']['purchase_id'] ?? 0);
+        if ($packageId <= 0 || $purchaseId <= 0) {
+            $this->telegram->sendMessage($chatId, '⚠️ گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید.');
+            return;
+        }
+
+        $this->database->clearUserState($userId);
+        $package = $this->database->getPackage($packageId);
+        $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
+        if ($package === null || !is_array($purchase)) {
+            $this->telegram->sendMessage($chatId, 'داده تمدید معتبر نیست.');
+            return;
+        }
+
+        $textOut = "💳 <b>پرداخت تمدید</b>\n\n"
+            . "سفارش: <code>#{$purchaseId}</code>\n"
+            . "پکیج تمدید: <b>" . htmlspecialchars((string) $package['name']) . "</b>\n"
+            . "مبلغ: <b>" . (int) $package['price'] . "</b> تومان\n\n"
+            . "روش پرداخت را از دکمه‌های عادی انتخاب کنید:";
+        $buttons = [[self::PAY_WALLET]];
+        if ($this->settings->get('gw_card_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_CARD];
+        }
+        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_CRYPTO];
+        }
+        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_TETRAPAY];
+        }
+        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_SWAPWALLET];
+        }
+        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_TRONPAYS];
+        }
+        $buttons[] = [KeyboardBuilder::BTN_BACK_MAIN];
+        $this->database->setUserState($userId, 'await_renew_payment_selection', ['purchase_id' => $purchaseId, 'package_id' => $packageId]);
+        $this->telegram->sendMessage($chatId, $textOut, $this->replyKeyboard($buttons));
+    }
+
+    private function handleBuyPaymentSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+        $packageId = (int) ($state['payload']['package_id'] ?? 0);
+        if ($packageId <= 0) {
+            $this->database->clearUserState($userId);
+            return;
+        }
+        if (!$this->ensurePurchaseAllowedForPackageMessage($chatId, $userId, $packageId)) {
+            return;
+        }
+
+        if ($text === self::PAY_WALLET) {
+            $this->database->clearUserState($userId);
+            $result = $this->database->walletPayPackage($userId, $packageId);
+            if (!($result['ok'] ?? false)) {
+                $msg = match ($result['error'] ?? '') {
+                    'insufficient_balance' => 'موجودی کیف پول کافی نیست.',
+                    'no_stock' => 'برای این پکیج موجودی ثبت‌شده وجود ندارد.',
+                    default => 'خطا در ثبت سفارش. دوباره تلاش کنید.',
+                };
+                $this->telegram->sendMessage($chatId, '❌ ' . $msg);
+                return;
+            }
+            $this->telegram->sendMessage(
+                $chatId,
+                "✅ خرید با کیف پول ثبت شد.\n\n"
+                . "شناسه پرداخت: <code>" . (int) $result['payment_id'] . "</code>\n"
+                . "مبلغ: <b>" . (int) $result['price'] . "</b> تومان\n"
+                . "موجودی جدید: <b>" . (int) $result['new_balance'] . "</b> تومان\n\n"
+                . "سفارش شما در صف تحویل قرار گرفت."
+            );
+            return;
+        }
+
+        if ($text === self::PAY_CARD || $text === self::PAY_CRYPTO || $text === self::PAY_TETRAPAY) {
+            $this->database->clearUserState($userId);
+            $this->createPurchasePaymentByMethod($chatId, $userId, $packageId, $text);
+            return;
+        }
+
+        if ($text === self::PAY_SWAPWALLET || $text === self::PAY_TRONPAYS) {
+            $this->database->clearUserState($userId);
+            $this->createPurchaseGatewayInvoice($chatId, $userId, $packageId, $text);
+            return;
+        }
+
+        if ($text !== self::PAY_WALLET && $text !== self::PAY_CARD && $text !== self::PAY_CRYPTO && $text !== self::PAY_TETRAPAY && $text !== self::PAY_SWAPWALLET && $text !== self::PAY_TRONPAYS) {
+            $this->telegram->sendMessage($chatId, '⚠️ لطفاً یکی از روش‌های پرداخت را انتخاب کنید.');
+            return;
+        }
+    }
+
+    private function handleRenewPaymentSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+        $purchaseId = (int) ($state['payload']['purchase_id'] ?? 0);
+        $packageId = (int) ($state['payload']['package_id'] ?? 0);
+        if ($purchaseId <= 0 || $packageId <= 0) {
+            $this->database->clearUserState($userId);
+            return;
+        }
+        if ($text === self::PAY_WALLET) {
+            $this->database->clearUserState($userId);
+            $result = $this->database->walletPayRenewal($userId, $purchaseId, $packageId);
+            if (!($result['ok'] ?? false)) {
+                $msg = match ($result['error'] ?? '') {
+                    'insufficient_balance' => '❌ موجودی کیف پول کافی نیست.',
+                    'purchase_not_found' => '❌ سرویس قابل تمدید پیدا نشد.',
+                    'test_not_renewable' => '❌ تمدید برای سرویس تست مجاز نیست.',
+                    'type_mismatch' => '❌ پکیج انتخابی برای این سرویس معتبر نیست.',
+                    default => '❌ پرداخت تمدید انجام نشد.',
+                };
+                $this->telegram->sendMessage($chatId, $msg);
+                return;
+            }
+            $this->telegram->sendMessage(
+                $chatId,
+                "✅ <b>پرداخت تمدید با کیف پول انجام شد.</b>\n\n"
+                . "سفارش شما در صف تحویل قرار گرفت.\n"
+                . "شماره سفارش: <code>" . (int) ($result['pending_order_id'] ?? 0) . "</code>"
+            );
+            return;
+        }
+
+        if ($text === self::PAY_CARD || $text === self::PAY_CRYPTO || $text === self::PAY_TETRAPAY) {
+            $this->database->clearUserState($userId);
+            $this->createRenewalPaymentByMethod($chatId, $userId, $purchaseId, $packageId, $text);
+            return;
+        }
+
+        if ($text === self::PAY_SWAPWALLET || $text === self::PAY_TRONPAYS) {
+            $this->database->clearUserState($userId);
+            $this->createRenewalGatewayInvoice($chatId, $userId, $purchaseId, $packageId, $text);
+            return;
+        }
+
+        if ($text !== self::PAY_WALLET && $text !== self::PAY_CARD && $text !== self::PAY_CRYPTO && $text !== self::PAY_TETRAPAY && $text !== self::PAY_SWAPWALLET && $text !== self::PAY_TRONPAYS) {
+            $this->telegram->sendMessage($chatId, '⚠️ لطفاً یکی از روش‌های پرداخت را انتخاب کنید.');
+            return;
+        }
+    }
+
+    private function createPurchasePaymentByMethod(int $chatId, int $userId, int $packageId, string $methodLabel): void
+    {
+        $method = $methodLabel === self::PAY_CARD ? 'card' : ($methodLabel === self::PAY_CRYPTO ? 'crypto' : 'tetrapay');
+        $package = $this->database->getPackage($packageId);
+        if ($package === null) {
+            $this->telegram->sendMessage($chatId, 'پکیج پیدا نشد.');
+            return;
+        }
+        $amount = (int) $this->database->effectivePackagePrice($userId, $package);
+        $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
+        $paymentId = $this->database->createPayment([
+            'kind' => 'purchase',
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'amount' => $amount,
+            'payment_method' => $paymentMethod,
+            'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
+            'gateway_ref' => null,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $pendingId = $this->database->createPendingOrder([
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'payment_id' => $paymentId,
+            'amount' => $amount,
+            'payment_method' => $paymentMethod,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+            'status' => 'waiting_payment',
+        ]);
+
+        if ($method === 'card') {
+            $card = htmlspecialchars($this->settings->get('payment_card', '---'));
+            $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
+            $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
+            $text = "🏦 <b>پرداخت کارت به کارت</b>\n\n"
+                . "شماره کارت: <code>{$card}</code>\n"
+                . ($bank !== '' ? "بانک: {$bank}\n" : '')
+                . ($owner !== '' ? "به نام: {$owner}\n" : '')
+                . "\nشناسه سفارش: <code>{$pendingId}</code>\n"
+                . "مبلغ: <b>{$amount}</b> تومان\n\n"
+                . "پس از واریز، رسید را همینجا (عکس/فایل/متن) ارسال کنید.";
+            $this->database->setUserState($userId, 'await_card_receipt', ['payment_id' => $paymentId]);
+            $this->telegram->sendMessage($chatId, $text);
+            return;
+        }
+
+        if ($method === 'crypto') {
+            $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
+            $text = "💎 <b>پرداخت کریپتو</b>\n\n"
+                . "شناسه سفارش: <code>{$pendingId}</code>\n"
+                . "ارز: <b>TRON</b>\n"
+                . "مبلغ معادل ریالی: <b>{$amount}</b> تومان\n\n"
+                . ($address !== '' ? "آدرس کیف پول:\n<code>{$address}</code>\n\n" : '')
+                . "پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\n"
+                . "مثال: <code>TX_HASH 12.345</code>";
+            $this->database->setUserState($userId, 'await_crypto_tx', ['payment_id' => $paymentId]);
+            $this->telegram->sendMessage($chatId, $text);
+            return;
+        }
+
+        $tp = $this->gateways->createTetrapayOrder($amount, (string) $pendingId);
+        if (!($tp['ok'] ?? false)) {
+            $this->telegram->sendMessage($chatId, "🏧 <b>پرداخت TetraPay</b>\n\nشناسه سفارش: <code>{$pendingId}</code>\nمبلغ: <b>{$amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.");
+            return;
+        }
+        $authority = (string) ($tp['authority'] ?? '');
+        if ($authority !== '') {
+            $this->database->setPaymentGatewayRef($paymentId, $authority);
+        }
+        $payUrl = (string) ($tp['pay_url'] ?? '');
+        $this->database->setUserState($userId, 'await_gateway_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => '✅ پرداخت تتراپی تایید شد. سفارش شما در صف تحویل قرار گرفت.']);
+        $this->sendGatewayPaymentIntro($chatId, "🏧 <b>پرداخت TetraPay</b>", $pendingId, $amount, $payUrl);
+    }
+
+    private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
+    {
+        $method = $methodLabel === self::PAY_CARD ? 'card' : ($methodLabel === self::PAY_CRYPTO ? 'crypto' : 'tetrapay');
+        $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
+        $package = $this->database->getPackage($packageId);
+        if (!is_array($purchase) || $package === null) {
+            $this->telegram->sendMessage($chatId, 'داده تمدید معتبر نیست.');
+            return;
+        }
+        $amount = (int) $package['price'];
+        $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
+        $paymentId = $this->database->createPayment([
+            'kind' => 'renewal',
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'amount' => $amount,
+            'payment_method' => $paymentMethod,
+            'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
+            'gateway_ref' => null,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $pendingId = $this->database->createPendingOrder([
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'payment_id' => $paymentId,
+            'amount' => $amount,
+            'payment_method' => $paymentMethod,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+            'status' => 'waiting_payment',
+        ]);
+
+        if ($method === 'card') {
+            $card = htmlspecialchars($this->settings->get('payment_card', '---'));
+            $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
+            $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
+            $text = "🏦 <b>کارت به کارت (تمدید)</b>\n\n"
+                . "شماره کارت: <code>{$card}</code>\n"
+                . ($bank !== '' ? "بانک: {$bank}\n" : '')
+                . ($owner !== '' ? "به نام: {$owner}\n" : '')
+                . "\nشناسه سفارش: <code>{$pendingId}</code>\n"
+                . "مبلغ: <b>{$amount}</b> تومان\n\n"
+                . "پس از واریز، رسید را همینجا ارسال کنید.";
+            $this->database->setUserState($userId, 'await_renewal_receipt', ['payment_id' => $paymentId]);
+            $this->telegram->sendMessage($chatId, $text);
+            return;
+        }
+
+        if ($method === 'crypto') {
+            $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
+            $text = "💎 <b>پرداخت کریپتو (تمدید)</b>\n\n"
+                . "شناسه سفارش: <code>{$pendingId}</code>\n"
+                . "ارز: <b>TRON</b>\n"
+                . "مبلغ معادل ریالی: <b>{$amount}</b> تومان\n\n"
+                . ($address !== '' ? "آدرس کیف پول:\n<code>{$address}</code>\n\n" : '')
+                . "پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\n"
+                . "مثال: <code>TX_HASH 12.345</code>";
+            $this->database->setUserState($userId, 'await_renewal_crypto_tx', ['payment_id' => $paymentId]);
+            $this->telegram->sendMessage($chatId, $text);
+            return;
+        }
+
+        $tp = $this->gateways->createTetrapayOrder($amount, (string) $pendingId);
+        if (!($tp['ok'] ?? false)) {
+            $this->telegram->sendMessage($chatId, "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\nشناسه سفارش: <code>{$pendingId}</code>\nمبلغ: <b>{$amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.");
+            return;
+        }
+        $authority = (string) ($tp['authority'] ?? '');
+        if ($authority !== '') {
+            $this->database->setPaymentGatewayRef($paymentId, $authority);
+        }
+        $payUrl = (string) ($tp['pay_url'] ?? '');
+        $this->database->setUserState($userId, 'await_gateway_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => '✅ پرداخت تمدید تایید شد. درخواست شما در صف تحویل قرار گرفت.']);
+        $this->sendGatewayPaymentIntro($chatId, "🏧 <b>پرداخت TetraPay (تمدید)</b>", $pendingId, $amount, $payUrl);
+    }
+
+    private function createPurchaseGatewayInvoice(int $chatId, int $userId, int $packageId, string $methodLabel): void
+    {
+        $gateway = $methodLabel === self::PAY_SWAPWALLET ? 'swapwallet_crypto' : 'tronpays_rial';
+        $package = $this->database->getPackage($packageId);
+        if ($package === null) {
+            $this->telegram->sendMessage($chatId, 'پکیج پیدا نشد.');
+            return;
+        }
+        $amount = (int) $this->database->effectivePackagePrice($userId, $package);
+        $paymentId = $this->database->createPayment([
+            'kind' => 'purchase',
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'amount' => $amount,
+            'payment_method' => $gateway,
+            'status' => 'waiting_gateway',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $pendingId = $this->database->createPendingOrder([
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'payment_id' => $paymentId,
+            'amount' => $amount,
+            'payment_method' => $gateway,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+            'status' => 'waiting_payment',
+        ]);
+        if ($gateway === 'swapwallet_crypto') {
+            $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Purchase');
+            if (!($invoice['ok'] ?? false)) {
+                $this->telegram->sendMessage($chatId, 'خطا در ایجاد فاکتور SwapWallet.');
+                return;
+            }
+            $invoiceId = (string) ($invoice['invoice_id'] ?? '');
+            if ($invoiceId !== '') {
+                $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
+            }
+            $payUrl = (string) ($invoice['pay_url'] ?? '');
+            $this->database->setUserState($userId, 'await_gateway_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => '✅ پرداخت SwapWallet تایید شد و سفارش در صف تحویل قرار گرفت.']);
+            $this->sendGatewayPaymentIntro($chatId, "💠 <b>پرداخت با SwapWallet</b>", $pendingId, $amount, $payUrl);
+            return;
+        }
+        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-' . $userId . '-' . $packageId . '-' . time());
+        if (!($invoice['ok'] ?? false)) {
+            $this->telegram->sendMessage($chatId, 'خطا در ایجاد فاکتور TronPays.');
+            return;
+        }
+        $invoiceId = (string) ($invoice['invoice_id'] ?? '');
+        if ($invoiceId !== '') {
+            $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
+        }
+        $payUrl = (string) ($invoice['pay_url'] ?? '');
+        $this->database->setUserState($userId, 'await_gateway_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => '✅ پرداخت TronPays تایید شد و سفارش در صف تحویل قرار گرفت.']);
+        $this->sendGatewayPaymentIntro($chatId, "🧾 <b>پرداخت با TronPays</b>", $pendingId, $amount, $payUrl);
+    }
+
+    private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
+    {
+        $gateway = $methodLabel === self::PAY_SWAPWALLET ? 'swapwallet_crypto' : 'tronpays_rial';
+        $package = $this->database->getPackage($packageId);
+        $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
+        if ($package === null || !is_array($purchase)) {
+            $this->telegram->sendMessage($chatId, 'داده تمدید معتبر نیست.');
+            return;
+        }
+        $amount = (int) $package['price'];
+        $paymentId = $this->database->createPayment([
+            'kind' => 'renewal',
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'amount' => $amount,
+            'payment_method' => $gateway,
+            'status' => 'waiting_gateway',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $pendingId = $this->database->createPendingOrder([
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'payment_id' => $paymentId,
+            'amount' => $amount,
+            'payment_method' => $gateway,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+            'status' => 'waiting_payment',
+        ]);
+        if ($gateway === 'swapwallet_crypto') {
+            $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Renewal');
+            if (!($invoice['ok'] ?? false)) {
+                $this->telegram->sendMessage($chatId, 'خطا در ایجاد فاکتور SwapWallet.');
+                return;
+            }
+            $invoiceId = (string) ($invoice['invoice_id'] ?? '');
+            if ($invoiceId !== '') {
+                $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
+            }
+            $payUrl = (string) ($invoice['pay_url'] ?? '');
+            $this->database->setUserState($userId, 'await_gateway_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => '✅ پرداخت SwapWallet تایید شد و درخواست تمدید در صف تحویل قرار گرفت.']);
+            $this->sendGatewayPaymentIntro($chatId, "💠 <b>پرداخت تمدید با SwapWallet</b>", $pendingId, $amount, $payUrl);
+            return;
+        }
+        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'rnw-' . $userId . '-' . $packageId . '-' . time());
+        if (!($invoice['ok'] ?? false)) {
+            $this->telegram->sendMessage($chatId, 'خطا در ایجاد فاکتور TronPays.');
+            return;
+        }
+        $invoiceId = (string) ($invoice['invoice_id'] ?? '');
+        if ($invoiceId !== '') {
+            $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
+        }
+        $payUrl = (string) ($invoice['pay_url'] ?? '');
+        $this->database->setUserState($userId, 'await_gateway_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => '✅ پرداخت TronPays تایید شد و درخواست تمدید در صف تحویل قرار گرفت.']);
+        $this->sendGatewayPaymentIntro($chatId, "🧾 <b>پرداخت تمدید با TronPays</b>", $pendingId, $amount, $payUrl);
+    }
+
+    private function handleGatewayVerifyState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+        if ($text !== self::PAY_VERIFY) {
+            $this->telegram->sendMessage($chatId, 'برای بررسی وضعیت، دکمه «🔄 بررسی پرداخت» را بزنید.');
+            return;
+        }
+        $paymentId = (int) ($state['payload']['payment_id'] ?? 0);
+        $gateway = (string) ($state['payload']['gateway'] ?? '');
+        $okText = (string) ($state['payload']['ok_text'] ?? '✅ پرداخت تایید شد.');
+        if ($paymentId <= 0 || $gateway === '') {
+            $this->database->clearUserState($userId);
+            return;
+        }
+        $payment = $this->database->getPaymentById($paymentId);
+        if ($payment === null) {
+            $this->telegram->sendMessage($chatId, 'پرداخت پیدا نشد.');
+            return;
+        }
+        $gatewayRef = (string) ($payment['gateway_ref'] ?? '');
+        $verify = match ($gateway) {
+            'tetrapay' => $this->gateways->verifyTetrapay($gatewayRef),
+            'swapwallet_crypto' => $this->gateways->checkSwapwalletCryptoInvoice($gatewayRef),
+            'tronpays_rial' => $this->gateways->checkTronpaysRialInvoice($gatewayRef),
+            default => ['ok' => false, 'paid' => false],
+        };
+        if (($verify['ok'] ?? false) && ($verify['paid'] ?? false)) {
+            $changed = $this->database->markPaymentAndPendingPaidIfWaitingGateway($paymentId);
+            if ($changed) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $okText);
+                return;
+            }
+        }
+        $this->telegram->sendMessage($chatId, 'پرداخت هنوز تایید نشده است.');
+    }
+
+    private function handlePurchaseRulesAcceptState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+        if ($text === KeyboardBuilder::BTN_BACK_TYPES) {
+            $this->startBuyTypeReplyFlow($chatId, $userId);
+            return;
+        }
+        if ($text !== self::ACCEPT_RULES) {
+            $this->telegram->sendMessage($chatId, 'لطفاً گزینه تایید قوانین را انتخاب کنید.');
+            return;
+        }
+        $packageId = (int) ($state['payload']['package_id'] ?? 0);
+        if ($packageId <= 0) {
+            $this->database->clearUserState($userId);
+            return;
+        }
+        $this->database->acceptPurchaseRules($userId);
+        $this->database->clearUserState($userId);
+        $package = $this->database->getPackage($packageId);
+        if ($package === null) {
+            $this->telegram->sendMessage($chatId, 'پکیج پیدا نشد.');
+            return;
+        }
+        $textOut = "💰 <b>پرداخت سفارش</b>\n\n"
+            . "پکیج: <b>" . htmlspecialchars((string) $package['name']) . "</b>\n"
+            . "قیمت: <b>" . (int) $this->database->effectivePackagePrice($userId, $package) . "</b> تومان\n\n"
+            . "روش پرداخت را از دکمه‌های عادی انتخاب کنید:";
+        $buttons = [[self::PAY_WALLET]];
+        if ($this->settings->get('gw_card_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_CARD];
+        }
+        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_CRYPTO];
+        }
+        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_TETRAPAY];
+        }
+        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_SWAPWALLET];
+        }
+        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
+            $buttons[] = [self::PAY_TRONPAYS];
+        }
+        $buttons[] = [KeyboardBuilder::BTN_BACK_MAIN];
+        $this->database->setUserState($userId, 'await_buy_payment_selection', ['package_id' => $packageId]);
+        $this->telegram->sendMessage($chatId, $textOut, $this->replyKeyboard($buttons));
+    }
+
+    private function sendGatewayPaymentIntro(int $chatId, string $title, int $pendingId, int $amount, string $payUrl): void
+    {
+        $text = $title . "\n\n"
+            . "سفارش: <code>{$pendingId}</code>\n"
+            . "مبلغ: <b>{$amount}</b> تومان\n\n"
+            . "بعد از پرداخت دکمه «" . self::PAY_VERIFY . "» را بزنید.";
+        if ($payUrl !== '') {
+            $this->telegram->sendMessage($chatId, $text, ['inline_keyboard' => [[['text' => '💳 پرداخت', 'url' => $payUrl]]]]);
+        } else {
+            $this->telegram->sendMessage($chatId, $text);
+        }
+        $this->telegram->sendMessage($chatId, 'برای بررسی پرداخت از دکمه زیر استفاده کن:', $this->replyKeyboard([[self::PAY_VERIFY], [KeyboardBuilder::BTN_BACK_MAIN]]));
+    }
+
+    private function ensurePurchaseAllowedForPackageMessage(int $chatId, int $userId, int $packageId): bool
+    {
+        if ($this->settings->get('shop_open', '1') !== '1') {
+            $this->telegram->sendMessage($chatId, 'فروشگاه در حال حاضر بسته است.');
+            return false;
+        }
+        if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
+            $this->telegram->sendMessage($chatId, 'ابتدا قوانین خرید را بپذیرید.');
+            return false;
+        }
+        if ($this->settings->get('preorder_mode', '0') === '1' && !$this->database->packageHasAvailableStock($packageId)) {
+            $this->telegram->sendMessage($chatId, 'این پکیج در حال حاضر موجودی ندارد.');
+            return false;
+        }
+        return true;
+    }
+
+    private function extractOptionKey(string $text): string
+    {
+        if (preg_match('/^\D*(\d+)/u', trim($text), $m) === 1) {
+            return (string) $m[1];
+        }
+        return trim($text);
+    }
+
+    private function replyKeyboard(array $rows): array
+    {
+        return [
+            'keyboard' => $rows,
+            'resize_keyboard' => true,
+            'one_time_keyboard' => false,
+        ];
+    }
+
+    private function dispatchReplyAsCallback(int $chatId, int $messageId, array $fromUser, string $data): void
+    {
+        $fakeId = 'msg-' . substr(md5($chatId . '-' . $messageId . '-' . $data . '-' . microtime(true)), 0, 24);
+        $this->callbackHandler->handle([
+            'callback_query' => [
+                'id' => $fakeId,
+                'from' => $fromUser,
+                'message' => [
+                    'chat' => ['id' => $chatId],
+                    'message_id' => $messageId,
+                ],
+                'data' => $data,
+            ],
+        ]);
     }
 
     private function checkChannelMembership(int $userId): bool
