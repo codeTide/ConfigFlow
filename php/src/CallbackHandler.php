@@ -1690,6 +1690,7 @@ final class CallbackHandler
                 [['text' => '🆔 تنظیم Group ID', 'callback_data' => 'admin:groupops:set_group']],
                 [['text' => '🧵 ساخت/تکمیل تاپیک‌ها', 'callback_data' => 'admin:groupops:ensure_topics']],
                 [['text' => '💾 بکاپ تنظیمات (JSON)', 'callback_data' => 'admin:groupops:backup_settings']],
+                [['text' => '🗄 بکاپ دیتابیس (SQL)', 'callback_data' => 'admin:groupops:backup_db']],
                 [['text' => '♻️ بازیابی تنظیمات', 'callback_data' => 'admin:groupops:restore_settings']],
                 [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']],
             ];
@@ -1739,6 +1740,18 @@ final class CallbackHandler
             }
             $ok = $this->sendSettingsBackup($chatId);
             $this->telegram->answerCallbackQuery($callbackId, $ok ? '✅ بکاپ ارسال شد.' : '❌ بکاپ انجام نشد.');
+            return;
+        }
+
+
+        if ($data === 'admin:groupops:backup_db') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $service = new DatabaseBackupService($this->database, $this->telegram, $this->settings);
+            $ok = $service->sendBackup($chatId);
+            $this->telegram->answerCallbackQuery($callbackId, $ok ? '✅ بکاپ دیتابیس ارسال شد.' : '❌ بکاپ دیتابیس انجام نشد.');
             return;
         }
 
