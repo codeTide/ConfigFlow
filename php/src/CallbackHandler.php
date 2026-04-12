@@ -1885,11 +1885,26 @@ final class CallbackHandler
         }
 
         if ($data === 'my_configs') {
+            $items = $this->database->listUserPurchasesSummary($userId, 8);
+            $rows = [];
+            if ($this->settings->get('manual_renewal_enabled', '1') === '1') {
+                foreach ($items as $item) {
+                    $purchaseId = (int) ($item['id'] ?? 0);
+                    if ($purchaseId <= 0) {
+                        continue;
+                    }
+                    $rows[] = [[
+                        'text' => '♻️ تمدید سفارش #' . $purchaseId,
+                        'callback_data' => 'renew:' . $purchaseId,
+                    ]];
+                }
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']];
             $this->telegram->editMessageText(
                 $chatId,
                 $messageId,
                 $this->menus->myConfigsText($userId),
-                KeyboardBuilder::backToMain()
+                ['inline_keyboard' => $rows]
             );
             $this->telegram->answerCallbackQuery($callbackId);
             return;
@@ -2001,6 +2016,86 @@ final class CallbackHandler
                 '📦 یک پکیج را انتخاب کنید:',
                 ['inline_keyboard' => $rows]
             );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'renew:') && !str_starts_with($data, 'renew:p:')) {
+            if ($this->settings->get('manual_renewal_enabled', '1') !== '1') {
+                $this->telegram->answerCallbackQuery($callbackId, 'تمدید دستی غیرفعال است.');
+                return;
+            }
+            $purchaseId = (int) substr($data, strlen('renew:'));
+            $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
+            if (!is_array($purchase)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'سفارش پیدا نشد.');
+                return;
+            }
+            if ((int) ($purchase['is_test'] ?? 0) === 1) {
+                $this->telegram->answerCallbackQuery($callbackId, 'تمدید برای سرویس تست ممکن نیست.');
+                return;
+            }
+
+            $typeId = (int) ($purchase['type_id'] ?? 0);
+            $packages = $this->database->getActivePackagesByType($typeId);
+            if ($packages === []) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پکیج تمدید یافت نشد.');
+                return;
+            }
+            $rows = [];
+            foreach ($packages as $pkg) {
+                $rows[] = [[
+                    'text' => sprintf('%s | %sGB | %s روز | %s تومان', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $pkg['price']),
+                    'callback_data' => 'renew:p:' . $purchaseId . ':' . (int) $pkg['id'],
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'my_configs']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "♻️ <b>انتخاب پکیج تمدید</b>\n\n"
+                . "سفارش: <code>#{$purchaseId}</code>\n"
+                . "سرویس فعلی: <b>" . htmlspecialchars((string) ($purchase['service_name'] ?? '-')) . "</b>\n"
+                . "پکیج فعلی: <b>" . htmlspecialchars((string) ($purchase['package_name'] ?? '-')) . "</b>\n\n"
+                . "پکیج تمدید را انتخاب کنید:",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'renew:p:')) {
+            $payload = substr($data, strlen('renew:p:'));
+            [$purchaseRaw, $packageRaw] = array_pad(explode(':', $payload, 2), 2, '');
+            $purchaseId = (int) $purchaseRaw;
+            $packageId = (int) $packageRaw;
+            $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
+            $package = $this->database->getPackage($packageId);
+            if (!is_array($purchase) || $package === null) {
+                $this->telegram->answerCallbackQuery($callbackId, 'داده تمدید معتبر نیست.');
+                return;
+            }
+
+            $text = "💳 <b>پرداخت تمدید</b>\n\n"
+                . "سفارش: <code>#{$purchaseId}</code>\n"
+                . "پکیج تمدید: <b>" . htmlspecialchars((string) $package['name']) . "</b>\n"
+                . "مبلغ: <b>" . (int) $package['price'] . "</b> تومان\n\n"
+                . "روش پرداخت را انتخاب کنید:";
+
+            $rows = [];
+            $rows[] = [['text' => '💰 پرداخت با کیف پول', 'callback_data' => 'buy:wallet:' . $packageId]];
+            if ($this->settings->get('gw_card_enabled', '0') === '1') {
+                $rows[] = [['text' => '🏦 کارت به کارت', 'callback_data' => 'buy:card:' . $packageId]];
+            }
+            if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
+                $rows[] = [['text' => '💎 پرداخت کریپتو', 'callback_data' => 'buy:crypto:pay:' . $packageId . ':tron']];
+            }
+            if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
+                $rows[] = [['text' => '🏧 پرداخت TetraPay', 'callback_data' => 'buy:tetrapay:' . $packageId]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'renew:' . $purchaseId]];
+
+            $this->telegram->editMessageText($chatId, $messageId, $text, ['inline_keyboard' => $rows]);
             $this->telegram->answerCallbackQuery($callbackId);
             return;
         }

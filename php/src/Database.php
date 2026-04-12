@@ -196,6 +196,26 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
+    public function getUserPurchaseForRenewal(int $userId, int $purchaseId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT p.id AS purchase_id, p.is_test, p.package_id, p.config_id,
+                    pkg.type_id, pkg.name AS package_name,
+                    cfg.service_name
+             FROM purchases p
+             JOIN packages pkg ON pkg.id = p.package_id
+             LEFT JOIN configs cfg ON cfg.id = p.config_id
+             WHERE p.user_id = :user_id AND p.id = :purchase_id
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'purchase_id' => $purchaseId,
+        ]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
     public function referralStats(int $userId): array
     {
         $refCountStmt = $this->pdo->prepare('SELECT COUNT(*) FROM referrals WHERE referrer_id = :user_id');

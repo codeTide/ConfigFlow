@@ -80,6 +80,7 @@ try {
         'worker_api_enabled' => '0',
         'worker_api_port' => '8080',
         'worker_api_key' => '',
+        'manual_renewal_enabled' => '1',
     ];
     $upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
     foreach ($defaults as $k => $v) {
