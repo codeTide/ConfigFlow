@@ -114,6 +114,36 @@ git clone https://github.com/codeTide/ConfigFlow.git
 cd ConfigFlow
 ```
 
+If you want files to be cloned directly into your **current directory** (instead of creating a `ConfigFlow/` folder), run this in an **empty** directory:
+
+```bash
+git clone https://github.com/codeTide/ConfigFlow.git .
+```
+
+If your current directory is **not empty**, `git clone ... .` will fail with:
+
+```text
+fatal: destination path '.' already exists and is not an empty directory.
+```
+
+Use one of these alternatives:
+
+**A) Keep current files and turn this folder into the repo (safe for existing files):**
+
+```bash
+git init
+git remote add origin https://github.com/codeTide/ConfigFlow.git
+git fetch origin
+git checkout -t origin/main
+```
+
+**B) Clone into a temp folder, then copy files into current folder:**
+
+```bash
+git clone https://github.com/codeTide/ConfigFlow.git /tmp/ConfigFlow
+rsync -av --exclude='.git' /tmp/ConfigFlow/ ./
+```
+
 ### 3) Install using wizard (or manual)
 
 Wizard:
