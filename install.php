@@ -490,6 +490,16 @@ if ($justInstalled) {
         $botDeepLink = 'https://t.me/' . $botUser;
     }
 }
+$showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
+$justInstalled = $result !== null && ($result['ok'] ?? false) === true;
+$botDeepLink = '';
+if ($justInstalled) {
+    $botUser = cf_get_bot_username((string) ($values['BOT_TOKEN'] ?? ''));
+    if ($botUser !== '') {
+        $botDeepLink = 'https://t.me/' . $botUser;
+    }
+}
+$showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
 ?>
 <!doctype html>
 <html lang="en">
