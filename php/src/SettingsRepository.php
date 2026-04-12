@@ -22,4 +22,12 @@ final class SettingsRepository
 
         return (string) $value;
     }
+
+    public function set(string $key, string $value): void
+    {
+        $stmt = $this->database->pdo()->prepare(
+            'INSERT INTO settings (`key`, `value`) VALUES (:key, :value) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)'
+        );
+        $stmt->execute(['key' => $key, 'value' => $value]);
+    }
 }

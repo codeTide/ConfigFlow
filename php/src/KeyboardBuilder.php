@@ -60,9 +60,18 @@ final class KeyboardBuilder
     {
         return [
             'inline_keyboard' => [
+                [['text' => '🧩 مدیریت نوع/پکیج', 'callback_data' => 'admin:types']],
+                [['text' => '📚 مدیریت موجودی کانفیگ', 'callback_data' => 'admin:stock']],
+                [['text' => '👥 مدیریت کاربران', 'callback_data' => 'admin:users']],
+                [['text' => '⚙️ تنظیمات', 'callback_data' => 'admin:settings']],
+                [['text' => '👮 مدیریت ادمین‌ها', 'callback_data' => 'admin:admins']],
+                [['text' => '📣 فوروارد همگانی', 'callback_data' => 'admin:broadcast']],
+                [['text' => '🤝 مدیریت نمایندگان', 'callback_data' => 'admin:agents']],
+                [['text' => '🖥 مدیریت پنل‌های 3x-ui', 'callback_data' => 'admin:panels']],
                 [['text' => '💳 مدیریت درخواست‌های شارژ', 'callback_data' => 'admin:payments']],
                 [['text' => '📦 صف تحویل سفارش‌ها', 'callback_data' => 'admin:deliveries']],
                 [['text' => '🗂 مدیریت درخواست‌ها (تست/نمایندگی)', 'callback_data' => 'admin:requests']],
+                [['text' => '🗃 بکاپ / تاپیک گروه', 'callback_data' => 'admin:groupops']],
                 [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']],
             ],
         ];
