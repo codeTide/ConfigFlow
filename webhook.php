@@ -14,21 +14,21 @@ use ConfigFlow\Bot\StartHandler;
 use ConfigFlow\Bot\TelegramClient;
 use ConfigFlow\Bot\UpdateRouter;
 
-require_once __DIR__ . '/../src/Bootstrap.php';
-require_once __DIR__ . '/../src/Config.php';
-require_once __DIR__ . '/../src/Database.php';
-require_once __DIR__ . '/../src/KeyboardBuilder.php';
-require_once __DIR__ . '/../src/MenuService.php';
-require_once __DIR__ . '/../src/SettingsRepository.php';
-require_once __DIR__ . '/../src/DatabaseBackupService.php';
-require_once __DIR__ . '/../src/TelegramClient.php';
-require_once __DIR__ . '/../src/StartHandler.php';
-require_once __DIR__ . '/../src/CallbackHandler.php';
-require_once __DIR__ . '/../src/MessageHandler.php';
-require_once __DIR__ . '/../src/PaymentGatewayService.php';
-require_once __DIR__ . '/../src/UpdateRouter.php';
+require_once __DIR__ . '/src/Bootstrap.php';
+require_once __DIR__ . '/src/Config.php';
+require_once __DIR__ . '/src/Database.php';
+require_once __DIR__ . '/src/KeyboardBuilder.php';
+require_once __DIR__ . '/src/MenuService.php';
+require_once __DIR__ . '/src/SettingsRepository.php';
+require_once __DIR__ . '/src/DatabaseBackupService.php';
+require_once __DIR__ . '/src/TelegramClient.php';
+require_once __DIR__ . '/src/StartHandler.php';
+require_once __DIR__ . '/src/CallbackHandler.php';
+require_once __DIR__ . '/src/MessageHandler.php';
+require_once __DIR__ . '/src/PaymentGatewayService.php';
+require_once __DIR__ . '/src/UpdateRouter.php';
 
-Bootstrap::loadEnv(__DIR__ . '/../.env');
+Bootstrap::loadEnv(__DIR__ . '/.env');
 
 $token = Config::botToken();
 if ($token === '') {
