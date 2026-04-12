@@ -171,7 +171,7 @@ sudo chmod -R u+rwX /path/to/ConfigFlow
 
 If your webserver user is different (for example `nginx`), replace `www-data`.
 
-How to find your webserver user:
+How to find your **PHP runtime user** (important: often this is php-fpm user, not nginx):
 
 ```bash
 # Nginx worker user
@@ -183,11 +183,44 @@ ps -o user= -C apache2 | head -n 1
 # Apache worker user (RHEL/CentOS)
 ps -o user= -C httpd | head -n 1
 
-# PHP-FPM pool user (common on many hosts)
-ps -o user= -C php-fpm | head -n 1
+# PHP-FPM process user (common on many hosts)
+ps aux | grep php-fpm | grep -v grep
+
+# PHP-FPM pool config user (Debian/Ubuntu)
+grep -R "^[[:space:]]*user[[:space:]]*=" /etc/php/*/fpm/pool.d/
+
+# PHP-FPM pool config user (aaPanel/custom layouts)
+grep -R "^[[:space:]]*user[[:space:]]*=" /www/server/php/*/etc/php-fpm.d/ /www/server/php/*/etc/php-fpm.conf 2>/dev/null
 ```
 
-If these return empty, ask host support for the PHP/web user and use that user/group in `chown`.
+If these return empty, ask host support for the PHP-FPM/web user and use that user/group in `chown`.
+
+Recommended permission reset (replace `www-data` with detected PHP runtime user):
+
+```bash
+sudo chown -R www-data:www-data /path/to/ConfigFlow
+find /path/to/ConfigFlow -type d -exec chmod 755 {} \;
+find /path/to/ConfigFlow -type f -exec chmod 644 {} \;
+chmod 600 /path/to/ConfigFlow/.env 2>/dev/null || true
+```
+
+If `.env` does not exist yet:
+
+```bash
+touch /path/to/ConfigFlow/.env
+chown www-data:www-data /path/to/ConfigFlow/.env
+chmod 600 /path/to/ConfigFlow/.env
+```
+
+If you get `Operation not permitted` on `.user.ini`:
+
+```bash
+lsattr /path/to/ConfigFlow/.user.ini
+# if immutable flag is set (i), remove it:
+chattr -i /path/to/ConfigFlow/.user.ini
+```
+
+Then re-run `chown/chmod` for `.user.ini` (or skip it if your panel manages it and project still works).
 
 ### 5) Serve webhook endpoint
 
