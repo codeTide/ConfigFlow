@@ -164,8 +164,39 @@ function cf_detect_base_url(): string
     return $scheme . '://' . $host;
 }
 
+function cf_has_existing_installation(string $root): bool
+{
+    $lockPath = $root . '/.install.lock';
+    if (is_file($lockPath)) {
+        return true;
+    }
+
+    $envPath = $root . '/.env';
+    if (!is_file($envPath)) {
+        return false;
+    }
+
+    $raw = file_get_contents($envPath);
+    if (!is_string($raw) || trim($raw) === '') {
+        return false;
+    }
+
+    return preg_match('/^BOT_TOKEN=.+$/m', $raw) === 1;
+}
+
+function cf_mark_installed(string $root): void
+{
+    $lockPath = $root . '/.install.lock';
+    $stamp = 'installed_at=' . gmdate('c') . PHP_EOL;
+    @file_put_contents($lockPath, $stamp, LOCK_EX);
+}
+
 function cf_install(array $input): array
 {
+    if (cf_has_existing_installation(__DIR__)) {
+        return ['ok' => false, 'messages' => ['Installation blocked: this project is already installed. Remove .install.lock only if you intentionally want to reinstall.']];
+    }
+
     if (!function_exists('putenv')) {
         return ['ok' => false, 'messages' => ['Installation failed: putenv() is disabled in PHP. Please enable putenv to continue.']];
     }
@@ -222,6 +253,9 @@ function cf_install(array $input): array
         $messages[] = '⚠ Webhook skipped (could not auto-detect current domain in this environment).';
     }
 
+    cf_mark_installed(__DIR__);
+    $messages[] = '✓ Installation lock created (.install.lock).';
+
     return ['ok' => true, 'messages' => $messages];
 }
 
@@ -245,6 +279,11 @@ function cf_prompt(string $label, ?string $default = null, bool $required = true
 if (PHP_SAPI === 'cli') {
     echo "\n=== ConfigFlow Installer (CLI) ===\n\n";
 
+    if (cf_has_existing_installation(__DIR__)) {
+        fwrite(STDERR, "Installation blocked: this project is already installed.\n");
+        exit(1);
+    }
+
     $input = [
         'BOT_TOKEN' => cf_prompt('BOT_TOKEN'),
         'ADMIN_IDS' => cf_prompt('ADMIN_IDS (comma separated)'),
@@ -266,6 +305,7 @@ if (PHP_SAPI === 'cli') {
 }
 
 $result = null;
+$isInstalled = cf_has_existing_installation(__DIR__);
 $values = [
     'BOT_TOKEN' => '',
     'ADMIN_IDS' => '',
@@ -278,11 +318,12 @@ $values = [
     'TETRAPAY_VERIFY_URL' => 'https://tetra98.com/api/verify',
 ];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
     foreach (array_keys($values) as $k) {
         $values[$k] = trim((string) ($_POST[$k] ?? $values[$k]));
     }
     $result = cf_install($values);
+    $isInstalled = cf_has_existing_installation(__DIR__);
 }
 ?>
 <!doctype html>
@@ -336,23 +377,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
   </div>
 
-  <form method="post" class="card" id="installerForm">
-    <div class="grid">
-      <?php foreach ($values as $key => $val): ?>
-        <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
-          <label for="<?= $key ?>"><?= $key ?></label>
-          <input
-            id="<?= $key ?>"
-            name="<?= $key ?>"
-            value="<?= htmlspecialchars($val) ?>"
-            autocomplete="off"
-          >
-        </div>
-      <?php endforeach; ?>
+  <?php if ($isInstalled): ?>
+    <div class="card">
+      <div class="ok">ConfigFlow is already installed on this path. Installer is locked.</div>
+      <p class="hint">If you really want to reinstall, manually remove <code>.install.lock</code> first.</p>
     </div>
+  <?php else: ?>
+    <form method="post" class="card" id="installerForm">
+      <div class="grid">
+        <?php foreach ($values as $key => $val): ?>
+          <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
+            <label for="<?= $key ?>"><?= $key ?></label>
+            <input
+              id="<?= $key ?>"
+              name="<?= $key ?>"
+              value="<?= htmlspecialchars($val) ?>"
+              autocomplete="off"
+            >
+          </div>
+        <?php endforeach; ?>
+      </div>
 
-    <button class="btn" type="submit">Install ConfigFlow</button>
-  </form>
+      <button class="btn" type="submit">Install ConfigFlow</button>
+    </form>
+  <?php endif; ?>
 </div>
 <script>
   (function () {
@@ -374,7 +422,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     });
   })();
 
-  document.getElementById('installerForm').addEventListener('submit', function (e) {
+  const installerForm = document.getElementById('installerForm');
+  if (installerForm) installerForm.addEventListener('submit', function (e) {
     const required = ['BOT_TOKEN','ADMIN_IDS','DB_HOST','DB_PORT','DB_NAME','DB_USER'];
     for (const name of required) {
       const el = document.querySelector(`[name="${name}"]`);

@@ -92,6 +92,9 @@ The installer will:
 2. Generate `.env`
 3. Connect to MySQL and initialize schema (`scripts/InitDb.php`)
 4. Optionally set Telegram webhook automatically
+5. Create `.install.lock` to prevent accidental reinstall
+
+If installer detects an existing installation (`.install.lock` or an existing `.env` with `BOT_TOKEN`), it blocks reinstall.
 
 ---
 
