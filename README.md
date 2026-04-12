@@ -31,7 +31,6 @@ ConfigFlow/
 ├── scripts/
 │   ├── InitDb.php
 │   ├── schema.sql
-│   ├── MigrateSqliteToMysql.php
 │   ├── PhpWorkerRuntime.php
 │   └── BackupRuntime.php
 ├── src/
@@ -174,12 +173,6 @@ This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 ---
 
 ## Utilities
-
-SQLite to MySQL migration:
-
-```bash
-php scripts/MigrateSqliteToMysql.php /path/to/configflow.db
-```
 
 Backup runtime:
 
