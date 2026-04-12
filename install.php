@@ -149,6 +149,29 @@ function cf_set_webhook(string $botToken, string $webhookUrl): array
     return $decoded;
 }
 
+function cf_get_bot_username(string $botToken): string
+{
+    if ($botToken === '' || !function_exists('curl_init')) {
+        return '';
+    }
+    $endpoint = "https://api.telegram.org/bot{$botToken}/getMe";
+    $ch = curl_init($endpoint);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 20,
+    ]);
+    $raw = curl_exec($ch);
+    curl_close($ch);
+    if (!is_string($raw) || $raw === '') {
+        return '';
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || ($decoded['ok'] ?? false) !== true) {
+        return '';
+    }
+    return trim((string) ($decoded['result']['username'] ?? ''));
+}
+
 function cf_runtime_user(): ?string
 {
     if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
@@ -470,6 +493,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['auth_action']) && $i
     $isInstalled = cf_has_existing_installation(__DIR__);
 }
 $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
+$justInstalled = $result !== null && ($result['ok'] ?? false) === true;
+$botDeepLink = '';
+if ($justInstalled) {
+    $botUser = cf_get_bot_username((string) ($values['BOT_TOKEN'] ?? ''));
+    if ($botUser !== '') {
+        $botDeepLink = 'https://t.me/' . $botUser;
+    }
+}
+$showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
 ?>
 <!doctype html>
 <html lang="en">
@@ -504,7 +536,7 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
     .btn{background:var(--btn);color:#fff;border:none;padding:12px 16px;border-radius:10px;cursor:pointer;font-weight:bold}
     .theme-btn{background:transparent;color:var(--fg);border:1px solid var(--card-border);padding:8px 12px;border-radius:10px;cursor:pointer}
     .ok{background:var(--ok-bg);border:1px solid var(--ok-border);color:var(--ok-fg);padding:10px;border-radius:10px;margin:8px 0}
-    .warn{background:#422006;border:1px solid #92400e;color:#fed7aa;padding:10px;border-radius:10px;margin:8px 0}
+    .warn{background:#fef3c7;border:1px solid #f59e0b;color:#7c2d12;padding:10px;border-radius:10px;margin:8px 0}
     .err{background:var(--err-bg);border:1px solid var(--err-border);color:var(--err-fg);padding:10px;border-radius:10px;margin:8px 0}
     .hint{font-size:12px;color:var(--muted)}
     .inline{display:flex;align-items:center;gap:8px}
@@ -573,6 +605,16 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
       <p class="hint">You can still reinstall from this page by enabling reinstall mode below.</p>
     </div>
   <?php endif; ?>
+  <?php if ($justInstalled): ?>
+    <div class="card">
+      <div class="ok">✅ Installation completed successfully.</div>
+      <?php if ($botDeepLink !== ''): ?>
+        <a class="btn" href="<?= htmlspecialchars($botDeepLink) ?>" target="_blank" rel="noopener">Open Telegram Bot</a>
+      <?php else: ?>
+        <p class="hint">Bot link is not available yet. You can open it manually from Telegram.</p>
+      <?php endif; ?>
+    </div>
+  <?php else: ?>
   <form method="post" class="card" id="installerForm">
       <?php if ($isInstalled): ?>
       <div class="full" style="margin-bottom:12px;">
@@ -608,6 +650,7 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
         <button class="btn" id="installBtn" type="submit">Install ConfigFlow</button>
       </div>
     </form>
+  <?php endif; ?>
   <?php endif; ?>
 </div>
 <script>
