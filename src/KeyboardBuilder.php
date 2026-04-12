@@ -165,7 +165,7 @@ final class KeyboardBuilder
             if ($text === '') {
                 continue;
             }
-            $length = mb_strlen($text);
+            $length = function_exists('mb_strlen') ? mb_strlen($text) : strlen($text);
             if ($length <= $limitThreeCols) {
                 $threeCols[] = $text;
             } elseif ($length <= $limitTwoCols) {
