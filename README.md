@@ -97,6 +97,7 @@ The installer will:
 Reinstall behavior:
 - Lock check is based on `.install.lock` only.
 - If lock exists, web installer shows **Reinstall mode** options:
+  - `Admin confirmation token` (current `BOT_TOKEN` from existing `.env`)
   - `Preserve database data` (safe default)
   - `Reset database (drop all tables)` (destructive)
 - Reinstall always rewrites `.env` with new form values.

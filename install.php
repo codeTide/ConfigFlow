@@ -199,6 +199,21 @@ function cf_mark_installed(string $root): void
     @file_put_contents($lockPath, $stamp, LOCK_EX);
 }
 
+function cf_read_env_value(string $path, string $key): string
+{
+    if (!is_file($path)) {
+        return '';
+    }
+    $raw = file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        return '';
+    }
+    if (preg_match('/^' . preg_quote($key, '/') . '=(.*)$/m', $raw, $m) === 1) {
+        return trim((string) ($m[1] ?? ''));
+    }
+    return '';
+}
+
 function cf_reset_database(array $env): void
 {
     $dsn = sprintf(
@@ -235,6 +250,13 @@ function cf_install(array $input): array
 
     if ($isLocked && !$allowReinstall) {
         return ['ok' => false, 'messages' => ['Installation blocked: this project is locked (.install.lock). Enable reinstall mode to continue.']];
+    }
+    if ($isLocked && $allowReinstall) {
+        $currentBotToken = cf_read_env_value(__DIR__ . '/.env', 'BOT_TOKEN');
+        $adminConfirmToken = trim((string) ($input['ADMIN_CONFIRM_TOKEN'] ?? ''));
+        if ($currentBotToken !== '' && !hash_equals($currentBotToken, $adminConfirmToken)) {
+            return ['ok' => false, 'messages' => ['Installation blocked: admin confirmation token is invalid.']];
+        }
     }
 
     if (!function_exists('putenv')) {
@@ -368,6 +390,7 @@ $values = [
     'TETRAPAY_VERIFY_URL' => 'https://tetra98.com/api/verify',
     'ALLOW_REINSTALL' => '0',
     'REINSTALL_MODE' => 'preserve',
+    'ADMIN_CONFIRM_TOKEN' => '',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
@@ -398,12 +421,13 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
       --ok-bg:#dcfce7;--ok-border:#16a34a;--ok-fg:#166534;
       --err-bg:#fee2e2;--err-border:#ef4444;--err-fg:#991b1b;
     }
+    *{box-sizing:border-box}
     body{font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:24px;transition:background .2s,color .2s}
     .wrap{max-width:900px;margin:0 auto}
     .card{background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
     h1{margin:0 0 10px 0;font-size:28px}
     .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .full{grid-column:1/-1}
     label{font-size:12px;display:block;margin-bottom:6px;color:var(--muted);letter-spacing:.2px}
     input,select{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}
@@ -415,6 +439,8 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
     .err{background:var(--err-bg);border:1px solid var(--err-border);color:var(--err-fg);padding:10px;border-radius:10px;margin:8px 0}
     .hint{font-size:12px;color:var(--muted)}
     .inline{display:flex;align-items:center;gap:8px}
+    fieldset{border:none;padding:0;margin:0}
+    .disabled{opacity:.6;filter:grayscale(.15)}
     @media (max-width:700px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
@@ -450,7 +476,9 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
   <form method="post" class="card" id="installerForm">
       <?php if ($isInstalled): ?>
       <div class="full" style="margin-bottom:12px;">
-        <label class="inline"><input style="width:auto" type="checkbox" name="ALLOW_REINSTALL" value="1"> Enable reinstall</label>
+        <label class="inline"><input style="width:auto" id="allowReinstall" type="checkbox" name="ALLOW_REINSTALL" value="1"> Enable reinstall</label>
+        <label for="ADMIN_CONFIRM_TOKEN" style="margin-top:8px;">Admin confirmation token (current BOT_TOKEN)</label>
+        <input id="ADMIN_CONFIRM_TOKEN" name="ADMIN_CONFIRM_TOKEN" type="password" autocomplete="off">
         <label for="REINSTALL_MODE" style="margin-top:8px;">Reinstall mode</label>
         <select id="REINSTALL_MODE" name="REINSTALL_MODE">
           <option value="preserve">Preserve database data</option>
@@ -458,9 +486,10 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
         </select>
       </div>
       <?php endif; ?>
+      <fieldset id="mainFields" class="<?= $isInstalled ? 'disabled' : '' ?>" <?= $isInstalled ? 'disabled' : '' ?>>
       <div class="grid">
         <?php foreach ($values as $key => $val): ?>
-          <?php if (in_array($key, ['ALLOW_REINSTALL','REINSTALL_MODE'], true)) { continue; } ?>
+          <?php if (in_array($key, ['ALLOW_REINSTALL','REINSTALL_MODE','ADMIN_CONFIRM_TOKEN'], true)) { continue; } ?>
           <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
             <label for="<?= $key ?>"><?= $key ?></label>
             <input
@@ -472,6 +501,7 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
           </div>
         <?php endforeach; ?>
       </div>
+      </fieldset>
 
       <button class="btn" type="submit">Install ConfigFlow</button>
     </form>
@@ -497,6 +527,18 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
   })();
 
   const installerForm = document.getElementById('installerForm');
+  const allowReinstall = document.getElementById('allowReinstall');
+  const mainFields = document.getElementById('mainFields');
+  if (allowReinstall && mainFields) {
+    const syncState = () => {
+      const enabled = allowReinstall.checked;
+      mainFields.disabled = !enabled;
+      mainFields.classList.toggle('disabled', !enabled);
+    };
+    syncState();
+    allowReinstall.addEventListener('change', syncState);
+  }
+
   if (installerForm) installerForm.addEventListener('submit', function (e) {
     const reinstallCheckbox = document.querySelector('[name="ALLOW_REINSTALL"]');
     if (reinstallCheckbox && !reinstallCheckbox.checked) {
