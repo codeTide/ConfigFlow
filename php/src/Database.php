@@ -90,6 +90,86 @@ final class Database
         return is_array($row) ? $row : null;
     }
 
+    public function isAdminUser(int $userId): bool
+    {
+        if (in_array($userId, Config::adminIds(), true)) {
+            return true;
+        }
+        $stmt = $this->pdo->prepare('SELECT user_id FROM admin_users WHERE user_id = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    public function listAdminUsers(): array
+    {
+        return $this->pdo->query(
+            'SELECT user_id, added_by, added_at, permissions
+             FROM admin_users
+             ORDER BY added_at DESC'
+        )->fetchAll();
+    }
+
+    public function upsertAdminUser(int $userId, int $addedBy, array $permissions): void
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO admin_users (user_id, added_by, added_at, permissions)
+             VALUES (:user_id, :added_by, :added_at, :permissions)
+             ON DUPLICATE KEY UPDATE permissions = VALUES(permissions), added_by = VALUES(added_by), added_at = VALUES(added_at)'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'added_by' => $addedBy,
+            'added_at' => gmdate('Y-m-d H:i:s'),
+            'permissions' => json_encode($permissions, JSON_UNESCAPED_UNICODE),
+        ]);
+    }
+
+    public function removeAdminUser(int $userId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM admin_users WHERE user_id = :user_id');
+        $stmt->execute(['user_id' => $userId]);
+    }
+
+    public function getAdminPermissions(int $userId): array
+    {
+        if (in_array($userId, Config::adminIds(), true)) {
+            return ['full' => true];
+        }
+        $stmt = $this->pdo->prepare('SELECT permissions FROM admin_users WHERE user_id = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
+        $raw = (string) ($stmt->fetchColumn() ?: '{}');
+        $perms = json_decode($raw, true);
+        return is_array($perms) ? $perms : [];
+    }
+
+    public function setAdminPermission(int $userId, string $permKey, bool $enabled): void
+    {
+        $perms = $this->getAdminPermissions($userId);
+        $perms[$permKey] = $enabled;
+        $this->upsertAdminUser($userId, $userId, $perms);
+    }
+
+    public function listUserIdsForBroadcast(string $scope): array
+    {
+        if ($scope === 'customers') {
+            $stmt = $this->pdo->query('SELECT DISTINCT user_id FROM purchases ORDER BY user_id ASC');
+            return array_map(static fn ($r) => (int) $r['user_id'], $stmt->fetchAll());
+        }
+        if ($scope === 'agents') {
+            $stmt = $this->pdo->query('SELECT user_id FROM users WHERE is_agent = 1 ORDER BY user_id ASC');
+            return array_map(static fn ($r) => (int) $r['user_id'], $stmt->fetchAll());
+        }
+        if ($scope === 'admins') {
+            $ids = Config::adminIds();
+            foreach ($this->listAdminUsers() as $row) {
+                $ids[] = (int) ($row['user_id'] ?? 0);
+            }
+            return array_values(array_unique(array_filter($ids)));
+        }
+        $stmt = $this->pdo->query('SELECT user_id FROM users ORDER BY user_id ASC');
+        return array_map(static fn ($r) => (int) $r['user_id'], $stmt->fetchAll());
+    }
+
     public function countUserPurchases(int $userId): int
     {
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM purchases WHERE user_id = :user_id');
@@ -372,11 +452,194 @@ final class Database
         return $this->pdo->query('SELECT id, name FROM config_types WHERE is_active = 1 ORDER BY id ASC')->fetchAll();
     }
 
+    public function listTypes(): array
+    {
+        return $this->pdo->query(
+            'SELECT id, name, description, is_active
+             FROM config_types
+             ORDER BY id DESC'
+        )->fetchAll();
+    }
+
+    public function addType(string $name, string $description = ''): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO config_types (name, description, is_active)
+             VALUES (:name, :description, 1)'
+        );
+        $stmt->execute([
+            'name' => trim($name),
+            'description' => trim($description),
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function setTypeActive(int $typeId, bool $active): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE config_types SET is_active = :active WHERE id = :id');
+        $stmt->execute([
+            'active' => $active ? 1 : 0,
+            'id' => $typeId,
+        ]);
+    }
+
+    public function deleteType(int $typeId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM config_types WHERE id = :id');
+        $stmt->execute(['id' => $typeId]);
+    }
+
     public function getActivePackagesByType(int $typeId): array
     {
         $stmt = $this->pdo->prepare('SELECT id, name, price, volume_gb, duration_days FROM packages WHERE type_id = :type_id AND active = 1 ORDER BY id ASC');
         $stmt->execute(['type_id' => $typeId]);
         return $stmt->fetchAll();
+    }
+
+    public function listPackagesByType(int $typeId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, type_id, name, price, volume_gb, duration_days, active
+             FROM packages
+             WHERE type_id = :type_id
+             ORDER BY id DESC'
+        );
+        $stmt->execute(['type_id' => $typeId]);
+        return $stmt->fetchAll();
+    }
+
+    public function addPackage(int $typeId, string $name, float $volumeGb, int $durationDays, int $price): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO packages (type_id, name, volume_gb, duration_days, price, active)
+             VALUES (:type_id, :name, :volume_gb, :duration_days, :price, 1)'
+        );
+        $stmt->execute([
+            'type_id' => $typeId,
+            'name' => trim($name),
+            'volume_gb' => $volumeGb,
+            'duration_days' => $durationDays,
+            'price' => $price,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function setPackageActive(int $packageId, bool $active): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE packages SET active = :active WHERE id = :id');
+        $stmt->execute([
+            'active' => $active ? 1 : 0,
+            'id' => $packageId,
+        ]);
+    }
+
+    public function deletePackage(int $packageId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM packages WHERE id = :id');
+        $stmt->execute(['id' => $packageId]);
+    }
+
+    public function countAvailableConfigsForPackage(int $packageId): int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+             FROM configs
+             WHERE package_id = :package_id
+               AND sold_to IS NULL
+               AND reserved_payment_id IS NULL
+               AND is_expired = 0'
+        );
+        $stmt->execute(['package_id' => $packageId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function listConfigsByPackage(int $packageId, int $limit = 20, int $offset = 0): array
+    {
+        $limit = max(1, min($limit, 100));
+        $offset = max(0, $offset);
+        $stmt = $this->pdo->prepare(
+            'SELECT id, service_name, sold_to, is_expired, inquiry_link, created_at
+             FROM configs
+             WHERE package_id = :package_id
+             ORDER BY id DESC
+             LIMIT ' . $limit . ' OFFSET ' . $offset
+        );
+        $stmt->execute(['package_id' => $packageId]);
+        return $stmt->fetchAll();
+    }
+
+    public function countConfigsByPackage(int $packageId): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM configs WHERE package_id = :package_id');
+        $stmt->execute(['package_id' => $packageId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function countConfigsByPackageFiltered(int $packageId, string $status = 'all', ?string $query = null): int
+    {
+        [$where, $params] = $this->buildConfigFilterSql($packageId, $status, $query);
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM configs WHERE ' . $where);
+        $stmt->execute($params);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function listConfigsByPackageFiltered(
+        int $packageId,
+        string $status = 'all',
+        ?string $query = null,
+        int $limit = 20,
+        int $offset = 0
+    ): array {
+        $limit = max(1, min($limit, 100));
+        $offset = max(0, $offset);
+        [$where, $params] = $this->buildConfigFilterSql($packageId, $status, $query);
+        $stmt = $this->pdo->prepare(
+            'SELECT id, service_name, sold_to, is_expired, inquiry_link, created_at
+             FROM configs
+             WHERE ' . $where . '
+             ORDER BY id DESC
+             LIMIT ' . $limit . ' OFFSET ' . $offset
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function addConfig(int $typeId, int $packageId, string $serviceName, string $configText, ?string $inquiryLink = null): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO configs (
+                type_id, package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
+             ) VALUES (
+                :type_id, :package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
+             )'
+        );
+        $stmt->execute([
+            'type_id' => $typeId,
+            'package_id' => $packageId,
+            'service_name' => trim($serviceName),
+            'config_text' => trim($configText),
+            'inquiry_link' => $inquiryLink !== null && trim($inquiryLink) !== '' ? trim($inquiryLink) : null,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function expireConfig(int $configId): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE configs SET is_expired = 1 WHERE id = :id');
+        $stmt->execute(['id' => $configId]);
+    }
+
+    public function deleteConfig(int $configId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM configs
+             WHERE id = :id
+               AND sold_to IS NULL
+               AND reserved_payment_id IS NULL'
+        );
+        $stmt->execute(['id' => $configId]);
+        return $stmt->rowCount() > 0;
     }
 
     public function getPackage(int $packageId): ?array
@@ -385,6 +648,334 @@ final class Database
         $stmt->execute(['id' => $packageId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
+    }
+
+    public function listUsers(int $limit = 30): array
+    {
+        $limit = max(1, min($limit, 200));
+        $stmt = $this->pdo->prepare(
+            'SELECT user_id, full_name, username, balance, status, is_agent
+             FROM users
+             ORDER BY user_id DESC
+             LIMIT :limit'
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function listAllPackages(): array
+    {
+        return $this->pdo->query(
+            'SELECT id, type_id, name, price, volume_gb, duration_days, active
+             FROM packages
+             ORDER BY id DESC'
+        )->fetchAll();
+    }
+
+    public function getAgencyPrice(int $userId, int $packageId): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT price FROM agency_prices
+             WHERE user_id = :user_id AND package_id = :package_id
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'package_id' => $packageId,
+        ]);
+        $val = $stmt->fetchColumn();
+        return $val === false ? null : (int) $val;
+    }
+
+    public function setAgencyPrice(int $userId, int $packageId, int $price): void
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO agency_prices (user_id, package_id, price)
+             VALUES (:user_id, :package_id, :price)
+             ON DUPLICATE KEY UPDATE price = VALUES(price)'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'price' => $price,
+        ]);
+    }
+
+    public function clearAgencyPrice(int $userId, int $packageId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM agency_prices
+             WHERE user_id = :user_id AND package_id = :package_id'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'package_id' => $packageId,
+        ]);
+    }
+
+    public function listPanels(): array
+    {
+        return $this->pdo->query(
+            'SELECT id, name, ip, port, patch, username, password, is_active, created_at
+             FROM panels
+             ORDER BY id DESC'
+        )->fetchAll();
+    }
+
+    public function getPanel(int $panelId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, name, ip, port, patch, username, password, is_active, created_at
+             FROM panels
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => $panelId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function addPanel(string $name, string $ip, int $port, string $patch, string $username, string $password): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO panels (name, ip, port, patch, username, password, is_active, created_at)
+             VALUES (:name, :ip, :port, :patch, :username, :password, 1, :created_at)'
+        );
+        $stmt->execute([
+            'name' => trim($name),
+            'ip' => trim($ip),
+            'port' => $port,
+            'patch' => trim($patch),
+            'username' => trim($username),
+            'password' => trim($password),
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function updatePanelActive(int $panelId, bool $active): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE panels SET is_active = :active WHERE id = :id');
+        $stmt->execute([
+            'active' => $active ? 1 : 0,
+            'id' => $panelId,
+        ]);
+    }
+
+    public function deletePanel(int $panelId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM panels WHERE id = :id');
+        $stmt->execute(['id' => $panelId]);
+    }
+
+    public function listPanelPackages(int $panelId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, panel_id, name, volume_gb, duration_days, inbound_id
+             FROM panel_packages
+             WHERE panel_id = :panel_id
+             ORDER BY id DESC'
+        );
+        $stmt->execute(['panel_id' => $panelId]);
+        return $stmt->fetchAll();
+    }
+
+    public function addPanelPackage(int $panelId, string $name, float $volumeGb, int $durationDays, int $inboundId): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO panel_packages (panel_id, name, volume_gb, duration_days, inbound_id)
+             VALUES (:panel_id, :name, :volume_gb, :duration_days, :inbound_id)'
+        );
+        $stmt->execute([
+            'panel_id' => $panelId,
+            'name' => trim($name),
+            'volume_gb' => $volumeGb,
+            'duration_days' => $durationDays,
+            'inbound_id' => $inboundId,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function deletePanelPackage(int $panelPackageId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM panel_packages WHERE id = :id');
+        $stmt->execute(['id' => $panelPackageId]);
+    }
+
+    public function isWorkerApiEnabled(): bool
+    {
+        $stmt = $this->pdo->prepare("SELECT `value` FROM settings WHERE `key` = 'worker_api_enabled' LIMIT 1");
+        $stmt->execute();
+        return (string) ($stmt->fetchColumn() ?: '0') === '1';
+    }
+
+    public function workerApiKey(): string
+    {
+        $stmt = $this->pdo->prepare("SELECT `value` FROM settings WHERE `key` = 'worker_api_key' LIMIT 1");
+        $stmt->execute();
+        return trim((string) ($stmt->fetchColumn() ?: ''));
+    }
+
+    public function listPendingXuiJobs(int $limit = 20): array
+    {
+        $limit = max(1, min($limit, 100));
+        $sql = "SELECT j.id, j.job_uuid, j.user_id, j.panel_id, j.panel_package_id, j.status, j.retry_count, j.created_at,\n"
+            . "       p.ip, p.port, p.patch, p.username, p.password,\n"
+            . "       pp.name AS pkg_name, pp.volume_gb, pp.duration_days, pp.inbound_id\n"
+            . "FROM xui_jobs j\n"
+            . "JOIN panels p ON p.id = j.panel_id\n"
+            . "JOIN panel_packages pp ON pp.id = j.panel_package_id\n"
+            . "WHERE j.status IN ('pending','failed') AND j.retry_count < 5 AND p.is_active = 1\n"
+            . "ORDER BY j.created_at ASC\n"
+            . "LIMIT {$limit}";
+        return $this->pdo->query($sql)->fetchAll();
+    }
+
+    public function markXuiJobProcessing(int $jobId): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare('SELECT id, status FROM xui_jobs WHERE id = :id LIMIT 1 FOR UPDATE');
+            $stmt->execute(['id' => $jobId]);
+            $row = $stmt->fetch();
+            if (!is_array($row)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_found'];
+            }
+            $status = (string) ($row['status'] ?? '');
+            if (!in_array($status, ['pending', 'failed'], true)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_actionable', 'status' => $status];
+            }
+            $upd = $this->pdo->prepare('UPDATE xui_jobs SET status = :status, updated_at = :updated_at WHERE id = :id');
+            $upd->execute([
+                'status' => 'processing',
+                'updated_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $jobId,
+            ]);
+            $this->pdo->commit();
+            return ['ok' => true];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
+    public function markXuiJobDone(int $jobId, string $resultConfig, string $resultLink): array
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE xui_jobs
+             SET status = :status, result_config = :result_config, result_link = :result_link, error_msg = NULL, updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'status' => 'done',
+            'result_config' => $resultConfig,
+            'result_link' => $resultLink,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $jobId,
+        ]);
+        if ($stmt->rowCount() <= 0) {
+            return ['ok' => false, 'error' => 'not_found'];
+        }
+        return ['ok' => true];
+    }
+
+    public function markXuiJobError(int $jobId, string $errorMsg): array
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare('SELECT retry_count FROM xui_jobs WHERE id = :id LIMIT 1 FOR UPDATE');
+            $stmt->execute(['id' => $jobId]);
+            $row = $stmt->fetch();
+            if (!is_array($row)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_found'];
+            }
+            $retry = ((int) ($row['retry_count'] ?? 0)) + 1;
+            $status = $retry < 5 ? 'failed' : 'error';
+            $upd = $this->pdo->prepare(
+                'UPDATE xui_jobs
+                 SET status = :status, error_msg = :error_msg, retry_count = :retry_count, updated_at = :updated_at
+                 WHERE id = :id'
+            );
+            $upd->execute([
+                'status' => $status,
+                'error_msg' => mb_substr($errorMsg, 0, 500),
+                'retry_count' => $retry,
+                'updated_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $jobId,
+            ]);
+            $this->pdo->commit();
+            return ['ok' => true, 'retry_count' => $retry];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
+    public function getXuiJob(int $jobId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM xui_jobs WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $jobId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function setUserStatus(int $userId, string $status): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE users SET status = :status WHERE user_id = :user_id');
+        $stmt->execute([
+            'status' => $status,
+            'user_id' => $userId,
+        ]);
+    }
+
+    public function setUserAgent(int $userId, bool $isAgent): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE users SET is_agent = :is_agent WHERE user_id = :user_id');
+        $stmt->execute([
+            'is_agent' => $isAgent ? 1 : 0,
+            'user_id' => $userId,
+        ]);
+    }
+
+    public function updateUserBalance(int $userId, int $amountDelta): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE users SET balance = balance + :delta WHERE user_id = :user_id');
+        $stmt->execute([
+            'delta' => $amountDelta,
+            'user_id' => $userId,
+        ]);
+    }
+
+    private function buildConfigFilterSql(int $packageId, string $status, ?string $query): array
+    {
+        $where = ['package_id = :package_id'];
+        $params = ['package_id' => $packageId];
+
+        if ($status === 'available') {
+            $where[] = 'sold_to IS NULL';
+            $where[] = 'reserved_payment_id IS NULL';
+            $where[] = 'is_expired = 0';
+        } elseif ($status === 'sold') {
+            $where[] = 'sold_to IS NOT NULL';
+        } elseif ($status === 'expired') {
+            $where[] = 'is_expired = 1';
+        }
+
+        $q = trim((string) ($query ?? ''));
+        if ($q !== '') {
+            $where[] = '(service_name LIKE :q OR config_text LIKE :q OR inquiry_link LIKE :q)';
+            $params['q'] = '%' . $q . '%';
+        }
+
+        return [implode(' AND ', $where), $params];
     }
 
     public function createPayment(array $data): int
