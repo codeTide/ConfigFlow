@@ -820,7 +820,7 @@ final class Database implements WorkerApiStore
     public function listPendingXuiJobs(int $limit = 20): array
     {
         $limit = max(1, min($limit, 100));
-        $sql = "SELECT j.id, j.job_uuid, j.user_id, j.panel_id, j.panel_package_id, j.status, j.retry_count, j.created_at,\n"
+        $sql = "SELECT j.id, j.job_uuid, j.order_id, j.user_id, j.panel_id, j.panel_package_id, j.status, j.retry_count, j.created_at,\n"
             . "       p.ip, p.port, p.patch, p.username, p.password,\n"
             . "       pp.name AS pkg_name, pp.volume_gb, pp.duration_days, pp.inbound_id\n"
             . "FROM xui_jobs j\n"
@@ -923,6 +923,14 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare('SELECT * FROM xui_jobs WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $jobId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function getXuiJobByOrderId(int $orderId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM xui_jobs WHERE order_id = :order_id ORDER BY id DESC LIMIT 1 FOR UPDATE');
+        $stmt->execute(['order_id' => $orderId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
     }
@@ -1251,9 +1259,34 @@ final class Database implements WorkerApiStore
                 $this->pdo->rollBack();
                 return ['ok' => false, 'error' => 'not_found'];
             }
-            if (($order['status'] ?? '') !== 'paid_waiting_delivery') {
+            $orderStatus = (string) ($order['status'] ?? '');
+            if (!in_array($orderStatus, ['paid_waiting_delivery', 'worker_queued'], true)) {
                 $this->pdo->rollBack();
                 return ['ok' => false, 'error' => 'not_actionable'];
+            }
+
+            $existingJob = $this->getXuiJobByOrderId((int) $order['id']);
+            if (is_array($existingJob)) {
+                $jobStatus = (string) ($existingJob['status'] ?? '');
+                if (in_array($jobStatus, ['pending', 'failed', 'processing'], true)) {
+                    $ordUpdate = $this->pdo->prepare("UPDATE pending_orders SET status = 'worker_queued' WHERE id = :id");
+                    $ordUpdate->execute(['id' => $orderId]);
+                    $this->pdo->commit();
+                    return [
+                        'ok' => true,
+                        'queued_worker' => true,
+                        'job_id' => (int) ($existingJob['id'] ?? 0),
+                        'job_status' => $jobStatus,
+                    ];
+                }
+
+                if ($jobStatus === 'done') {
+                    $resultConfig = trim((string) ($existingJob['result_config'] ?? ''));
+                    $resultLink = trim((string) ($existingJob['result_link'] ?? ''));
+                    if ($resultConfig !== '' || $resultLink !== '') {
+                        return $this->finalizeWorkerDelivery($order, $existingJob);
+                    }
+                }
             }
 
             $configStmt = $this->pdo->prepare(
@@ -1269,61 +1302,184 @@ final class Database implements WorkerApiStore
             );
             $configStmt->execute(['package_id' => (int) $order['package_id']]);
             $config = $configStmt->fetch();
-            if (!is_array($config)) {
+            if (is_array($config)) {
+                return $this->finalizeStockDelivery($order, $config);
+            }
+
+            $panelPackage = $this->matchPanelPackageForPackage((int) $order['package_id']);
+            if (!is_array($panelPackage)) {
                 $this->pdo->rollBack();
                 return ['ok' => false, 'error' => 'no_stock'];
             }
 
-            $purchaseStmt = $this->pdo->prepare(
-                'INSERT INTO purchases (user_id, package_id, config_id, amount, payment_method, created_at, is_test)
-                 VALUES (:user_id, :package_id, :config_id, :amount, :payment_method, :created_at, 0)'
+            $jobUuid = bin2hex(random_bytes(16));
+            $insert = $this->pdo->prepare(
+                'INSERT INTO xui_jobs (job_uuid, order_id, user_id, panel_id, panel_package_id, status, retry_count, created_at, updated_at)
+                 VALUES (:job_uuid, :order_id, :user_id, :panel_id, :panel_package_id, :status, 0, :created_at, :updated_at)'
             );
-            $purchaseStmt->execute([
+            $now = gmdate('Y-m-d H:i:s');
+            $insert->execute([
+                'job_uuid' => $jobUuid,
+                'order_id' => (int) $order['id'],
                 'user_id' => (int) $order['user_id'],
-                'package_id' => (int) $order['package_id'],
-                'config_id' => (int) $config['id'],
-                'amount' => (int) $order['amount'],
-                'payment_method' => (string) $order['payment_method'],
-                'created_at' => gmdate('Y-m-d H:i:s'),
-            ]);
-            $purchaseId = (int) $this->pdo->lastInsertId();
-
-            $cfgUpdate = $this->pdo->prepare(
-                'UPDATE configs
-                 SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at
-                 WHERE id = :id'
-            );
-            $cfgUpdate->execute([
-                'sold_to' => (int) $order['user_id'],
-                'purchase_id' => $purchaseId,
-                'sold_at' => gmdate('Y-m-d H:i:s'),
-                'id' => (int) $config['id'],
+                'panel_id' => (int) $panelPackage['panel_id'],
+                'panel_package_id' => (int) $panelPackage['id'],
+                'status' => 'pending',
+                'created_at' => $now,
+                'updated_at' => $now,
             ]);
 
-            $ordUpdate = $this->pdo->prepare("UPDATE pending_orders SET status = 'delivered' WHERE id = :id");
+            $ordUpdate = $this->pdo->prepare("UPDATE pending_orders SET status = 'worker_queued' WHERE id = :id");
             $ordUpdate->execute(['id' => $orderId]);
-
-            if (!empty($order['payment_id'])) {
-                $payUpdate = $this->pdo->prepare("UPDATE payments SET status = 'completed', approved_at = :approved_at WHERE id = :id");
-                $payUpdate->execute([
-                    'approved_at' => gmdate('Y-m-d H:i:s'),
-                    'id' => (int) $order['payment_id'],
-                ]);
-            }
-
             $this->pdo->commit();
             return [
                 'ok' => true,
-                'user_id' => (int) $order['user_id'],
-                'config_text' => (string) $config['config_text'],
-                'service_name' => (string) ($config['service_name'] ?? ''),
-                'inquiry_link' => (string) ($config['inquiry_link'] ?? ''),
+                'queued_worker' => true,
+                'job_id' => (int) $this->pdo->lastInsertId(),
+                'job_status' => 'pending',
             ];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
             return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
+    private function matchPanelPackageForPackage(int $packageId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT pp.id, pp.panel_id, pp.name
+             FROM packages p
+             JOIN panel_packages pp
+               ON pp.volume_gb = p.volume_gb
+              AND pp.duration_days = p.duration_days
+             JOIN panels pnl ON pnl.id = pp.panel_id
+             WHERE p.id = :package_id AND pnl.is_active = 1
+             ORDER BY pp.id ASC
+             LIMIT 1'
+        );
+        $stmt->execute(['package_id' => $packageId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    private function finalizeStockDelivery(array $order, array $config): array
+    {
+        $purchaseId = $this->createPurchase(
+            (int) $order['user_id'],
+            (int) $order['package_id'],
+            (int) $config['id'],
+            (int) $order['amount'],
+            (string) $order['payment_method']
+        );
+
+        $cfgUpdate = $this->pdo->prepare(
+            'UPDATE configs
+             SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at
+             WHERE id = :id'
+        );
+        $cfgUpdate->execute([
+            'sold_to' => (int) $order['user_id'],
+            'purchase_id' => $purchaseId,
+            'sold_at' => gmdate('Y-m-d H:i:s'),
+            'id' => (int) $config['id'],
+        ]);
+
+        $this->markOrderDelivered((int) $order['id'], (int) ($order['payment_id'] ?? 0));
+        $this->pdo->commit();
+
+        return [
+            'ok' => true,
+            'user_id' => (int) $order['user_id'],
+            'config_text' => (string) $config['config_text'],
+            'service_name' => (string) ($config['service_name'] ?? ''),
+            'inquiry_link' => (string) ($config['inquiry_link'] ?? ''),
+        ];
+    }
+
+    private function finalizeWorkerDelivery(array $order, array $job): array
+    {
+        $pkgStmt = $this->pdo->prepare('SELECT type_id, name FROM packages WHERE id = :id LIMIT 1');
+        $pkgStmt->execute(['id' => (int) $order['package_id']]);
+        $pkg = $pkgStmt->fetch();
+        if (!is_array($pkg)) {
+            $this->pdo->rollBack();
+            return ['ok' => false, 'error' => 'package_not_found'];
+        }
+
+        $cfgInsert = $this->pdo->prepare(
+            'INSERT INTO configs (type_id, package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
+             VALUES (:type_id, :package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
+        );
+        $cfgInsert->execute([
+            'type_id' => (int) $pkg['type_id'],
+            'package_id' => (int) $order['package_id'],
+            'service_name' => (string) ($pkg['name'] ?? 'XUI Service'),
+            'config_text' => (string) ($job['result_config'] ?? ''),
+            'inquiry_link' => (string) ($job['result_link'] ?? ''),
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $configId = (int) $this->pdo->lastInsertId();
+
+        $purchaseId = $this->createPurchase(
+            (int) $order['user_id'],
+            (int) $order['package_id'],
+            $configId,
+            (int) $order['amount'],
+            (string) $order['payment_method']
+        );
+
+        $cfgUpdate = $this->pdo->prepare(
+            'UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id'
+        );
+        $cfgUpdate->execute([
+            'sold_to' => (int) $order['user_id'],
+            'purchase_id' => $purchaseId,
+            'sold_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $configId,
+        ]);
+
+        $this->markOrderDelivered((int) $order['id'], (int) ($order['payment_id'] ?? 0));
+        $this->pdo->commit();
+
+        return [
+            'ok' => true,
+            'user_id' => (int) $order['user_id'],
+            'config_text' => (string) ($job['result_config'] ?? ''),
+            'service_name' => (string) ($pkg['name'] ?? 'XUI Service'),
+            'inquiry_link' => (string) ($job['result_link'] ?? ''),
+        ];
+    }
+
+    private function createPurchase(int $userId, int $packageId, int $configId, int $amount, string $paymentMethod): int
+    {
+        $purchaseStmt = $this->pdo->prepare(
+            'INSERT INTO purchases (user_id, package_id, config_id, amount, payment_method, created_at, is_test)
+             VALUES (:user_id, :package_id, :config_id, :amount, :payment_method, :created_at, 0)'
+        );
+        $purchaseStmt->execute([
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'config_id' => $configId,
+            'amount' => $amount,
+            'payment_method' => $paymentMethod,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    private function markOrderDelivered(int $orderId, int $paymentId): void
+    {
+        $ordUpdate = $this->pdo->prepare("UPDATE pending_orders SET status = 'delivered' WHERE id = :id");
+        $ordUpdate->execute(['id' => $orderId]);
+
+        if ($paymentId > 0) {
+            $payUpdate = $this->pdo->prepare("UPDATE payments SET status = 'completed', approved_at = :approved_at WHERE id = :id");
+            $payUpdate->execute([
+                'approved_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $paymentId,
+            ]);
         }
     }
 

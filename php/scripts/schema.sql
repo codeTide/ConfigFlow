@@ -185,6 +185,7 @@ CREATE TABLE IF NOT EXISTS panel_packages (
 CREATE TABLE IF NOT EXISTS xui_jobs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     job_uuid VARCHAR(191) NOT NULL UNIQUE,
+    order_id BIGINT NULL,
     user_id BIGINT NOT NULL,
     panel_id BIGINT NOT NULL,
     panel_package_id BIGINT NOT NULL,
@@ -195,6 +196,8 @@ CREATE TABLE IF NOT EXISTS xui_jobs (
     error_msg TEXT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
+    UNIQUE KEY uniq_xui_jobs_order (order_id),
+    FOREIGN KEY (order_id) REFERENCES pending_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE CASCADE,
     FOREIGN KEY (panel_package_id) REFERENCES panel_packages(id) ON DELETE CASCADE,
     INDEX idx_xui_jobs_status (status),

@@ -1689,6 +1689,22 @@ final class CallbackHandler
                 return;
             }
 
+            if (($result['queued_worker'] ?? false) === true) {
+                $jobId = (int) ($result['job_id'] ?? 0);
+                $jobStatus = (string) ($result['job_status'] ?? 'pending');
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    "🛰 سفارش <code>{$orderId}</code> در صف Worker API قرار گرفت.\n"
+                    . "Job ID: <code>{$jobId}</code>\n"
+                    . "Status: <b>" . htmlspecialchars($jobStatus) . "</b>\n\n"
+                    . "بعد از تکمیل job توسط worker، دوباره روی تحویل سفارش بزنید.",
+                    KeyboardBuilder::adminPanel()
+                );
+                $this->telegram->answerCallbackQuery($callbackId, 'سفارش در صف Worker قرار گرفت.');
+                return;
+            }
+
             $deliveryText = "🎉 <b>سفارش شما تحویل شد</b>\n\n";
             if (($result['service_name'] ?? '') !== '') {
                 $deliveryText .= "سرویس: <b>" . htmlspecialchars((string) $result['service_name']) . "</b>\n\n";

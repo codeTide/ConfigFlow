@@ -45,6 +45,26 @@ if (!is_string($sql) || trim($sql) === '') {
     exit(1);
 }
 
+/** @return bool */
+function columnExists(PDO $pdo, string $table, string $column): bool
+{
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name AND COLUMN_NAME = :column_name'
+    );
+    $stmt->execute(['table_name' => $table, 'column_name' => $column]);
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+/** @return bool */
+function indexExists(PDO $pdo, string $table, string $index): bool
+{
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name AND INDEX_NAME = :index_name'
+    );
+    $stmt->execute(['table_name' => $table, 'index_name' => $index]);
+    return (int) $stmt->fetchColumn() > 0;
+}
+
 try {
     $pdo->beginTransaction();
 
@@ -64,6 +84,14 @@ try {
     $upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
     foreach ($defaults as $k => $v) {
         $upsert->execute(['k' => $k, 'v' => $v]);
+    }
+
+    if (!columnExists($pdo, 'xui_jobs', 'order_id')) {
+        $pdo->exec('ALTER TABLE xui_jobs ADD COLUMN order_id BIGINT NULL AFTER job_uuid');
+    }
+    if (!indexExists($pdo, 'xui_jobs', 'uniq_xui_jobs_order')) {
+        // Keep migration safe for legacy rows with order_id=0; uniqueness applies only to real orders.
+        $pdo->exec('ALTER TABLE xui_jobs ADD UNIQUE KEY uniq_xui_jobs_order (order_id)');
     }
 
     $pdo->commit();
