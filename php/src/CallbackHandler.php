@@ -2036,7 +2036,10 @@ final class CallbackHandler
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیج پیدا نشد.');
                 return;
             }
-            $amount = (int) $package['price'];
+            if (!$this->ensurePurchaseAllowedForPackage($userId, (int) $package['id'], $callbackId)) {
+                return;
+            }
+            $amount = $this->database->effectivePackagePrice($userId, $package);
             if (!$this->isGatewayAmountAllowed('swapwallet_crypto', $amount)) {
                 $this->telegram->answerCallbackQuery($callbackId, 'مبلغ برای این درگاه مجاز نیست. محدوده: ' . $this->gatewayRangeText('swapwallet_crypto'));
                 return;
@@ -2114,7 +2117,10 @@ final class CallbackHandler
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیج پیدا نشد.');
                 return;
             }
-            $amount = (int) $package['price'];
+            if (!$this->ensurePurchaseAllowedForPackage($userId, (int) $package['id'], $callbackId)) {
+                return;
+            }
+            $amount = $this->database->effectivePackagePrice($userId, $package);
             if (!$this->isGatewayAmountAllowed('tronpays_rial', $amount)) {
                 $this->telegram->answerCallbackQuery($callbackId, 'مبلغ برای این درگاه مجاز نیست. محدوده: ' . $this->gatewayRangeText('tronpays_rial'));
                 return;
@@ -2299,6 +2305,11 @@ final class CallbackHandler
             }
 
             if ($data === 'buy:start') {
+                if ($this->settings->get('shop_open', '1') !== '1') {
+                    $this->telegram->answerCallbackQuery($callbackId, 'فروشگاه در حال حاضر بسته است.');
+                    return;
+                }
+
                 $types = $this->database->getActiveTypes();
                 if ($types === []) {
                     $this->telegram->answerCallbackQuery($callbackId, 'فعلاً سرویسی برای خرید فعال نیست.');
@@ -2358,7 +2369,8 @@ final class CallbackHandler
 
         if (str_starts_with($data, 'buy:type:')) {
             $typeId = (int) substr($data, strlen('buy:type:'));
-            $packages = $this->database->getActivePackagesByType($typeId);
+            $stockOnly = $this->settings->get('preorder_mode', '0') === '1';
+            $packages = $this->database->getActivePackagesByTypeWithStock($typeId, $stockOnly);
             if ($packages === []) {
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیجی برای این نوع سرویس یافت نشد.');
                 return;
@@ -2366,7 +2378,9 @@ final class CallbackHandler
 
             $rows = [];
             foreach ($packages as $pkg) {
-                $label = sprintf('%s | %sGB | %s روز | %s تومان', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $pkg['price']);
+                $price = $this->database->effectivePackagePrice($userId, $pkg);
+                $stockText = isset($pkg['stock']) ? (' | موجودی: ' . (int) $pkg['stock']) : '';
+                $label = sprintf('%s | %sGB | %s روز | %s تومان%s', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $price, $stockText);
                 $rows[] = [[
                     'text' => $label,
                     'callback_data' => 'buy:pkg:' . (int) $pkg['id'],
@@ -2771,7 +2785,7 @@ final class CallbackHandler
                 "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\n"
                 . "شناسه سفارش: <code>{$pendingId}</code>\n"
                 . "مبلغ: <b>{$amount}</b> تومان\n\n"
-                . "اتصال API تتراپی در فاز بعدی تکمیل می‌شود.",
+                . "ارتباط با درگاه آنلاین برقرار نشد. لطفاً از کارت‌به‌کارت یا کیف پول استفاده کنید.",
                 KeyboardBuilder::backToMain()
             );
             $this->telegram->answerCallbackQuery($callbackId);
@@ -2779,6 +2793,24 @@ final class CallbackHandler
         }
 
         if (str_starts_with($data, 'buy:pkg:')) {
+            if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
+                $rulesText = trim($this->settings->get('purchase_rules_text', ''));
+                $rulesText = $rulesText !== '' ? $rulesText : 'لطفاً قوانین خرید را بپذیرید.';
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    "📜 <b>قوانین خرید</b>
+
+" . $rulesText,
+                    ['inline_keyboard' => [
+                        [['text' => '✅ قوانین را می‌پذیرم', 'callback_data' => 'buy:rules:accept']],
+                        [['text' => '🔙 بازگشت', 'callback_data' => 'buy:start']],
+                    ]]
+                );
+                $this->telegram->answerCallbackQuery($callbackId);
+                return;
+            }
+
             $packageId = (int) substr($data, strlen('buy:pkg:'));
             $package = $this->database->getPackage($packageId);
             if ($package === null) {
@@ -2788,7 +2820,7 @@ final class CallbackHandler
 
             $text = "💰 <b>پرداخت سفارش</b>\n\n"
                 . "پکیج: <b>" . htmlspecialchars((string) $package['name']) . "</b>\n"
-                . "قیمت: <b>" . (int) $package['price'] . "</b> تومان\n\n"
+                . "قیمت: <b>" . (int) $this->database->effectivePackagePrice($userId, $package) . "</b> تومان\n\n"
                 . "روش پرداخت را انتخاب کنید:";
             $rows = [];
             $rows[] = [['text' => '💳 پرداخت با کیف پول', 'callback_data' => 'buy:wallet:' . $packageId]];
@@ -2814,8 +2846,18 @@ final class CallbackHandler
             return;
         }
 
+        if ($data === 'buy:rules:accept') {
+            $this->database->acceptPurchaseRules($userId);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ قوانین ثبت شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'buy:start']]);
+            return;
+        }
+
         if (str_starts_with($data, 'buy:crypto:coins:')) {
             $packageId = (int) substr($data, strlen('buy:crypto:coins:'));
+            if (!$this->ensurePurchaseAllowedForPackage($userId, $packageId, $callbackId)) {
+                return;
+            }
             $coins = [
                 'tron' => 'TRON',
                 'ton' => 'TON',
@@ -2856,8 +2898,11 @@ final class CallbackHandler
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیج پیدا نشد.');
                 return;
             }
+            if (!$this->ensurePurchaseAllowedForPackage($userId, (int) $package['id'], $callbackId)) {
+                return;
+            }
 
-            $amount = (int) $package['price'];
+            $amount = $this->database->effectivePackagePrice($userId, $package);
             $paymentId = $this->database->createPayment([
                 'kind' => 'purchase',
                 'user_id' => $userId,
@@ -2931,7 +2976,7 @@ final class CallbackHandler
                 $text = "🏧 <b>پرداخت TetraPay</b>\n\n"
                     . "شناسه سفارش: <code>{$pendingId}</code>\n"
                     . "مبلغ: <b>{$amount}</b> تومان\n\n"
-                    . "اتصال API تتراپی در فاز بعدی تکمیل می‌شود.";
+                    . "ارتباط با درگاه آنلاین برقرار نشد. لطفاً از کارت‌به‌کارت یا کیف پول استفاده کنید.";
             }
 
             $this->telegram->editMessageText($chatId, $messageId, $text, KeyboardBuilder::backToMain());
@@ -3016,10 +3061,17 @@ final class CallbackHandler
 
         if (str_starts_with($data, 'buy:wallet:')) {
             $packageId = (int) substr($data, strlen('buy:wallet:'));
+            if (!$this->ensurePurchaseAllowedForPackage($userId, $packageId, $callbackId)) {
+                return;
+            }
             $result = $this->database->walletPayPackage($userId, $packageId);
             if (!($result['ok'] ?? false)) {
                 if (($result['error'] ?? '') === 'insufficient_balance') {
                     $this->telegram->answerCallbackQuery($callbackId, 'موجودی کیف پول کافی نیست.');
+                    return;
+                }
+                if (($result['error'] ?? '') === 'no_stock') {
+                    $this->telegram->answerCallbackQuery($callbackId, 'برای این پکیج موجودی ثبت‌شده وجود ندارد.');
                     return;
                 }
                 $this->telegram->answerCallbackQuery($callbackId, 'خطا در ثبت سفارش. دوباره تلاش کنید.');
@@ -3040,7 +3092,7 @@ final class CallbackHandler
             return;
         }
 
-        $this->telegram->answerCallbackQuery($callbackId, 'این بخش در فاز بعدی مهاجرت تکمیل می‌شود.');
+        $this->telegram->answerCallbackQuery($callbackId, 'عملیات نامعتبر یا پشتیبانی‌نشده.');
     }
 
     private function encodeStockQueryToken(?string $query): string
@@ -3116,6 +3168,26 @@ final class CallbackHandler
             return 'panels';
         }
         return null;
+    }
+
+    private function ensurePurchaseAllowedForPackage(int $userId, int $packageId, string $callbackId): bool
+    {
+        if ($this->settings->get('shop_open', '1') !== '1') {
+            $this->telegram->answerCallbackQuery($callbackId, 'فروشگاه در حال حاضر بسته است.');
+            return false;
+        }
+
+        if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
+            $this->telegram->answerCallbackQuery($callbackId, 'ابتدا قوانین خرید را بپذیرید.');
+            return false;
+        }
+
+        if ($this->settings->get('preorder_mode', '0') === '1' && !$this->database->packageHasAvailableStock($packageId)) {
+            $this->telegram->answerCallbackQuery($callbackId, 'این پکیج در حال حاضر موجودی ندارد.');
+            return false;
+        }
+
+        return true;
     }
 
     private function isGatewayAmountAllowed(string $gateway, int $amount): bool

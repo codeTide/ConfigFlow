@@ -1038,7 +1038,11 @@ final class Database implements WorkerApiStore
             return ['ok' => false, 'error' => 'package_not_found'];
         }
 
-        $price = (int) $package['price'];
+        if ($this->settingValue('preorder_mode', '0') === '1' && !$this->packageHasAvailableStock($packageId)) {
+            return ['ok' => false, 'error' => 'no_stock'];
+        }
+
+        $price = $this->effectivePackagePrice($userId, $package);
         $this->pdo->beginTransaction();
         try {
             $user = $this->getUser($userId);
@@ -1104,7 +1108,7 @@ final class Database implements WorkerApiStore
             return ['ok' => false, 'error' => 'type_mismatch'];
         }
 
-        $price = (int) $package['price'];
+        $price = $this->effectivePackagePrice($userId, $package);
         $this->pdo->beginTransaction();
         try {
             $user = $this->getUser($userId);
@@ -1558,7 +1562,13 @@ final class Database implements WorkerApiStore
             'payment_method' => $paymentMethod,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
-        return (int) $this->pdo->lastInsertId();
+        $purchaseId = (int) $this->pdo->lastInsertId();
+
+        if ($paymentMethod !== 'referral_gift') {
+            $this->processReferralPurchaseReward($userId);
+        }
+
+        return $purchaseId;
     }
 
     private function markOrderDelivered(int $orderId, int $paymentId): void
@@ -1758,4 +1768,238 @@ final class Database implements WorkerApiStore
             return false;
         }
     }
+
+    public function getActivePackagesByTypeWithStock(int $typeId, bool $stockOnly = false): array
+    {
+        $sql = 'SELECT p.id, p.type_id, p.name, p.price, p.volume_gb, p.duration_days,
+'
+            . '       (SELECT COUNT(*) FROM configs c WHERE c.package_id = p.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0) AS stock
+'
+            . 'FROM packages p WHERE p.type_id = :type_id AND p.active = 1';
+        if ($stockOnly) {
+            $sql .= ' HAVING stock > 0';
+        }
+        $sql .= ' ORDER BY p.id ASC';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['type_id' => $typeId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getAgencyPriceConfig(int $userId): array
+    {
+        $stmt = $this->pdo->prepare('SELECT price_mode, global_type, global_val FROM agency_price_config WHERE user_id = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return ['price_mode' => 'package', 'global_type' => 'pct', 'global_val' => 0];
+        }
+        return [
+            'price_mode' => (string) ($row['price_mode'] ?? 'package'),
+            'global_type' => (string) ($row['global_type'] ?? 'pct'),
+            'global_val' => (int) ($row['global_val'] ?? 0),
+        ];
+    }
+
+    public function getAgencyTypeDiscount(int $userId, int $typeId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT discount_type, discount_value FROM agency_type_discount WHERE user_id = :user_id AND type_id = :type_id LIMIT 1'
+        );
+        $stmt->execute(['user_id' => $userId, 'type_id' => $typeId]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return null;
+        }
+        return [
+            'discount_type' => (string) ($row['discount_type'] ?? 'pct'),
+            'discount_value' => (int) ($row['discount_value'] ?? 0),
+        ];
+    }
+
+    public function effectivePackagePrice(int $userId, array $package): int
+    {
+        $base = (int) ($package['price'] ?? 0);
+        $user = $this->getUser($userId);
+        if (!is_array($user) || (int) ($user['is_agent'] ?? 0) !== 1) {
+            return $base;
+        }
+
+        $packageId = (int) ($package['id'] ?? 0);
+        $typeId = (int) ($package['type_id'] ?? 0);
+
+        // Python-parity precedence: package > type > global
+        $pkgCustom = $this->getAgencyPrice($userId, $packageId);
+        if ($pkgCustom !== null) {
+            return max(0, $pkgCustom);
+        }
+
+        $typeDiscount = $this->getAgencyTypeDiscount($userId, $typeId);
+        if ($typeDiscount !== null) {
+            $dType = (string) ($typeDiscount['discount_type'] ?? 'pct');
+            $dValue = (int) ($typeDiscount['discount_value'] ?? 0);
+            return $dType === 'pct'
+                ? max(0, $base - (int) round($base * $dValue / 100))
+                : max(0, $base - $dValue);
+        }
+
+        $config = $this->getAgencyPriceConfig($userId);
+        $gType = (string) ($config['global_type'] ?? 'pct');
+        $gVal = (int) ($config['global_val'] ?? 0);
+        return $gType === 'pct'
+            ? max(0, $base - (int) round($base * $gVal / 100))
+            : max(0, $base - $gVal);
+    }
+
+    public function hasAcceptedPurchaseRules(int $userId): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM purchase_rule_acceptances WHERE user_id = :user_id LIMIT 1');
+        $stmt->execute(['user_id' => $userId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    public function acceptPurchaseRules(int $userId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO purchase_rule_acceptances (user_id, accepted_at) VALUES (:user_id, :accepted_at) ON DUPLICATE KEY UPDATE accepted_at = VALUES(accepted_at)'
+        );
+        $stmt->execute(['user_id' => $userId, 'accepted_at' => gmdate('Y-m-d H:i:s')]);
+    }
+
+
+
+    public function packageHasAvailableStock(int $packageId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM configs WHERE package_id = :package_id AND sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired = 0 LIMIT 1'
+        );
+        $stmt->execute(['package_id' => $packageId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    public function addReferral(int $referrerId, int $refereeId): void
+    {
+        if ($referrerId <= 0 || $refereeId <= 0 || $referrerId === $refereeId) {
+            return;
+        }
+        $stmt = $this->pdo->prepare(
+            'INSERT IGNORE INTO referrals (referrer_id, referee_id, created_at, start_reward_given, purchase_reward_given) VALUES (:referrer_id, :referee_id, :created_at, 0, 0)'
+        );
+        $stmt->execute([
+            'referrer_id' => $referrerId,
+            'referee_id' => $refereeId,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        if ($stmt->rowCount() > 0) {
+            $this->processReferralStartReward($referrerId);
+        }
+    }
+
+
+    private function processReferralStartReward(int $referrerId): void
+    {
+        if ((string) $this->settingValue('referral_start_reward_enabled', '0') !== '1') {
+            return;
+        }
+        $requiredCount = max(1, (int) $this->settingValue('referral_start_reward_count', '1'));
+
+        $stmt = $this->pdo->prepare(
+            'SELECT referee_id FROM referrals WHERE referrer_id = :referrer_id AND start_reward_given = 0 ORDER BY id ASC LIMIT ' . $requiredCount
+        );
+        $stmt->execute(['referrer_id' => $referrerId]);
+        $rows = $stmt->fetchAll();
+        if (count($rows) < $requiredCount) {
+            return;
+        }
+
+        $mark = $this->pdo->prepare('UPDATE referrals SET start_reward_given = 1 WHERE referrer_id = :referrer_id AND referee_id = :referee_id');
+        foreach ($rows as $row) {
+            $mark->execute(['referrer_id' => $referrerId, 'referee_id' => (int) ($row['referee_id'] ?? 0)]);
+        }
+        $this->grantReferralReward($referrerId, 'referral_start_reward');
+    }
+
+    private function processReferralPurchaseReward(int $buyerUserId): void
+    {
+        if ((string) $this->settingValue('referral_purchase_reward_enabled', '0') !== '1') {
+            return;
+        }
+
+        $refStmt = $this->pdo->prepare('SELECT referrer_id FROM referrals WHERE referee_id = :referee_id LIMIT 1');
+        $refStmt->execute(['referee_id' => $buyerUserId]);
+        $referrerId = (int) ($refStmt->fetchColumn() ?: 0);
+        if ($referrerId <= 0) {
+            return;
+        }
+
+        $requiredCount = max(1, (int) $this->settingValue('referral_purchase_reward_count', '1'));
+        $stmt = $this->pdo->prepare(
+            'SELECT DISTINCT r.referee_id
+'
+            . 'FROM referrals r JOIN purchases p ON p.user_id = r.referee_id AND p.is_test = 0
+'
+            . 'WHERE r.referrer_id = :referrer_id AND r.purchase_reward_given = 0
+'
+            . 'ORDER BY r.id ASC LIMIT ' . $requiredCount
+        );
+        $stmt->execute(['referrer_id' => $referrerId]);
+        $rows = $stmt->fetchAll();
+        if (count($rows) < $requiredCount) {
+            return;
+        }
+
+        $mark = $this->pdo->prepare('UPDATE referrals SET purchase_reward_given = 1 WHERE referrer_id = :referrer_id AND referee_id = :referee_id');
+        foreach ($rows as $row) {
+            $mark->execute(['referrer_id' => $referrerId, 'referee_id' => (int) ($row['referee_id'] ?? 0)]);
+        }
+        $this->grantReferralReward($referrerId, 'referral_purchase_reward');
+    }
+
+    private function grantReferralReward(int $referrerId, string $prefix): void
+    {
+        $rewardType = (string) $this->settingValue($prefix . '_type', 'wallet');
+        if ($rewardType === 'wallet') {
+            $amount = (int) $this->settingValue($prefix . '_amount', '0');
+            if ($amount > 0) {
+                $upd = $this->pdo->prepare('UPDATE users SET balance = balance + :amount WHERE user_id = :user_id');
+                $upd->execute(['amount' => $amount, 'user_id' => $referrerId]);
+            }
+            return;
+        }
+
+        $packageId = (int) $this->settingValue($prefix . '_package', '0');
+        if ($packageId <= 0) {
+            return;
+        }
+
+        $cfgStmt = $this->pdo->prepare(
+            'SELECT id FROM configs WHERE package_id = :package_id AND sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired = 0 ORDER BY id ASC LIMIT 1 FOR UPDATE'
+        );
+        $cfgStmt->execute(['package_id' => $packageId]);
+        $cfgId = (int) ($cfgStmt->fetchColumn() ?: 0);
+        if ($cfgId <= 0) {
+            return;
+        }
+
+        $purchaseId = $this->createPurchase($referrerId, $packageId, $cfgId, 0, 'referral_gift');
+        $cfgUpdate = $this->pdo->prepare('UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
+        $cfgUpdate->execute([
+            'sold_to' => $referrerId,
+            'purchase_id' => $purchaseId,
+            'sold_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $cfgId,
+        ]);
+    }
+
+    private function settingValue(string $key, string $default = ''): string
+    {
+        $stmt = $this->pdo->prepare('SELECT value FROM settings WHERE `key` = :key LIMIT 1');
+        $stmt->execute(['key' => $key]);
+        $value = $stmt->fetchColumn();
+        if ($value === false || $value === null) {
+            return $default;
+        }
+        return (string) $value;
+    }
+
 }
