@@ -6,7 +6,7 @@ namespace ConfigFlow\Bot;
 
 use PDO;
 
-final class Database
+final class Database implements WorkerApiStore
 {
     private PDO $pdo;
 
@@ -895,8 +895,8 @@ final class Database
                 $this->pdo->rollBack();
                 return ['ok' => false, 'error' => 'not_found'];
             }
-            $retry = ((int) ($row['retry_count'] ?? 0)) + 1;
-            $status = $retry < 5 ? 'failed' : 'error';
+            $retry = XuiJobState::nextRetryCount((int) ($row['retry_count'] ?? 0));
+            $status = XuiJobState::statusAfterError($retry);
             $upd = $this->pdo->prepare(
                 'UPDATE xui_jobs
                  SET status = :status, error_msg = :error_msg, retry_count = :retry_count, updated_at = :updated_at
