@@ -501,6 +501,7 @@ if ($justInstalled) {
         $botDeepLink = 'https://t.me/' . $botUser;
     }
 }
+$showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
 ?>
 <!doctype html>
 <html lang="en">
