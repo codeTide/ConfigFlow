@@ -42,11 +42,23 @@ final class CallbackHandler
             return;
         }
 
-        $isAdmin = in_array($userId, Config::adminIds(), true);
+        $isAdmin = $this->database->isAdminUser($userId);
 
         if ($data === 'noop') {
             $this->telegram->answerCallbackQuery($callbackId);
             return;
+        }
+
+        if (str_starts_with($data, 'admin:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $requiredPerm = $this->requiredAdminPermission($data);
+            if ($requiredPerm !== null && !$this->adminHasPermission($userId, $requiredPerm)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'مجوز لازم برای این بخش را ندارید.');
+                return;
+            }
         }
 
         if ($data === 'nav:main') {
@@ -107,6 +119,1321 @@ final class CallbackHandler
                 ['inline_keyboard' => $rows]
             );
             $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:admins') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $rows = [];
+            $rows[] = [['text' => '➕ افزودن ادمین', 'callback_data' => 'admin:admins:add']];
+            foreach ($this->database->listAdminUsers() as $adm) {
+                $uid = (int) ($adm['user_id'] ?? 0);
+                $rows[] = [[
+                    'text' => "👮 U:{$uid}",
+                    'callback_data' => 'admin:admins:view:' . $uid,
+                ]];
+            }
+            foreach (Config::adminIds() as $ownerId) {
+                $rows[] = [[
+                    'text' => "👑 OWNER {$ownerId}",
+                    'callback_data' => 'noop',
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText($chatId, $messageId, '👮 <b>مدیریت ادمین‌ها</b>', ['inline_keyboard' => $rows]);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:admins:add') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->database->setUserState($userId, 'await_admin_add_admin');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 آیدی عددی ادمین جدید را ارسال کنید.",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:admins']]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:admins:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $targetUid = (int) substr($data, strlen('admin:admins:view:'));
+            $perms = $this->database->getAdminPermissions($targetUid);
+            if (in_array($targetUid, Config::adminIds(), true)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'این کاربر owner است و قابل ویرایش نیست.');
+                return;
+            }
+            $keys = ['types', 'stock', 'users', 'settings', 'payments', 'requests', 'broadcast', 'agents', 'panels'];
+            $rows = [];
+            foreach ($keys as $k) {
+                $enabled = (bool) ($perms[$k] ?? false);
+                $rows[] = [[
+                    'text' => ($enabled ? '✅ ' : '❌ ') . $k,
+                    'callback_data' => 'admin:admins:perm:' . $targetUid . ':' . $k . ':' . ($enabled ? 0 : 1),
+                ]];
+            }
+            $rows[] = [['text' => '🗑 حذف ادمین', 'callback_data' => 'admin:admins:remove:' . $targetUid]];
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:admins']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "👮 <b>دسترسی‌های ادمین</b>\n\nآیدی: <code>{$targetUid}</code>",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:admins:perm:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $targetUid = (int) ($parts[3] ?? 0);
+            $permKey = (string) ($parts[4] ?? '');
+            $enabled = ((int) ($parts[5] ?? 0)) === 1;
+            if ($targetUid > 0 && $permKey !== '') {
+                $perms = $this->database->getAdminPermissions($targetUid);
+                $perms[$permKey] = $enabled;
+                $this->database->upsertAdminUser($targetUid, $userId, $perms);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ ذخیره شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:admins:view:' . $targetUid]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:admins:remove:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $targetUid = (int) substr($data, strlen('admin:admins:remove:'));
+            if (!in_array($targetUid, Config::adminIds(), true)) {
+                $this->database->removeAdminUser($targetUid);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ حذف شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:admins']]);
+            return;
+        }
+
+        if ($data === 'admin:broadcast') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📣 <b>فوروارد همگانی</b>\n\nگروه هدف را انتخاب کنید:",
+                ['inline_keyboard' => [
+                    [['text' => 'همه کاربران', 'callback_data' => 'admin:broadcast:set:all']],
+                    [['text' => 'فقط مشتریان', 'callback_data' => 'admin:broadcast:set:customers']],
+                    [['text' => 'فقط نمایندگان', 'callback_data' => 'admin:broadcast:set:agents']],
+                    [['text' => 'فقط ادمین‌ها', 'callback_data' => 'admin:broadcast:set:admins']],
+                    [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']],
+                ]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:broadcast:set:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $scope = (string) substr($data, strlen('admin:broadcast:set:'));
+            if (!in_array($scope, ['all', 'customers', 'agents', 'admins'], true)) {
+                $scope = 'all';
+            }
+            $this->database->setUserState($userId, 'await_admin_broadcast', ['scope' => $scope]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📤 پیام/فایل را ارسال کنید تا برای گروه هدف (<b>{$scope}</b>) ارسال شود.",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:broadcast']]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:types') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $types = $this->database->listTypes();
+            $rows = [];
+            $rows[] = [['text' => '➕ افزودن نوع سرویس', 'callback_data' => 'admin:type:add']];
+            foreach ($types as $type) {
+                $activeMark = ((int) ($type['is_active'] ?? 0)) === 1 ? '🟢' : '🔴';
+                $rows[] = [[
+                    'text' => "{$activeMark} " . (string) ($type['name'] ?? '-') . ' #' . (int) ($type['id'] ?? 0),
+                    'callback_data' => 'admin:type:view:' . (int) ($type['id'] ?? 0),
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                '🧩 <b>مدیریت نوع سرویس و پکیج‌ها</b>',
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:type:add') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->database->setUserState($userId, 'await_admin_type_name', [
+                'source_chat_id' => $chatId,
+                'source_message_id' => $messageId,
+            ]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 نام نوع سرویس جدید را ارسال کنید.\nمثال: <code>VLESS EU</code>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:types']]]
+                ]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:type:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $typeId = (int) substr($data, strlen('admin:type:view:'));
+            $type = null;
+            foreach ($this->database->listTypes() as $item) {
+                if ((int) ($item['id'] ?? 0) === $typeId) {
+                    $type = $item;
+                    break;
+                }
+            }
+            if (!is_array($type)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'نوع سرویس یافت نشد.');
+                return;
+            }
+
+            $packages = $this->database->listPackagesByType($typeId);
+            $rows = [];
+            $rows[] = [['text' => '➕ افزودن پکیج', 'callback_data' => 'admin:pkg:add:' . $typeId]];
+            $rows[] = [[
+                'text' => ((int) ($type['is_active'] ?? 0) === 1 ? '🔴 غیرفعال کردن نوع' : '🟢 فعال کردن نوع'),
+                'callback_data' => 'admin:type:toggle:' . $typeId . ':' . (((int) ($type['is_active'] ?? 0) === 1) ? 0 : 1),
+            ]];
+            $rows[] = [['text' => '🗑 حذف نوع سرویس', 'callback_data' => 'admin:type:delete:' . $typeId]];
+            foreach ($packages as $pkg) {
+                $mark = ((int) ($pkg['active'] ?? 0) === 1) ? '🟢' : '🔴';
+                $rows[] = [[
+                    'text' => sprintf(
+                        '%s #%d | %s | %sGB | %s روز | %s تومان',
+                        $mark,
+                        (int) ($pkg['id'] ?? 0),
+                        (string) ($pkg['name'] ?? '-'),
+                        (string) ($pkg['volume_gb'] ?? '0'),
+                        (string) ($pkg['duration_days'] ?? '0'),
+                        (string) ($pkg['price'] ?? '0')
+                    ),
+                    'callback_data' => 'admin:pkg:view:' . (int) ($pkg['id'] ?? 0) . ':' . $typeId,
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:types']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📦 <b>نوع سرویس:</b> " . htmlspecialchars((string) ($type['name'] ?? '-')) . "\n"
+                . "شناسه: <code>{$typeId}</code>",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:type:toggle:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $typeId = (int) ($parts[3] ?? 0);
+            $active = ((int) ($parts[4] ?? 0)) === 1;
+            if ($typeId > 0) {
+                $this->database->setTypeActive($typeId, $active);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ ذخیره شد.');
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:type:view:' . $typeId,
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:type:delete:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $typeId = (int) substr($data, strlen('admin:type:delete:'));
+            if ($typeId > 0) {
+                $this->database->deleteType($typeId);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ نوع سرویس حذف شد.');
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:types',
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pkg:add:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $typeId = (int) substr($data, strlen('admin:pkg:add:'));
+            $this->database->setUserState($userId, 'await_admin_package', [
+                'type_id' => $typeId,
+                'source_chat_id' => $chatId,
+                'source_message_id' => $messageId,
+            ]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 اطلاعات پکیج را با فرمت زیر ارسال کنید:\n"
+                . "<code>نام | حجم(GB) | مدت(روز) | قیمت(تومان)</code>\n\n"
+                . "مثال:\n<code>پلن طلایی | 120 | 30 | 250000</code>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:type:view:' . $typeId]]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pkg:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $packageId = (int) ($parts[3] ?? 0);
+            $typeId = (int) ($parts[4] ?? 0);
+            $pkg = $this->database->getPackage($packageId);
+            if (!is_array($pkg)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پکیج یافت نشد.');
+                return;
+            }
+            $active = 1;
+            foreach ($this->database->listPackagesByType((int) $pkg['type_id']) as $p) {
+                if ((int) $p['id'] === $packageId) {
+                    $active = (int) $p['active'];
+                    break;
+                }
+            }
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📦 <b>جزئیات پکیج</b>\n\n"
+                . "شناسه: <code>{$packageId}</code>\n"
+                . "نام: <b>" . htmlspecialchars((string) ($pkg['name'] ?? '-')) . "</b>\n"
+                . "حجم: <b>" . htmlspecialchars((string) ($pkg['volume_gb'] ?? '0')) . " GB</b>\n"
+                . "مدت: <b>" . htmlspecialchars((string) ($pkg['duration_days'] ?? '0')) . " روز</b>\n"
+                . "قیمت: <b>" . (int) ($pkg['price'] ?? 0) . "</b> تومان\n"
+                . "وضعیت: <b>" . ($active === 1 ? 'فعال' : 'غیرفعال') . "</b>",
+                ['inline_keyboard' => [
+                    [[
+                        'text' => $active === 1 ? '🔴 غیرفعال کردن' : '🟢 فعال کردن',
+                        'callback_data' => 'admin:pkg:toggle:' . $packageId . ':' . ($active === 1 ? 0 : 1) . ':' . ((int) $pkg['type_id']),
+                    ]],
+                    [[
+                        'text' => '🗑 حذف پکیج',
+                        'callback_data' => 'admin:pkg:delete:' . $packageId . ':' . ((int) $pkg['type_id']),
+                    ]],
+                    [[
+                        'text' => '🔙 بازگشت',
+                        'callback_data' => 'admin:type:view:' . ($typeId > 0 ? $typeId : (int) $pkg['type_id']),
+                    ]],
+                ]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pkg:toggle:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $packageId = (int) ($parts[3] ?? 0);
+            $active = ((int) ($parts[4] ?? 0)) === 1;
+            $typeId = (int) ($parts[5] ?? 0);
+            if ($packageId > 0) {
+                $this->database->setPackageActive($packageId, $active);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ ذخیره شد.');
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:type:view:' . $typeId,
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pkg:delete:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $packageId = (int) ($parts[3] ?? 0);
+            $typeId = (int) ($parts[4] ?? 0);
+            if ($packageId > 0) {
+                $this->database->deletePackage($packageId);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ پکیج حذف شد.');
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:type:view:' . $typeId,
+            ]]);
+            return;
+        }
+
+        if ($data === 'admin:users') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $users = $this->database->listUsers(25);
+            $rows = [];
+            foreach ($users as $u) {
+                $rows[] = [[
+                    'text' => sprintf(
+                        '%s U:%d | %s | %d تومان',
+                        ((string) ($u['status'] ?? '') === 'restricted') ? '🚫' : '✅',
+                        (int) ($u['user_id'] ?? 0),
+                        (string) (($u['full_name'] ?? '') !== '' ? $u['full_name'] : ($u['username'] ?? '-')),
+                        (int) ($u['balance'] ?? 0)
+                    ),
+                    'callback_data' => 'admin:user:view:' . (int) ($u['user_id'] ?? 0),
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                '👥 <b>مدیریت کاربران</b>',
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:stock') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $types = $this->database->listTypes();
+            $rows = [];
+            foreach ($types as $type) {
+                $rows[] = [[
+                    'text' => '🗂 ' . (string) ($type['name'] ?? '-') . ' #' . (int) ($type['id'] ?? 0),
+                    'callback_data' => 'admin:stock:type:' . (int) ($type['id'] ?? 0),
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                '📚 <b>مدیریت موجودی کانفیگ</b>' . "\n\n" . 'ابتدا نوع سرویس را انتخاب کنید:',
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:type:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $typeId = (int) substr($data, strlen('admin:stock:type:'));
+            $packages = $this->database->listPackagesByType($typeId);
+            $rows = [];
+            foreach ($packages as $pkg) {
+                $available = $this->database->countAvailableConfigsForPackage((int) ($pkg['id'] ?? 0));
+                $rows[] = [[
+                    'text' => sprintf(
+                        '📦 #%d %s | موجودی: %d',
+                        (int) ($pkg['id'] ?? 0),
+                        (string) ($pkg['name'] ?? '-'),
+                        $available
+                    ),
+                    'callback_data' => 'admin:stock:pkg:' . (int) ($pkg['id'] ?? 0) . ':' . $typeId,
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:stock']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📦 <b>پکیج‌های نوع {$typeId}</b>",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:pkg:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $packageId = (int) ($parts[3] ?? 0);
+            $typeId = (int) ($parts[4] ?? 0);
+            $page = max(1, (int) ($parts[5] ?? 1));
+            $statusToken = (string) ($parts[6] ?? 'all');
+            $status = match ($statusToken) {
+                'av' => 'available',
+                'sl' => 'sold',
+                'ex' => 'expired',
+                default => 'all',
+            };
+            $query = $this->decodeStockQueryToken((string) ($parts[7] ?? ''));
+            $perPage = 15;
+            $total = $this->database->countConfigsByPackageFiltered($packageId, $status, $query);
+            $totalPages = max(1, (int) ceil($total / $perPage));
+            if ($page > $totalPages) {
+                $page = $totalPages;
+            }
+            $offset = ($page - 1) * $perPage;
+            $configs = $this->database->listConfigsByPackageFiltered($packageId, $status, $query, $perPage, $offset);
+            $available = $this->database->countAvailableConfigsForPackage($packageId);
+            $qToken = $this->encodeStockQueryToken($query);
+            $statusToken = match ($status) {
+                'available' => 'av',
+                'sold' => 'sl',
+                'expired' => 'ex',
+                default => 'all',
+            };
+            $rows = [];
+            $rows[] = [['text' => '➕ افزودن کانفیگ', 'callback_data' => 'admin:stock:add:' . $packageId . ':' . $typeId]];
+            $rows[] = [[
+                'text' => '🔎 جستجو (name/config/inquiry)',
+                'callback_data' => 'admin:stock:search:' . $packageId . ':' . $typeId . ':' . $statusToken . ':' . $qToken,
+            ]];
+            if ($query !== null && trim($query) !== '') {
+                $rows[] = [[
+                    'text' => '🧹 پاک‌کردن جستجو',
+                    'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':1:' . $statusToken . ':',
+                ]];
+            }
+            $rows[] = [
+                [
+                    'text' => ($status === 'all' ? '✅ ' : '') . 'همه',
+                    'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':1:all:' . $qToken,
+                ],
+                [
+                    'text' => ($status === 'available' ? '✅ ' : '') . 'موجود',
+                    'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':1:av:' . $qToken,
+                ],
+                [
+                    'text' => ($status === 'sold' ? '✅ ' : '') . 'فروخته',
+                    'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':1:sl:' . $qToken,
+                ],
+                [
+                    'text' => ($status === 'expired' ? '✅ ' : '') . 'منقضی',
+                    'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':1:ex:' . $qToken,
+                ],
+            ];
+            $rows[] = [[
+                'text' => '❌ منقضی‌کردن موجودهای این صفحه',
+                'callback_data' => 'admin:stock:bulkexp:' . $packageId . ':' . $typeId . ':' . $page . ':' . $statusToken . ':' . $qToken,
+            ]];
+            $rows[] = [[
+                'text' => '🗑 حذف موجودهای این صفحه',
+                'callback_data' => 'admin:stock:bulkdel:' . $packageId . ':' . $typeId . ':' . $page . ':' . $statusToken . ':' . $qToken,
+            ]];
+            foreach ($configs as $cfg) {
+                $state = ((int) ($cfg['is_expired'] ?? 0) === 1) ? '❌' : (((int) ($cfg['sold_to'] ?? 0) > 0) ? '🔴' : '🟢');
+                $rows[] = [[
+                    'text' => sprintf('%s #%d %s', $state, (int) ($cfg['id'] ?? 0), (string) ($cfg['service_name'] ?? '-')),
+                    'callback_data' => 'admin:stock:view:' . (int) ($cfg['id'] ?? 0) . ':' . $packageId . ':' . $typeId,
+                ]];
+            }
+            $nav = [];
+            if ($page > 1) {
+                $nav[] = ['text' => '⬅️ قبلی', 'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':' . ($page - 1) . ':' . $statusToken . ':' . $qToken];
+            }
+            $nav[] = ['text' => "📄 {$page}/{$totalPages}", 'callback_data' => 'noop'];
+            if ($page < $totalPages) {
+                $nav[] = ['text' => 'بعدی ➡️', 'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':' . ($page + 1) . ':' . $statusToken . ':' . $qToken];
+            }
+            $rows[] = $nav;
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:stock:type:' . $typeId]];
+            $statusFa = match ($status) {
+                'available' => 'موجود',
+                'sold' => 'فروخته',
+                'expired' => 'منقضی',
+                default => 'همه',
+            };
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📚 <b>کانفیگ‌های پکیج {$packageId}</b>\n"
+                . "فیلتر وضعیت: <b>{$statusFa}</b>\n"
+                . ($query !== null && trim($query) !== '' ? "عبارت جستجو: <code>" . htmlspecialchars($query) . "</code>\n" : '')
+                . "موجودی آزاد: <b>{$available}</b>\n"
+                . "کل آیتم‌ها: <b>{$total}</b>\n"
+                . "راهنما: 🟢 موجود | 🔴 فروخته | ❌ منقضی",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:search:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $packageId = (int) ($parts[3] ?? 0);
+            $typeId = (int) ($parts[4] ?? 0);
+            $statusToken = (string) ($parts[5] ?? 'all');
+            $qToken = (string) ($parts[6] ?? '');
+            $currentQuery = $this->decodeStockQueryToken($qToken);
+            $this->database->setUserState($userId, 'await_admin_stock_search', [
+                'package_id' => $packageId,
+                'type_id' => $typeId,
+                'status_token' => $statusToken,
+            ]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "🔎 عبارت جستجو را ارسال کنید.\n"
+                . "روی `name` / `config_text` / `inquiry_link` جستجو می‌شود.\n\n"
+                . ($currentQuery !== null && trim($currentQuery) !== '' ? "جستجوی فعلی: <code>" . htmlspecialchars($currentQuery) . "</code>" : "برای پاک کردن، یک پیام خالی یا `-` بفرست."),
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':1:' . $statusToken . ':' . $qToken]]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:add:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $packageId = (int) ($parts[3] ?? 0);
+            $typeId = (int) ($parts[4] ?? 0);
+            $this->database->setUserState($userId, 'await_admin_add_config', [
+                'package_id' => $packageId,
+                'type_id' => $typeId,
+            ]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 کانفیگ جدید را با فرمت زیر بفرستید:\n\n"
+                . "<code>نام سرویس</code>\n"
+                . "<code>---</code>\n"
+                . "<code>متن کانفیگ</code>\n"
+                . "<code>---</code>\n"
+                . "<code>inquiry لینک-استعلام (اختیاری)</code>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId]]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:bulkexp:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $packageId = (int) ($parts[3] ?? 0);
+            $typeId = (int) ($parts[4] ?? 0);
+            $page = max(1, (int) ($parts[5] ?? 1));
+            $statusToken = (string) ($parts[6] ?? 'all');
+            $status = match ($statusToken) {
+                'av' => 'available',
+                'sl' => 'sold',
+                'ex' => 'expired',
+                default => 'all',
+            };
+            $qToken = (string) ($parts[7] ?? '');
+            $query = $this->decodeStockQueryToken($qToken);
+            $perPage = 15;
+            $offset = ($page - 1) * $perPage;
+            $configs = $this->database->listConfigsByPackageFiltered($packageId, $status, $query, $perPage, $offset);
+            $n = 0;
+            foreach ($configs as $cfg) {
+                if ((int) ($cfg['sold_to'] ?? 0) === 0 && (int) ($cfg['is_expired'] ?? 0) === 0) {
+                    $this->database->expireConfig((int) ($cfg['id'] ?? 0));
+                    $n++;
+                }
+            }
+            $this->telegram->answerCallbackQuery($callbackId, "✅ {$n} مورد منقضی شد.");
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':' . $page . ':' . $statusToken . ':' . $qToken,
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:bulkdel:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $packageId = (int) ($parts[3] ?? 0);
+            $typeId = (int) ($parts[4] ?? 0);
+            $page = max(1, (int) ($parts[5] ?? 1));
+            $statusToken = (string) ($parts[6] ?? 'all');
+            $status = match ($statusToken) {
+                'av' => 'available',
+                'sl' => 'sold',
+                'ex' => 'expired',
+                default => 'all',
+            };
+            $qToken = (string) ($parts[7] ?? '');
+            $query = $this->decodeStockQueryToken($qToken);
+            $perPage = 15;
+            $offset = ($page - 1) * $perPage;
+            $configs = $this->database->listConfigsByPackageFiltered($packageId, $status, $query, $perPage, $offset);
+            $n = 0;
+            foreach ($configs as $cfg) {
+                if ((int) ($cfg['sold_to'] ?? 0) === 0) {
+                    if ($this->database->deleteConfig((int) ($cfg['id'] ?? 0))) {
+                        $n++;
+                    }
+                }
+            }
+            $this->telegram->answerCallbackQuery($callbackId, "✅ {$n} مورد حذف شد.");
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':' . $page . ':' . $statusToken . ':' . $qToken,
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $configId = (int) ($parts[3] ?? 0);
+            $packageId = (int) ($parts[4] ?? 0);
+            $typeId = (int) ($parts[5] ?? 0);
+            $cfg = null;
+            foreach ($this->database->listConfigsByPackage($packageId, 100, 0) as $item) {
+                if ((int) ($item['id'] ?? 0) === $configId) {
+                    $cfg = $item;
+                    break;
+                }
+            }
+            if (!is_array($cfg)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'کانفیگ یافت نشد.');
+                return;
+            }
+            $state = ((int) ($cfg['is_expired'] ?? 0) === 1) ? 'منقضی' : (((int) ($cfg['sold_to'] ?? 0) > 0) ? 'فروخته' : 'موجود');
+            $buttons = [];
+            if ((int) ($cfg['is_expired'] ?? 0) === 0) {
+                $buttons[] = [['text' => '❌ منقضی کن', 'callback_data' => 'admin:stock:expire:' . $configId . ':' . $packageId . ':' . $typeId]];
+            }
+            if ((int) ($cfg['sold_to'] ?? 0) === 0) {
+                $buttons[] = [['text' => '🗑 حذف کن', 'callback_data' => 'admin:stock:delete:' . $configId . ':' . $packageId . ':' . $typeId]];
+            }
+            $buttons[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId]];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "🧾 <b>جزئیات کانفیگ</b>\n\n"
+                . "ID: <code>{$configId}</code>\n"
+                . "نام: <b>" . htmlspecialchars((string) ($cfg['service_name'] ?? '-')) . "</b>\n"
+                . "وضعیت: <b>{$state}</b>",
+                ['inline_keyboard' => $buttons]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:expire:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $configId = (int) ($parts[3] ?? 0);
+            $packageId = (int) ($parts[4] ?? 0);
+            $typeId = (int) ($parts[5] ?? 0);
+            if ($configId > 0) {
+                $this->database->expireConfig($configId);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ کانفیگ منقضی شد.');
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId,
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:stock:delete:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $configId = (int) ($parts[3] ?? 0);
+            $packageId = (int) ($parts[4] ?? 0);
+            $typeId = (int) ($parts[5] ?? 0);
+            $ok = $configId > 0 ? $this->database->deleteConfig($configId) : false;
+            $this->telegram->answerCallbackQuery($callbackId, $ok ? '✅ کانفیگ حذف شد.' : 'این کانفیگ قابل حذف نیست.');
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId,
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:user:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $targetUid = (int) substr($data, strlen('admin:user:view:'));
+            $u = $this->database->getUser($targetUid);
+            if (!is_array($u)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'کاربر یافت نشد.');
+                return;
+            }
+            $status = (string) ($u['status'] ?? 'unsafe');
+            $isAgent = ((int) ($u['is_agent'] ?? 0)) === 1;
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "👤 <b>کاربر</b>\n\n"
+                . "آیدی: <code>{$targetUid}</code>\n"
+                . "نام: " . htmlspecialchars((string) ($u['full_name'] ?? '-')) . "\n"
+                . "یوزرنیم: @" . htmlspecialchars((string) (($u['username'] ?? '') !== '' ? $u['username'] : '-')) . "\n"
+                . "موجودی: <b>" . (int) ($u['balance'] ?? 0) . "</b> تومان\n"
+                . "وضعیت: <b>{$status}</b>\n"
+                . "نمایندگی: <b>" . ($isAgent ? 'فعال' : 'غیرفعال') . "</b>",
+                ['inline_keyboard' => [
+                    [[
+                        'text' => $status === 'restricted' ? '✅ رفع محدودیت' : '🚫 محدودسازی',
+                        'callback_data' => 'admin:user:status:' . $targetUid . ':' . ($status === 'restricted' ? 'unsafe' : 'restricted'),
+                    ]],
+                    [[
+                        'text' => $isAgent ? '🧷 لغو نمایندگی' : '🤝 فعال‌سازی نمایندگی',
+                        'callback_data' => 'admin:user:agent:' . $targetUid . ':' . ($isAgent ? 0 : 1),
+                    ]],
+                    [
+                        ['text' => '➕ افزایش موجودی', 'callback_data' => 'admin:user:bal:add:' . $targetUid],
+                        ['text' => '➖ کاهش موجودی', 'callback_data' => 'admin:user:bal:sub:' . $targetUid],
+                    ],
+                    [['text' => '🔙 بازگشت', 'callback_data' => 'admin:users']],
+                ]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:user:status:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $targetUid = (int) ($parts[3] ?? 0);
+            $status = (string) ($parts[4] ?? 'unsafe');
+            if ($targetUid > 0 && in_array($status, ['unsafe', 'restricted'], true)) {
+                $this->database->setUserStatus($targetUid, $status);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ وضعیت کاربر بروزرسانی شد.');
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:user:view:' . $targetUid,
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:user:agent:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $targetUid = (int) ($parts[3] ?? 0);
+            $isAgent = ((int) ($parts[4] ?? 0)) === 1;
+            if ($targetUid > 0) {
+                $this->database->setUserAgent($targetUid, $isAgent);
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ وضعیت نمایندگی ذخیره شد.');
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:user:view:' . $targetUid,
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:user:bal:add:') || str_starts_with($data, 'admin:user:bal:sub:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $isAdd = str_starts_with($data, 'admin:user:bal:add:');
+            $targetUid = (int) substr($data, strlen($isAdd ? 'admin:user:bal:add:' : 'admin:user:bal:sub:'));
+            $this->database->setUserState($userId, 'await_admin_user_balance', [
+                'target_user_id' => $targetUid,
+                'mode' => $isAdd ? 'add' : 'sub',
+                'source_chat_id' => $chatId,
+                'source_message_id' => $messageId,
+            ]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                ($isAdd ? '➕' : '➖') . " مبلغ را به تومان ارسال کنید.\n"
+                . "کاربر: <code>{$targetUid}</code>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:user:view:' . $targetUid]]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:settings') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $botStatus = $this->settings->get('bot_status', 'on');
+            $freeTest = $this->settings->get('free_test_enabled', '1');
+            $agencyReq = $this->settings->get('agency_request_enabled', '1');
+            $rows = [
+                [[
+                    'text' => '🤖 وضعیت ربات: ' . ($botStatus === 'on' ? 'ON' : strtoupper($botStatus)),
+                    'callback_data' => 'admin:settings:bot',
+                ]],
+                [[
+                    'text' => '🎁 تست رایگان: ' . ($freeTest === '1' ? '✅' : '❌'),
+                    'callback_data' => 'admin:settings:toggle:free_test_enabled',
+                ]],
+                [[
+                    'text' => '🤝 درخواست نمایندگی: ' . ($agencyReq === '1' ? '✅' : '❌'),
+                    'callback_data' => 'admin:settings:toggle:agency_request_enabled',
+                ]],
+                [[
+                    'text' => '💳 کارت‌به‌کارت: ' . ($this->settings->get('gw_card_enabled', '0') === '1' ? '✅' : '❌'),
+                    'callback_data' => 'admin:settings:toggle:gw_card_enabled',
+                ]],
+                [[
+                    'text' => '💎 کریپتو: ' . ($this->settings->get('gw_crypto_enabled', '0') === '1' ? '✅' : '❌'),
+                    'callback_data' => 'admin:settings:toggle:gw_crypto_enabled',
+                ]],
+                [[
+                    'text' => '🏦 TetraPay: ' . ($this->settings->get('gw_tetrapay_enabled', '0') === '1' ? '✅' : '❌'),
+                    'callback_data' => 'admin:settings:toggle:gw_tetrapay_enabled',
+                ]],
+                [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']],
+            ];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                '⚙️ <b>تنظیمات سریع</b>',
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:agents') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $rows = [];
+            foreach ($this->database->listUserIdsForBroadcast('agents') as $aid) {
+                $rows[] = [[
+                    'text' => '🤝 U:' . $aid,
+                    'callback_data' => 'admin:agents:view:' . $aid,
+                ]];
+            }
+            if ($rows === []) {
+                $rows[] = [['text' => 'نماینده‌ای ثبت نشده', 'callback_data' => 'noop']];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText($chatId, $messageId, '🤝 <b>مدیریت نمایندگان</b>', ['inline_keyboard' => $rows]);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:agents:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $agentId = (int) substr($data, strlen('admin:agents:view:'));
+            $rows = [];
+            foreach ($this->database->listAllPackages() as $pkg) {
+                $pkgId = (int) ($pkg['id'] ?? 0);
+                $defaultPrice = (int) ($pkg['price'] ?? 0);
+                $custom = $this->database->getAgencyPrice($agentId, $pkgId);
+                $label = sprintf(
+                    '#%d %s | default:%d | agent:%s',
+                    $pkgId,
+                    (string) ($pkg['name'] ?? '-'),
+                    $defaultPrice,
+                    $custom === null ? '-' : (string) $custom
+                );
+                $rows[] = [[
+                    'text' => $label,
+                    'callback_data' => 'admin:agents:set:' . $agentId . ':' . $pkgId,
+                ]];
+                if ($custom !== null) {
+                    $rows[] = [[
+                        'text' => '🧹 حذف قیمت اختصاصی پکیج #' . $pkgId,
+                        'callback_data' => 'admin:agents:clear:' . $agentId . ':' . $pkgId,
+                    ]];
+                }
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:agents']];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "🤝 <b>قیمت‌گذاری نماینده</b>\n\nکاربر: <code>{$agentId}</code>",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:agents:set:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $agentId = (int) ($parts[3] ?? 0);
+            $pkgId = (int) ($parts[4] ?? 0);
+            $this->database->setUserState($userId, 'await_agent_price', [
+                'agent_id' => $agentId,
+                'package_id' => $pkgId,
+            ]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "💵 قیمت اختصاصی را به تومان ارسال کنید.\nکاربر: <code>{$agentId}</code> | پکیج: <code>{$pkgId}</code>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:agents:view:' . $agentId]]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:agents:clear:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $agentId = (int) ($parts[3] ?? 0);
+            $pkgId = (int) ($parts[4] ?? 0);
+            $this->database->clearAgencyPrice($agentId, $pkgId);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ حذف شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:agents:view:' . $agentId]]);
+            return;
+        }
+
+        if ($data === 'admin:panels') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $rows = [];
+            $rows[] = [['text' => '➕ افزودن پنل', 'callback_data' => 'admin:panels:add']];
+            $rows[] = [['text' => '⚙️ تنظیمات Worker API', 'callback_data' => 'admin:panels:worker']];
+            foreach ($this->database->listPanels() as $p) {
+                $rows[] = [[
+                    'text' => (((int) ($p['is_active'] ?? 0) === 1) ? '🟢 ' : '🔴 ') . '#' . (int) $p['id'] . ' ' . (string) ($p['name'] ?? '-'),
+                    'callback_data' => 'admin:panels:view:' . (int) ($p['id'] ?? 0),
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText($chatId, $messageId, "🖥 <b>مدیریت پنل‌های 3x-ui</b>", ['inline_keyboard' => $rows]);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:panels:add') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->database->setUserState($userId, 'await_panel_add');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 اطلاعات پنل را با فرمت زیر بفرستید:\n<code>name|ip|port|patch|username|password</code>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:panels']]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:panels:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $panelId = (int) substr($data, strlen('admin:panels:view:'));
+            $panel = $this->database->getPanel($panelId);
+            if (!is_array($panel)) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پنل پیدا نشد.');
+                return;
+            }
+            $rows = [
+                [[
+                    'text' => ((int) ($panel['is_active'] ?? 0) === 1 ? '🔴 غیرفعال‌کردن' : '🟢 فعال‌کردن'),
+                    'callback_data' => 'admin:panels:toggle:' . $panelId . ':' . (((int) ($panel['is_active'] ?? 0) === 1) ? 0 : 1),
+                ]],
+                [['text' => '📦 مدیریت پکیج‌های پنل', 'callback_data' => 'admin:panels:pkgs:' . $panelId]],
+                [['text' => '🗑 حذف پنل', 'callback_data' => 'admin:panels:del:' . $panelId]],
+                [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panels']],
+            ];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "🖥 <b>جزئیات پنل</b>\n\n"
+                . "ID: <code>{$panelId}</code>\n"
+                . "Name: <b>" . htmlspecialchars((string) ($panel['name'] ?? '-')) . "</b>\n"
+                . "IP: <code>" . htmlspecialchars((string) ($panel['ip'] ?? '-')) . "</code>\n"
+                . "Port: <code>" . (int) ($panel['port'] ?? 0) . "</code>\n"
+                . "Patch: <code>" . htmlspecialchars((string) ($panel['patch'] ?? '/')) . "</code>\n"
+                . "User: <code>" . htmlspecialchars((string) ($panel['username'] ?? '-')) . "</code>\n"
+                . "Status: <b>" . (((int) ($panel['is_active'] ?? 0) === 1) ? 'Active' : 'Inactive') . "</b>",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:panels:toggle:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $panelId = (int) ($parts[3] ?? 0);
+            $active = ((int) ($parts[4] ?? 0)) === 1;
+            $this->database->updatePanelActive($panelId, $active);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ ذخیره شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:panels:view:' . $panelId]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:panels:del:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $panelId = (int) substr($data, strlen('admin:panels:del:'));
+            $this->database->deletePanel($panelId);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ پنل حذف شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:panels']]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:panels:pkgs:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $panelId = (int) substr($data, strlen('admin:panels:pkgs:'));
+            $rows = [];
+            $rows[] = [['text' => '➕ افزودن پکیج پنل', 'callback_data' => 'admin:panels:pkgs:add:' . $panelId]];
+            foreach ($this->database->listPanelPackages($panelId) as $pp) {
+                $rows[] = [[
+                    'text' => sprintf('#%d %s | %sGB/%sD | inb:%s', (int) $pp['id'], (string) $pp['name'], (string) $pp['volume_gb'], (string) $pp['duration_days'], (string) $pp['inbound_id']),
+                    'callback_data' => 'admin:panels:pkgs:del:' . (int) $pp['id'] . ':' . $panelId,
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panels:view:' . $panelId]];
+            $this->telegram->editMessageText($chatId, $messageId, "📦 <b>پکیج‌های پنل {$panelId}</b>", ['inline_keyboard' => $rows]);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:panels:pkgs:add:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $panelId = (int) substr($data, strlen('admin:panels:pkgs:add:'));
+            $this->database->setUserState($userId, 'await_panel_pkg_add', ['panel_id' => $panelId]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 اطلاعات پکیج پنل:\n<code>name|volume_gb|duration_days|inbound_id</code>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:panels:pkgs:' . $panelId]]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:panels:pkgs:del:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $parts = explode(':', $data);
+            $ppId = (int) ($parts[4] ?? 0);
+            $panelId = (int) ($parts[5] ?? 0);
+            $this->database->deletePanelPackage($ppId);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ حذف شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:panels:pkgs:' . $panelId]]);
+            return;
+        }
+
+        if ($data === 'admin:panels:worker') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $enabled = $this->settings->get('worker_api_enabled', '0');
+            $port = $this->settings->get('worker_api_port', '8080');
+            $key = $this->settings->get('worker_api_key', '');
+            $rows = [
+                [[
+                    'text' => 'Worker API: ' . ($enabled === '1' ? '✅ ON' : '❌ OFF'),
+                    'callback_data' => 'admin:panels:worker:toggle',
+                ]],
+                [['text' => '🔑 تنظیم API Key', 'callback_data' => 'admin:panels:worker:key']],
+                [['text' => '🔌 تنظیم Port', 'callback_data' => 'admin:panels:worker:port']],
+                [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panels']],
+            ];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "⚙️ <b>Worker API Settings</b>\n\n"
+                . "Enabled: <b>" . ($enabled === '1' ? 'ON' : 'OFF') . "</b>\n"
+                . "Port: <code>" . htmlspecialchars($port) . "</code>\n"
+                . "Key: <code>" . htmlspecialchars($key !== '' ? substr($key, 0, 8) . '...' : '-') . "</code>",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:panels:worker:toggle') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $cur = $this->settings->get('worker_api_enabled', '0');
+            $this->settings->set('worker_api_enabled', $cur === '1' ? '0' : '1');
+            $this->telegram->answerCallbackQuery($callbackId, '✅ ذخیره شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:panels:worker']]);
+            return;
+        }
+
+        if ($data === 'admin:panels:worker:key' || $data === 'admin:panels:worker:port') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $stateName = $data === 'admin:panels:worker:key' ? 'await_worker_api_key' : 'await_worker_api_port';
+            $this->database->setUserState($userId, $stateName);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                $data === 'admin:panels:worker:key'
+                    ? "🔑 API Key جدید را ارسال کنید."
+                    : "🔌 Port جدید را ارسال کنید.",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:panels:worker']]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:settings:bot') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $current = $this->settings->get('bot_status', 'on');
+            $next = $current === 'on' ? 'update' : ($current === 'update' ? 'off' : 'on');
+            $this->settings->set('bot_status', $next);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ وضعیت ربات: ' . strtoupper($next));
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:settings',
+            ]]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:settings:toggle:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $key = substr($data, strlen('admin:settings:toggle:'));
+            $allowed = ['free_test_enabled', 'agency_request_enabled', 'gw_card_enabled', 'gw_crypto_enabled', 'gw_tetrapay_enabled'];
+            if (in_array($key, $allowed, true)) {
+                $current = $this->settings->get($key, '0');
+                $this->settings->set($key, $current === '1' ? '0' : '1');
+                $this->telegram->answerCallbackQuery($callbackId, '✅ ذخیره شد.');
+            } else {
+                $this->telegram->answerCallbackQuery($callbackId, 'کلید تنظیمات مجاز نیست.');
+            }
+            $this->handle(['callback_query' => [
+                'id' => $callbackId,
+                'from' => $fromUser,
+                'message' => $message,
+                'data' => 'admin:settings',
+            ]]);
             return;
         }
 
@@ -359,6 +1686,22 @@ final class CallbackHandler
             if (!($result['ok'] ?? false)) {
                 $msg = (($result['error'] ?? '') === 'no_stock') ? 'موجودی کافی برای این پکیج وجود ندارد.' : 'تحویل سفارش انجام نشد.';
                 $this->telegram->answerCallbackQuery($callbackId, $msg);
+                return;
+            }
+
+            if (($result['queued_worker'] ?? false) === true) {
+                $jobId = (int) ($result['job_id'] ?? 0);
+                $jobStatus = (string) ($result['job_status'] ?? 'pending');
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    "🛰 سفارش <code>{$orderId}</code> در صف Worker API قرار گرفت.\n"
+                    . "Job ID: <code>{$jobId}</code>\n"
+                    . "Status: <b>" . htmlspecialchars($jobStatus) . "</b>\n\n"
+                    . "بعد از تکمیل job توسط worker، دوباره روی تحویل سفارش بزنید.",
+                    KeyboardBuilder::adminPanel()
+                );
+                $this->telegram->answerCallbackQuery($callbackId, 'سفارش در صف Worker قرار گرفت.');
                 return;
             }
 
@@ -882,5 +2225,77 @@ final class CallbackHandler
         }
 
         $this->telegram->answerCallbackQuery($callbackId, 'این بخش در فاز بعدی مهاجرت تکمیل می‌شود.');
+    }
+
+    private function encodeStockQueryToken(?string $query): string
+    {
+        $q = trim((string) ($query ?? ''));
+        if ($q === '') {
+            return '';
+        }
+        $raw = base64_encode($q);
+        return rtrim(strtr($raw, '+/', '-_'), '=');
+    }
+
+    private function decodeStockQueryToken(string $token): ?string
+    {
+        $t = trim($token);
+        if ($t === '') {
+            return null;
+        }
+        $raw = strtr($t, '-_', '+/');
+        $pad = strlen($raw) % 4;
+        if ($pad > 0) {
+            $raw .= str_repeat('=', 4 - $pad);
+        }
+        $decoded = base64_decode($raw, true);
+        if ($decoded === false) {
+            return null;
+        }
+        return trim((string) $decoded);
+    }
+
+    private function adminHasPermission(int $userId, string $perm): bool
+    {
+        $perms = $this->database->getAdminPermissions($userId);
+        if ((bool) ($perms['full'] ?? false)) {
+            return true;
+        }
+        return (bool) ($perms[$perm] ?? false);
+    }
+
+    private function requiredAdminPermission(string $data): ?string
+    {
+        if (str_starts_with($data, 'admin:admins')) {
+            return 'full';
+        }
+        if (str_starts_with($data, 'admin:broadcast')) {
+            return 'broadcast';
+        }
+        if (str_starts_with($data, 'admin:type') || str_starts_with($data, 'admin:pkg') || $data === 'admin:types') {
+            return 'types';
+        }
+        if (str_starts_with($data, 'admin:stock') || $data === 'admin:stock') {
+            return 'stock';
+        }
+        if (str_starts_with($data, 'admin:user') || $data === 'admin:users') {
+            return 'users';
+        }
+        if (str_starts_with($data, 'admin:settings') || $data === 'admin:settings') {
+            return 'settings';
+        }
+        if (str_starts_with($data, 'admin:payment') || str_starts_with($data, 'admin:deliver') || $data === 'admin:payments' || $data === 'admin:deliveries') {
+            return 'payments';
+        }
+        if (str_starts_with($data, 'admin:req') || $data === 'admin:requests') {
+            return 'requests';
+        }
+        if (str_starts_with($data, 'admin:agents') || $data === 'admin:agents') {
+            return 'agents';
+        }
+        if (str_starts_with($data, 'admin:panels') || $data === 'admin:panels') {
+            return 'panels';
+        }
+        return null;
     }
 }
