@@ -16,8 +16,8 @@ ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-b
 - Payment gateway orchestration (wallet, card, crypto, tetrapay)
 - Admin review flows for requests and payments
 - Free-test and agency request tracking
-- Worker API endpoints for async x-ui style jobs (`public/worker_api.php`)
-- Runtime worker loop (`scripts/php_worker_runtime.php`)
+- Worker API endpoints for async x-ui style jobs (`public/WorkerApi.php`)
+- Runtime worker loop (`scripts/PhpWorkerRuntime.php`)
 - Backup runtime and SQLite migration helpers
 
 ## Project Structure
@@ -27,13 +27,13 @@ ConfigFlow/
 ├── webhook.php
 ├── install.php
 ├── public/
-│   └── worker_api.php
+│   └── WorkerApi.php
 ├── scripts/
-│   ├── init_db.php
+│   ├── InitDb.php
 │   ├── schema.sql
-│   ├── migrate_sqlite_to_mysql.php
-│   ├── php_worker_runtime.php
-│   └── backup_runtime.php
+│   ├── MigrateSqliteToMysql.php
+│   ├── PhpWorkerRuntime.php
+│   └── BackupRuntime.php
 ├── src/
 └── env.example
 ```
@@ -88,7 +88,7 @@ The installer will:
 
 1. Collect `.env` values (with validation)
 2. Generate `.env`
-3. Connect to MySQL and initialize schema (`scripts/init_db.php`)
+3. Connect to MySQL and initialize schema (`scripts/InitDb.php`)
 4. Optionally set Telegram webhook automatically
 
 ---
@@ -123,7 +123,7 @@ php install.php
 Manual schema init (if `.env` already exists):
 
 ```bash
-php scripts/init_db.php
+php scripts/InitDb.php
 ```
 
 ### 4) Serve webhook endpoint
@@ -152,7 +152,7 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 ### 6) Run worker runtime (optional but recommended)
 
 ```bash
-php scripts/php_worker_runtime.php
+php scripts/PhpWorkerRuntime.php
 ```
 
 ---
@@ -175,13 +175,13 @@ This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 SQLite to MySQL migration:
 
 ```bash
-php scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
+php scripts/MigrateSqliteToMysql.php /path/to/configflow.db
 ```
 
 Backup runtime:
 
 ```bash
-php scripts/backup_runtime.php
+php scripts/BackupRuntime.php
 ```
 
 ## Checks
