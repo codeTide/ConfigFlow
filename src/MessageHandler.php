@@ -934,12 +934,7 @@ ID: <code>{$pinId}</code>");
         }
 
         if ($text === KeyboardBuilder::BTN_PROFILE) {
-            $this->telegram->sendMessage($chatId, "👤 <b>بخش حساب</b>\nیکی از گزینه‌های زیر را انتخاب کنید:", $this->menus->accountMenuReplyKeyboard());
-            return true;
-        }
-
-        if ($text === KeyboardBuilder::BTN_PROFILE_INFO) {
-            $this->telegram->sendMessage($chatId, $this->menus->profileText($userId));
+            $this->telegram->sendMessage($chatId, $this->menus->profileText($userId), $this->menus->accountMenuReplyKeyboard());
             return true;
         }
 

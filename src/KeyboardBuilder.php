@@ -10,8 +10,7 @@ final class KeyboardBuilder
     public const BTN_MY_CONFIGS = '📦 کانفیگ‌هام';
     public const BTN_FREE_TEST = '🎁 تست رایگان';
     public const BTN_PROFILE = '👤 حساب';
-    public const BTN_PROFILE_INFO = '🪪 پروفایل';
-    public const BTN_WALLET = '💳 کیف پول';
+    public const BTN_WALLET = '💳 شارژ حساب';
     public const BTN_SUPPORT = '🎧 پشتیبانی';
     public const BTN_REFERRAL = '🎁 دعوت';
     public const BTN_AGENCY = '🤝 نمایندگی';
@@ -60,7 +59,7 @@ final class KeyboardBuilder
         if ($isAdmin) {
             $keyboard[] = [self::BTN_ADMIN];
         }
-        $keyboard[] = [self::BTN_PROFILE, self::BTN_BUY, self::BTN_MY_CONFIGS];
+        $keyboard[] = [self::BTN_MY_CONFIGS, self::BTN_BUY, self::BTN_PROFILE];
         $keyboard[] = $freeTestEnabled ? [self::BTN_FREE_TEST, self::BTN_SUPPORT] : [self::BTN_SUPPORT];
 
         return [
@@ -73,10 +72,10 @@ final class KeyboardBuilder
     public static function accountReply(bool $referralEnabled, bool $agencyEnabled): array
     {
         $keyboard = [
-            [self::BTN_PROFILE_INFO, self::BTN_WALLET],
+            [self::BTN_WALLET, self::BTN_REFERRAL],
         ];
-        if ($referralEnabled) {
-            $keyboard[] = [self::BTN_REFERRAL];
+        if (!$referralEnabled) {
+            $keyboard = [[self::BTN_WALLET]];
         }
         if ($agencyEnabled) {
             $keyboard[] = [self::BTN_AGENCY];
