@@ -634,8 +634,8 @@ ConfigFlow/
 │   │   ├── TelegramClient.php
 │   │   └── UpdateRouter.php
 │   └── .env.example
-├── api.py                   # Flask API — سرویس Worker API
-├── worker.py                # ورکر سرور ایران (اتصال به 3x-ui)
+├── php/public/worker_api.php# معادل Worker API در PHP
+├── php/scripts/php_worker_runtime.php # ورکر PHP برای صف 3x-ui
 ├── requirements.txt         # وابستگی‌های Python
 ├── env.example              # نمونه فایل محیطی ربات
 ├── config.env.example       # نمونه فایل محیطی ورکر
@@ -924,14 +924,11 @@ ConfigFlow/
 ## 🖥️ اجرا
 
 ```bash
-# اجرای ورکر ایران (روی سرور ایران)
-python3 worker.py
-
-# اجرای API (برای ورکر)
-python3 api.py
-
-# اجرای webhook فاز ۱ PHP
+# اجرای webhook فاز PHP
 php -S 0.0.0.0:8080 -t php/public
+
+# اجرای Worker Runtime در PHP
+php php/scripts/php_worker_runtime.php
 ```
 
 ---
@@ -943,7 +940,6 @@ php -S 0.0.0.0:8080 -t php/public
 | `pyTelegramBotAPI` | فریم‌ورک ربات تلگرام |
 | `qrcode` + `pillow` | تولید QR Code برای کانفیگ |
 | `python-dotenv` | خواندن فایل `.env` |
-| `flask` | Web API برای ورکر |
 | `requests` | ارتباط با APIهای خارجی |
 
 ---

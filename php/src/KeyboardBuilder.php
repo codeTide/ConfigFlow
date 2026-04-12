@@ -66,6 +66,7 @@ final class KeyboardBuilder
                 [['text' => '⚙️ تنظیمات', 'callback_data' => 'admin:settings']],
                 [['text' => '👮 مدیریت ادمین‌ها', 'callback_data' => 'admin:admins']],
                 [['text' => '📣 فوروارد همگانی', 'callback_data' => 'admin:broadcast']],
+                [['text' => '📌 پیام‌های پین', 'callback_data' => 'admin:pins']],
                 [['text' => '🤝 مدیریت نمایندگان', 'callback_data' => 'admin:agents']],
                 [['text' => '🖥 مدیریت پنل‌های 3x-ui', 'callback_data' => 'admin:panels']],
                 [['text' => '💳 مدیریت درخواست‌های شارژ', 'callback_data' => 'admin:payments']],
