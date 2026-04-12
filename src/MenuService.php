@@ -71,9 +71,9 @@ final class MenuService
         return "👤 <b>پروفایل کاربری</b>\n\n"
             . "📱 نام: " . htmlspecialchars((string) ($user['full_name'] ?? '-')) . "\n"
             . "🏷 نام کاربری: " . htmlspecialchars((string) $username) . "\n"
-            . "🆔 آیدی: <code>{$userIdFa}</code>\n\n"
+            . "🪪 آیدی: <code>{$userIdFa}</code>\n\n"
             . "💰 موجودی: <b>{$balanceFa}</b> تومان\n\n"
-            . "> 🔐 حساب شما امن نگه داشته شده؛ برای شارژ، دعوت یا نمایندگی از دکمه‌های همین بخش استفاده کنید.";
+            . "<blockquote>🔐 حساب شما امن نگه داشته شده؛ برای شارژ، دعوت یا نمایندگی از دکمه‌های همین بخش استفاده کنید.</blockquote>";
     }
 
     private function toPersianDigits(string $value): string
