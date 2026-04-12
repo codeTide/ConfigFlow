@@ -393,7 +393,7 @@ $values = [
     'ADMIN_CONFIRM_TOKEN' => '',
 ];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
     foreach (array_keys($values) as $k) {
         $values[$k] = trim((string) ($_POST[$k] ?? $values[$k]));
     }
