@@ -52,7 +52,6 @@ Main variables:
 
 ```env
 BOT_TOKEN=
-BOT_USERNAME=
 ADMIN_IDS=
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -62,6 +61,10 @@ DB_PASS=
 TETRAPAY_CREATE_URL=https://tetra98.com/api/create_order
 TETRAPAY_VERIFY_URL=https://tetra98.com/api/verify
 ```
+
+Notes:
+- `BOT_USERNAME` is auto-resolved from Telegram API (`getMe`) at runtime.
+- Web installer auto-detects the current domain to set Telegram webhook to `/webhook.php`.
 
 ---
 
@@ -89,6 +92,15 @@ The installer will:
 2. Generate `.env`
 3. Connect to MySQL and initialize schema (`scripts/InitDb.php`)
 4. Optionally set Telegram webhook automatically
+5. Create `.install.lock` to prevent accidental reinstall
+
+Reinstall behavior:
+- Lock check is based on `.install.lock` only.
+- If lock exists, web installer shows **Reinstall mode** options:
+  - `Admin confirmation token` (current `BOT_TOKEN` from existing `.env`)
+  - `Preserve database data` (safe default)
+  - `Reset database (drop all tables)` (destructive)
+- Reinstall always rewrites `.env` with new form values.
 
 ---
 
@@ -103,11 +115,12 @@ Install PHP + required extensions + MySQL:
 - `curl`
 - `mbstring`
 - `json`
+- `putenv` enabled (used by env loader/installer)
 
 ### 2) Clone
 
 ```bash
-git clone https://github.com/Emadhabibnia1385/ConfigFlow.git
+git clone https://github.com/codeTide/ConfigFlow.git
 cd ConfigFlow
 ```
 
@@ -125,7 +138,62 @@ Manual schema init (if `.env` already exists):
 php scripts/InitDb.php
 ```
 
-### 4) Serve webhook endpoint
+### 4) Permissions (important on shared/VPS hosts)
+
+Installer needs permission to write `.env` in project root.
+Installer will also try to auto-fix owner/permissions for project root, `.env`, and `.user.ini` (if present).
+For that auto-fix to work, `chown`/`chmod` must be allowed in PHP and the PHP runtime user must have enough privileges.
+
+Typical Linux fix (replace `www-data` with your PHP runtime user):
+
+```bash
+sudo chown -R www-data:www-data /path/to/ConfigFlow
+sudo chmod -R u+rwX /path/to/ConfigFlow
+```
+
+How to find your **PHP runtime user** (usually php-fpm):
+
+```bash
+# PHP-FPM process user (common on many hosts)
+ps aux | grep php-fpm | grep -v grep
+
+# PHP-FPM pool user (Debian/Ubuntu)
+grep -R "^[[:space:]]*user[[:space:]]*=" /etc/php/*/fpm/pool.d/
+
+# PHP-FPM pool user (aaPanel/custom layouts)
+grep -R "^[[:space:]]*user[[:space:]]*=" /www/server/php/*/etc/php-fpm.d/ /www/server/php/*/etc/php-fpm.conf 2>/dev/null
+```
+
+If these return empty, ask host support for the PHP-FPM user and use that user/group in `chown`.
+
+Recommended permission reset (replace `www-data` with detected PHP runtime user):
+
+```bash
+sudo chown -R www-data:www-data /path/to/ConfigFlow
+find /path/to/ConfigFlow -type d -exec chmod 755 {} \;
+find /path/to/ConfigFlow -type f -exec chmod 644 {} \;
+chmod 600 /path/to/ConfigFlow/.env 2>/dev/null || true
+```
+
+If `.env` does not exist yet:
+
+```bash
+touch /path/to/ConfigFlow/.env
+chown www-data:www-data /path/to/ConfigFlow/.env
+chmod 600 /path/to/ConfigFlow/.env
+```
+
+If you get `Operation not permitted` on `.user.ini`:
+
+```bash
+lsattr /path/to/ConfigFlow/.user.ini
+# if immutable flag is set (i), remove it:
+chattr -i /path/to/ConfigFlow/.user.ini
+```
+
+Then re-run `chown/chmod` for `.user.ini` (or skip it if your panel manages it and project still works).
+
+### 5) Serve webhook endpoint
 
 Dev server:
 
@@ -135,7 +203,7 @@ php -S 0.0.0.0:8080
 
 Production (Nginx/Apache): expose `https://YOUR_DOMAIN/webhook.php`.
 
-### 5) Set webhook (if not done by installer)
+### 6) Set webhook (if not done by installer)
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
@@ -148,7 +216,7 @@ Check status:
 curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 ```
 
-### 6) Run worker runtime (optional but recommended)
+### 7) Run worker runtime (optional but recommended)
 
 ```bash
 php scripts/PhpWorkerRuntime.php
@@ -160,7 +228,13 @@ php scripts/PhpWorkerRuntime.php
 
 This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 
-1. Upload project files.
+1. Upload project files **or clone directly on host** (if SSH/Git is available):
+
+```bash
+git clone https://github.com/codeTide/ConfigFlow.git
+cd ConfigFlow
+```
+
 2. Keep your usual document root (no special root change needed for webhook).
 3. Ensure `https://YOUR_DOMAIN/webhook.php` is reachable.
 4. Run installer using one of these methods:
