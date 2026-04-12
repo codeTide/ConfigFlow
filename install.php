@@ -10,40 +10,33 @@ if (PHP_SAPI !== 'cli') {
 
 function cf_auth_file(): string
 {
-    return __DIR__ . '/.installer_auth.json';
+    return __DIR__ . '/.env';
 }
 
-/** @return array{username:string,password_hash:string}|null */
-function cf_load_installer_auth(): ?array
+/** @return array{username:string,password:string} */
+function cf_installer_credentials(): array
 {
     $path = cf_auth_file();
-    if (!is_file($path)) {
-        return null;
+    $username = 'admin';
+    $password = 'admin';
+    if (is_file($path)) {
+        $raw = file_get_contents($path);
+        if (is_string($raw) && $raw !== '') {
+            if (preg_match('/^INSTALLER_USERNAME=(.*)$/m', $raw, $m1) === 1) {
+                $u = trim((string) ($m1[1] ?? ''));
+                if ($u !== '') {
+                    $username = $u;
+                }
+            }
+            if (preg_match('/^INSTALLER_PASSWORD=(.*)$/m', $raw, $m2) === 1) {
+                $p = trim((string) ($m2[1] ?? ''));
+                if ($p !== '') {
+                    $password = $p;
+                }
+            }
+        }
     }
-    $raw = file_get_contents($path);
-    if (!is_string($raw) || $raw === '') {
-        return null;
-    }
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        return null;
-    }
-    $username = trim((string) ($decoded['username'] ?? ''));
-    $passwordHash = trim((string) ($decoded['password_hash'] ?? ''));
-    if ($username === '' || $passwordHash === '') {
-        return null;
-    }
-    return ['username' => $username, 'password_hash' => $passwordHash];
-}
-
-function cf_save_installer_auth(string $username, string $password): void
-{
-    $payload = [
-        'username' => trim($username),
-        'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-        'updated_at' => gmdate('c'),
-    ];
-    file_put_contents(cf_auth_file(), json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
+    return ['username' => $username, 'password' => $password];
 }
 
 function cf_is_installer_authenticated(): bool
@@ -51,10 +44,7 @@ function cf_is_installer_authenticated(): bool
     if (PHP_SAPI === 'cli') {
         return true;
     }
-    $auth = cf_load_installer_auth();
-    if ($auth === null) {
-        return false;
-    }
+    $auth = cf_installer_credentials();
     $user = (string) ($_SESSION['installer_user'] ?? '');
     $last = (int) ($_SESSION['installer_last'] ?? 0);
     $now = time();
@@ -88,6 +78,15 @@ function cf_validate(array $input): array
     $port = (string) ($input['DB_PORT'] ?? '');
     if ($port !== '' && (!ctype_digit($port) || (int) $port < 1 || (int) $port > 65535)) {
         $errors[] = 'DB_PORT must be a valid port number.';
+    }
+
+    $installerUser = trim((string) ($input['INSTALLER_USERNAME'] ?? ''));
+    $installerPass = trim((string) ($input['INSTALLER_PASSWORD'] ?? ''));
+    if ($installerUser === '' || $installerPass === '') {
+        $errors[] = 'INSTALLER_USERNAME and INSTALLER_PASSWORD are required.';
+    }
+    if (mb_strlen($installerPass) < 4) {
+        $errors[] = 'INSTALLER_PASSWORD must be at least 4 characters.';
     }
 
     return $errors;
@@ -319,6 +318,8 @@ function cf_install(array $input): array
         'DB_NAME' => trim((string) ($input['DB_NAME'] ?? 'configflow')),
         'DB_USER' => trim((string) ($input['DB_USER'] ?? 'root')),
         'DB_PASS' => (string) ($input['DB_PASS'] ?? ''),
+        'INSTALLER_USERNAME' => trim((string) ($input['INSTALLER_USERNAME'] ?? 'admin')),
+        'INSTALLER_PASSWORD' => trim((string) ($input['INSTALLER_PASSWORD'] ?? 'admin')),
         'TETRAPAY_CREATE_URL' => trim((string) ($input['TETRAPAY_CREATE_URL'] ?? 'https://tetra98.com/api/create_order')),
         'TETRAPAY_VERIFY_URL' => trim((string) ($input['TETRAPAY_VERIFY_URL'] ?? 'https://tetra98.com/api/verify')),
     ];
@@ -422,28 +423,15 @@ if (PHP_SAPI === 'cli') {
 
 $result = null;
 $authError = '';
-$needsAuthSetup = cf_load_installer_auth() === null;
 $isAuthenticated = cf_is_installer_authenticated();
+[$authUser, $authPass] = [cf_installer_credentials()['username'], cf_installer_credentials()['password']];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['auth_action'])) {
     $action = (string) ($_POST['auth_action'] ?? '');
-    if ($action === 'setup' && $needsAuthSetup) {
+    if ($action === 'login') {
         $u = trim((string) ($_POST['auth_username'] ?? ''));
         $p = (string) ($_POST['auth_password'] ?? '');
-        if ($u === '' || mb_strlen($p) < 8) {
-            $authError = 'Setup failed: username is required and password must be at least 8 characters.';
-        } else {
-            cf_save_installer_auth($u, $p);
-            $_SESSION['installer_user'] = $u;
-            $_SESSION['installer_last'] = time();
-            $isAuthenticated = true;
-            $needsAuthSetup = false;
-        }
-    } elseif ($action === 'login' && !$needsAuthSetup) {
-        $auth = cf_load_installer_auth();
-        $u = trim((string) ($_POST['auth_username'] ?? ''));
-        $p = (string) ($_POST['auth_password'] ?? '');
-        if ($auth === null || !hash_equals($auth['username'], $u) || !password_verify($p, $auth['password_hash'])) {
+        if (!hash_equals($authUser, $u) || !hash_equals($authPass, $p)) {
             $authError = 'Login failed: invalid username or password.';
         } else {
             $_SESSION['installer_user'] = $u;
@@ -467,6 +455,8 @@ $values = [
     'DB_PASS' => '',
     'TETRAPAY_CREATE_URL' => 'https://tetra98.com/api/create_order',
     'TETRAPAY_VERIFY_URL' => 'https://tetra98.com/api/verify',
+    'INSTALLER_USERNAME' => $authUser,
+    'INSTALLER_PASSWORD' => $authPass,
     'ALLOW_REINSTALL' => '0',
     'REINSTALL_MODE' => 'preserve',
 ];
@@ -558,9 +548,9 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
 
   <?php if (!$isAuthenticated): ?>
     <div class="card">
-      <h3 style="margin-top:0;"><?= $needsAuthSetup ? 'Setup installer login' : 'Installer login' ?></h3>
+      <h3 style="margin-top:0;">Installer login</h3>
       <form method="post" class="grid">
-        <input type="hidden" name="auth_action" value="<?= $needsAuthSetup ? 'setup' : 'login' ?>">
+        <input type="hidden" name="auth_action" value="login">
         <div>
           <label for="auth_username">Username</label>
           <input id="auth_username" name="auth_username" autocomplete="off">
@@ -570,12 +560,10 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
           <input id="auth_password" name="auth_password" type="password" autocomplete="off">
         </div>
         <div class="full" style="margin-top:8px;">
-          <button class="btn" type="submit"><?= $needsAuthSetup ? 'Create login' : 'Login' ?></button>
+          <button class="btn" type="submit">Login</button>
         </div>
       </form>
-      <?php if ($needsAuthSetup): ?>
-        <p class="hint">First run: create installer username/password. Session auto-logout after 30 minutes of inactivity.</p>
-      <?php endif; ?>
+      <p class="hint">Default first login is <code>admin / admin</code>. Change it from installer fields after login. Session auto-logout after 30 minutes of inactivity.</p>
     </div>
   <?php else: ?>
   <?php if ($showInstalledCard): ?>
@@ -601,12 +589,13 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
       <div class="grid">
         <?php foreach ($values as $key => $val): ?>
           <?php if (in_array($key, ['ALLOW_REINSTALL','REINSTALL_MODE'], true)) { continue; } ?>
-          <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
+          <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','INSTALLER_USERNAME','INSTALLER_PASSWORD','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
             <label for="<?= $key ?>"><?= $key ?></label>
             <input
               id="<?= $key ?>"
               name="<?= $key ?>"
               value="<?= htmlspecialchars($val) ?>"
+              type="<?= $key === 'INSTALLER_PASSWORD' ? 'password' : 'text' ?>"
               autocomplete="off"
             >
           </div>
@@ -668,7 +657,7 @@ $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? fal
       return;
     }
 
-    const required = ['BOT_TOKEN','ADMIN_IDS','DB_HOST','DB_PORT','DB_NAME','DB_USER'];
+    const required = ['BOT_TOKEN','ADMIN_IDS','DB_HOST','DB_PORT','DB_NAME','DB_USER','INSTALLER_USERNAME','INSTALLER_PASSWORD'];
     for (const name of required) {
       const el = document.querySelector(`[name="${name}"]`);
       if (!el || !el.value.trim()) {

@@ -96,7 +96,8 @@ The installer will:
 
 Reinstall behavior:
 - Lock check is based on `.install.lock` only.
-- Access to installer requires username/password login (`.installer_auth.json`), with auto logout after 30 minutes inactivity.
+- Access to installer requires username/password login (stored in `.env` as `INSTALLER_USERNAME` / `INSTALLER_PASSWORD`), with auto logout after 30 minutes inactivity.
+- Default first login is `admin / admin`; change installer credentials from the install form immediately.
 - If lock exists, web installer shows **Reinstall mode** options:
   - `Preserve database data` (safe default)
   - `Reset database (drop all tables)` (destructive)
