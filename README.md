@@ -111,10 +111,34 @@ git clone https://github.com/codeTide/ConfigFlow.git
 cd ConfigFlow
 ```
 
-If you want files to be cloned directly into your **current directory** (instead of creating a `ConfigFlow/` folder), run this in an empty directory:
+If you want files to be cloned directly into your **current directory** (instead of creating a `ConfigFlow/` folder), run this in an **empty** directory:
 
 ```bash
 git clone https://github.com/codeTide/ConfigFlow.git .
+```
+
+If your current directory is **not empty**, `git clone ... .` will fail with:
+
+```text
+fatal: destination path '.' already exists and is not an empty directory.
+```
+
+Use one of these alternatives:
+
+**A) Keep current files and turn this folder into the repo (safe for existing files):**
+
+```bash
+git init
+git remote add origin https://github.com/codeTide/ConfigFlow.git
+git fetch origin
+git checkout -t origin/main
+```
+
+**B) Clone into a temp folder, then copy files into current folder:**
+
+```bash
+git clone https://github.com/codeTide/ConfigFlow.git /tmp/ConfigFlow
+rsync -av --exclude='.git' /tmp/ConfigFlow/ ./
 ```
 
 ### 3) Install using wizard (or manual)
@@ -178,6 +202,8 @@ For cloning into the current directory (no extra `ConfigFlow/` folder), use:
 ```bash
 git clone https://github.com/codeTide/ConfigFlow.git .
 ```
+
+> Important: this command only works when the destination directory is empty.
 
 2. Keep your usual document root (no special root change needed for webhook).
 3. Ensure `https://YOUR_DOMAIN/webhook.php` is reachable.
