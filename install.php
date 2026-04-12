@@ -317,14 +317,9 @@ function cf_reset_database(array $env): void
 function cf_install(array $input): array
 {
     $isLocked = cf_has_existing_installation(__DIR__);
-    $allowReinstall = (string) ($input['ALLOW_REINSTALL'] ?? '') === '1';
     $reinstallMode = (string) ($input['REINSTALL_MODE'] ?? 'preserve');
     if (!in_array($reinstallMode, ['preserve', 'reset_db'], true)) {
         $reinstallMode = 'preserve';
-    }
-
-    if ($isLocked && !$allowReinstall) {
-        return ['ok' => false, 'messages' => ['Installation blocked: this project is locked (.install.lock). Enable reinstall mode to continue.']];
     }
     if (!function_exists('putenv')) {
         return ['ok' => false, 'messages' => ['Installation failed: putenv() is disabled in PHP. Please enable putenv to continue.']];
@@ -354,8 +349,8 @@ function cf_install(array $input): array
     }
 
     $messages = [];
-    if ($isLocked && $allowReinstall) {
-        $messages[] = '⚠ Reinstall mode is enabled.';
+    if ($isLocked) {
+        $messages[] = '⚠ Existing installation detected. Reinstall mode is active.';
     }
 
     try {
@@ -365,10 +360,10 @@ function cf_install(array $input): array
             $messages[] = $permMsg;
         }
 
-        if ($isLocked && $allowReinstall && $reinstallMode === 'reset_db') {
+        if ($isLocked && $reinstallMode === 'reset_db') {
             cf_reset_database($env);
             $messages[] = '⚠ Database tables were dropped (reset_db mode).';
-        } elseif ($isLocked && $allowReinstall) {
+        } elseif ($isLocked) {
             $messages[] = '✓ Database data preserved (preserve mode).';
         }
 
@@ -483,7 +478,6 @@ $values = [
     'TETRAPAY_VERIFY_URL' => 'https://tetra98.com/api/verify',
     'INSTALLER_USERNAME' => $authUser,
     'INSTALLER_PASSWORD' => $authPass,
-    'ALLOW_REINSTALL' => '0',
     'REINSTALL_MODE' => 'preserve',
 ];
 
@@ -620,8 +614,12 @@ $botDeepLink = $botDeepLink ?? '';
   <?php else: ?>
   <?php if ($showInstalledCard): ?>
     <div class="card">
-      <div class="ok">ConfigFlow is already installed on this path (.install.lock found).</div>
-      <p class="hint">You can still reinstall from this page by enabling reinstall mode below.</p>
+      <div class="warn"><b>Installation already exists</b> (`.install.lock` found).</div>
+      <p class="hint">Submitting this form will run <b>reinstall</b>:</p>
+      <ul class="hint" style="margin-top:6px;">
+        <li><b>Preserve database data</b>: updates `.env` and schema/migrations, keeps existing data.</li>
+        <li><b>Reset database</b>: drops all tables and rebuilds schema (destructive).</li>
+      </ul>
     </div>
   <?php endif; ?>
   <?php if ($justInstalled): ?>
@@ -632,20 +630,17 @@ $botDeepLink = $botDeepLink ?? '';
   <form method="post" class="card" id="installerForm">
       <?php if ($isInstalled): ?>
       <div class="full" style="margin-bottom:12px;">
-        <label class="inline"><input style="width:auto" id="allowReinstall" type="checkbox" name="ALLOW_REINSTALL" value="1"> Enable reinstall</label>
-        <div id="reinstallAdvanced" style="display:none;margin-top:10px;">
         <label for="REINSTALL_MODE" style="margin-top:8px;">Reinstall mode</label>
-        <select id="REINSTALL_MODE" name="REINSTALL_MODE" disabled>
+        <select id="REINSTALL_MODE" name="REINSTALL_MODE">
           <option value="preserve">Preserve database data</option>
           <option value="reset_db">Reset database (drop all tables)</option>
         </select>
-        </div>
       </div>
       <?php endif; ?>
-      <fieldset id="mainFields" class="<?= $isInstalled ? 'disabled' : '' ?>" <?= $isInstalled ? 'disabled' : '' ?>>
+      <fieldset id="mainFields">
       <div class="grid">
         <?php foreach ($values as $key => $val): ?>
-          <?php if (in_array($key, ['ALLOW_REINSTALL','REINSTALL_MODE'], true)) { continue; } ?>
+          <?php if (in_array($key, ['REINSTALL_MODE'], true)) { continue; } ?>
           <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','INSTALLER_USERNAME','INSTALLER_PASSWORD','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
             <label for="<?= $key ?>"><?= $key ?></label>
             <input
@@ -688,33 +683,8 @@ $botDeepLink = $botDeepLink ?? '';
   })();
 
   const installerForm = document.getElementById('installerForm');
-  const allowReinstall = document.getElementById('allowReinstall');
-  const mainFields = document.getElementById('mainFields');
-  const reinstallAdvanced = document.getElementById('reinstallAdvanced');
-  const reinstallMode = document.getElementById('REINSTALL_MODE');
-  const installBtn = document.getElementById('installBtn');
-  if (allowReinstall && mainFields) {
-    const syncState = () => {
-      const enabled = allowReinstall.checked;
-      mainFields.disabled = !enabled;
-      mainFields.classList.toggle('disabled', !enabled);
-      if (reinstallMode) reinstallMode.disabled = !enabled;
-      if (installBtn) installBtn.disabled = !enabled;
-      if (reinstallAdvanced) reinstallAdvanced.style.display = enabled ? 'block' : 'none';
-    };
-    syncState();
-    allowReinstall.addEventListener('change', syncState);
-  }
 
   if (installerForm) installerForm.addEventListener('submit', function (e) {
-    const reinstallCheckbox = document.querySelector('[name="ALLOW_REINSTALL"]');
-    if (reinstallCheckbox && !reinstallCheckbox.checked) {
-      e.preventDefault();
-      alert('Enable reinstall first');
-      reinstallCheckbox.focus();
-      return;
-    }
-
     const required = ['BOT_TOKEN','ADMIN_IDS','DB_HOST','DB_PORT','DB_NAME','DB_USER','INSTALLER_USERNAME','INSTALLER_PASSWORD'];
     for (const name of required) {
       const el = document.querySelector(`[name="${name}"]`);
