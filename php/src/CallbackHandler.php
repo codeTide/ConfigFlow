@@ -257,6 +257,146 @@ final class CallbackHandler
             return;
         }
 
+
+        if ($data === 'admin:pins') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $rows = [[['text' => '➕ افزودن پیام پین', 'callback_data' => 'admin:pins:add']]];
+            foreach ($this->database->listPinnedMessages() as $pin) {
+                $pinId = (int) ($pin['id'] ?? 0);
+                $rows[] = [[
+                    'text' => '📌 #' . $pinId,
+                    'callback_data' => 'admin:pins:view:' . $pinId,
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText($chatId, $messageId, '📌 <b>مدیریت پیام‌های پین</b>', ['inline_keyboard' => $rows]);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:pins:add') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->database->setUserState($userId, 'await_admin_pin_add');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 متن پیام پین را ارسال کنید.",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:pins']]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pins:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $pinId = (int) substr($data, strlen('admin:pins:view:'));
+            $pin = $this->database->getPinnedMessage($pinId);
+            if ($pin === null) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پیام پین پیدا نشد.');
+                return;
+            }
+            $sendCount = count($this->database->getPinnedSends($pinId));
+            $rows = [
+                [['text' => '📤 ارسال به همه کاربران', 'callback_data' => 'admin:pins:send:' . $pinId]],
+                [['text' => '✏️ ویرایش', 'callback_data' => 'admin:pins:edit:' . $pinId]],
+                [['text' => '🗑 حذف', 'callback_data' => 'admin:pins:delete:' . $pinId]],
+                [['text' => '🔙 بازگشت', 'callback_data' => 'admin:pins']],
+            ];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📌 <b>پیام پین #{$pinId}</b>
+
+" . htmlspecialchars((string) ($pin['text'] ?? '')) . "
+
+ارسال‌شده: <b>{$sendCount}</b>",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pins:edit:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $pinId = (int) substr($data, strlen('admin:pins:edit:'));
+            $this->database->setUserState($userId, 'await_admin_pin_edit', ['pin_id' => $pinId]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 متن جدید پیام پین را ارسال کنید.",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:pins:view:' . $pinId]]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pins:delete:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $pinId = (int) substr($data, strlen('admin:pins:delete:'));
+            $this->database->deletePinnedMessage($pinId);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ حذف شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:pins']]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pins:send:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $pinId = (int) substr($data, strlen('admin:pins:send:'));
+            $pin = $this->database->getPinnedMessage($pinId);
+            if ($pin === null) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پیام پین پیدا نشد.');
+                return;
+            }
+            $sent = 0;
+            $pinned = 0;
+            foreach ($this->database->listUserIdsForBroadcast('all') as $targetId) {
+                if ($targetId <= 0) {
+                    continue;
+                }
+                try {
+                    $result = $this->telegram->sendMessageWithResult($targetId, (string) ($pin['text'] ?? ''));
+                    if (is_array($result)) {
+                        $sent++;
+                        $msgId = (int) ($result['message_id'] ?? 0);
+                        if ($msgId > 0) {
+                            $this->database->savePinnedSend($pinId, $targetId, $msgId);
+                            $this->telegram->pinChatMessage($targetId, $msgId, true);
+                            $pinned++;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ ارسال انجام شد.');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "✅ پیام پین ارسال شد.
+📤 ارسال: <b>{$sent}</b>
+📌 پین: <b>{$pinned}</b>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:pins:view:' . $pinId]]]]
+            );
+            return;
+        }
+
         if ($data === 'admin:broadcast') {
             if (!$isAdmin) {
                 $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
@@ -2036,7 +2176,10 @@ final class CallbackHandler
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیج پیدا نشد.');
                 return;
             }
-            $amount = (int) $package['price'];
+            if (!$this->ensurePurchaseAllowedForPackage($userId, (int) $package['id'], $callbackId)) {
+                return;
+            }
+            $amount = $this->database->effectivePackagePrice($userId, $package);
             if (!$this->isGatewayAmountAllowed('swapwallet_crypto', $amount)) {
                 $this->telegram->answerCallbackQuery($callbackId, 'مبلغ برای این درگاه مجاز نیست. محدوده: ' . $this->gatewayRangeText('swapwallet_crypto'));
                 return;
@@ -2114,7 +2257,10 @@ final class CallbackHandler
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیج پیدا نشد.');
                 return;
             }
-            $amount = (int) $package['price'];
+            if (!$this->ensurePurchaseAllowedForPackage($userId, (int) $package['id'], $callbackId)) {
+                return;
+            }
+            $amount = $this->database->effectivePackagePrice($userId, $package);
             if (!$this->isGatewayAmountAllowed('tronpays_rial', $amount)) {
                 $this->telegram->answerCallbackQuery($callbackId, 'مبلغ برای این درگاه مجاز نیست. محدوده: ' . $this->gatewayRangeText('tronpays_rial'));
                 return;
@@ -2299,6 +2445,11 @@ final class CallbackHandler
             }
 
             if ($data === 'buy:start') {
+                if ($this->settings->get('shop_open', '1') !== '1') {
+                    $this->telegram->answerCallbackQuery($callbackId, 'فروشگاه در حال حاضر بسته است.');
+                    return;
+                }
+
                 $types = $this->database->getActiveTypes();
                 if ($types === []) {
                     $this->telegram->answerCallbackQuery($callbackId, 'فعلاً سرویسی برای خرید فعال نیست.');
@@ -2358,7 +2509,8 @@ final class CallbackHandler
 
         if (str_starts_with($data, 'buy:type:')) {
             $typeId = (int) substr($data, strlen('buy:type:'));
-            $packages = $this->database->getActivePackagesByType($typeId);
+            $stockOnly = $this->settings->get('preorder_mode', '0') === '1';
+            $packages = $this->database->getActivePackagesByTypeWithStock($typeId, $stockOnly);
             if ($packages === []) {
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیجی برای این نوع سرویس یافت نشد.');
                 return;
@@ -2366,7 +2518,9 @@ final class CallbackHandler
 
             $rows = [];
             foreach ($packages as $pkg) {
-                $label = sprintf('%s | %sGB | %s روز | %s تومان', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $pkg['price']);
+                $price = $this->database->effectivePackagePrice($userId, $pkg);
+                $stockText = isset($pkg['stock']) ? (' | موجودی: ' . (int) $pkg['stock']) : '';
+                $label = sprintf('%s | %sGB | %s روز | %s تومان%s', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $price, $stockText);
                 $rows[] = [[
                     'text' => $label,
                     'callback_data' => 'buy:pkg:' . (int) $pkg['id'],
@@ -2771,7 +2925,7 @@ final class CallbackHandler
                 "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\n"
                 . "شناسه سفارش: <code>{$pendingId}</code>\n"
                 . "مبلغ: <b>{$amount}</b> تومان\n\n"
-                . "اتصال API تتراپی در فاز بعدی تکمیل می‌شود.",
+                . "ارتباط با درگاه آنلاین برقرار نشد. لطفاً از کارت‌به‌کارت یا کیف پول استفاده کنید.",
                 KeyboardBuilder::backToMain()
             );
             $this->telegram->answerCallbackQuery($callbackId);
@@ -2779,6 +2933,24 @@ final class CallbackHandler
         }
 
         if (str_starts_with($data, 'buy:pkg:')) {
+            if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
+                $rulesText = trim($this->settings->get('purchase_rules_text', ''));
+                $rulesText = $rulesText !== '' ? $rulesText : 'لطفاً قوانین خرید را بپذیرید.';
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    "📜 <b>قوانین خرید</b>
+
+" . $rulesText,
+                    ['inline_keyboard' => [
+                        [['text' => '✅ قوانین را می‌پذیرم', 'callback_data' => 'buy:rules:accept']],
+                        [['text' => '🔙 بازگشت', 'callback_data' => 'buy:start']],
+                    ]]
+                );
+                $this->telegram->answerCallbackQuery($callbackId);
+                return;
+            }
+
             $packageId = (int) substr($data, strlen('buy:pkg:'));
             $package = $this->database->getPackage($packageId);
             if ($package === null) {
@@ -2788,7 +2960,7 @@ final class CallbackHandler
 
             $text = "💰 <b>پرداخت سفارش</b>\n\n"
                 . "پکیج: <b>" . htmlspecialchars((string) $package['name']) . "</b>\n"
-                . "قیمت: <b>" . (int) $package['price'] . "</b> تومان\n\n"
+                . "قیمت: <b>" . (int) $this->database->effectivePackagePrice($userId, $package) . "</b> تومان\n\n"
                 . "روش پرداخت را انتخاب کنید:";
             $rows = [];
             $rows[] = [['text' => '💳 پرداخت با کیف پول', 'callback_data' => 'buy:wallet:' . $packageId]];
@@ -2814,8 +2986,18 @@ final class CallbackHandler
             return;
         }
 
+        if ($data === 'buy:rules:accept') {
+            $this->database->acceptPurchaseRules($userId);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ قوانین ثبت شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'buy:start']]);
+            return;
+        }
+
         if (str_starts_with($data, 'buy:crypto:coins:')) {
             $packageId = (int) substr($data, strlen('buy:crypto:coins:'));
+            if (!$this->ensurePurchaseAllowedForPackage($userId, $packageId, $callbackId)) {
+                return;
+            }
             $coins = [
                 'tron' => 'TRON',
                 'ton' => 'TON',
@@ -2856,8 +3038,11 @@ final class CallbackHandler
                 $this->telegram->answerCallbackQuery($callbackId, 'پکیج پیدا نشد.');
                 return;
             }
+            if (!$this->ensurePurchaseAllowedForPackage($userId, (int) $package['id'], $callbackId)) {
+                return;
+            }
 
-            $amount = (int) $package['price'];
+            $amount = $this->database->effectivePackagePrice($userId, $package);
             $paymentId = $this->database->createPayment([
                 'kind' => 'purchase',
                 'user_id' => $userId,
@@ -2931,7 +3116,7 @@ final class CallbackHandler
                 $text = "🏧 <b>پرداخت TetraPay</b>\n\n"
                     . "شناسه سفارش: <code>{$pendingId}</code>\n"
                     . "مبلغ: <b>{$amount}</b> تومان\n\n"
-                    . "اتصال API تتراپی در فاز بعدی تکمیل می‌شود.";
+                    . "ارتباط با درگاه آنلاین برقرار نشد. لطفاً از کارت‌به‌کارت یا کیف پول استفاده کنید.";
             }
 
             $this->telegram->editMessageText($chatId, $messageId, $text, KeyboardBuilder::backToMain());
@@ -3016,10 +3201,17 @@ final class CallbackHandler
 
         if (str_starts_with($data, 'buy:wallet:')) {
             $packageId = (int) substr($data, strlen('buy:wallet:'));
+            if (!$this->ensurePurchaseAllowedForPackage($userId, $packageId, $callbackId)) {
+                return;
+            }
             $result = $this->database->walletPayPackage($userId, $packageId);
             if (!($result['ok'] ?? false)) {
                 if (($result['error'] ?? '') === 'insufficient_balance') {
                     $this->telegram->answerCallbackQuery($callbackId, 'موجودی کیف پول کافی نیست.');
+                    return;
+                }
+                if (($result['error'] ?? '') === 'no_stock') {
+                    $this->telegram->answerCallbackQuery($callbackId, 'برای این پکیج موجودی ثبت‌شده وجود ندارد.');
                     return;
                 }
                 $this->telegram->answerCallbackQuery($callbackId, 'خطا در ثبت سفارش. دوباره تلاش کنید.');
@@ -3040,7 +3232,7 @@ final class CallbackHandler
             return;
         }
 
-        $this->telegram->answerCallbackQuery($callbackId, 'این بخش در فاز بعدی مهاجرت تکمیل می‌شود.');
+        $this->telegram->answerCallbackQuery($callbackId, 'عملیات نامعتبر یا پشتیبانی‌نشده.');
     }
 
     private function encodeStockQueryToken(?string $query): string
@@ -3085,7 +3277,7 @@ final class CallbackHandler
         if (str_starts_with($data, 'admin:admins')) {
             return 'full';
         }
-        if (str_starts_with($data, 'admin:broadcast')) {
+        if (str_starts_with($data, 'admin:broadcast') || str_starts_with($data, 'admin:pins') || $data === 'admin:pins') {
             return 'broadcast';
         }
         if (str_starts_with($data, 'admin:type') || str_starts_with($data, 'admin:pkg') || $data === 'admin:types') {
@@ -3116,6 +3308,26 @@ final class CallbackHandler
             return 'panels';
         }
         return null;
+    }
+
+    private function ensurePurchaseAllowedForPackage(int $userId, int $packageId, string $callbackId): bool
+    {
+        if ($this->settings->get('shop_open', '1') !== '1') {
+            $this->telegram->answerCallbackQuery($callbackId, 'فروشگاه در حال حاضر بسته است.');
+            return false;
+        }
+
+        if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
+            $this->telegram->answerCallbackQuery($callbackId, 'ابتدا قوانین خرید را بپذیرید.');
+            return false;
+        }
+
+        if ($this->settings->get('preorder_mode', '0') === '1' && !$this->database->packageHasAvailableStock($packageId)) {
+            $this->telegram->answerCallbackQuery($callbackId, 'این پکیج در حال حاضر موجودی ندارد.');
+            return false;
+        }
+
+        return true;
     }
 
     private function isGatewayAmountAllowed(string $gateway, int $amount): bool

@@ -56,8 +56,21 @@ final class MenuService
 
     public function supportText(): string
     {
-        return "🎧 <b>ارتباط با پشتیبانی</b>\n\n"
-            . "آیدی پشتیبانی: " . htmlspecialchars($this->settings->get('support_username', '-'));
+        $username = trim($this->settings->get('support_username', ''));
+        $link = trim($this->settings->get('support_link', ''));
+        $linkDesc = trim($this->settings->get('support_link_desc', ''));
+
+        $text = "🎧 <b>ارتباط با پشتیبانی</b>\n\n"
+            . "آیدی پشتیبانی: " . htmlspecialchars($username !== '' ? $username : '-');
+
+        if ($link !== '') {
+            $text .= "\n🌐 لینک پشتیبانی: " . htmlspecialchars($link);
+            if ($linkDesc !== '') {
+                $text .= "\n📝 " . htmlspecialchars($linkDesc);
+            }
+        }
+
+        return $text;
     }
 
     public function myConfigsText(int $userId): string
@@ -101,7 +114,10 @@ final class MenuService
         $botUsername = Config::botUsername();
         $refLink = $botUsername !== '' ? "https://t.me/{$botUsername}?start=ref_{$userId}" : "ref_{$userId}";
 
-        return "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>\n\n"
+        $banner = trim($this->settings->get('referral_banner_text', ''));
+        $intro = $banner !== '' ? $banner . "\n\n" : "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>\n\n";
+
+        return $intro
             . "📊 زیرمجموعه‌ها: <b>{$stats['total_referrals']}</b>\n"
             . "🛒 خریدهای زیرمجموعه: <b>{$stats['purchase_count']}</b>\n"
             . "💵 مجموع خرید زیرمجموعه: <b>{$stats['total_purchase_amount']}</b> تومان\n\n"

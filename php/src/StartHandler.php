@@ -35,6 +35,14 @@ final class StartHandler
         }
 
         $this->database->ensureUser($fromUser);
+
+        if (preg_match('/^\/start\s+ref_(\d+)/', $text, $m) === 1) {
+            $referrerId = (int) ($m[1] ?? 0);
+            if ($this->settings->get('referral_enabled', '1') === '1') {
+                $this->database->addReferral($referrerId, $userId);
+            }
+        }
+
         $botStatus = $this->settings->get('bot_status', 'on');
 
         if ($botStatus === 'off') {
@@ -63,6 +71,7 @@ final class StartHandler
             $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
             return;
         }
+
 
         $this->telegram->sendMessage(
             $chatId,
