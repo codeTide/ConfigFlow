@@ -456,5 +456,160 @@ final class MessageHandler
             );
             return;
         }
+
+        if ($state['state_name'] === 'await_admin_add_admin') {
+            if (!in_array($userId, Config::adminIds(), true)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $targetUid = (int) preg_replace('/\D+/', '', $text);
+            if ($targetUid <= 0) {
+                $this->telegram->sendMessage($chatId, '⚠️ آیدی عددی معتبر ارسال کنید.');
+                return;
+            }
+            $this->database->upsertAdminUser($targetUid, $userId, [
+                'types' => true,
+                'stock' => true,
+                'users' => true,
+                'settings' => true,
+                'payments' => true,
+                'requests' => true,
+            ]);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ ادمین <code>{$targetUid}</code> اضافه شد.");
+            return;
+        }
+
+        if ($state['state_name'] === 'await_agent_price') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $payload = $state['payload'] ?? [];
+            $agentId = (int) ($payload['agent_id'] ?? 0);
+            $packageId = (int) ($payload['package_id'] ?? 0);
+            $price = (int) preg_replace('/\D+/', '', $text);
+            if ($agentId <= 0 || $packageId <= 0 || $price <= 0) {
+                $this->telegram->sendMessage($chatId, '⚠️ قیمت معتبر وارد کنید.');
+                return;
+            }
+            $this->database->setAgencyPrice($agentId, $packageId, $price);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ قیمت اختصاصی ثبت شد.\nU:<code>{$agentId}</code> | P:<code>{$packageId}</code> | <b>{$price}</b>");
+            return;
+        }
+
+        if ($state['state_name'] === 'await_panel_add') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $parts = array_map('trim', explode('|', $text));
+            if (count($parts) !== 6) {
+                $this->telegram->sendMessage($chatId, '⚠️ فرمت باید 6 بخشی باشد: name|ip|port|patch|username|password');
+                return;
+            }
+            [$name, $ip, $portRaw, $patch, $username, $password] = $parts;
+            $port = (int) preg_replace('/\D+/', '', $portRaw);
+            if ($name === '' || $ip === '' || $port <= 0 || $username === '' || $password === '') {
+                $this->telegram->sendMessage($chatId, '⚠️ مقادیر معتبر نیستند.');
+                return;
+            }
+            $panelId = $this->database->addPanel($name, $ip, $port, $patch, $username, $password);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ پنل ثبت شد. ID: <code>{$panelId}</code>");
+            return;
+        }
+
+        if ($state['state_name'] === 'await_panel_pkg_add') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $panelId = (int) (($state['payload'] ?? [])['panel_id'] ?? 0);
+            $parts = array_map('trim', explode('|', $text));
+            if (count($parts) !== 4) {
+                $this->telegram->sendMessage($chatId, '⚠️ فرمت: name|volume_gb|duration_days|inbound_id');
+                return;
+            }
+            [$name, $volRaw, $durRaw, $inbRaw] = $parts;
+            $vol = (float) str_replace(',', '.', $volRaw);
+            $dur = (int) preg_replace('/\D+/', '', $durRaw);
+            $inb = (int) preg_replace('/\D+/', '', $inbRaw);
+            if ($panelId <= 0 || $name === '' || $vol <= 0 || $dur <= 0 || $inb <= 0) {
+                $this->telegram->sendMessage($chatId, '⚠️ مقادیر معتبر نیستند.');
+                return;
+            }
+            $id = $this->database->addPanelPackage($panelId, $name, $vol, $dur, $inb);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ پکیج پنل ثبت شد. ID: <code>{$id}</code>");
+            return;
+        }
+
+        if ($state['state_name'] === 'await_worker_api_key') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $key = trim($text);
+            if ($key === '' || strlen($key) < 8) {
+                $this->telegram->sendMessage($chatId, '⚠️ کلید معتبر نیست.');
+                return;
+            }
+            $this->database->clearUserState($userId);
+            $this->database->pdo()->prepare('INSERT INTO settings (`key`,`value`) VALUES (\'worker_api_key\', :v) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)')->execute(['v' => $key]);
+            $this->telegram->sendMessage($chatId, '✅ Worker API key ذخیره شد.');
+            return;
+        }
+
+        if ($state['state_name'] === 'await_worker_api_port') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $port = (int) preg_replace('/\D+/', '', $text);
+            if ($port < 1 || $port > 65535) {
+                $this->telegram->sendMessage($chatId, '⚠️ پورت معتبر نیست.');
+                return;
+            }
+            $this->database->clearUserState($userId);
+            $this->database->pdo()->prepare('INSERT INTO settings (`key`,`value`) VALUES (\'worker_api_port\', :v) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)')->execute(['v' => (string) $port]);
+            $this->telegram->sendMessage($chatId, '✅ Worker API port ذخیره شد.');
+            return;
+        }
+
+        if ($state['state_name'] === 'await_admin_broadcast') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $scope = (string) (($state['payload'] ?? [])['scope'] ?? 'all');
+            $targets = $this->database->listUserIdsForBroadcast($scope);
+            $sourceChatId = (int) ($message['chat']['id'] ?? 0);
+            $sourceMessageId = (int) ($message['message_id'] ?? 0);
+            if ($sourceChatId === 0 || $sourceMessageId === 0) {
+                $this->telegram->sendMessage($chatId, '❌ پیام قابل ارسال نیست.');
+                return;
+            }
+            $sent = 0;
+            $isForwarded = isset($message['forward_date']);
+            foreach ($targets as $targetId) {
+                if ($targetId <= 0) {
+                    continue;
+                }
+                try {
+                    if ($isForwarded) {
+                        $this->telegram->forwardMessage($targetId, $sourceChatId, $sourceMessageId);
+                    } else {
+                        $this->telegram->copyMessage($targetId, $sourceChatId, $sourceMessageId);
+                    }
+                    $sent++;
+                } catch (\Throwable $e) {
+                }
+            }
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ ارسال همگانی انجام شد.\nتعداد موفق: <b>{$sent}</b>");
+            return;
+        }
     }
 }

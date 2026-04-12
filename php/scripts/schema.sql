@@ -141,3 +141,43 @@ CREATE TABLE IF NOT EXISTS user_states (
     state_payload JSON NULL,
     updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS admin_users (
+    user_id BIGINT PRIMARY KEY,
+    added_by BIGINT NOT NULL,
+    added_at DATETIME NOT NULL,
+    permissions TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agency_prices (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    package_id BIGINT NOT NULL,
+    price INT NOT NULL,
+    UNIQUE KEY uniq_agency_price (user_id, package_id),
+    INDEX idx_agency_user (user_id),
+    INDEX idx_agency_package (package_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS panels (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    ip VARCHAR(191) NOT NULL,
+    port INT NOT NULL,
+    patch VARCHAR(191) NULL,
+    username VARCHAR(191) NOT NULL,
+    password VARCHAR(191) NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS panel_packages (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    panel_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    volume_gb DECIMAL(10,2) NOT NULL,
+    duration_days INT NOT NULL,
+    inbound_id INT NOT NULL DEFAULT 1,
+    FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE CASCADE,
+    INDEX idx_panel_packages_panel (panel_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
