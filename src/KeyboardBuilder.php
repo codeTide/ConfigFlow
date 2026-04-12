@@ -6,15 +6,15 @@ namespace ConfigFlow\Bot;
 
 final class KeyboardBuilder
 {
-    public const BTN_BUY = '🛒 خرید کانفیگ جدید';
-    public const BTN_MY_CONFIGS = '📦 کانفیگ‌های من';
+    public const BTN_BUY = '🛒 خرید';
+    public const BTN_MY_CONFIGS = '📦 کانفیگ‌هام';
     public const BTN_FREE_TEST = '🎁 تست رایگان';
-    public const BTN_PROFILE = '👤 حساب کاربری';
-    public const BTN_WALLET = '💳 شارژ کیف پول';
-    public const BTN_SUPPORT = '🎧 ارتباط با پشتیبانی';
-    public const BTN_REFERRAL = '🎁 دعوت دوستان';
-    public const BTN_AGENCY = '🤝 درخواست نمایندگی';
-    public const BTN_ADMIN = '⚙️ ورود به پنل مدیریت';
+    public const BTN_PROFILE = '👤 حساب من';
+    public const BTN_WALLET = '💳 کیف پول';
+    public const BTN_SUPPORT = '🎧 پشتیبانی';
+    public const BTN_REFERRAL = '🎁 دعوت';
+    public const BTN_AGENCY = '🤝 نمایندگی';
+    public const BTN_ADMIN = '⚙️ پنل مدیریت';
     public const BTN_BACK_MAIN = '🏠 منوی اصلی';
     public const BTN_BACK_TYPES = '🔙 بازگشت به سرویس‌ها';
     public const BTN_BACK_PURCHASES = '🔙 بازگشت به سفارش‌ها';
@@ -77,7 +77,7 @@ final class KeyboardBuilder
             $buttons[] = self::BTN_ADMIN;
         }
 
-        $keyboard = self::smartKeyboardRows($buttons);
+        $keyboard = self::smartKeyboardRows($buttons, [3, 2, 1], 12, 18);
 
         return [
             'keyboard' => $keyboard,
@@ -127,21 +127,21 @@ final class KeyboardBuilder
     public static function adminPanelReply(): array
     {
         $buttons = [
-            '🧩 مدیریت نوع/پکیج',
-            '📚 مدیریت موجودی کانفیگ',
-            '👥 مدیریت کاربران',
+            '🧩 نوع/پکیج',
+            '📚 موجودی',
+            '👥 کاربران',
             '⚙️ تنظیمات',
-            '👮 مدیریت ادمین‌ها',
-            '📣 فوروارد همگانی',
-            '📌 پیام‌های پین',
-            '🤝 مدیریت نمایندگان',
-            '🖥 مدیریت پنل‌های 3x-ui',
-            '💳 مدیریت درخواست‌های شارژ',
-            '📦 صف تحویل سفارش‌ها',
-            '🗂 مدیریت درخواست‌ها (تست/نمایندگی)',
-            '🗃 بکاپ / تاپیک گروه',
+            '👮 ادمین‌ها',
+            '📣 همگانی',
+            '📌 پین‌ها',
+            '🤝 نماینده‌ها',
+            '🖥 پنل‌های 3x-ui',
+            '💳 شارژها',
+            '📦 تحویل سفارش',
+            '🗂 درخواست‌ها',
+            '🗃 بکاپ/تاپیک',
         ];
-        $keyboard = self::smartKeyboardRows($buttons, [2, 1], 14, 24);
+        $keyboard = self::smartKeyboardRows($buttons, [3, 2, 1], 12, 20);
         $keyboard[] = [self::BTN_BACK_MAIN];
 
         return [

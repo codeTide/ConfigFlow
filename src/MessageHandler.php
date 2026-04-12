@@ -1019,19 +1019,19 @@ ID: <code>{$pinId}</code>");
 
         if ($this->database->isAdminUser($userId)) {
             $adminRouteMap = [
-                '🧩 مدیریت نوع/پکیج' => 'admin:types',
-                '📚 مدیریت موجودی کانفیگ' => 'admin:stock',
-                '👥 مدیریت کاربران' => 'admin:users',
+                '🧩 نوع/پکیج' => 'admin:types',
+                '📚 موجودی' => 'admin:stock',
+                '👥 کاربران' => 'admin:users',
                 '⚙️ تنظیمات' => 'admin:settings',
-                '👮 مدیریت ادمین‌ها' => 'admin:admins',
-                '📣 فوروارد همگانی' => 'admin:broadcast',
-                '📌 پیام‌های پین' => 'admin:pins',
-                '🤝 مدیریت نمایندگان' => 'admin:agents',
-                '🖥 مدیریت پنل‌های 3x-ui' => 'admin:panels',
-                '💳 مدیریت درخواست‌های شارژ' => 'admin:payments',
-                '📦 صف تحویل سفارش‌ها' => 'admin:deliveries',
-                '🗂 مدیریت درخواست‌ها (تست/نمایندگی)' => 'admin:requests',
-                '🗃 بکاپ / تاپیک گروه' => 'admin:groupops',
+                '👮 ادمین‌ها' => 'admin:admins',
+                '📣 همگانی' => 'admin:broadcast',
+                '📌 پین‌ها' => 'admin:pins',
+                '🤝 نماینده‌ها' => 'admin:agents',
+                '🖥 پنل‌های 3x-ui' => 'admin:panels',
+                '💳 شارژها' => 'admin:payments',
+                '📦 تحویل سفارش' => 'admin:deliveries',
+                '🗂 درخواست‌ها' => 'admin:requests',
+                '🗃 بکاپ/تاپیک' => 'admin:groupops',
             ];
             $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {
