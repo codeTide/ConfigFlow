@@ -33,6 +33,25 @@ final class MenuService
         );
     }
 
+    public function mainMenuReplyKeyboard(int $userId): array
+    {
+        $isAdmin = $this->database->isAdminUser($userId);
+        return KeyboardBuilder::mainReply(
+            $isAdmin,
+            $this->settings->get('referral_enabled', '1') === '1',
+            $this->settings->get('agency_request_enabled', '1') === '1',
+            $this->settings->get('free_test_enabled', '1') === '1',
+        );
+    }
+
+    public function accountMenuReplyKeyboard(): array
+    {
+        return KeyboardBuilder::accountReply(
+            $this->settings->get('referral_enabled', '1') === '1',
+            $this->settings->get('agency_request_enabled', '1') === '1',
+        );
+    }
+
     public function profileText(int $userId): string
     {
         $user = $this->database->getUser($userId);
