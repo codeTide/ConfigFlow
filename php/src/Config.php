@@ -58,4 +58,14 @@ final class Config
     {
         return (string) getenv('TETRAPAY_VERIFY_URL') ?: 'https://tetra98.com/api/verify';
     }
+
+    public static function swapwalletBaseUrl(): string
+    {
+        return (string) getenv('SWAPWALLET_BASE_URL') ?: 'https://api.swapwallet.org';
+    }
+
+    public static function tronpaysBaseUrl(): string
+    {
+        return (string) getenv('TRONPAYS_RIAL_BASE_URL') ?: 'https://api.tronpays.online';
+    }
 }

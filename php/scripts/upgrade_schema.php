@@ -81,6 +81,12 @@ try {
         'worker_api_port' => '8080',
         'worker_api_key' => '',
         'manual_renewal_enabled' => '1',
+        'gw_swapwallet_crypto_enabled' => '0',
+        'gw_tronpays_rial_enabled' => '0',
+        'swapwallet_crypto_api_key' => '',
+        'swapwallet_crypto_username' => '',
+        'tronpays_rial_api_key' => '',
+        'tronpays_rial_callback_url' => '',
     ];
     $upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
     foreach ($defaults as $k => $v) {
