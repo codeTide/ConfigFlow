@@ -85,7 +85,8 @@ function cf_validate(array $input): array
     if ($installerUser === '' || $installerPass === '') {
         $errors[] = 'INSTALLER_USERNAME and INSTALLER_PASSWORD are required.';
     }
-    if (mb_strlen($installerPass) < 4) {
+    $installerPassLen = function_exists('mb_strlen') ? (int) mb_strlen($installerPass) : strlen($installerPass);
+    if ($installerPassLen < 4) {
         $errors[] = 'INSTALLER_PASSWORD must be at least 4 characters.';
     }
 
