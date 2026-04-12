@@ -6,10 +6,10 @@ declare(strict_types=1);
  * Schema upgrade helper for existing deployments.
  *
  * Usage:
- *   php php/scripts/upgrade_schema.php
+ *   php scripts/upgrade_schema.php
  */
 
-$root = dirname(__DIR__, 2);
+$root = dirname(__DIR__);
 $envPath = $root . '/.env';
 if (is_file($envPath)) {
     $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
