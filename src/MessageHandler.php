@@ -1011,6 +1011,12 @@ ID: <code>{$pinId}</code>");
             return true;
         }
 
+        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return true;
+        }
+
         if ($this->database->isAdminUser($userId)) {
             $adminRouteMap = [
                 '🧩 مدیریت نوع/پکیج' => 'admin:types',

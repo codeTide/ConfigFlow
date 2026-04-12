@@ -55,28 +55,29 @@ final class KeyboardBuilder
 
     public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
     {
-        $keyboard = [
-            [self::BTN_BUY, self::BTN_MY_CONFIGS],
-        ];
+        $buttons = [self::BTN_BUY, self::BTN_MY_CONFIGS];
 
         if ($freeTestEnabled) {
-            $keyboard[] = [self::BTN_FREE_TEST];
+            $buttons[] = self::BTN_FREE_TEST;
         }
 
-        $keyboard[] = [self::BTN_PROFILE, self::BTN_WALLET];
-        $keyboard[] = [self::BTN_SUPPORT];
+        $buttons[] = self::BTN_PROFILE;
+        $buttons[] = self::BTN_WALLET;
+        $buttons[] = self::BTN_SUPPORT;
 
         if ($referralEnabled) {
-            $keyboard[] = [self::BTN_REFERRAL];
+            $buttons[] = self::BTN_REFERRAL;
         }
 
         if ($agencyEnabled) {
-            $keyboard[] = [self::BTN_AGENCY];
+            $buttons[] = self::BTN_AGENCY;
         }
 
         if ($isAdmin) {
-            $keyboard[] = [self::BTN_ADMIN];
+            $buttons[] = self::BTN_ADMIN;
         }
+
+        $keyboard = self::smartKeyboardRows($buttons);
 
         return [
             'keyboard' => $keyboard,
@@ -125,25 +126,78 @@ final class KeyboardBuilder
 
     public static function adminPanelReply(): array
     {
+        $buttons = [
+            '🧩 مدیریت نوع/پکیج',
+            '📚 مدیریت موجودی کانفیگ',
+            '👥 مدیریت کاربران',
+            '⚙️ تنظیمات',
+            '👮 مدیریت ادمین‌ها',
+            '📣 فوروارد همگانی',
+            '📌 پیام‌های پین',
+            '🤝 مدیریت نمایندگان',
+            '🖥 مدیریت پنل‌های 3x-ui',
+            '💳 مدیریت درخواست‌های شارژ',
+            '📦 صف تحویل سفارش‌ها',
+            '🗂 مدیریت درخواست‌ها (تست/نمایندگی)',
+            '🗃 بکاپ / تاپیک گروه',
+        ];
+        $keyboard = self::smartKeyboardRows($buttons, [2, 1], 14, 24);
+        $keyboard[] = [self::BTN_BACK_MAIN];
+
         return [
-            'keyboard' => [
-                ['🧩 مدیریت نوع/پکیج'],
-                ['📚 مدیریت موجودی کانفیگ'],
-                ['👥 مدیریت کاربران'],
-                ['⚙️ تنظیمات'],
-                ['👮 مدیریت ادمین‌ها'],
-                ['📣 فوروارد همگانی'],
-                ['📌 پیام‌های پین'],
-                ['🤝 مدیریت نمایندگان'],
-                ['🖥 مدیریت پنل‌های 3x-ui'],
-                ['💳 مدیریت درخواست‌های شارژ'],
-                ['📦 صف تحویل سفارش‌ها'],
-                ['🗂 مدیریت درخواست‌ها (تست/نمایندگی)'],
-                ['🗃 بکاپ / تاپیک گروه'],
-                [self::BTN_BACK_MAIN],
-            ],
+            'keyboard' => $keyboard,
             'resize_keyboard' => true,
             'is_persistent' => true,
+        ];
+    }
+
+    public static function smartKeyboardRows(
+        array $buttonTexts,
+        array $layoutPattern = [3, 2, 1],
+        int $limitThreeCols = 14,
+        int $limitTwoCols = 20
+    ): array {
+        $threeCols = [];
+        $twoCols = [];
+        $singleCol = [];
+        foreach ($buttonTexts as $buttonText) {
+            $text = trim((string) $buttonText);
+            if ($text === '') {
+                continue;
+            }
+            $length = mb_strlen($text);
+            if ($length <= $limitThreeCols) {
+                $threeCols[] = $text;
+            } elseif ($length <= $limitTwoCols) {
+                $twoCols[] = $text;
+            } else {
+                $singleCol[] = $text;
+            }
+        }
+
+        $groups = [
+            3 => &$threeCols,
+            2 => &$twoCols,
+            1 => &$singleCol,
+        ];
+        $rows = [];
+        foreach ($layoutPattern as $cols) {
+            $cols = (int) $cols;
+            if (!isset($groups[$cols])) {
+                continue;
+            }
+            while (count($groups[$cols]) >= $cols) {
+                $rows[] = array_splice($groups[$cols], 0, $cols);
+            }
+        }
+
+        $remaining = array_merge($threeCols, $twoCols, $singleCol);
+        while ($remaining !== []) {
+            $rows[] = array_splice($remaining, 0, 2);
+        }
+
+        return [
+            ...$rows,
         ];
     }
 }
