@@ -51,6 +51,26 @@ final class TelegramClient
         $this->request('answerCallbackQuery', $payload);
     }
 
+    public function copyMessage(int $chatId, int $fromChatId, int $messageId): void
+    {
+        $payload = [
+            'chat_id' => $chatId,
+            'from_chat_id' => $fromChatId,
+            'message_id' => $messageId,
+        ];
+        $this->request('copyMessage', $payload);
+    }
+
+    public function forwardMessage(int $chatId, int $fromChatId, int $messageId): void
+    {
+        $payload = [
+            'chat_id' => $chatId,
+            'from_chat_id' => $fromChatId,
+            'message_id' => $messageId,
+        ];
+        $this->request('forwardMessage', $payload);
+    }
+
     private function request(string $method, array $payload): void
     {
         $ch = curl_init($this->baseUrl . $method);
