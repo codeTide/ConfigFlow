@@ -35,7 +35,6 @@ ConfigFlow/
 │   ├── php_worker_runtime.php
 │   └── backup_runtime.php
 ├── src/
-├── tests/
 └── env.example
 ```
 
@@ -69,15 +68,25 @@ TETRAPAY_VERIFY_URL=https://tetra98.com/api/verify
 
 ## Quick Install Wizard (Recommended)
 
-Run:
+Installer supports both:
+- CLI mode: `php install.php`
+- Browser mode: open `https://YOUR_DOMAIN/install.php` and submit the form
+
+CLI run:
 
 ```bash
 php install.php
 ```
 
+Browser run:
+
+```text
+https://YOUR_DOMAIN/install.php
+```
+
 The installer will:
 
-1. Ask for `.env` values (bot token, DB credentials, admin IDs, etc.)
+1. Collect `.env` values (with validation)
 2. Generate `.env`
 3. Connect to MySQL and initialize schema (`scripts/init_db.php`)
 4. Optionally set Telegram webhook automatically
@@ -179,5 +188,4 @@ php scripts/backup_runtime.php
 
 ```bash
 find . -maxdepth 2 -type f -name '*.php' -print0 | xargs -0 -n1 php -l
-php tests/WorkerApiAppTest.php
 ```
