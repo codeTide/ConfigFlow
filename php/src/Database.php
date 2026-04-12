@@ -196,6 +196,26 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
+    public function getUserPurchaseForRenewal(int $userId, int $purchaseId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT p.id AS purchase_id, p.is_test, p.package_id, p.config_id,
+                    pkg.type_id, pkg.name AS package_name,
+                    cfg.service_name
+             FROM purchases p
+             JOIN packages pkg ON pkg.id = p.package_id
+             LEFT JOIN configs cfg ON cfg.id = p.config_id
+             WHERE p.user_id = :user_id AND p.id = :purchase_id
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'purchase_id' => $purchaseId,
+        ]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
     public function referralStats(int $userId): array
     {
         $refCountStmt = $this->pdo->prepare('SELECT COUNT(*) FROM referrals WHERE referrer_id = :user_id');
@@ -630,6 +650,12 @@ final class Database implements WorkerApiStore
         $stmt->execute(['id' => $configId]);
     }
 
+    public function unexpireConfig(int $configId): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE configs SET is_expired = 0 WHERE id = :id');
+        $stmt->execute(['id' => $configId]);
+    }
+
     public function deleteConfig(int $configId): bool
     {
         $stmt = $this->pdo->prepare(
@@ -1061,6 +1087,72 @@ final class Database implements WorkerApiStore
         }
     }
 
+    public function walletPayRenewal(int $userId, int $purchaseId, int $packageId): array
+    {
+        $purchase = $this->getUserPurchaseForRenewal($userId, $purchaseId);
+        if (!is_array($purchase)) {
+            return ['ok' => false, 'error' => 'purchase_not_found'];
+        }
+        if ((int) ($purchase['is_test'] ?? 0) === 1) {
+            return ['ok' => false, 'error' => 'test_not_renewable'];
+        }
+        $package = $this->getPackage($packageId);
+        if ($package === null) {
+            return ['ok' => false, 'error' => 'package_not_found'];
+        }
+        if ((int) ($purchase['type_id'] ?? 0) !== (int) ($package['type_id'] ?? -1)) {
+            return ['ok' => false, 'error' => 'type_mismatch'];
+        }
+
+        $price = (int) $package['price'];
+        $this->pdo->beginTransaction();
+        try {
+            $user = $this->getUser($userId);
+            $balance = (int) ($user['balance'] ?? 0);
+            if ($balance < $price) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'insufficient_balance', 'price' => $price, 'balance' => $balance];
+            }
+
+            $newBalance = $balance - $price;
+            $update = $this->pdo->prepare('UPDATE users SET balance = :balance WHERE user_id = :user_id');
+            $update->execute(['balance' => $newBalance, 'user_id' => $userId]);
+
+            $paymentId = $this->createPayment([
+                'kind' => 'renewal',
+                'user_id' => $userId,
+                'package_id' => $packageId,
+                'amount' => $price,
+                'payment_method' => 'wallet',
+                'status' => 'paid',
+                'created_at' => gmdate('Y-m-d H:i:s'),
+            ]);
+
+            $pendingStmt = $this->pdo->prepare(
+                'INSERT INTO pending_orders (user_id, package_id, payment_id, amount, payment_method, created_at, status)
+                 VALUES (:user_id, :package_id, :payment_id, :amount, :payment_method, :created_at, :status)'
+            );
+            $pendingStmt->execute([
+                'user_id' => $userId,
+                'package_id' => $packageId,
+                'payment_id' => $paymentId,
+                'amount' => $price,
+                'payment_method' => 'wallet',
+                'created_at' => gmdate('Y-m-d H:i:s'),
+                'status' => 'paid_waiting_delivery',
+            ]);
+
+            $pendingId = (int) $this->pdo->lastInsertId();
+            $this->pdo->commit();
+            return ['ok' => true, 'payment_id' => $paymentId, 'pending_order_id' => $pendingId, 'price' => $price, 'new_balance' => $newBalance];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
     public function listWaitingWalletChargePayments(int $limit = 20): array
     {
         $stmt = $this->pdo->prepare(
@@ -1193,7 +1285,7 @@ final class Database implements WorkerApiStore
                         'user_id' => (int) $payment['user_id'],
                     ]);
                 }
-            } elseif ($kind === 'purchase') {
+            } elseif ($kind === 'purchase' || $kind === 'renewal') {
                 $pendingStatus = $approve ? 'paid_waiting_delivery' : 'cancelled';
                 $pendingUpdate = $this->pdo->prepare('UPDATE pending_orders SET status = :status WHERE payment_id = :payment_id');
                 $pendingUpdate->execute([
