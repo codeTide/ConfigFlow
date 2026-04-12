@@ -203,3 +203,40 @@ CREATE TABLE IF NOT EXISTS xui_jobs (
     INDEX idx_xui_jobs_status (status),
     INDEX idx_xui_jobs_panel (panel_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agency_price_config (
+    user_id BIGINT PRIMARY KEY,
+    price_mode VARCHAR(32) NOT NULL DEFAULT 'package',
+    global_type VARCHAR(16) NOT NULL DEFAULT 'pct',
+    global_val INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agency_type_discount (
+    user_id BIGINT NOT NULL,
+    type_id BIGINT NOT NULL,
+    discount_type VARCHAR(16) NOT NULL DEFAULT 'pct',
+    discount_value INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, type_id),
+    INDEX idx_agency_type_discount_type (type_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pinned_messages (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    text TEXT NOT NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pinned_message_sends (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    pin_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
+    INDEX idx_pinned_send_pin (pin_id),
+    INDEX idx_pinned_send_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS purchase_rule_acceptances (
+    user_id BIGINT PRIMARY KEY,
+    accepted_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

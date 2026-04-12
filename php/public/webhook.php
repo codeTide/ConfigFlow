@@ -20,6 +20,7 @@ require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/KeyboardBuilder.php';
 require_once __DIR__ . '/../src/MenuService.php';
 require_once __DIR__ . '/../src/SettingsRepository.php';
+require_once __DIR__ . '/../src/DatabaseBackupService.php';
 require_once __DIR__ . '/../src/TelegramClient.php';
 require_once __DIR__ . '/../src/StartHandler.php';
 require_once __DIR__ . '/../src/CallbackHandler.php';
