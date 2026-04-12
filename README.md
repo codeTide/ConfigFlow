@@ -94,7 +94,12 @@ The installer will:
 4. Optionally set Telegram webhook automatically
 5. Create `.install.lock` to prevent accidental reinstall
 
-If installer detects an existing installation (`.install.lock` or an existing `.env` with `BOT_TOKEN`), it blocks reinstall.
+Reinstall behavior:
+- Lock check is based on `.install.lock` only.
+- If lock exists, web installer shows **Reinstall mode** options:
+  - `Preserve database data` (safe default)
+  - `Reset database (drop all tables)` (destructive)
+- Reinstall always rewrites `.env` with new form values.
 
 ---
 
