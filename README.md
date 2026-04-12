@@ -106,6 +106,7 @@ Install PHP + required extensions + MySQL:
 - `curl`
 - `mbstring`
 - `json`
+- `putenv` enabled (used by env loader/installer)
 
 ### 2) Clone
 
@@ -161,6 +162,8 @@ php scripts/InitDb.php
 ### 4) Permissions (important on shared/VPS hosts)
 
 Installer needs permission to write `.env` in project root.
+Installer will also try to auto-fix owner/permissions for project root, `.env`, and `.user.ini` (if present).
+For that auto-fix to work, `chown`/`chmod` must be allowed in PHP and the PHP runtime user must have enough privileges.
 
 Typical Linux fix (replace `www-data` with your PHP runtime user):
 

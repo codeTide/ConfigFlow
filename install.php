@@ -82,6 +82,63 @@ function cf_set_webhook(string $botToken, string $webhookUrl): array
     return $decoded;
 }
 
+function cf_runtime_user(): ?string
+{
+    if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+        $info = posix_getpwuid(posix_geteuid());
+        $name = is_array($info) ? trim((string) ($info['name'] ?? '')) : '';
+        if ($name !== '') {
+            return $name;
+        }
+    }
+
+    $fallback = trim((string) get_current_user());
+    return $fallback !== '' ? $fallback : null;
+}
+
+/** @return string[] */
+function cf_auto_fix_permissions(string $projectRoot): array
+{
+    $messages = [];
+    $runtimeUser = cf_runtime_user();
+    $targets = [$projectRoot, $projectRoot . '/.env'];
+
+    $userIni = $projectRoot . '/.user.ini';
+    if (is_file($userIni)) {
+        $targets[] = $userIni;
+    }
+
+    foreach ($targets as $target) {
+        if (!file_exists($target)) {
+            continue;
+        }
+
+        $mode = 0644;
+        if (is_dir($target)) {
+            $mode = 0755;
+        } elseif (str_ends_with($target, '/.env')) {
+            $mode = 0600;
+        }
+        if (function_exists('chmod')) {
+            if (@chmod($target, $mode)) {
+                $messages[] = "✓ Permission set on {$target}";
+            } else {
+                $messages[] = "⚠ Could not chmod {$target}";
+            }
+        }
+
+        if ($runtimeUser !== null && function_exists('chown')) {
+            if (@chown($target, $runtimeUser)) {
+                $messages[] = "✓ Owner set to {$runtimeUser} for {$target}";
+            } else {
+                $messages[] = "⚠ Could not chown {$target} to {$runtimeUser}";
+            }
+        }
+    }
+
+    return $messages;
+}
+
 function cf_detect_base_url(): string
 {
     if (PHP_SAPI === 'cli') {
@@ -109,6 +166,10 @@ function cf_detect_base_url(): string
 
 function cf_install(array $input): array
 {
+    if (!function_exists('putenv')) {
+        return ['ok' => false, 'messages' => ['Installation failed: putenv() is disabled in PHP. Please enable putenv to continue.']];
+    }
+
     if (!is_file(__DIR__ . '/webhook.php')) {
         return ['ok' => false, 'messages' => ['Installation failed: webhook.php was not found in project root.']];
     }
@@ -135,6 +196,9 @@ function cf_install(array $input): array
     try {
         cf_write_env($env, __DIR__ . '/.env');
         $messages[] = '✓ .env file written.';
+        foreach (cf_auto_fix_permissions(__DIR__) as $permMsg) {
+            $messages[] = $permMsg;
+        }
 
         ob_start();
         require __DIR__ . '/scripts/InitDb.php';
