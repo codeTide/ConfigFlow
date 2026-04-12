@@ -29,6 +29,32 @@ final class TelegramClient
         $this->request('sendMessage', $payload);
     }
 
+
+
+    public function sendMessageWithResult(int $chatId, string $text, ?array $replyMarkup = null): ?array
+    {
+        $payload = [
+            'chat_id' => $chatId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+        ];
+        if ($replyMarkup !== null) {
+            $payload['reply_markup'] = json_encode($replyMarkup, JSON_UNESCAPED_UNICODE);
+        }
+
+        $result = $this->requestWithResult('sendMessage', $payload);
+        return is_array($result) ? $result : null;
+    }
+
+    public function pinChatMessage(int $chatId, int $messageId, bool $disableNotification = true): void
+    {
+        $payload = [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'disable_notification' => $disableNotification ? 'true' : 'false',
+        ];
+        $this->request('pinChatMessage', $payload);
+    }
     public function editMessageText(int $chatId, int $messageId, string $text, ?array $replyMarkup = null): void
     {
         $payload = [
