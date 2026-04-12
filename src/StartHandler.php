@@ -76,7 +76,7 @@ final class StartHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->menus->mainMenuText(),
-            $this->menus->mainMenuKeyboard($userId)
+            $this->menus->mainMenuReplyKeyboard($userId)
         );
     }
 

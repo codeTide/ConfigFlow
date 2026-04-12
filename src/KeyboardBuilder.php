@@ -6,38 +6,83 @@ namespace ConfigFlow\Bot;
 
 final class KeyboardBuilder
 {
+    public const BTN_BUY = '🛒 خرید کانفیگ جدید';
+    public const BTN_MY_CONFIGS = '📦 کانفیگ‌های من';
+    public const BTN_FREE_TEST = '🎁 تست رایگان';
+    public const BTN_PROFILE = '👤 حساب کاربری';
+    public const BTN_WALLET = '💳 شارژ کیف پول';
+    public const BTN_SUPPORT = '🎧 ارتباط با پشتیبانی';
+    public const BTN_REFERRAL = '🎁 دعوت دوستان';
+    public const BTN_AGENCY = '🤝 درخواست نمایندگی';
+    public const BTN_ADMIN = '⚙️ ورود به پنل مدیریت';
+    public const BTN_BACK_MAIN = '🏠 منوی اصلی';
+    public const BTN_BACK_TYPES = '🔙 بازگشت به سرویس‌ها';
+    public const BTN_BACK_PURCHASES = '🔙 بازگشت به سفارش‌ها';
+
     public static function main(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
     {
         $keyboard = [
             [
-                ['text' => '🛒 خرید کانفیگ جدید', 'callback_data' => 'buy:start'],
-                ['text' => '📦 کانفیگ‌های من', 'callback_data' => 'my_configs'],
+                ['text' => self::BTN_BUY, 'callback_data' => 'buy:start'],
+                ['text' => self::BTN_MY_CONFIGS, 'callback_data' => 'my_configs'],
             ],
         ];
 
         if ($freeTestEnabled) {
-            $keyboard[] = [['text' => '🎁 تست رایگان', 'callback_data' => 'test:start']];
+            $keyboard[] = [['text' => self::BTN_FREE_TEST, 'callback_data' => 'test:start']];
         }
 
         $keyboard[] = [
-            ['text' => '👤 حساب کاربری', 'callback_data' => 'profile'],
-            ['text' => '💳 شارژ کیف پول', 'callback_data' => 'wallet:charge'],
+            ['text' => self::BTN_PROFILE, 'callback_data' => 'profile'],
+            ['text' => self::BTN_WALLET, 'callback_data' => 'wallet:charge'],
         ];
-        $keyboard[] = [['text' => '🎧 ارتباط با پشتیبانی', 'callback_data' => 'support']];
+        $keyboard[] = [['text' => self::BTN_SUPPORT, 'callback_data' => 'support']];
 
         if ($referralEnabled) {
-            $keyboard[] = [['text' => '🎁 دعوت دوستان', 'callback_data' => 'referral:menu']];
+            $keyboard[] = [['text' => self::BTN_REFERRAL, 'callback_data' => 'referral:menu']];
         }
 
         if ($agencyEnabled) {
-            $keyboard[] = [['text' => '🤝 درخواست نمایندگی', 'callback_data' => 'agency:request']];
+            $keyboard[] = [['text' => self::BTN_AGENCY, 'callback_data' => 'agency:request']];
         }
 
         if ($isAdmin) {
-            $keyboard[] = [['text' => '⚙️ ورود به پنل مدیریت', 'callback_data' => 'admin:panel']];
+            $keyboard[] = [['text' => self::BTN_ADMIN, 'callback_data' => 'admin:panel']];
         }
 
         return ['inline_keyboard' => $keyboard];
+    }
+
+    public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
+    {
+        $keyboard = [
+            [self::BTN_BUY, self::BTN_MY_CONFIGS],
+        ];
+
+        if ($freeTestEnabled) {
+            $keyboard[] = [self::BTN_FREE_TEST];
+        }
+
+        $keyboard[] = [self::BTN_PROFILE, self::BTN_WALLET];
+        $keyboard[] = [self::BTN_SUPPORT];
+
+        if ($referralEnabled) {
+            $keyboard[] = [self::BTN_REFERRAL];
+        }
+
+        if ($agencyEnabled) {
+            $keyboard[] = [self::BTN_AGENCY];
+        }
+
+        if ($isAdmin) {
+            $keyboard[] = [self::BTN_ADMIN];
+        }
+
+        return [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+        ];
     }
 
     public static function backToMain(): array
@@ -75,6 +120,30 @@ final class KeyboardBuilder
                 [['text' => '🗃 بکاپ / تاپیک گروه', 'callback_data' => 'admin:groupops']],
                 [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']],
             ],
+        ];
+    }
+
+    public static function adminPanelReply(): array
+    {
+        return [
+            'keyboard' => [
+                ['🧩 مدیریت نوع/پکیج'],
+                ['📚 مدیریت موجودی کانفیگ'],
+                ['👥 مدیریت کاربران'],
+                ['⚙️ تنظیمات'],
+                ['👮 مدیریت ادمین‌ها'],
+                ['📣 فوروارد همگانی'],
+                ['📌 پیام‌های پین'],
+                ['🤝 مدیریت نمایندگان'],
+                ['🖥 مدیریت پنل‌های 3x-ui'],
+                ['💳 مدیریت درخواست‌های شارژ'],
+                ['📦 صف تحویل سفارش‌ها'],
+                ['🗂 مدیریت درخواست‌ها (تست/نمایندگی)'],
+                ['🗃 بکاپ / تاپیک گروه'],
+                [self::BTN_BACK_MAIN],
+            ],
+            'resize_keyboard' => true,
+            'is_persistent' => true,
         ];
     }
 }
