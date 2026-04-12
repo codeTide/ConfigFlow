@@ -107,8 +107,14 @@ Install PHP + required extensions + MySQL:
 ### 2) Clone
 
 ```bash
-git clone https://github.com/Emadhabibnia1385/ConfigFlow.git
+git clone https://github.com/codeTide/ConfigFlow.git
 cd ConfigFlow
+```
+
+If you want files to be cloned directly into your **current directory** (instead of creating a `ConfigFlow/` folder), run this in an empty directory:
+
+```bash
+git clone https://github.com/codeTide/ConfigFlow.git .
 ```
 
 ### 3) Install using wizard (or manual)
@@ -160,7 +166,19 @@ php scripts/PhpWorkerRuntime.php
 
 This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 
-1. Upload project files.
+1. Upload project files **or clone directly on host** (if SSH/Git is available):
+
+```bash
+git clone https://github.com/codeTide/ConfigFlow.git
+cd ConfigFlow
+```
+
+For cloning into the current directory (no extra `ConfigFlow/` folder), use:
+
+```bash
+git clone https://github.com/codeTide/ConfigFlow.git .
+```
+
 2. Keep your usual document root (no special root change needed for webhook).
 3. Ensure `https://YOUR_DOMAIN/webhook.php` is reachable.
 4. Run installer using one of these methods:
