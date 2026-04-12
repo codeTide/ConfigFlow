@@ -23,11 +23,6 @@ function cf_validate(array $input): array
         $errors[] = 'DB_PORT must be a valid port number.';
     }
 
-    $webhookBase = trim((string) ($input['WEBHOOK_BASE_URL'] ?? ''));
-    if ($webhookBase !== '' && filter_var($webhookBase, FILTER_VALIDATE_URL) === false) {
-        $errors[] = 'WEBHOOK_BASE_URL must be a valid URL (or leave empty).';
-    }
-
     return $errors;
 }
 
@@ -39,8 +34,19 @@ function cf_write_env(array $values, string $path): void
     }
 
     $content = implode(PHP_EOL, $lines) . PHP_EOL;
-    if (file_put_contents($path, $content) === false) {
-        throw new RuntimeException('Could not write .env file. Check file permissions.');
+    $dir = dirname($path);
+    if (!is_dir($dir) || !is_writable($dir)) {
+        throw new RuntimeException('Could not write .env file. Project directory is not writable.');
+    }
+
+    set_error_handler(static function (): bool {
+        return true;
+    });
+    $bytes = @file_put_contents($path, $content, LOCK_EX);
+    restore_error_handler();
+
+    if ($bytes === false) {
+        throw new RuntimeException('Could not write .env file. Check file permissions (owner/group/chmod).');
     }
 }
 
@@ -76,11 +82,39 @@ function cf_set_webhook(string $botToken, string $webhookUrl): array
     return $decoded;
 }
 
+function cf_detect_base_url(): string
+{
+    if (PHP_SAPI === 'cli') {
+        return '';
+    }
+
+    $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    if ($host === '') {
+        return '';
+    }
+
+    $isHttps = false;
+    $https = strtolower((string) ($_SERVER['HTTPS'] ?? ''));
+    if ($https !== '' && $https !== 'off') {
+        $isHttps = true;
+    }
+    $xfp = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    if ($xfp === 'https') {
+        $isHttps = true;
+    }
+
+    $scheme = $isHttps ? 'https' : 'http';
+    return $scheme . '://' . $host;
+}
+
 function cf_install(array $input): array
 {
+    if (!is_file(__DIR__ . '/webhook.php')) {
+        return ['ok' => false, 'messages' => ['Installation failed: webhook.php was not found in project root.']];
+    }
+
     $env = [
         'BOT_TOKEN' => trim((string) ($input['BOT_TOKEN'] ?? '')),
-        'BOT_USERNAME' => trim((string) ($input['BOT_USERNAME'] ?? '')),
         'ADMIN_IDS' => trim((string) ($input['ADMIN_IDS'] ?? '')),
         'DB_HOST' => trim((string) ($input['DB_HOST'] ?? '127.0.0.1')),
         'DB_PORT' => trim((string) ($input['DB_PORT'] ?? '3306')),
@@ -110,17 +144,18 @@ function cf_install(array $input): array
         return ['ok' => false, 'messages' => ['Installation failed: ' . $e->getMessage()]];
     }
 
-    $webhookBase = trim((string) ($input['WEBHOOK_BASE_URL'] ?? ''));
+    $webhookBase = cf_detect_base_url();
     if ($webhookBase !== '') {
         $webhookUrl = rtrim($webhookBase, '/') . '/webhook.php';
         $res = cf_set_webhook($env['BOT_TOKEN'], $webhookUrl);
         if (($res['ok'] ?? false) === true) {
             $messages[] = '✓ Telegram webhook set: ' . $webhookUrl;
+            $messages[] = '✓ Webhook base URL auto-detected from current domain: ' . $webhookBase;
         } else {
             $messages[] = '⚠ Webhook not set: ' . (string) ($res['description'] ?? 'Unknown error');
         }
     } else {
-        $messages[] = '⚠ Webhook skipped (WEBHOOK_BASE_URL is empty).';
+        $messages[] = '⚠ Webhook skipped (could not auto-detect current domain in this environment).';
     }
 
     return ['ok' => true, 'messages' => $messages];
@@ -148,7 +183,6 @@ if (PHP_SAPI === 'cli') {
 
     $input = [
         'BOT_TOKEN' => cf_prompt('BOT_TOKEN'),
-        'BOT_USERNAME' => cf_prompt('BOT_USERNAME', '', false),
         'ADMIN_IDS' => cf_prompt('ADMIN_IDS (comma separated)'),
         'DB_HOST' => cf_prompt('DB_HOST', '127.0.0.1'),
         'DB_PORT' => cf_prompt('DB_PORT', '3306'),
@@ -157,7 +191,6 @@ if (PHP_SAPI === 'cli') {
         'DB_PASS' => cf_prompt('DB_PASS', '', false),
         'TETRAPAY_CREATE_URL' => cf_prompt('TETRAPAY_CREATE_URL', 'https://tetra98.com/api/create_order'),
         'TETRAPAY_VERIFY_URL' => cf_prompt('TETRAPAY_VERIFY_URL', 'https://tetra98.com/api/verify'),
-        'WEBHOOK_BASE_URL' => cf_prompt('WEBHOOK_BASE_URL (optional, ex: https://example.com)', '', false),
     ];
 
     $result = cf_install($input);
@@ -171,7 +204,6 @@ if (PHP_SAPI === 'cli') {
 $result = null;
 $values = [
     'BOT_TOKEN' => '',
-    'BOT_USERNAME' => '',
     'ADMIN_IDS' => '',
     'DB_HOST' => '127.0.0.1',
     'DB_PORT' => '3306',
@@ -180,7 +212,6 @@ $values = [
     'DB_PASS' => '',
     'TETRAPAY_CREATE_URL' => 'https://tetra98.com/api/create_order',
     'TETRAPAY_VERIFY_URL' => 'https://tetra98.com/api/verify',
-    'WEBHOOK_BASE_URL' => '',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -197,24 +228,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ConfigFlow Installer</title>
   <style>
-    body{font-family:Tahoma,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:24px}
+    :root{
+      --bg:#0f172a;--fg:#e2e8f0;--muted:#94a3b8;--card:#111827;--card-border:#334155;
+      --input-bg:#0b1220;--input-border:#475569;--btn:#2563eb;
+      --ok-bg:#052e16;--ok-border:#166534;--ok-fg:#86efac;
+      --err-bg:#3f1d1d;--err-border:#7f1d1d;--err-fg:#fecaca;
+    }
+    body[data-theme="light"]{
+      --bg:#f1f5f9;--fg:#0f172a;--muted:#334155;--card:#ffffff;--card-border:#cbd5e1;
+      --input-bg:#ffffff;--input-border:#94a3b8;--btn:#1d4ed8;
+      --ok-bg:#dcfce7;--ok-border:#16a34a;--ok-fg:#166534;
+      --err-bg:#fee2e2;--err-border:#ef4444;--err-fg:#991b1b;
+    }
+    body{font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:24px;transition:background .2s,color .2s}
     .wrap{max-width:900px;margin:0 auto}
-    .card{background:#111827;border:1px solid #334155;border-radius:14px;padding:20px;margin-bottom:16px}
+    .card{background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:20px;margin-bottom:16px}
     h1{margin:0 0 10px 0;font-size:28px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .full{grid-column:1/-1}
-    label{font-size:13px;display:block;margin-bottom:6px;color:#94a3b8}
-    input{width:100%;padding:10px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#e2e8f0}
-    .btn{background:#2563eb;color:#fff;border:none;padding:12px 16px;border-radius:10px;cursor:pointer;font-weight:bold}
-    .ok{background:#052e16;border:1px solid #166534;color:#86efac;padding:10px;border-radius:10px;margin:8px 0}
-    .err{background:#3f1d1d;border:1px solid #7f1d1d;color:#fecaca;padding:10px;border-radius:10px;margin:8px 0}
-    .hint{font-size:12px;color:#94a3b8}
+    label{font-size:13px;display:block;margin-bottom:6px;color:var(--muted)}
+    input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}
+    .btn{background:var(--btn);color:#fff;border:none;padding:12px 16px;border-radius:10px;cursor:pointer;font-weight:bold}
+    .theme-btn{background:transparent;color:var(--fg);border:1px solid var(--card-border);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .ok{background:var(--ok-bg);border:1px solid var(--ok-border);color:var(--ok-fg);padding:10px;border-radius:10px;margin:8px 0}
+    .err{background:var(--err-bg);border:1px solid var(--err-border);color:var(--err-fg);padding:10px;border-radius:10px;margin:8px 0}
+    .hint{font-size:12px;color:var(--muted)}
+    @media (max-width:700px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="card">
-    <h1>⚙️ ConfigFlow Installer</h1>
+    <div class="topbar">
+      <h1>⚙️ ConfigFlow Installer</h1>
+      <button type="button" id="themeToggle" class="theme-btn">🌙 Dark</button>
+    </div>
     <p>Fill your bot and database settings, then click install.</p>
     <?php if ($result !== null): ?>
       <?php foreach ($result['messages'] as $message): ?>
@@ -226,18 +275,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <form method="post" class="card" id="installerForm">
     <div class="grid">
       <?php foreach ($values as $key => $val): ?>
-        <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','WEBHOOK_BASE_URL','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
+        <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
           <label for="<?= $key ?>"><?= $key ?></label>
-          <input id="<?= $key ?>" name="<?= $key ?>" value="<?= htmlspecialchars($val) ?>" autocomplete="off">
+          <input
+            id="<?= $key ?>"
+            name="<?= $key ?>"
+            value="<?= htmlspecialchars($val) ?>"
+            autocomplete="off"
+          >
         </div>
       <?php endforeach; ?>
     </div>
 
-    <p class="hint">WEBHOOK_BASE_URL sample: https://example.com (installer will set /webhook.php automatically)</p>
     <button class="btn" type="submit">Install ConfigFlow</button>
   </form>
 </div>
 <script>
+  (function () {
+    const saved = localStorage.getItem('cf_theme');
+    const theme = saved === 'light' ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', theme);
+    const btn = document.getElementById('themeToggle');
+    const updateLabel = () => {
+      const current = document.body.getAttribute('data-theme') || 'dark';
+      btn.textContent = current === 'light' ? '🌙 Dark' : '☀️ Light';
+    };
+    updateLabel();
+    btn.addEventListener('click', function () {
+      const current = document.body.getAttribute('data-theme') || 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      document.body.setAttribute('data-theme', next);
+      localStorage.setItem('cf_theme', next);
+      updateLabel();
+    });
+  })();
+
   document.getElementById('installerForm').addEventListener('submit', function (e) {
     const required = ['BOT_TOKEN','ADMIN_IDS','DB_HOST','DB_PORT','DB_NAME','DB_USER'];
     for (const name of required) {
