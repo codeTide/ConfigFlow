@@ -62,6 +62,129 @@ final class PaymentGatewayService
         return ['ok' => true, 'paid' => $isPaid, 'raw' => $data];
     }
 
+    public function createSwapwalletCryptoInvoice(int $amount, string $orderId, string $network = 'TRON', string $description = 'Payment'): array
+    {
+        $apiKey = trim($this->settings->get('swapwallet_crypto_api_key', ''));
+        $username = ltrim(trim($this->settings->get('swapwallet_crypto_username', '')), '@');
+        if ($apiKey === '' || $username === '') {
+            return ['ok' => false, 'error' => 'swapwallet_credentials_missing'];
+        }
+        if (str_starts_with(strtolower($apiKey), 'bearer ')) {
+            $apiKey = trim(substr($apiKey, 7));
+        }
+
+        $allowedToken = strtoupper($network) === 'TON' ? 'TON' : 'USDT';
+        $payload = [
+            'amount' => ['number' => (string) $amount, 'unit' => 'IRT'],
+            'network' => strtoupper($network),
+            'allowedToken' => $allowedToken,
+            'ttl' => 3600,
+            'orderId' => (string) $orderId,
+            'description' => $description,
+        ];
+        $url = rtrim(Config::swapwalletBaseUrl(), '/') . '/v2/payment/' . rawurlencode($username) . '/invoices/temporary-wallet';
+        $res = $this->postJsonHeaders($url, $payload, [
+            'Authorization: Bearer ' . $apiKey,
+            'Accept: application/json',
+        ]);
+        if (!($res['ok'] ?? false)) {
+            return ['ok' => false, 'error' => 'request_failed'];
+        }
+        $data = $res['data'] ?? [];
+        if (($data['status'] ?? '') !== 'OK' || !is_array($data['result'] ?? null)) {
+            return ['ok' => false, 'error' => 'invalid_response', 'raw' => $data];
+        }
+        $result = $data['result'];
+        $links = is_array($result['links'] ?? null) ? $result['links'] : [];
+        $firstUrl = '';
+        foreach ($links as $link) {
+            if (is_array($link) && trim((string) ($link['url'] ?? '')) !== '') {
+                $firstUrl = trim((string) $link['url']);
+                break;
+            }
+        }
+        return [
+            'ok' => true,
+            'invoice_id' => (string) ($result['id'] ?? ''),
+            'pay_url' => $firstUrl,
+            'wallet_address' => (string) ($result['walletAddress'] ?? ''),
+            'links' => $links,
+            'raw' => $result,
+        ];
+    }
+
+    public function checkSwapwalletCryptoInvoice(string $invoiceId): array
+    {
+        $apiKey = trim($this->settings->get('swapwallet_crypto_api_key', ''));
+        $username = ltrim(trim($this->settings->get('swapwallet_crypto_username', '')), '@');
+        if ($apiKey === '' || $username === '' || trim($invoiceId) === '') {
+            return ['ok' => false, 'error' => 'missing_data'];
+        }
+        if (str_starts_with(strtolower($apiKey), 'bearer ')) {
+            $apiKey = trim(substr($apiKey, 7));
+        }
+        $url = rtrim(Config::swapwalletBaseUrl(), '/') . '/v2/payment/' . rawurlencode($username) . '/invoices/' . rawurlencode($invoiceId);
+        $res = $this->getJsonHeaders($url, [
+            'Authorization: Bearer ' . $apiKey,
+            'Accept: application/json',
+        ]);
+        if (!($res['ok'] ?? false)) {
+            return ['ok' => false, 'error' => 'request_failed'];
+        }
+        $data = $res['data'] ?? [];
+        $result = is_array($data['result'] ?? null) ? $data['result'] : [];
+        $status = strtoupper((string) ($result['status'] ?? $data['status'] ?? ''));
+        $isPaid = in_array($status, ['PAID', 'COMPLETED', 'SUCCESS'], true);
+        return ['ok' => true, 'paid' => $isPaid, 'raw' => $data];
+    }
+
+    public function createTronpaysRialInvoice(int $amount, string $hashId): array
+    {
+        $apiKey = trim($this->settings->get('tronpays_rial_api_key', ''));
+        $callback = trim($this->settings->get('tronpays_rial_callback_url', ''));
+        if ($apiKey === '') {
+            return ['ok' => false, 'error' => 'tronpays_api_key_missing'];
+        }
+        $payload = [
+            'api_key' => $apiKey,
+            'hash_id' => substr(md5($hashId), 0, 20),
+            'amount' => $amount,
+            'callback_url' => $callback !== '' ? $callback : 'https://example.com/',
+        ];
+        $url = rtrim(Config::tronpaysBaseUrl(), '/') . '/api/invoice/create';
+        $res = $this->postJsonHeaders($url, $payload, ['Accept: application/json']);
+        if (!($res['ok'] ?? false)) {
+            return ['ok' => false, 'error' => 'request_failed'];
+        }
+        $data = $res['data'] ?? [];
+        return [
+            'ok' => true,
+            'invoice_id' => (string) ($data['invoice_id'] ?? $data['invoiceId'] ?? ''),
+            'pay_url' => (string) ($data['invoice_url'] ?? $data['invoiceUrl'] ?? ''),
+            'raw' => $data,
+        ];
+    }
+
+    public function checkTronpaysRialInvoice(string $invoiceId): array
+    {
+        $apiKey = trim($this->settings->get('tronpays_rial_api_key', ''));
+        if ($apiKey === '' || trim($invoiceId) === '') {
+            return ['ok' => false, 'error' => 'missing_data'];
+        }
+        $url = rtrim(Config::tronpaysBaseUrl(), '/') . '/api/invoice/check';
+        $res = $this->postJsonHeaders($url, [
+            'api_key' => $apiKey,
+            'invoice_id' => $invoiceId,
+        ], ['Accept: application/json']);
+        if (!($res['ok'] ?? false)) {
+            return ['ok' => false, 'error' => 'request_failed'];
+        }
+        $data = $res['data'] ?? [];
+        $status = strtoupper((string) ($data['status'] ?? $data['state'] ?? $data['payment_status'] ?? (is_string($data) ? $data : '')));
+        $isPaid = in_array($status, ['PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED', 'DONE'], true);
+        return ['ok' => true, 'paid' => $isPaid, 'raw' => $data];
+    }
+
     public function cryptoAddress(string $coin): string
     {
         return trim($this->settings->get('crypto_wallet_' . $coin, ''));
@@ -237,6 +360,51 @@ final class PaymentGatewayService
             return ['ok' => false];
         }
 
+        return ['ok' => true, 'data' => $decoded];
+    }
+
+    private function postJsonHeaders(string $url, array $payload, array $headers): array
+    {
+        $allHeaders = array_merge(['Content-Type: application/json; charset=utf-8'], $headers);
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER => $allHeaders,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+        ]);
+        $raw = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($raw === false || $err !== '') {
+            return ['ok' => false, 'error' => $err];
+        }
+        $decoded = json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            return ['ok' => false, 'error' => 'decode_error'];
+        }
+        return ['ok' => true, 'data' => $decoded];
+    }
+
+    private function getJsonHeaders(string $url, array $headers): array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_HTTPHEADER => $headers,
+        ]);
+        $raw = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($raw === false || $err !== '') {
+            return ['ok' => false, 'error' => $err];
+        }
+        $decoded = json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            return ['ok' => false, 'error' => 'decode_error'];
+        }
         return ['ok' => true, 'data' => $decoded];
     }
 

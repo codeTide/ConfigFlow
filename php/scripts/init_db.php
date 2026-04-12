@@ -65,6 +65,16 @@ $pdo->exec(
 $defaults = [
     'bot_status' => 'on',
     'start_text' => '',
+    'channel_id' => '',
+    'group_id' => '',
+    'group_topic_backup' => '',
+    'group_topic_broadcast_report' => '',
+    'group_topic_error_log' => '',
+    'backup_enabled' => '0',
+    'backup_interval' => '24',
+    'backup_target_id' => '',
+    'php_worker_runtime_enabled' => '0',
+    'php_worker_poll_interval' => '10',
 ];
 
 $stmt = $pdo->prepare('INSERT IGNORE INTO settings (`key`, `value`) VALUES (:key, :value)');
