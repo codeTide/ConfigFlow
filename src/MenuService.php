@@ -65,13 +65,31 @@ final class MenuService
         }
 
         $balance = (int) ($user['balance'] ?? 0);
+        $balanceFa = $this->toPersianDigits((string) $balance);
+        $userIdFa = $this->toPersianDigits((string) $userId);
 
         return "👤 <b>پروفایل کاربری</b>\n\n"
             . "📱 نام: " . htmlspecialchars((string) ($user['full_name'] ?? '-')) . "\n"
             . "🏷 نام کاربری: " . htmlspecialchars((string) $username) . "\n"
-            . "🔢 آیدی: <code>{$userId}</code>\n\n"
-            . "💰 موجودی: <b>{$balance}</b> تومان\n\n"
-            . "> حساب شما امن نگه داشته شده؛ برای شارژ، دعوت یا نمایندگی از دکمه‌های همین بخش استفاده کنید.";
+            . "🆔 آیدی: <code>{$userIdFa}</code>\n\n"
+            . "💰 موجودی: <b>{$balanceFa}</b> تومان\n\n"
+            . "> 🔐 حساب شما امن نگه داشته شده؛ برای شارژ، دعوت یا نمایندگی از دکمه‌های همین بخش استفاده کنید.";
+    }
+
+    private function toPersianDigits(string $value): string
+    {
+        return strtr($value, [
+            '0' => '۰',
+            '1' => '۱',
+            '2' => '۲',
+            '3' => '۳',
+            '4' => '۴',
+            '5' => '۵',
+            '6' => '۶',
+            '7' => '۷',
+            '8' => '۸',
+            '9' => '۹',
+        ]);
     }
 
     public function supportText(): string

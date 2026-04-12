@@ -16,6 +16,7 @@ final class KeyboardBuilder
     public const BTN_AGENCY = '🤝 نمایندگی';
     public const BTN_ADMIN = '⚙️ پنل مدیریت';
     public const BTN_BACK_MAIN = '🏠 منوی اصلی';
+    public const BTN_BACK_ACCOUNT = '↩️ بازگشت';
     public const BTN_BACK_TYPES = '🔙 بازگشت به سرویس‌ها';
     public const BTN_BACK_PURCHASES = '🔙 بازگشت به سفارش‌ها';
 

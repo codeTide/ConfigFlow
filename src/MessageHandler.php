@@ -100,6 +100,16 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_wallet_amount') {
+            if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+                return;
+            }
+            if ($text === KeyboardBuilder::BTN_BACK_ACCOUNT) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $this->menus->profileText($userId), $this->menus->accountMenuReplyKeyboard());
+                return;
+            }
             if ($text === '' || str_starts_with($text, '/')) {
                 return;
             }
@@ -965,7 +975,7 @@ ID: <code>{$pinId}</code>");
             $this->telegram->sendMessage(
                 $chatId,
                 "💳 <b>شارژ کیف پول</b>\n\nلطفاً مبلغ موردنظر را به تومان ارسال کنید.",
-                null
+                $this->replyKeyboard([[KeyboardBuilder::BTN_BACK_ACCOUNT, KeyboardBuilder::BTN_BACK_MAIN]])
             );
             return true;
         }
