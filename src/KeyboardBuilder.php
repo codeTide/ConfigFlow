@@ -9,7 +9,8 @@ final class KeyboardBuilder
     public const BTN_BUY = '🛒 خرید';
     public const BTN_MY_CONFIGS = '📦 کانفیگ‌هام';
     public const BTN_FREE_TEST = '🎁 تست رایگان';
-    public const BTN_PROFILE = '👤 حساب من';
+    public const BTN_PROFILE = '👤 حساب';
+    public const BTN_PROFILE_INFO = '🪪 پروفایل';
     public const BTN_WALLET = '💳 کیف پول';
     public const BTN_SUPPORT = '🎧 پشتیبانی';
     public const BTN_REFERRAL = '🎁 دعوت';
@@ -55,29 +56,32 @@ final class KeyboardBuilder
 
     public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
     {
-        $buttons = [self::BTN_BUY, self::BTN_MY_CONFIGS];
-
-        if ($freeTestEnabled) {
-            $buttons[] = self::BTN_FREE_TEST;
-        }
-
-        $buttons[] = self::BTN_PROFILE;
-        $buttons[] = self::BTN_WALLET;
-        $buttons[] = self::BTN_SUPPORT;
-
-        if ($referralEnabled) {
-            $buttons[] = self::BTN_REFERRAL;
-        }
-
-        if ($agencyEnabled) {
-            $buttons[] = self::BTN_AGENCY;
-        }
-
+        $keyboard = [];
         if ($isAdmin) {
-            $buttons[] = self::BTN_ADMIN;
+            $keyboard[] = [self::BTN_ADMIN];
         }
+        $keyboard[] = [self::BTN_PROFILE, self::BTN_BUY, self::BTN_MY_CONFIGS];
+        $keyboard[] = $freeTestEnabled ? [self::BTN_FREE_TEST, self::BTN_SUPPORT] : [self::BTN_SUPPORT];
 
-        $keyboard = self::smartKeyboardRows($buttons, [3, 2, 1], 12, 18);
+        return [
+            'keyboard' => $keyboard,
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+        ];
+    }
+
+    public static function accountReply(bool $referralEnabled, bool $agencyEnabled): array
+    {
+        $keyboard = [
+            [self::BTN_PROFILE_INFO, self::BTN_WALLET],
+        ];
+        if ($referralEnabled) {
+            $keyboard[] = [self::BTN_REFERRAL];
+        }
+        if ($agencyEnabled) {
+            $keyboard[] = [self::BTN_AGENCY];
+        }
+        $keyboard[] = [self::BTN_BACK_MAIN];
 
         return [
             'keyboard' => $keyboard,
