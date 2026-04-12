@@ -257,6 +257,146 @@ final class CallbackHandler
             return;
         }
 
+
+        if ($data === 'admin:pins') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $rows = [[['text' => '➕ افزودن پیام پین', 'callback_data' => 'admin:pins:add']]];
+            foreach ($this->database->listPinnedMessages() as $pin) {
+                $pinId = (int) ($pin['id'] ?? 0);
+                $rows[] = [[
+                    'text' => '📌 #' . $pinId,
+                    'callback_data' => 'admin:pins:view:' . $pinId,
+                ]];
+            }
+            $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panel']];
+            $this->telegram->editMessageText($chatId, $messageId, '📌 <b>مدیریت پیام‌های پین</b>', ['inline_keyboard' => $rows]);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:pins:add') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->database->setUserState($userId, 'await_admin_pin_add');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 متن پیام پین را ارسال کنید.",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:pins']]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pins:view:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $pinId = (int) substr($data, strlen('admin:pins:view:'));
+            $pin = $this->database->getPinnedMessage($pinId);
+            if ($pin === null) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پیام پین پیدا نشد.');
+                return;
+            }
+            $sendCount = count($this->database->getPinnedSends($pinId));
+            $rows = [
+                [['text' => '📤 ارسال به همه کاربران', 'callback_data' => 'admin:pins:send:' . $pinId]],
+                [['text' => '✏️ ویرایش', 'callback_data' => 'admin:pins:edit:' . $pinId]],
+                [['text' => '🗑 حذف', 'callback_data' => 'admin:pins:delete:' . $pinId]],
+                [['text' => '🔙 بازگشت', 'callback_data' => 'admin:pins']],
+            ];
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📌 <b>پیام پین #{$pinId}</b>
+
+" . htmlspecialchars((string) ($pin['text'] ?? '')) . "
+
+ارسال‌شده: <b>{$sendCount}</b>",
+                ['inline_keyboard' => $rows]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pins:edit:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $pinId = (int) substr($data, strlen('admin:pins:edit:'));
+            $this->database->setUserState($userId, 'await_admin_pin_edit', ['pin_id' => $pinId]);
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "📝 متن جدید پیام پین را ارسال کنید.",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:pins:view:' . $pinId]]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pins:delete:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $pinId = (int) substr($data, strlen('admin:pins:delete:'));
+            $this->database->deletePinnedMessage($pinId);
+            $this->telegram->answerCallbackQuery($callbackId, '✅ حذف شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:pins']]);
+            return;
+        }
+
+        if (str_starts_with($data, 'admin:pins:send:')) {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $pinId = (int) substr($data, strlen('admin:pins:send:'));
+            $pin = $this->database->getPinnedMessage($pinId);
+            if ($pin === null) {
+                $this->telegram->answerCallbackQuery($callbackId, 'پیام پین پیدا نشد.');
+                return;
+            }
+            $sent = 0;
+            $pinned = 0;
+            foreach ($this->database->listUserIdsForBroadcast('all') as $targetId) {
+                if ($targetId <= 0) {
+                    continue;
+                }
+                try {
+                    $result = $this->telegram->sendMessageWithResult($targetId, (string) ($pin['text'] ?? ''));
+                    if (is_array($result)) {
+                        $sent++;
+                        $msgId = (int) ($result['message_id'] ?? 0);
+                        if ($msgId > 0) {
+                            $this->database->savePinnedSend($pinId, $targetId, $msgId);
+                            $this->telegram->pinChatMessage($targetId, $msgId, true);
+                            $pinned++;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+            $this->telegram->answerCallbackQuery($callbackId, '✅ ارسال انجام شد.');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "✅ پیام پین ارسال شد.
+📤 ارسال: <b>{$sent}</b>
+📌 پین: <b>{$pinned}</b>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:pins:view:' . $pinId]]]]
+            );
+            return;
+        }
+
         if ($data === 'admin:broadcast') {
             if (!$isAdmin) {
                 $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
@@ -3137,7 +3277,7 @@ final class CallbackHandler
         if (str_starts_with($data, 'admin:admins')) {
             return 'full';
         }
-        if (str_starts_with($data, 'admin:broadcast')) {
+        if (str_starts_with($data, 'admin:broadcast') || str_starts_with($data, 'admin:pins') || $data === 'admin:pins') {
             return 'broadcast';
         }
         if (str_starts_with($data, 'admin:type') || str_starts_with($data, 'admin:pkg') || $data === 'admin:types') {

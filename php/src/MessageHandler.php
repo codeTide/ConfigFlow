@@ -38,6 +38,11 @@ final class MessageHandler
             return;
         }
 
+        if ($text !== '' && str_starts_with($text, '/start')) {
+            $this->database->clearUserState($userId);
+            return;
+        }
+
         if ($state['state_name'] === 'await_wallet_amount') {
             if ($text === '' || str_starts_with($text, '/')) {
                 return;
@@ -794,6 +799,42 @@ final class MessageHandler
             return;
         }
 
+
+
+        if ($state['state_name'] === 'await_admin_pin_add') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $body = trim((string) ($message['text'] ?? ''));
+            if ($body === '') {
+                $this->telegram->sendMessage($chatId, '⚠️ متن پیام پین نمی‌تواند خالی باشد.');
+                return;
+            }
+            $pinId = $this->database->addPinnedMessage($body);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ پیام پین ثبت شد.
+ID: <code>{$pinId}</code>");
+            return;
+        }
+
+        if ($state['state_name'] === 'await_admin_pin_edit') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $pinId = (int) (($state['payload'] ?? [])['pin_id'] ?? 0);
+            $body = trim((string) ($message['text'] ?? ''));
+            if ($pinId <= 0 || $body === '') {
+                $this->telegram->sendMessage($chatId, '⚠️ داده ویرایش پیام پین معتبر نیست.');
+                return;
+            }
+            $this->database->updatePinnedMessage($pinId, $body);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ پیام پین ویرایش شد.
+ID: <code>{$pinId}</code>");
+            return;
+        }
         if ($state['state_name'] === 'await_admin_broadcast') {
             if (!$this->database->isAdminUser($userId)) {
                 $this->database->clearUserState($userId);

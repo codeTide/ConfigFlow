@@ -238,6 +238,69 @@ final class Database implements WorkerApiStore
         ];
     }
 
+
+
+    public function listPinnedMessages(): array
+    {
+        return $this->pdo->query('SELECT id, text, created_at FROM pinned_messages ORDER BY id ASC')->fetchAll();
+    }
+
+    public function getPinnedMessage(int $pinId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, text, created_at FROM pinned_messages WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $pinId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function addPinnedMessage(string $text): int
+    {
+        $stmt = $this->pdo->prepare('INSERT INTO pinned_messages (text, created_at) VALUES (:text, :created_at)');
+        $stmt->execute(['text' => trim($text), 'created_at' => gmdate('Y-m-d H:i:s')]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function updatePinnedMessage(int $pinId, string $text): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE pinned_messages SET text = :text WHERE id = :id');
+        $stmt->execute(['text' => trim($text), 'id' => $pinId]);
+    }
+
+    public function deletePinnedMessage(int $pinId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM pinned_messages WHERE id = :id');
+        $stmt->execute(['id' => $pinId]);
+        $stmt2 = $this->pdo->prepare('DELETE FROM pinned_message_sends WHERE pin_id = :pin_id');
+        $stmt2->execute(['pin_id' => $pinId]);
+    }
+
+    public function savePinnedSend(int $pinId, int $userId, int $messageId): void
+    {
+        $check = $this->pdo->prepare('SELECT id FROM pinned_message_sends WHERE pin_id = :pin_id AND user_id = :user_id LIMIT 1');
+        $check->execute(['pin_id' => $pinId, 'user_id' => $userId]);
+        $existingId = (int) ($check->fetchColumn() ?: 0);
+        if ($existingId > 0) {
+            $upd = $this->pdo->prepare('UPDATE pinned_message_sends SET message_id = :message_id WHERE id = :id');
+            $upd->execute(['message_id' => $messageId, 'id' => $existingId]);
+            return;
+        }
+
+        $stmt = $this->pdo->prepare('INSERT INTO pinned_message_sends (pin_id, user_id, message_id) VALUES (:pin_id, :user_id, :message_id)');
+        $stmt->execute(['pin_id' => $pinId, 'user_id' => $userId, 'message_id' => $messageId]);
+    }
+
+    public function getPinnedSends(int $pinId): array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, pin_id, user_id, message_id FROM pinned_message_sends WHERE pin_id = :pin_id ORDER BY id ASC');
+        $stmt->execute(['pin_id' => $pinId]);
+        return $stmt->fetchAll();
+    }
+
+    public function deletePinnedSends(int $pinId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM pinned_message_sends WHERE pin_id = :pin_id');
+        $stmt->execute(['pin_id' => $pinId]);
+    }
     public function createFreeTestRequest(int $userId, string $note): int
     {
         $stmt = $this->pdo->prepare(
