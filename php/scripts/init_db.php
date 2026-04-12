@@ -73,6 +73,8 @@ $defaults = [
     'backup_enabled' => '0',
     'backup_interval' => '24',
     'backup_target_id' => '',
+    'php_worker_runtime_enabled' => '0',
+    'php_worker_poll_interval' => '10',
 ];
 
 $stmt = $pdo->prepare('INSERT IGNORE INTO settings (`key`, `value`) VALUES (:key, :value)');

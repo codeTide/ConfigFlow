@@ -692,6 +692,22 @@ final class MessageHandler
             return;
         }
 
+        if ($state['state_name'] === 'await_php_worker_poll_interval') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $interval = (int) preg_replace('/\\D+/', '', $text);
+            if ($interval < 3 || $interval > 3600) {
+                $this->telegram->sendMessage($chatId, '⚠️ بازه معتبر نیست (3 تا 3600 ثانیه).');
+                return;
+            }
+            $this->settings->set('php_worker_poll_interval', (string) $interval);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ بازه Poll ذخیره شد: <b>{$interval}</b> ثانیه");
+            return;
+        }
+
         if ($state['state_name'] === 'await_admin_set_channel') {
             if (!$this->database->isAdminUser($userId)) {
                 $this->database->clearUserState($userId);

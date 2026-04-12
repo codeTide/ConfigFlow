@@ -1376,6 +1376,8 @@ final class CallbackHandler
             $enabled = $this->settings->get('worker_api_enabled', '0');
             $port = $this->settings->get('worker_api_port', '8080');
             $key = $this->settings->get('worker_api_key', '');
+            $phpRuntime = $this->settings->get('php_worker_runtime_enabled', '0');
+            $phpPoll = $this->settings->get('php_worker_poll_interval', '10');
             $rows = [
                 [[
                     'text' => 'Worker API: ' . ($enabled === '1' ? '✅ ON' : '❌ OFF'),
@@ -1383,6 +1385,11 @@ final class CallbackHandler
                 ]],
                 [['text' => '🔑 تنظیم API Key', 'callback_data' => 'admin:panels:worker:key']],
                 [['text' => '🔌 تنظیم Port', 'callback_data' => 'admin:panels:worker:port']],
+                [[
+                    'text' => 'PHP Runtime: ' . ($phpRuntime === '1' ? '✅ ON' : '❌ OFF'),
+                    'callback_data' => 'admin:panels:worker:php_toggle',
+                ]],
+                [['text' => '⏱ تنظیم Poll Interval', 'callback_data' => 'admin:panels:worker:php_poll']],
                 [['text' => '🔙 بازگشت', 'callback_data' => 'admin:panels']],
             ];
             $this->telegram->editMessageText(
@@ -1391,7 +1398,10 @@ final class CallbackHandler
                 "⚙️ <b>Worker API Settings</b>\n\n"
                 . "Enabled: <b>" . ($enabled === '1' ? 'ON' : 'OFF') . "</b>\n"
                 . "Port: <code>" . htmlspecialchars($port) . "</code>\n"
-                . "Key: <code>" . htmlspecialchars($key !== '' ? substr($key, 0, 8) . '...' : '-') . "</code>",
+                . "Key: <code>" . htmlspecialchars($key !== '' ? substr($key, 0, 8) . '...' : '-') . "</code>\n"
+                . "PHP Runtime: <b>" . ($phpRuntime === '1' ? 'ON' : 'OFF') . "</b>\n"
+                . "Poll: <code>" . htmlspecialchars($phpPoll) . "s</code>\n\n"
+                . "<i>CLI:</i> <code>php php/scripts/php_worker_runtime.php</code>",
                 ['inline_keyboard' => $rows]
             );
             $this->telegram->answerCallbackQuery($callbackId);
@@ -1407,6 +1417,34 @@ final class CallbackHandler
             $this->settings->set('worker_api_enabled', $cur === '1' ? '0' : '1');
             $this->telegram->answerCallbackQuery($callbackId, '✅ ذخیره شد.');
             $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:panels:worker']]);
+            return;
+        }
+
+        if ($data === 'admin:panels:worker:php_toggle') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $cur = $this->settings->get('php_worker_runtime_enabled', '0');
+            $this->settings->set('php_worker_runtime_enabled', $cur === '1' ? '0' : '1');
+            $this->telegram->answerCallbackQuery($callbackId, '✅ ذخیره شد.');
+            $this->handle(['callback_query' => ['id' => $callbackId, 'from' => $fromUser, 'message' => $message, 'data' => 'admin:panels:worker']]);
+            return;
+        }
+
+        if ($data === 'admin:panels:worker:php_poll') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->database->setUserState($userId, 'await_php_worker_poll_interval');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "⏱ بازه Poll را به ثانیه ارسال کنید (حداقل 3).",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:panels:worker']]]]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
 

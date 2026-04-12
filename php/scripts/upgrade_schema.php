@@ -105,6 +105,8 @@ try {
         'backup_enabled' => '0',
         'backup_interval' => '24',
         'backup_target_id' => '',
+        'php_worker_runtime_enabled' => '0',
+        'php_worker_poll_interval' => '10',
     ];
     $upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
     foreach ($defaults as $k => $v) {
