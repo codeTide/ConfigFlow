@@ -103,7 +103,7 @@ function cf_install(array $input): array
         $messages[] = '✓ .env file written.';
 
         ob_start();
-        require __DIR__ . '/scripts/init_db.php';
+        require __DIR__ . '/scripts/InitDb.php';
         $initOut = trim((string) ob_get_clean());
         $messages[] = '✓ Database schema initialized.' . ($initOut !== '' ? " ({$initOut})" : '');
     } catch (Throwable $e) {

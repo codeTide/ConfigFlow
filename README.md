@@ -16,8 +16,8 @@ ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-b
 - Payment gateway orchestration (wallet, card, crypto, tetrapay)
 - Admin review flows for requests and payments
 - Free-test and agency request tracking
-- Worker API endpoints for async x-ui style jobs (`public/worker_api.php`)
-- Runtime worker loop (`scripts/php_worker_runtime.php`)
+- Worker API endpoints for async x-ui style jobs (`public/WorkerApi.php`)
+- Runtime worker loop (`scripts/PhpWorkerRuntime.php`)
 - Backup runtime and SQLite migration helpers
 
 ## Project Structure
@@ -27,13 +27,12 @@ ConfigFlow/
 ├── webhook.php
 ├── install.php
 ├── public/
-│   └── worker_api.php
+│   └── WorkerApi.php
 ├── scripts/
-│   ├── init_db.php
+│   ├── InitDb.php
 │   ├── schema.sql
-│   ├── migrate_sqlite_to_mysql.php
-│   ├── php_worker_runtime.php
-│   └── backup_runtime.php
+│   ├── PhpWorkerRuntime.php
+│   └── BackupRuntime.php
 ├── src/
 └── env.example
 ```
@@ -88,7 +87,7 @@ The installer will:
 
 1. Collect `.env` values (with validation)
 2. Generate `.env`
-3. Connect to MySQL and initialize schema (`scripts/init_db.php`)
+3. Connect to MySQL and initialize schema (`scripts/InitDb.php`)
 4. Optionally set Telegram webhook automatically
 
 ---
@@ -123,7 +122,7 @@ php install.php
 Manual schema init (if `.env` already exists):
 
 ```bash
-php scripts/init_db.php
+php scripts/InitDb.php
 ```
 
 ### 4) Serve webhook endpoint
@@ -152,7 +151,7 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 ### 6) Run worker runtime (optional but recommended)
 
 ```bash
-php scripts/php_worker_runtime.php
+php scripts/PhpWorkerRuntime.php
 ```
 
 ---
@@ -164,7 +163,10 @@ This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 1. Upload project files.
 2. Keep your usual document root (no special root change needed for webhook).
 3. Ensure `https://YOUR_DOMAIN/webhook.php` is reachable.
-4. Run `php install.php` from Terminal/SSH (or ask host support to run it once).
+4. Run installer using one of these methods:
+   - Terminal/SSH: `php install.php`
+   - Browser: open `https://YOUR_DOMAIN/install.php` and submit the form
+   - If you do not have terminal access, ask host support to run `php install.php` once.
 5. If webhook was skipped in installer, set it manually via Telegram API.
 6. For worker runtime, use background process if allowed, otherwise cron.
 
@@ -172,16 +174,10 @@ This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 
 ## Utilities
 
-SQLite to MySQL migration:
-
-```bash
-php scripts/migrate_sqlite_to_mysql.php /path/to/configflow.db
-```
-
 Backup runtime:
 
 ```bash
-php scripts/backup_runtime.php
+php scripts/BackupRuntime.php
 ```
 
 ## Checks
