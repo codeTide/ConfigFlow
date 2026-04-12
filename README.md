@@ -52,7 +52,6 @@ Main variables:
 
 ```env
 BOT_TOKEN=
-BOT_USERNAME=
 ADMIN_IDS=
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -62,6 +61,10 @@ DB_PASS=
 TETRAPAY_CREATE_URL=https://tetra98.com/api/create_order
 TETRAPAY_VERIFY_URL=https://tetra98.com/api/verify
 ```
+
+Notes:
+- `BOT_USERNAME` is auto-resolved from Telegram API (`getMe`) at runtime.
+- Web installer auto-detects the current domain to set Telegram webhook to `/webhook.php`.
 
 ---
 
