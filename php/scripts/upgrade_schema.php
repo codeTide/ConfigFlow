@@ -87,6 +87,16 @@ try {
         'swapwallet_crypto_username' => '',
         'tronpays_rial_api_key' => '',
         'tronpays_rial_callback_url' => '',
+        'gw_card_min' => '0',
+        'gw_card_max' => '0',
+        'gw_crypto_min' => '0',
+        'gw_crypto_max' => '0',
+        'gw_tetrapay_min' => '0',
+        'gw_tetrapay_max' => '0',
+        'gw_swapwallet_crypto_min' => '0',
+        'gw_swapwallet_crypto_max' => '0',
+        'gw_tronpays_rial_min' => '0',
+        'gw_tronpays_rial_max' => '0',
     ];
     $upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
     foreach ($defaults as $k => $v) {
