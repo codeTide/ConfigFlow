@@ -52,7 +52,6 @@ Main variables:
 
 ```env
 BOT_TOKEN=
-BOT_USERNAME=
 ADMIN_IDS=
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -62,6 +61,10 @@ DB_PASS=
 TETRAPAY_CREATE_URL=https://tetra98.com/api/create_order
 TETRAPAY_VERIFY_URL=https://tetra98.com/api/verify
 ```
+
+Notes:
+- `BOT_USERNAME` is auto-resolved from Telegram API (`getMe`) at runtime.
+- Web installer auto-detects the current domain to set Telegram webhook to `/webhook.php`.
 
 ---
 
@@ -107,7 +110,7 @@ Install PHP + required extensions + MySQL:
 ### 2) Clone
 
 ```bash
-git clone https://github.com/Emadhabibnia1385/ConfigFlow.git
+git clone https://github.com/codeTide/ConfigFlow.git
 cd ConfigFlow
 ```
 
@@ -125,7 +128,38 @@ Manual schema init (if `.env` already exists):
 php scripts/InitDb.php
 ```
 
-### 4) Serve webhook endpoint
+### 4) Permissions (important on shared/VPS hosts)
+
+Installer needs permission to write `.env` in project root.
+
+Typical Linux fix (Debian/Ubuntu with nginx/apache user):
+
+```bash
+sudo chown -R www-data:www-data /path/to/ConfigFlow
+sudo chmod -R u+rwX /path/to/ConfigFlow
+```
+
+If your webserver user is different (for example `nginx`), replace `www-data`.
+
+How to find your webserver user:
+
+```bash
+# Nginx worker user
+ps -o user= -C nginx | head -n 1
+
+# Apache worker user (Debian/Ubuntu)
+ps -o user= -C apache2 | head -n 1
+
+# Apache worker user (RHEL/CentOS)
+ps -o user= -C httpd | head -n 1
+
+# PHP-FPM pool user (common on many hosts)
+ps -o user= -C php-fpm | head -n 1
+```
+
+If these return empty, ask host support for the PHP/web user and use that user/group in `chown`.
+
+### 5) Serve webhook endpoint
 
 Dev server:
 
@@ -135,7 +169,7 @@ php -S 0.0.0.0:8080
 
 Production (Nginx/Apache): expose `https://YOUR_DOMAIN/webhook.php`.
 
-### 5) Set webhook (if not done by installer)
+### 6) Set webhook (if not done by installer)
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
@@ -148,7 +182,7 @@ Check status:
 curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 ```
 
-### 6) Run worker runtime (optional but recommended)
+### 7) Run worker runtime (optional but recommended)
 
 ```bash
 php scripts/PhpWorkerRuntime.php
@@ -160,7 +194,13 @@ php scripts/PhpWorkerRuntime.php
 
 This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 
-1. Upload project files.
+1. Upload project files **or clone directly on host** (if SSH/Git is available):
+
+```bash
+git clone https://github.com/codeTide/ConfigFlow.git
+cd ConfigFlow
+```
+
 2. Keep your usual document root (no special root change needed for webhook).
 3. Ensure `https://YOUR_DOMAIN/webhook.php` is reachable.
 4. Run installer using one of these methods:
