@@ -164,7 +164,10 @@ This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 1. Upload project files.
 2. Keep your usual document root (no special root change needed for webhook).
 3. Ensure `https://YOUR_DOMAIN/webhook.php` is reachable.
-4. Run `php install.php` from Terminal/SSH (or ask host support to run it once).
+4. Run installer using one of these methods:
+   - Terminal/SSH: `php install.php`
+   - Browser: open `https://YOUR_DOMAIN/install.php` and submit the form
+   - If you do not have terminal access, ask host support to run `php install.php` once.
 5. If webhook was skipped in installer, set it manually via Telegram API.
 6. For worker runtime, use background process if allowed, otherwise cron.
 
