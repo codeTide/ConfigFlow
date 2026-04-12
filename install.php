@@ -34,8 +34,19 @@ function cf_write_env(array $values, string $path): void
     }
 
     $content = implode(PHP_EOL, $lines) . PHP_EOL;
-    if (file_put_contents($path, $content) === false) {
-        throw new RuntimeException('Could not write .env file. Check file permissions.');
+    $dir = dirname($path);
+    if (!is_dir($dir) || !is_writable($dir)) {
+        throw new RuntimeException('Could not write .env file. Project directory is not writable.');
+    }
+
+    set_error_handler(static function (): bool {
+        return true;
+    });
+    $bytes = @file_put_contents($path, $content, LOCK_EX);
+    restore_error_handler();
+
+    if ($bytes === false) {
+        throw new RuntimeException('Could not write .env file. Check file permissions (owner/group/chmod).');
     }
 }
 
@@ -276,8 +287,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php endforeach; ?>
     </div>
 
-    <p class="hint">BOT username is auto-resolved from Telegram API in runtime; no manual field is required.</p>
-    <p class="hint">Installer auto-detects current domain and tries setting <code>/webhook.php</code>. If auto-detect is unavailable (e.g. CLI), set webhook manually after install.</p>
     <button class="btn" type="submit">Install ConfigFlow</button>
   </form>
 </div>

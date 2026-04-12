@@ -158,7 +158,20 @@ Manual schema init (if `.env` already exists):
 php scripts/InitDb.php
 ```
 
-### 4) Serve webhook endpoint
+### 4) Permissions (important on shared/VPS hosts)
+
+Installer needs permission to write `.env` in project root.
+
+Typical Linux fix (Debian/Ubuntu with nginx/apache user):
+
+```bash
+sudo chown -R www-data:www-data /path/to/ConfigFlow
+sudo chmod -R u+rwX /path/to/ConfigFlow
+```
+
+If your webserver user is different (for example `nginx`), replace `www-data`.
+
+### 5) Serve webhook endpoint
 
 Dev server:
 
@@ -168,7 +181,7 @@ php -S 0.0.0.0:8080
 
 Production (Nginx/Apache): expose `https://YOUR_DOMAIN/webhook.php`.
 
-### 5) Set webhook (if not done by installer)
+### 6) Set webhook (if not done by installer)
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
@@ -181,7 +194,7 @@ Check status:
 curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 ```
 
-### 6) Run worker runtime (optional but recommended)
+### 7) Run worker runtime (optional but recommended)
 
 ```bash
 php scripts/PhpWorkerRuntime.php
@@ -199,14 +212,6 @@ This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 git clone https://github.com/codeTide/ConfigFlow.git
 cd ConfigFlow
 ```
-
-For cloning into the current directory (no extra `ConfigFlow/` folder), use:
-
-```bash
-git clone https://github.com/codeTide/ConfigFlow.git .
-```
-
-> Important: this command only works when the destination directory is empty.
 
 2. Keep your usual document root (no special root change needed for webhook).
 3. Ensure `https://YOUR_DOMAIN/webhook.php` is reachable.
