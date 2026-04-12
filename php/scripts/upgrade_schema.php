@@ -98,6 +98,13 @@ try {
         'gw_tronpays_rial_min' => '0',
         'gw_tronpays_rial_max' => '0',
         'channel_id' => '',
+        'group_id' => '',
+        'group_topic_backup' => '',
+        'group_topic_broadcast_report' => '',
+        'group_topic_error_log' => '',
+        'backup_enabled' => '0',
+        'backup_interval' => '24',
+        'backup_target_id' => '',
     ];
     $upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
     foreach ($defaults as $k => $v) {

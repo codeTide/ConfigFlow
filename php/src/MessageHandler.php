@@ -712,6 +712,72 @@ final class MessageHandler
             return;
         }
 
+        if ($state['state_name'] === 'await_admin_group_id') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $value = trim($text);
+            if ($value === '') {
+                $this->telegram->sendMessage($chatId, '⚠️ مقدار group_id نمی‌تواند خالی باشد.');
+                return;
+            }
+            if ($value !== '-' && !preg_match('/^-?\d+$/', $value)) {
+                $this->telegram->sendMessage($chatId, '⚠️ Group ID باید عددی باشد یا «-».');
+                return;
+            }
+            $groupId = $value === '-' ? '' : $value;
+            $this->settings->set('group_id', $groupId);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage(
+                $chatId,
+                $groupId === '' ? '✅ Group ID غیرفعال شد.' : "✅ Group ID ذخیره شد: <code>" . htmlspecialchars($groupId) . "</code>"
+            );
+            return;
+        }
+
+        if ($state['state_name'] === 'await_admin_restore_settings') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $raw = '';
+            if ($text !== '') {
+                $raw = $text;
+            } elseif (isset($message['document']) && is_array($message['document'])) {
+                $fileId = trim((string) ($message['document']['file_id'] ?? ''));
+                if ($fileId !== '') {
+                    $dl = $this->telegram->downloadFileById($fileId);
+                    if (is_string($dl)) {
+                        $raw = $dl;
+                    }
+                }
+            }
+            if ($raw === '') {
+                $this->telegram->sendMessage($chatId, '⚠️ فایل/متن JSON معتبر ارسال نشد.');
+                return;
+            }
+            $data = json_decode($raw, true);
+            $settings = is_array($data) ? ($data['settings'] ?? null) : null;
+            if (!is_array($settings)) {
+                $this->telegram->sendMessage($chatId, '⚠️ ساختار JSON نامعتبر است. کلید settings پیدا نشد.');
+                return;
+            }
+            $count = 0;
+            foreach ($settings as $k => $v) {
+                $key = trim((string) $k);
+                if ($key === '') {
+                    continue;
+                }
+                $this->settings->set($key, (string) $v);
+                $count++;
+            }
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ بازیابی تنظیمات انجام شد.\nتعداد کلیدهای اعمال‌شده: <b>{$count}</b>");
+            $this->sendToGroupTopic('backup', "♻️ بازیابی تنظیمات انجام شد.\nادمین: <code>{$userId}</code>\nتعداد کلید: <b>{$count}</b>");
+            return;
+        }
+
         if ($state['state_name'] === 'await_admin_broadcast') {
             if (!$this->database->isAdminUser($userId)) {
                 $this->database->clearUserState($userId);
@@ -743,6 +809,7 @@ final class MessageHandler
             }
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, "✅ ارسال همگانی انجام شد.\nتعداد موفق: <b>{$sent}</b>");
+            $this->sendToGroupTopic('broadcast_report', "📣 گزارش ارسال همگانی\nادمین: <code>{$userId}</code>\nscope: <b>" . htmlspecialchars($scope) . "</b>\nموفق: <b>{$sent}</b>");
             return;
         }
     }
@@ -787,5 +854,15 @@ final class MessageHandler
             return 'https://t.me/c/' . substr($channelId, 4);
         }
         return 'https://t.me/' . ltrim($channelId, '@');
+    }
+
+    private function sendToGroupTopic(string $topicKey, string $text): void
+    {
+        $groupIdRaw = trim($this->settings->get('group_id', ''));
+        $topicIdRaw = trim($this->settings->get('group_topic_' . $topicKey, ''));
+        if (!preg_match('/^-?\d+$/', $groupIdRaw) || !preg_match('/^\d+$/', $topicIdRaw)) {
+            return;
+        }
+        $this->telegram->sendTopicMessage((int) $groupIdRaw, (int) $topicIdRaw, $text);
     }
 }
