@@ -120,18 +120,40 @@ function cf_auto_fix_permissions(string $projectRoot): array
             $mode = 0600;
         }
         if (function_exists('chmod')) {
-            if (@chmod($target, $mode)) {
+            $chmodErr = '';
+            set_error_handler(static function (int $_errno, string $errstr) use (&$chmodErr): bool {
+                $chmodErr = $errstr;
+                return true;
+            });
+            $chmodOk = chmod($target, $mode);
+            restore_error_handler();
+            if ($chmodOk) {
                 $messages[] = "✓ Permission set on {$target}";
             } else {
-                $messages[] = "⚠ Could not chmod {$target}";
+                $extra = $chmodErr !== '' ? " ({$chmodErr})" : '';
+                if (str_ends_with($target, '/.user.ini')) {
+                    $extra .= $extra === '' ? ' (file may be immutable or panel-managed)' : ', file may be immutable or panel-managed';
+                }
+                $messages[] = "⚠ Could not chmod {$target}{$extra}";
             }
         }
 
         if ($runtimeUser !== null && function_exists('chown')) {
-            if (@chown($target, $runtimeUser)) {
+            $chownErr = '';
+            set_error_handler(static function (int $_errno, string $errstr) use (&$chownErr): bool {
+                $chownErr = $errstr;
+                return true;
+            });
+            $chownOk = chown($target, $runtimeUser);
+            restore_error_handler();
+            if ($chownOk) {
                 $messages[] = "✓ Owner set to {$runtimeUser} for {$target}";
             } else {
-                $messages[] = "⚠ Could not chown {$target} to {$runtimeUser}";
+                $extra = $chownErr !== '' ? " ({$chownErr})" : '';
+                if (str_ends_with($target, '/.user.ini')) {
+                    $extra .= $extra === '' ? ' (file may be immutable or panel-managed)' : ', file may be immutable or panel-managed';
+                }
+                $messages[] = "⚠ Could not chown {$target} to {$runtimeUser}{$extra}";
             }
         }
     }
@@ -355,6 +377,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
     $result = cf_install($values);
     $isInstalled = cf_has_existing_installation(__DIR__);
 }
+$showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
 ?>
 <!doctype html>
 <html lang="en">
@@ -377,18 +400,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
     }
     body{font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:24px;transition:background .2s,color .2s}
     .wrap{max-width:900px;margin:0 auto}
-    .card{background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:20px;margin-bottom:16px}
+    .card{background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
     h1{margin:0 0 10px 0;font-size:28px}
     .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .full{grid-column:1/-1}
-    label{font-size:13px;display:block;margin-bottom:6px;color:var(--muted)}
-    input,select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}
+    label{font-size:12px;display:block;margin-bottom:6px;color:var(--muted);letter-spacing:.2px}
+    input,select{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}
+    input:focus,select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
     .btn{background:var(--btn);color:#fff;border:none;padding:12px 16px;border-radius:10px;cursor:pointer;font-weight:bold}
     .theme-btn{background:transparent;color:var(--fg);border:1px solid var(--card-border);padding:8px 12px;border-radius:10px;cursor:pointer}
     .ok{background:var(--ok-bg);border:1px solid var(--ok-border);color:var(--ok-fg);padding:10px;border-radius:10px;margin:8px 0}
+    .warn{background:#422006;border:1px solid #92400e;color:#fed7aa;padding:10px;border-radius:10px;margin:8px 0}
     .err{background:var(--err-bg);border:1px solid var(--err-border);color:var(--err-fg);padding:10px;border-radius:10px;margin:8px 0}
     .hint{font-size:12px;color:var(--muted)}
+    .inline{display:flex;align-items:center;gap:8px}
     @media (max-width:700px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
@@ -402,12 +428,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
     <p>Fill your bot and database settings, then click install.</p>
     <?php if ($result !== null): ?>
       <?php foreach ($result['messages'] as $message): ?>
-        <div class="<?= $result['ok'] ? 'ok' : 'err' ?>"><?= htmlspecialchars($message) ?></div>
+        <?php
+          $boxClass = 'ok';
+          if (str_starts_with((string) $message, '⚠')) {
+              $boxClass = 'warn';
+          } elseif (str_starts_with((string) $message, '✗') || str_starts_with((string) $message, 'Installation failed') || str_starts_with((string) $message, 'Installation blocked')) {
+              $boxClass = 'err';
+          }
+        ?>
+        <div class="<?= $boxClass ?>"><?= htmlspecialchars($message) ?></div>
       <?php endforeach; ?>
     <?php endif; ?>
   </div>
 
-  <?php if ($isInstalled): ?>
+  <?php if ($showInstalledCard): ?>
     <div class="card">
       <div class="ok">ConfigFlow is already installed on this path (.install.lock found).</div>
       <p class="hint">You can still reinstall from this page by enabling reinstall mode below.</p>
@@ -416,7 +450,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
   <form method="post" class="card" id="installerForm">
       <?php if ($isInstalled): ?>
       <div class="full" style="margin-bottom:12px;">
-        <label><input type="checkbox" name="ALLOW_REINSTALL" value="1"> Enable reinstall</label>
+        <label class="inline"><input style="width:auto" type="checkbox" name="ALLOW_REINSTALL" value="1"> Enable reinstall</label>
         <label for="REINSTALL_MODE" style="margin-top:8px;">Reinstall mode</label>
         <select id="REINSTALL_MODE" name="REINSTALL_MODE">
           <option value="preserve">Preserve database data</option>
