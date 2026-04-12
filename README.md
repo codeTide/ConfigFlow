@@ -25,6 +25,7 @@ ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-b
 ```text
 ConfigFlow/
 ├── webhook.php
+├── install.php
 ├── public/
 │   └── worker_api.php
 ├── scripts/
@@ -35,13 +36,15 @@ ConfigFlow/
 │   └── backup_runtime.php
 ├── src/
 ├── tests/
-├── env.example
-└── config.env.example
+└── env.example
 ```
 
-## Environment
+## Environment Files
 
-Create `.env` from sample:
+- `env.example` is a **template** only.
+- Real runtime config is `.env` (created manually or by installer).
+
+Create manually:
 
 ```bash
 cp env.example .env
@@ -64,11 +67,28 @@ TETRAPAY_VERIFY_URL=https://tetra98.com/api/verify
 
 ---
 
+## Quick Install Wizard (Recommended)
+
+Run:
+
+```bash
+php install.php
+```
+
+The installer will:
+
+1. Ask for `.env` values (bot token, DB credentials, admin IDs, etc.)
+2. Generate `.env`
+3. Connect to MySQL and initialize schema (`scripts/init_db.php`)
+4. Optionally set Telegram webhook automatically
+
+---
+
 ## Installation Guide (VPS / Dedicated Server)
 
 ### 1) Requirements
 
-Install PHP + needed extensions + MySQL:
+Install PHP + required extensions + MySQL:
 
 - `php` 8.1+
 - `pdo_mysql`
@@ -76,15 +96,22 @@ Install PHP + needed extensions + MySQL:
 - `mbstring`
 - `json`
 
-### 2) Clone + configure
+### 2) Clone
 
 ```bash
 git clone https://github.com/Emadhabibnia1385/ConfigFlow.git
 cd ConfigFlow
-cp env.example .env
 ```
 
-### 3) Initialize database schema
+### 3) Install using wizard (or manual)
+
+Wizard:
+
+```bash
+php install.php
+```
+
+Manual schema init (if `.env` already exists):
 
 ```bash
 php scripts/init_db.php
@@ -92,26 +119,22 @@ php scripts/init_db.php
 
 ### 4) Serve webhook endpoint
 
-#### Option A: Quick dev server
+Dev server:
 
 ```bash
 php -S 0.0.0.0:8080
 ```
 
-#### Option B: Nginx/Apache (recommended production)
+Production (Nginx/Apache): expose `https://YOUR_DOMAIN/webhook.php`.
 
-Keep normal web root (project root) and expose `https://YOUR_DOMAIN/webhook.php`.
-
-### 5) Set Telegram webhook
-
-Use your bot token and public HTTPS URL:
+### 5) Set webhook (if not done by installer)
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
   -d "url=https://YOUR_DOMAIN/webhook.php"
 ```
 
-Verify webhook info:
+Check status:
 
 ```bash
 curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
@@ -123,53 +146,18 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 php scripts/php_worker_runtime.php
 ```
 
-Run it with `systemd`/`supervisor` for production.
-
 ---
 
 ## Installation Guide (Shared Hosting / cPanel / aaPanel)
 
-This project can run on most shared hosts if they support PHP 8.1+ and MySQL.
+This project can run on shared hosting if PHP 8.1+ and MySQL are available.
 
-### 1) Upload files
-
-- Upload project files to your host (Git deploy or File Manager).
-- Keep project files in a private app directory if possible.
-- Keep files in your normal web root (or your host's default project root).
-
-### 2) Document root
-
-No special document-root change is required for the Telegram webhook because `webhook.php` is now at the repository root.
-
-- cPanel / aaPanel / shared hosting can keep the default site root as-is.
-- Ensure your domain serves `https://YOUR_DOMAIN/webhook.php`.
-
-### 3) Create database + `.env`
-
-- Create MySQL DB/user from your panel.
-- Fill `.env` with those credentials.
-
-Then run schema init from Terminal/SSH (if available):
-
-```bash
-php scripts/init_db.php
-```
-
-If SSH is not available, ask host support to execute the script once.
-
-### 4) Set webhook URL
-
-After your URL is live over HTTPS, set:
-
-```bash
-curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
-  -d "url=https://YOUR_DOMAIN/webhook.php"
-```
-
-### 5) Worker runtime on shared hosts
-
-- Preferred: run `php scripts/php_worker_runtime.php` as a background process (if host allows).
-- Fallback: run it through cron frequently (if long-running processes are restricted).
+1. Upload project files.
+2. Keep your usual document root (no special root change needed for webhook).
+3. Ensure `https://YOUR_DOMAIN/webhook.php` is reachable.
+4. Run `php install.php` from Terminal/SSH (or ask host support to run it once).
+5. If webhook was skipped in installer, set it manually via Telegram API.
+6. For worker runtime, use background process if allowed, otherwise cron.
 
 ---
 
@@ -190,6 +178,6 @@ php scripts/backup_runtime.php
 ## Checks
 
 ```bash
-find public scripts src tests -name '*.php' -print0 | xargs -0 -n1 php -l
+find . -maxdepth 2 -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 php tests/WorkerApiAppTest.php
 ```
