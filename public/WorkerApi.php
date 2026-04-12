@@ -8,8 +8,8 @@ use ConfigFlow\Bot\WorkerApiApp;
 
 require __DIR__ . '/../src/Bootstrap.php';
 require __DIR__ . '/../src/Config.php';
-require __DIR__ . '/../src/Database.php';
 require __DIR__ . '/../src/WorkerApiStore.php';
+require __DIR__ . '/../src/Database.php';
 require __DIR__ . '/../src/XuiJobState.php';
 require __DIR__ . '/../src/WorkerApiApp.php';
 
