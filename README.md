@@ -171,6 +171,24 @@ sudo chmod -R u+rwX /path/to/ConfigFlow
 
 If your webserver user is different (for example `nginx`), replace `www-data`.
 
+How to find your webserver user:
+
+```bash
+# Nginx worker user
+ps -o user= -C nginx | head -n 1
+
+# Apache worker user (Debian/Ubuntu)
+ps -o user= -C apache2 | head -n 1
+
+# Apache worker user (RHEL/CentOS)
+ps -o user= -C httpd | head -n 1
+
+# PHP-FPM pool user (common on many hosts)
+ps -o user= -C php-fpm | head -n 1
+```
+
+If these return empty, ask host support for the PHP/web user and use that user/group in `chown`.
+
 ### 5) Serve webhook endpoint
 
 Dev server:
