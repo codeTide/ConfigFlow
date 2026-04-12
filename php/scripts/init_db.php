@@ -65,6 +65,7 @@ $pdo->exec(
 $defaults = [
     'bot_status' => 'on',
     'start_text' => '',
+    'channel_id' => '',
 ];
 
 $stmt = $pdo->prepare('INSERT IGNORE INTO settings (`key`, `value`) VALUES (:key, :value)');

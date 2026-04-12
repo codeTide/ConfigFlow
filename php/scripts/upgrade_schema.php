@@ -97,6 +97,7 @@ try {
         'gw_swapwallet_crypto_max' => '0',
         'gw_tronpays_rial_min' => '0',
         'gw_tronpays_rial_max' => '0',
+        'channel_id' => '',
     ];
     $upsert = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value` = `value`');
     foreach ($defaults as $k => $v) {

@@ -9,6 +9,7 @@ final class MessageHandler
     public function __construct(
         private Database $database,
         private TelegramClient $telegram,
+        private SettingsRepository $settings,
     ) {
     }
 
@@ -26,12 +27,16 @@ final class MessageHandler
             return;
         }
 
+        $text = trim((string) ($message['text'] ?? ''));
+        if (!str_starts_with($text, '/start') && !$this->checkChannelMembership($userId)) {
+            $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
+            return;
+        }
+
         $state = $this->database->getUserState($userId);
         if ($state === null) {
             return;
         }
-
-        $text = trim((string) ($message['text'] ?? ''));
 
         if ($state['state_name'] === 'await_wallet_amount') {
             if ($text === '' || str_starts_with($text, '/')) {
@@ -687,6 +692,26 @@ final class MessageHandler
             return;
         }
 
+        if ($state['state_name'] === 'await_admin_set_channel') {
+            if (!$this->database->isAdminUser($userId)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $value = trim($text);
+            if ($value === '') {
+                $this->telegram->sendMessage($chatId, '⚠️ مقدار کانال نمی‌تواند خالی باشد. برای غیرفعال‌سازی «-» ارسال کنید.');
+                return;
+            }
+            $channelId = $value === '-' ? '' : $value;
+            $this->settings->set('channel_id', $channelId);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage(
+                $chatId,
+                $channelId === '' ? '✅ قفل کانال غیرفعال شد.' : "✅ کانال قفل ذخیره شد: <code>" . htmlspecialchars($channelId) . "</code>"
+            );
+            return;
+        }
+
         if ($state['state_name'] === 'await_admin_broadcast') {
             if (!$this->database->isAdminUser($userId)) {
                 $this->database->clearUserState($userId);
@@ -720,5 +745,47 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, "✅ ارسال همگانی انجام شد.\nتعداد موفق: <b>{$sent}</b>");
             return;
         }
+    }
+
+    private function checkChannelMembership(int $userId): bool
+    {
+        $channelId = trim($this->settings->get('channel_id', ''));
+        if ($channelId === '') {
+            return true;
+        }
+
+        $member = $this->telegram->getChatMember($channelId, $userId);
+        if (!is_array($member)) {
+            return true;
+        }
+
+        $status = (string) ($member['status'] ?? '');
+        return in_array($status, ['member', 'administrator', 'creator'], true);
+    }
+
+    private function channelLockText(): string
+    {
+        return "🔒 برای استفاده از ربات، ابتدا باید در کانال ما عضو شوید.\n\nپس از عضویت، روی «عضو شدم» بزنید.";
+    }
+
+    private function channelLockKeyboard(): array
+    {
+        $channelId = trim($this->settings->get('channel_id', ''));
+        $channelUrl = $this->channelJoinUrl($channelId);
+        return ['inline_keyboard' => [
+            [['text' => '📢 عضویت در کانال', 'url' => $channelUrl]],
+            [['text' => '✅ عضو شدم', 'callback_data' => 'check_channel']],
+        ]];
+    }
+
+    private function channelJoinUrl(string $channelId): string
+    {
+        if (str_starts_with($channelId, '@')) {
+            return 'https://t.me/' . ltrim($channelId, '@');
+        }
+        if (str_starts_with($channelId, '-100')) {
+            return 'https://t.me/c/' . substr($channelId, 4);
+        }
+        return 'https://t.me/' . ltrim($channelId, '@');
     }
 }
