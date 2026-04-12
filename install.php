@@ -59,6 +59,17 @@ function cf_is_installer_authenticated(): bool
     return true;
 }
 
+function cf_redirect_self(): void
+{
+    $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+    $path = parse_url($uri, PHP_URL_PATH);
+    if (!is_string($path) || $path === '') {
+        $path = '/';
+    }
+    header('Location: ' . $path);
+    exit;
+}
+
 function cf_validate(array $input): array
 {
     $errors = [];
@@ -450,10 +461,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['auth_action'])) {
             $_SESSION['installer_user'] = $u;
             $_SESSION['installer_last'] = time();
             $isAuthenticated = true;
+            cf_redirect_self();
         }
     } elseif ($action === 'logout') {
         unset($_SESSION['installer_user'], $_SESSION['installer_last']);
         $isAuthenticated = false;
+        cf_redirect_self();
     }
 }
 
@@ -479,27 +492,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['auth_action']) && $i
         $values[$k] = trim((string) ($_POST[$k] ?? $values[$k]));
     }
     $result = cf_install($values);
-    $isInstalled = cf_has_existing_installation(__DIR__);
+    $_SESSION['installer_flash_result'] = $result;
+    if (($result['ok'] ?? false) === true) {
+        $botUser = cf_get_bot_username((string) ($values['BOT_TOKEN'] ?? ''));
+        $_SESSION['installer_flash_bot_link'] = $botUser !== '' ? ('https://t.me/' . $botUser) : '';
+    } else {
+        $_SESSION['installer_flash_bot_link'] = '';
+    }
+    cf_redirect_self();
 }
-$showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
-$justInstalled = $result !== null && ($result['ok'] ?? false) === true;
-$botDeepLink = '';
-if ($justInstalled) {
-    $botUser = cf_get_bot_username((string) ($values['BOT_TOKEN'] ?? ''));
-    if ($botUser !== '') {
-        $botDeepLink = 'https://t.me/' . $botUser;
+
+if (isset($_SESSION['installer_flash_result'])) {
+    $flash = $_SESSION['installer_flash_result'];
+    if (is_array($flash)) {
+        $result = $flash;
+    }
+    unset($_SESSION['installer_flash_result']);
+}
+if (isset($_SESSION['installer_flash_bot_link'])) {
+    $flashBot = (string) $_SESSION['installer_flash_bot_link'];
+    unset($_SESSION['installer_flash_bot_link']);
+    if ($flashBot !== '') {
+        $botDeepLink = $flashBot;
     }
 }
+$isInstalled = cf_has_existing_installation(__DIR__);
 $showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
 $justInstalled = $result !== null && ($result['ok'] ?? false) === true;
-$botDeepLink = '';
-if ($justInstalled) {
-    $botUser = cf_get_bot_username((string) ($values['BOT_TOKEN'] ?? ''));
-    if ($botUser !== '') {
-        $botDeepLink = 'https://t.me/' . $botUser;
-    }
-}
-$showInstalledCard = $isInstalled && !($result !== null && ($result['ok'] ?? false) === true);
+$botDeepLink = $botDeepLink ?? '';
 ?>
 <!doctype html>
 <html lang="en">
