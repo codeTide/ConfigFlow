@@ -82,7 +82,6 @@ Install PHP + needed extensions + MySQL:
 git clone https://github.com/Emadhabibnia1385/ConfigFlow.git
 cd ConfigFlow
 cp env.example .env
-nano .env
 ```
 
 ### 3) Initialize database schema
