@@ -67,7 +67,10 @@ final class TelegramClient
             $payload['reply_markup'] = json_encode($replyMarkup, JSON_UNESCAPED_UNICODE);
         }
 
-        $this->request('editMessageText', $payload);
+        $result = $this->requestWithResult('editMessageText', $payload);
+        if (!is_array($result)) {
+            $this->sendMessage($chatId, $text, $replyMarkup);
+        }
     }
 
     public function answerCallbackQuery(string $callbackQueryId, string $text = ''): void
