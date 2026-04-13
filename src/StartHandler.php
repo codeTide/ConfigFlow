@@ -11,7 +11,9 @@ final class StartHandler
         private TelegramClient $telegram,
         private SettingsRepository $settings,
         private MenuService $menus,
+        private ?UiJsonCatalog $catalog = null,
     ) {
+        $this->catalog ??= new UiJsonCatalog();
     }
 
     public function handle(array $update): void
@@ -52,7 +54,7 @@ final class StartHandler
         if ($botStatus === 'update') {
             $this->telegram->sendMessage(
                 $chatId,
-                "🔄 <b>ربات در حال بروزرسانی است</b>\n\nفعلاً ربات در حال بروزرسانی می‌باشد، لطفاً بعداً اقدام نمایید."
+                $this->catalog->get('messages.start.bot_updating', ['emoji' => $this->catalog->get('emojis.sync')])
             );
 
             return;
@@ -61,7 +63,7 @@ final class StartHandler
         if ($this->database->userStatus($userId) === 'restricted') {
             $this->telegram->sendMessage(
                 $chatId,
-                "🚫 <b>دسترسی محدود شده</b>\n\nشما از ربات محدود شده‌اید و نمی‌توانید از آن استفاده کنید."
+                $this->catalog->get('messages.start.access_restricted', ['emoji' => $this->catalog->get('emojis.ban')])
             );
 
             return;
@@ -69,7 +71,7 @@ final class StartHandler
 
         if (!$this->checkChannelMembership($userId)) {
             $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
-            $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
             return;
         }
 
@@ -99,20 +101,20 @@ final class StartHandler
 
     private function channelLockText(): string
     {
-        return "🔒 برای استفاده از ربات، ابتدا باید در کانال ما عضو شوید.\n\nپس از عضویت، روی «عضو شدم» بزنید.";
+        return $this->catalog->get('messages.channel.lock_simple', ['emoji' => $this->catalog->get('emojis.lock')]);
     }
 
     private function channelLockKeyboard(): array
     {
         $channelId = trim($this->settings->get('channel_id', ''));
         $channelUrl = $this->channelJoinUrl($channelId);
-        return ['inline_keyboard' => [[['text' => '📢 عضویت در کانال', 'url' => $channelUrl]]]];
+        return ['inline_keyboard' => [[['text' => $this->catalog->get('buttons.join_channel'), 'url' => $channelUrl]]]];
     }
 
     private function channelLockReplyKeyboard(): array
     {
         return [
-            'keyboard' => [[KeyboardBuilder::BTN_CHECK_CHANNEL]],
+            'keyboard' => [[KeyboardBuilder::checkChannel()]],
             'resize_keyboard' => true,
             'is_persistent' => true,
         ];

@@ -84,9 +84,11 @@ final class MessageHandler
         private PaymentGatewayService $gateways,
         private ?UiTextCatalogInterface $uiText = null,
         private ?UiKeyboardFactoryInterface $uiKeyboard = null,
+        private ?UiJsonCatalog $catalog = null,
     ) {
         $this->uiText ??= new UiTextCatalog();
         $this->uiKeyboard ??= new UiKeyboardFactory();
+        $this->catalog ??= new UiJsonCatalog();
     }
 
     public function handle(array $update): void
@@ -106,17 +108,17 @@ final class MessageHandler
 
         $text = trim((string) ($message['text'] ?? ''));
         if (!str_starts_with($text, '/start') && !$this->checkChannelMembership($userId)) {
-            if ($text === KeyboardBuilder::BTN_CHECK_CHANNEL) {
+            if ($text === KeyboardBuilder::checkChannel() || $text === KeyboardBuilder::BTN_CHECK_CHANNEL) {
                 if ($this->checkChannelMembership($userId)) {
                     $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
                 } else {
                     $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
-                    $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
+                    $this->telegram->sendMessage($chatId, $this->catalog->get('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
                 }
                 return;
             }
             $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
-            $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
             return;
         }
 
@@ -128,9 +130,9 @@ final class MessageHandler
             return;
         }
 
-        if (($text === KeyboardBuilder::BTN_ADMIN || $text === '↩️ پنل مدیریت') && $this->database->isAdminUser($userId)) {
+        if (($text === KeyboardBuilder::admin() || $text === KeyboardBuilder::BTN_ADMIN || $text === $this->catalog->get('admin.common.back_to_panel')) && $this->database->isAdminUser($userId)) {
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('وضعیت قبلی منقضی شده بود و ریست شد. اکنون از پنل مدیریت ادامه دهید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.common.legacy_state_reset')));
             $this->openAdminRoot($chatId, $userId);
             return;
         }
@@ -291,12 +293,12 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_wallet_amount') {
-            if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === KeyboardBuilder::backMain() || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
                 return;
             }
-            if ($text === KeyboardBuilder::BTN_BACK_ACCOUNT) {
+            if ($text === KeyboardBuilder::backAccount() || $text === KeyboardBuilder::BTN_BACK_ACCOUNT) {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->menus->profileText($userId), $this->menus->accountMenuReplyKeyboard());
                 return;
@@ -306,7 +308,7 @@ final class MessageHandler
             }
             $amount = (int) preg_replace('/\D+/', '', $text);
             if ($amount <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->error('مبلغ وارد شده معتبر نیست. لطفاً فقط عدد صحیح وارد کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.wallet.invalid_amount')));
                 return;
             }
 
@@ -323,23 +325,27 @@ final class MessageHandler
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ درخواست شارژ کیف پول ثبت شد.\n\n"
-                . "شماره درخواست: <code>{$paymentId}</code>\n"
-                . "مبلغ: <b>{$amount}</b> تومان\n\n"
-                . 'بعد از تایید ادمین موجودی شما شارژ می‌شود.'
+                $this->catalog->get('messages.user.wallet.request_submitted', [
+                    'payment_id' => $paymentId,
+                    'amount' => $amount,
+                ])
             );
 
             $adminKeyboard = $this->replyKeyboard([
-                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
-                [KeyboardBuilder::BTN_ADMIN],
+                [
+                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
+                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
+                ],
+                [KeyboardBuilder::admin()],
             ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
-                    "💳 <b>درخواست شارژ کیف پول جدید</b>\n\n"
-                    . "شماره: <code>{$paymentId}</code>\n"
-                    . "کاربر: <code>{$userId}</code>\n"
-                    . "مبلغ: <b>{$amount}</b> تومان",
+                    $this->catalog->get('admin.payments.wallet_charge_new', [
+                        'payment_id' => $paymentId,
+                        'user_id' => $userId,
+                        'amount' => $amount,
+                    ]),
                     $adminKeyboard
                 );
             }
@@ -365,7 +371,7 @@ final class MessageHandler
             $receiptText = $caption !== '' ? $caption : ($text !== '' ? $text : null);
 
             if (($fileId === null || $fileId === '') && ($receiptText === null || $receiptText === '')) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً رسید را به‌صورت عکس/فایل یا متن ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.receipt.missing_purchase', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
 
@@ -373,20 +379,24 @@ final class MessageHandler
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ رسید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
+                $this->catalog->get('messages.user.payment.receipt.saved_purchase', ['payment_id' => $paymentId])
             );
 
             $adminKeyboard = $this->replyKeyboard([
-                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
-                [KeyboardBuilder::BTN_ADMIN],
+                [
+                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
+                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
+                ],
+                [KeyboardBuilder::admin()],
             ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
-                    "🧾 <b>رسید کارت‌به‌کارت جدید</b>\n\n"
-                    . "پرداخت: <code>{$paymentId}</code>\n"
-                    . "کاربر: <code>{$userId}</code>\n"
-                    . ($receiptText ? "توضیح: " . htmlspecialchars($receiptText) . "\n" : ''),
+                    $this->catalog->get('admin.payments.card_receipt_new', [
+                        'payment_id' => $paymentId,
+                        'user_id' => $userId,
+                        'note_line' => $receiptText ? $this->catalog->get('admin.common.note_line', ['note' => htmlspecialchars($receiptText)]) : '',
+                    ]),
                     $adminKeyboard
                 );
             }
@@ -411,7 +421,7 @@ final class MessageHandler
             $receiptText = $caption !== '' ? $caption : ($text !== '' ? $text : null);
 
             if (($fileId === null || $fileId === '') && ($receiptText === null || $receiptText === '')) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً رسید تمدید را به‌صورت عکس/فایل یا متن ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.receipt.missing_renew', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
 
@@ -419,20 +429,24 @@ final class MessageHandler
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ رسید تمدید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
+                $this->catalog->get('messages.user.payment.receipt.saved_renew', ['payment_id' => $paymentId])
             );
 
             $adminKeyboard = $this->replyKeyboard([
-                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
-                [KeyboardBuilder::BTN_ADMIN],
+                [
+                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
+                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
+                ],
+                [KeyboardBuilder::admin()],
             ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
-                    "♻️ <b>رسید تمدید جدید</b>\n\n"
-                    . "پرداخت: <code>{$paymentId}</code>\n"
-                    . "کاربر: <code>{$userId}</code>\n"
-                    . ($receiptText ? "توضیح: " . htmlspecialchars($receiptText) . "\n" : ''),
+                    $this->catalog->get('admin.payments.renew_receipt_new', [
+                        'payment_id' => $paymentId,
+                        'user_id' => $userId,
+                        'note_line' => $receiptText ? $this->catalog->get('admin.common.note_line', ['note' => htmlspecialchars($receiptText)]) : '',
+                    ]),
                     $adminKeyboard
                 );
             }
@@ -455,38 +469,42 @@ final class MessageHandler
                 $claimedAmount = (float) str_replace(',', '.', (string) $parts[1]);
             }
             if ($txHash === '' || str_starts_with($txHash, '/')) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً TX Hash معتبر ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
             if (strlen($txHash) < 10) {
-                $this->telegram->sendMessage($chatId, '⚠️ طول TX Hash معتبر نیست.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid_length', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
 
             $ok = $this->database->submitCryptoTxHash($paymentId, $txHash, $claimedAmount);
             if (!$ok) {
-                $this->telegram->sendMessage($chatId, '❌ ثبت TX Hash انجام نشد. لطفاً دوباره تلاش کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.submit_failed', ['emoji' => $this->catalog->get('emojis.error')]));
                 return;
             }
 
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ TX Hash ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
+                $this->catalog->get('messages.user.payment.tx.saved_purchase', ['payment_id' => $paymentId])
             );
 
             $adminKeyboard = $this->replyKeyboard([
-                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
-                [KeyboardBuilder::BTN_ADMIN],
+                [
+                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
+                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
+                ],
+                [KeyboardBuilder::admin()],
             ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
-                    "💎 <b>TX Hash جدید</b>\n\n"
-                    . "پرداخت: <code>{$paymentId}</code>\n"
-                    . "کاربر: <code>{$userId}</code>\n"
-                    . "TX: <code>" . htmlspecialchars($txHash) . "</code>\n"
-                    . ($claimedAmount !== null ? "Amount: <b>{$claimedAmount}</b>\n" : ''),
+                    $this->catalog->get('admin.payments.tx_new', [
+                        'payment_id' => $paymentId,
+                        'user_id' => $userId,
+                        'tx_hash' => htmlspecialchars($txHash),
+                        'amount_line' => $claimedAmount !== null ? $this->catalog->get('admin.payments.amount_line', ['amount' => $claimedAmount]) : '',
+                    ]),
                     $adminKeyboard
                 );
             }
@@ -508,38 +526,42 @@ final class MessageHandler
                 $claimedAmount = (float) str_replace(',', '.', (string) $parts[1]);
             }
             if ($txHash === '' || str_starts_with($txHash, '/')) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً TX Hash معتبر ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
             if (strlen($txHash) < 10) {
-                $this->telegram->sendMessage($chatId, '⚠️ طول TX Hash معتبر نیست.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid_length', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
 
             $ok = $this->database->submitCryptoTxHash($paymentId, $txHash, $claimedAmount);
             if (!$ok) {
-                $this->telegram->sendMessage($chatId, '❌ ثبت TX Hash انجام نشد. لطفاً دوباره تلاش کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.submit_failed', ['emoji' => $this->catalog->get('emojis.error')]));
                 return;
             }
 
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ TX Hash تمدید ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
+                $this->catalog->get('messages.user.payment.tx.saved_renew', ['payment_id' => $paymentId])
             );
 
             $adminKeyboard = $this->replyKeyboard([
-                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
-                [KeyboardBuilder::BTN_ADMIN],
+                [
+                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
+                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
+                ],
+                [KeyboardBuilder::admin()],
             ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
-                    "♻️ <b>TX Hash تمدید جدید</b>\n\n"
-                    . "پرداخت: <code>{$paymentId}</code>\n"
-                    . "کاربر: <code>{$userId}</code>\n"
-                    . "TX: <code>" . htmlspecialchars($txHash) . "</code>\n"
-                    . ($claimedAmount !== null ? "Amount: <b>{$claimedAmount}</b>\n" : ''),
+                    $this->catalog->get('admin.payments.tx_renew_new', [
+                        'payment_id' => $paymentId,
+                        'user_id' => $userId,
+                        'tx_hash' => htmlspecialchars($txHash),
+                        'amount_line' => $claimedAmount !== null ? $this->catalog->get('admin.payments.amount_line', ['amount' => $claimedAmount]) : '',
+                    ]),
                     $adminKeyboard
                 );
             }
@@ -548,11 +570,11 @@ final class MessageHandler
 
         if ($state['state_name'] === 'await_free_test_note') {
             if ($this->isBotMenuButton($text)) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً متن توضیح ارسال کنید، نه دکمه‌های منو.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.note_as_text', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً توضیح کوتاه تست را ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.note_required', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
 
@@ -560,21 +582,21 @@ final class MessageHandler
             $requestId = $this->database->createFreeTestRequest($userId, $text);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید.\n"
-                . "شناسه درخواست: <code>{$requestId}</code>"
+                $this->catalog->get('messages.user.free_test.request_submitted', ['request_id' => $requestId])
             );
 
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
-                    "🎁 <b>درخواست تست رایگان جدید</b>\n\n"
-                    . "شناسه: <code>{$requestId}</code>\n"
-                    . "کاربر: <code>{$userId}</code>\n"
-                    . "توضیح:\n" . htmlspecialchars($text),
+                    $this->catalog->get('admin.requests.new_free_request', [
+                        'request_id' => $requestId,
+                        'user_id' => $userId,
+                        'note' => htmlspecialchars($text),
+                    ]),
                     $this->replyKeyboard([
-                        ["👀 درخواست تست #{$requestId}"],
-                        ['🗂 درخواست‌ها'],
-                        [KeyboardBuilder::BTN_ADMIN],
+                        [$this->catalog->get('admin.requests.actions.open_free', ['request_id' => $requestId])],
+                        [$this->catalog->get('buttons.admin.requests')],
+                        [KeyboardBuilder::admin()],
                     ])
                 );
             }
@@ -583,11 +605,11 @@ final class MessageHandler
 
         if ($state['state_name'] === 'await_agency_request') {
             if ($this->isBotMenuButton($text)) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً متن درخواست نمایندگی را تایپ کنید، نه دکمه‌های منو.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_as_text', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً متن درخواست نمایندگی را ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_required', ['emoji' => $this->catalog->get('emojis.warning')]));
                 return;
             }
 
@@ -595,21 +617,21 @@ final class MessageHandler
             $requestId = $this->database->createAgencyRequest($userId, $text);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ درخواست نمایندگی ثبت شد و برای بررسی ادمین ارسال گردید.\n"
-                . "شناسه درخواست: <code>{$requestId}</code>"
+                $this->catalog->get('messages.user.agency.request_submitted', ['request_id' => $requestId])
             );
 
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
-                    "🤝 <b>درخواست نمایندگی جدید</b>\n\n"
-                    . "شناسه: <code>{$requestId}</code>\n"
-                    . "کاربر: <code>{$userId}</code>\n"
-                    . "متن درخواست:\n" . htmlspecialchars($text),
+                    $this->catalog->get('admin.requests.new_agency_request', [
+                        'request_id' => $requestId,
+                        'user_id' => $userId,
+                        'note' => htmlspecialchars($text),
+                    ]),
                     $this->replyKeyboard([
-                        ["👀 درخواست نمایندگی #{$requestId}"],
-                        ['🗂 درخواست‌ها'],
-                        [KeyboardBuilder::BTN_ADMIN],
+                        [$this->catalog->get('admin.requests.actions.open_agency', ['request_id' => $requestId])],
+                        [$this->catalog->get('buttons.admin.requests')],
+                        [KeyboardBuilder::admin()],
                     ])
                 );
             }
@@ -626,12 +648,12 @@ final class MessageHandler
             $maxClaims = (int) ($parts[1] ?? 1);
             $cooldownDays = (int) ($parts[2] ?? 0);
             if ($packageId <= 0) {
-                $this->telegram->sendMessage($chatId, '⚠️ فرمت نامعتبر است. نمونه: <code>12|1|0</code>');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_freetest_rule_format'));
                 return;
             }
             $this->database->saveFreeTestRule($packageId, $maxClaims, $cooldownDays, true);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, '✅ قانون تست رایگان ذخیره شد.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.freetest_rule_saved'));
             return;
         }
 
@@ -642,12 +664,12 @@ final class MessageHandler
             }
             $targetUserId = (int) preg_replace('/\D+/', '', $text);
             if ($targetUserId <= 0) {
-                $this->telegram->sendMessage($chatId, '⚠️ آیدی عددی معتبر ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.valid_numeric_user_id_required'));
                 return;
             }
             $this->database->resetFreeTestQuota($targetUserId);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, "✅ سهمیه تست کاربر <code>{$targetUserId}</code> ریست شد.");
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.freetest_user_quota_reset', ['target_user_id' => $targetUserId]));
             return;
         }
 
@@ -667,19 +689,19 @@ final class MessageHandler
             $approve = ((int) ($payload['approve'] ?? 0)) === 1;
             if ($text === UiLabels::BTN_BACK) {
                 if ($requestKind === 'free' || $requestKind === 'agency') {
-                    $this->openAdminRequestView($chatId, $userId, $requestKind, $requestId, 'pending', $this->uiText->info('این مسیر legacy است؛ ادامه بررسی از مسیر canonical انجام می‌شود.'));
+                    $this->openAdminRequestView($chatId, $userId, $requestKind, $requestId, 'pending', $this->uiText->info($this->catalog->get('admin.legacy.info.request_note_legacy_redirect')));
                 } else {
-                    $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->uiText->info('این مسیر legacy است؛ ادامه بررسی از مسیر canonical انجام می‌شود.'));
+                    $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->uiText->info($this->catalog->get('admin.legacy.info.request_note_legacy_redirect')));
                 }
                 return;
             }
             if ($requestId <= 0 || ($requestKind !== 'free' && $requestKind !== 'agency')) {
                 $this->database->clearUserState($userId);
-                $this->telegram->sendMessage($chatId, '❌ اطلاعات درخواست نامعتبر است.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_request_info'));
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, '⚠️ لطفاً نوت ادمین را ارسال کنید یا «-» بفرستید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.admin_note_required'));
                 return;
             }
             $adminNote = trim($text) === '-' ? null : trim($text);
@@ -689,28 +711,28 @@ final class MessageHandler
                 : $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
             if (!($result['ok'] ?? false)) {
                 $msg = (($result['error'] ?? '') === 'already_reviewed')
-                    ? 'این درخواست قبلاً بررسی شده است.'
-                    : 'ثبت نتیجه بررسی انجام نشد.';
+                    ? $this->catalog->get('admin.legacy.errors.request_already_reviewed')
+                    : $this->catalog->get('admin.legacy.errors.request_review_failed');
                 $this->telegram->sendMessage($chatId, '❌ ' . $msg);
                 $this->openAdminRequestsList($chatId, $userId, $requestKind, 'pending');
                 return;
             }
 
-            $statusText = $approve ? '✅ تایید شد' : '❌ رد شد';
-            $label = $requestKind === 'free' ? 'درخواست تست رایگان' : 'درخواست نمایندگی';
+            $statusText = $approve ? $this->catalog->get('admin.legacy.labels.status_approved') : $this->catalog->get('admin.legacy.labels.status_rejected');
+            $label = $requestKind === 'free' ? $this->catalog->get('admin.legacy.labels.free_request') : $this->catalog->get('admin.legacy.labels.agency_request');
             $this->telegram->sendMessage(
                 $chatId,
                 "{$label} <code>{$requestId}</code> {$statusText}."
             );
 
             $userNotice = $approve
-                ? ($requestKind === 'free' ? "✅ درخواست تست رایگان شما تایید شد." : "✅ درخواست نمایندگی شما تایید شد.")
-                : ($requestKind === 'free' ? "❌ درخواست تست رایگان شما رد شد." : "❌ درخواست نمایندگی شما رد شد.");
+                ? ($requestKind === 'free' ? $this->catalog->get('admin.legacy.user_notice.free_approved') : $this->catalog->get('admin.legacy.user_notice.agency_approved'))
+                : ($requestKind === 'free' ? $this->catalog->get('admin.legacy.user_notice.free_rejected') : $this->catalog->get('admin.legacy.user_notice.agency_rejected'));
             if ($adminNote !== null && $adminNote !== '') {
-                $userNotice .= "\n\n📝 توضیح ادمین:\n" . htmlspecialchars($adminNote);
+                $userNotice .= $this->catalog->get('admin.legacy.user_notice.admin_note', ['note' => htmlspecialchars($adminNote)]);
             }
             $this->telegram->sendMessage((int) ($result['user_id'] ?? 0), $userNotice);
-            $this->openAdminRequestsList($chatId, $userId, $requestKind, 'pending', $this->uiText->info('مسیر قبلی برای سازگاری نگه داشته شده اما canonical نیست.'));
+            $this->openAdminRequestsList($chatId, $userId, $requestKind, 'pending', $this->uiText->info($this->catalog->get('admin.legacy.info.legacy_path_not_canonical')));
             return;
         }
 
@@ -724,16 +746,16 @@ final class MessageHandler
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
-                $this->openAdminTypesList($chatId, $userId, $this->uiText->info('این مسیر legacy است؛ از این به بعد مسیر canonical در منوی reply انجام می‌شود.'));
+                $this->openAdminTypesList($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.type_name_legacy_redirect')));
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('لطفاً نام نوع سرویس را ارسال کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.legacy.errors.type_name_required')));
                 return;
             }
             $typeId = $this->database->addType($text, '');
-            $this->telegram->sendMessage($chatId, $this->uiText->success("نوع سرویس ثبت شد. شناسه: <code>{$typeId}</code>"));
-            $this->openAdminTypesList($chatId, $userId, $this->uiText->info('مسیر قبلی برای سازگاری نگه داشته شده اما canonical نیست.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.legacy.success.type_created', ['type_id' => $typeId])));
+            $this->openAdminTypesList($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.legacy_path_not_canonical')));
             return;
         }
 
@@ -747,22 +769,22 @@ final class MessageHandler
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت ورودی نامعتبر است.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.legacy.errors.invalid_input_format')));
                 return;
             }
             $payload = $state['payload'] ?? [];
             $typeId = (int) ($payload['type_id'] ?? 0);
             if ($text === UiLabels::BTN_BACK) {
                 if ($typeId > 0) {
-                    $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->info('این مسیر legacy است؛ برای ادامه از مسیر canonical استفاده کنید.'));
+                    $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->info($this->catalog->get('admin.legacy.info.legacy_use_canonical')));
                 } else {
-                    $this->openAdminTypesList($chatId, $userId, $this->uiText->info('این مسیر legacy است؛ برای ادامه از مسیر canonical استفاده کنید.'));
+                    $this->openAdminTypesList($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.legacy_use_canonical')));
                 }
                 return;
             }
             $parts = array_map('trim', explode('|', $text));
             if (count($parts) !== 4) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت باید 4 بخشی و با | جدا شود.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.legacy.errors.four_part_pipe_format')));
                 return;
             }
             [$name, $volumeRaw, $durationRaw, $priceRaw] = $parts;
@@ -770,12 +792,12 @@ final class MessageHandler
             $duration = (int) preg_replace('/\D+/', '', $durationRaw);
             $price = (int) preg_replace('/\D+/', '', $priceRaw);
             if ($name === '' || $volume <= 0 || $duration <= 0 || $price <= 0 || $typeId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مقادیر واردشده معتبر نیستند.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.legacy.errors.invalid_values')));
                 return;
             }
             $packageId = $this->database->addPackage($typeId, $name, $volume, $duration, $price);
-            $this->telegram->sendMessage($chatId, $this->uiText->success("پکیج ثبت شد. شناسه: <code>{$packageId}</code>"));
-            $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->info('مسیر قبلی برای سازگاری نگه داشته شده اما canonical نیست.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.legacy.success.package_created', ['package_id' => $packageId])));
+            $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->info($this->catalog->get('admin.legacy.info.legacy_path_not_canonical')));
             return;
         }
 
@@ -792,17 +814,17 @@ final class MessageHandler
             $targetUid = (int) ($payload['target_user_id'] ?? 0);
             $mode = (string) ($payload['mode'] ?? 'add');
             if ($text === UiLabels::BTN_BACK) {
-                $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->info('این مسیر legacy است؛ ادامه کار از flow canonical انجام می‌شود.'));
+                $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->info($this->catalog->get('admin.legacy.info.user_balance_legacy_redirect')));
                 return;
             }
             $amount = (int) preg_replace('/\D+/', '', $text);
             if ($targetUid <= 0 || $amount <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مبلغ معتبر وارد کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.legacy.errors.valid_amount_required')));
                 return;
             }
             $delta = $mode === 'sub' ? -$amount : $amount;
             $this->database->updateUserBalance($targetUid, $delta);
-            $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->info('مسیر قبلی برای سازگاری نگه داشته شده اما canonical نیست.'));
+            $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->info($this->catalog->get('admin.legacy.info.legacy_path_not_canonical')));
             return;
         }
 
@@ -819,17 +841,17 @@ final class MessageHandler
             $typeId = (int) ($payload['type_id'] ?? 0);
             $packageId = (int) ($payload['package_id'] ?? 0);
             if ($text === UiLabels::BTN_BACK) {
-                $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->info('این مسیر legacy است؛ برای ادامه از flow canonical استفاده کنید.'));
+                $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->info($this->catalog->get('admin.legacy.info.stock_add_config_legacy_redirect')));
                 return;
             }
             $raw = trim((string) ($message['text'] ?? ''));
             if ($raw === '' || str_starts_with($raw, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('لطفاً متن کانفیگ را طبق فرمت ارسال کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.legacy.errors.config_text_required')));
                 return;
             }
             $chunks = preg_split('/\n---\n/', $raw) ?: [];
             if (count($chunks) < 2) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت نامعتبر است. جداکننده --- را رعایت کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.legacy.errors.invalid_config_separator')));
                 return;
             }
             $serviceName = trim((string) ($chunks[0] ?? ''));
@@ -844,11 +866,11 @@ final class MessageHandler
                 }
             }
             if ($serviceName === '' || $configText === '' || $typeId <= 0 || $packageId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('نام سرویس یا متن کانفیگ معتبر نیست.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.legacy.errors.invalid_service_or_config_text')));
                 return;
             }
             $configId = $this->database->addConfig($typeId, $packageId, $serviceName, $configText, $inquiry);
-            $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->info("مسیر قبلی canonical نیست؛ کانفیگ با شناسه <code>{$configId}</code> ثبت شد."));
+            $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->info($this->catalog->get('admin.legacy.info.config_created_noncanonical', ['config_id' => $configId])));
             return;
         }
 
@@ -865,14 +887,14 @@ final class MessageHandler
             $packageId = (int) ($payload['package_id'] ?? 0);
             $typeId = (int) ($payload['type_id'] ?? 0);
             if ($text === UiLabels::BTN_BACK) {
-                $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->info('این مسیر legacy است؛ ادامه از مسیر canonical انجام می‌شود.'));
+                $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
             $query = trim((string) ($message['text'] ?? ''));
             if ($query === '-' || $query === '—') {
                 $query = '';
             }
-            $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, $query, $this->uiText->info('مسیر جستجوی قبلی canonical نیست و به flow جدید منتقل شد.'));
+            $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, $query, $this->uiText->info($this->catalog->get('admin.legacy.info.search_legacy_redirect')));
             return;
         }
 
@@ -886,12 +908,12 @@ final class MessageHandler
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
-                $this->openAdminAdminsList($chatId, $userId, $this->uiText->info('این مسیر legacy است؛ ادامه از مسیر canonical انجام می‌شود.'));
+                $this->openAdminAdminsList($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
             $targetUid = (int) preg_replace('/\D+/', '', $text);
             if ($targetUid <= 0) {
-                $this->telegram->sendMessage($chatId, '⚠️ آیدی عددی معتبر ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.valid_numeric_user_id_required'));
                 return;
             }
             $this->database->upsertAdminUser($targetUid, $userId, [
@@ -902,7 +924,7 @@ final class MessageHandler
                 'payments' => true,
                 'requests' => true,
             ]);
-            $this->openAdminAdminView($chatId, $userId, $targetUid, $this->uiText->info('مسیر قبلی canonical نیست و به flow جدید منتقل شد.'));
+            $this->openAdminAdminView($chatId, $userId, $targetUid, $this->uiText->info($this->catalog->get('admin.legacy.info.add_admin_legacy_redirect')));
             return;
         }
 
@@ -916,12 +938,12 @@ final class MessageHandler
             $packageId = (int) ($payload['package_id'] ?? 0);
             $price = (int) preg_replace('/\D+/', '', $text);
             if ($agentId <= 0 || $packageId <= 0 || $price <= 0) {
-                $this->telegram->sendMessage($chatId, '⚠️ قیمت معتبر وارد کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.valid_price_required'));
                 return;
             }
             $this->database->setAgencyPrice($agentId, $packageId, $price);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, "✅ قیمت اختصاصی ثبت شد.\nU:<code>{$agentId}</code> | P:<code>{$packageId}</code> | <b>{$price}</b>");
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.agent_price_saved', ['agent_id' => $agentId, 'package_id' => $packageId, 'price' => $price]));
             return;
         }
 
@@ -932,18 +954,18 @@ final class MessageHandler
             }
             $parts = array_map('trim', explode('|', $text));
             if (count($parts) !== 6) {
-                $this->telegram->sendMessage($chatId, '⚠️ فرمت باید 6 بخشی باشد: name|ip|port|patch|username|password');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.panel_format_six_parts'));
                 return;
             }
             [$name, $ip, $portRaw, $patch, $username, $password] = $parts;
             $port = (int) preg_replace('/\D+/', '', $portRaw);
             if ($name === '' || $ip === '' || $port <= 0 || $username === '' || $password === '') {
-                $this->telegram->sendMessage($chatId, '⚠️ مقادیر معتبر نیستند.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_values'));
                 return;
             }
             $panelId = $this->database->addPanel($name, $ip, $port, $patch, $username, $password);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, "✅ پنل ثبت شد. ID: <code>{$panelId}</code>");
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.panel_created', ['panel_id' => $panelId]));
             return;
         }
 
@@ -955,7 +977,7 @@ final class MessageHandler
             $panelId = (int) (($state['payload'] ?? [])['panel_id'] ?? 0);
             $parts = array_map('trim', explode('|', $text));
             if (count($parts) !== 4) {
-                $this->telegram->sendMessage($chatId, '⚠️ فرمت: name|volume_gb|duration_days|inbound_id');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.panel_package_format'));
                 return;
             }
             [$name, $volRaw, $durRaw, $inbRaw] = $parts;
@@ -963,12 +985,12 @@ final class MessageHandler
             $dur = (int) preg_replace('/\D+/', '', $durRaw);
             $inb = (int) preg_replace('/\D+/', '', $inbRaw);
             if ($panelId <= 0 || $name === '' || $vol <= 0 || $dur <= 0 || $inb <= 0) {
-                $this->telegram->sendMessage($chatId, '⚠️ مقادیر معتبر نیستند.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_values'));
                 return;
             }
             $id = $this->database->addPanelPackage($panelId, $name, $vol, $dur, $inb);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, "✅ پکیج پنل ثبت شد. ID: <code>{$id}</code>");
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.panel_package_created', ['id' => $id]));
             return;
         }
 
@@ -979,12 +1001,12 @@ final class MessageHandler
             }
             $key = trim($text);
             if ($key === '' || strlen($key) < 8) {
-                $this->telegram->sendMessage($chatId, '⚠️ کلید معتبر نیست.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_worker_api_key'));
                 return;
             }
             $this->database->clearUserState($userId);
             $this->database->pdo()->prepare('INSERT INTO settings (`key`,`value`) VALUES (\'worker_api_key\', :v) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)')->execute(['v' => $key]);
-            $this->telegram->sendMessage($chatId, '✅ Worker API key ذخیره شد.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.worker_api_key_saved'));
             return;
         }
 
@@ -995,12 +1017,12 @@ final class MessageHandler
             }
             $port = (int) preg_replace('/\D+/', '', $text);
             if ($port < 1 || $port > 65535) {
-                $this->telegram->sendMessage($chatId, '⚠️ پورت معتبر نیست.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_worker_api_port'));
                 return;
             }
             $this->database->clearUserState($userId);
             $this->database->pdo()->prepare('INSERT INTO settings (`key`,`value`) VALUES (\'worker_api_port\', :v) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)')->execute(['v' => (string) $port]);
-            $this->telegram->sendMessage($chatId, '✅ Worker API port ذخیره شد.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.worker_api_port_saved'));
             return;
         }
 
@@ -1011,12 +1033,12 @@ final class MessageHandler
             }
             $interval = (int) preg_replace('/\\D+/', '', $text);
             if ($interval < 3 || $interval > 3600) {
-                $this->telegram->sendMessage($chatId, '⚠️ بازه معتبر نیست (3 تا 3600 ثانیه).');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_poll_interval'));
                 return;
             }
             $this->settings->set('php_worker_poll_interval', (string) $interval);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, "✅ بازه Poll ذخیره شد: <b>{$interval}</b> ثانیه");
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.poll_interval_saved', ['interval' => $interval]));
             return;
         }
 
@@ -1030,18 +1052,18 @@ final class MessageHandler
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
-                $this->openAdminSettingsView($chatId, $userId, $this->uiText->info('این مسیر legacy است؛ ادامه از مسیر canonical انجام می‌شود.'));
+                $this->openAdminSettingsView($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
             $value = trim($text);
             if ($value === '') {
-                $this->telegram->sendMessage($chatId, '⚠️ مقدار کانال نمی‌تواند خالی باشد. برای غیرفعال‌سازی «-» ارسال کنید.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.channel_value_empty'));
                 return;
             }
             $channelId = $value === '-' ? '' : $value;
             $this->settings->set('channel_id', $channelId);
-            $msg = $channelId === '' ? '✅ قفل کانال غیرفعال شد.' : "✅ کانال قفل ذخیره شد: <code>" . htmlspecialchars($channelId) . "</code>";
-            $this->openAdminSettingsView($chatId, $userId, $this->uiText->info("مسیر قبلی canonical نیست. {$msg}"));
+            $msg = $channelId === '' ? $this->catalog->get('admin.legacy.success.channel_lock_disabled') : $this->catalog->get('admin.legacy.success.channel_lock_saved', ['channel_id' => htmlspecialchars($channelId)]);
+            $this->openAdminSettingsView($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.noncanonical_prefix', ['msg' => $msg])));
             return;
         }
 
@@ -1052,11 +1074,11 @@ final class MessageHandler
             }
             $value = trim($text);
             if ($value === '') {
-                $this->telegram->sendMessage($chatId, '⚠️ مقدار group_id نمی‌تواند خالی باشد.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.group_id_empty'));
                 return;
             }
             if ($value !== '-' && !preg_match('/^-?\d+$/', $value)) {
-                $this->telegram->sendMessage($chatId, '⚠️ Group ID باید عددی باشد یا «-».');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.group_id_numeric_or_dash'));
                 return;
             }
             $groupId = $value === '-' ? '' : $value;
@@ -1064,7 +1086,7 @@ final class MessageHandler
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage(
                 $chatId,
-                $groupId === '' ? '✅ Group ID غیرفعال شد.' : "✅ Group ID ذخیره شد: <code>" . htmlspecialchars($groupId) . "</code>"
+                $groupId === '' ? $this->catalog->get('admin.legacy.success.group_id_disabled') : $this->catalog->get('admin.legacy.success.group_id_saved', ['group_id' => htmlspecialchars($groupId)])
             );
             return;
         }
@@ -1087,13 +1109,13 @@ final class MessageHandler
                 }
             }
             if ($raw === '') {
-                $this->telegram->sendMessage($chatId, '⚠️ فایل/متن JSON معتبر ارسال نشد.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.valid_json_input_not_sent'));
                 return;
             }
             $data = json_decode($raw, true);
             $settings = is_array($data) ? ($data['settings'] ?? null) : null;
             if (!is_array($settings)) {
-                $this->telegram->sendMessage($chatId, '⚠️ ساختار JSON نامعتبر است. کلید settings پیدا نشد.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_json_missing_settings'));
                 return;
             }
             $count = 0;
@@ -1106,8 +1128,8 @@ final class MessageHandler
                 $count++;
             }
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, "✅ بازیابی تنظیمات انجام شد.\nتعداد کلیدهای اعمال‌شده: <b>{$count}</b>");
-            $this->sendToGroupTopic('backup', "♻️ بازیابی تنظیمات انجام شد.\nادمین: <code>{$userId}</code>\nتعداد کلید: <b>{$count}</b>");
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.settings_restored_count', ['count' => $count]));
+            $this->sendToGroupTopic('backup', $this->catalog->get('admin.legacy.info.settings_restored_group_topic', ['user_id' => $userId, 'count' => $count]));
             return;
         }
 
@@ -1123,16 +1145,16 @@ final class MessageHandler
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
-                $this->openAdminPinsList($chatId, $userId, $this->uiText->info('این مسیر legacy است؛ ادامه از مسیر canonical انجام می‌شود.'));
+                $this->openAdminPinsList($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
             $body = trim((string) ($message['text'] ?? ''));
             if ($body === '') {
-                $this->telegram->sendMessage($chatId, '⚠️ متن پیام پین نمی‌تواند خالی باشد.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.pin_message_empty'));
                 return;
             }
             $pinId = $this->database->addPinnedMessage($body);
-            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->info('مسیر قبلی canonical نیست و به flow جدید منتقل شد.'));
+            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->info($this->catalog->get('admin.legacy.info.add_admin_legacy_redirect')));
             return;
         }
 
@@ -1147,16 +1169,16 @@ final class MessageHandler
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
-                $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->info('این مسیر legacy است؛ ادامه از مسیر canonical انجام می‌شود.'));
+                $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
             $body = trim((string) ($message['text'] ?? ''));
             if ($pinId <= 0 || $body === '') {
-                $this->telegram->sendMessage($chatId, '⚠️ داده ویرایش پیام پین معتبر نیست.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_pin_edit_data'));
                 return;
             }
             $this->database->updatePinnedMessage($pinId, $body);
-            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->info('مسیر قبلی canonical نیست و به flow جدید منتقل شد.'));
+            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->info($this->catalog->get('admin.legacy.info.add_admin_legacy_redirect')));
             return;
         }
         if ($state['state_name'] === 'await_admin_broadcast') {
@@ -1201,22 +1223,22 @@ final class MessageHandler
             return false;
         }
 
-        if ($text === KeyboardBuilder::BTN_PROFILE) {
+        if ($text === KeyboardBuilder::profile() || $text === KeyboardBuilder::BTN_PROFILE) {
             $this->telegram->sendMessage($chatId, $this->menus->profileText($userId), $this->menus->accountMenuReplyKeyboard());
             return true;
         }
 
-        if ($text === KeyboardBuilder::BTN_SUPPORT) {
+        if ($text === KeyboardBuilder::support() || $text === KeyboardBuilder::BTN_SUPPORT) {
             $this->telegram->sendMessage($chatId, $this->menus->supportText());
             return true;
         }
 
-        if ($text === KeyboardBuilder::BTN_MY_CONFIGS) {
+        if ($text === KeyboardBuilder::myConfigs() || $text === KeyboardBuilder::BTN_MY_CONFIGS) {
             $this->showMyConfigsWithReplyFlow($chatId, $userId);
             return true;
         }
 
-        if ($text === KeyboardBuilder::BTN_REFERRAL) {
+        if ($text === KeyboardBuilder::referralButton() || $text === KeyboardBuilder::BTN_REFERRAL) {
             if ($this->settings->get('referral_enabled', '1') !== '1') {
                 return false;
             }
@@ -1228,22 +1250,22 @@ final class MessageHandler
             return true;
         }
 
-        if ($text === KeyboardBuilder::BTN_WALLET) {
+        if ($text === KeyboardBuilder::wallet() || $text === KeyboardBuilder::BTN_WALLET) {
             $this->database->setUserState($userId, 'await_wallet_amount');
             $this->telegram->sendMessage(
                 $chatId,
-                "💵 لطفاً مبلغ موردنظر را به تومان ارسال کنید:",
-                $this->replyKeyboard([[KeyboardBuilder::BTN_BACK_ACCOUNT, KeyboardBuilder::BTN_BACK_MAIN]])
+                $this->catalog->get('messages.user.wallet.enter_amount', ['emoji' => $this->catalog->get('emojis.cash')]),
+                $this->replyKeyboard([[KeyboardBuilder::backAccount(), KeyboardBuilder::backMain()]])
             );
             return true;
         }
 
-        if ($text === KeyboardBuilder::BTN_BUY) {
+        if ($text === KeyboardBuilder::buy() || $text === KeyboardBuilder::BTN_BUY) {
             $this->startBuyTypeReplyFlow($chatId, $userId);
             return true;
         }
 
-        if ($text === KeyboardBuilder::BTN_FREE_TEST) {
+        if ($text === KeyboardBuilder::freeTest() || $text === KeyboardBuilder::BTN_FREE_TEST) {
             if ($this->settings->get('free_test_enabled', '1') !== '1') {
                 return false;
             }
@@ -1251,39 +1273,38 @@ final class MessageHandler
             if (($claim['ok'] ?? false) !== true) {
                 $this->telegram->sendMessage(
                     $chatId,
-                    "⚠️ در حال حاضر سرویس تست آماده نداریم یا سهمیه شما کامل شده است."
+                    $this->catalog->get('messages.user.free_test.not_available', ['emoji' => $this->catalog->get('emojis.warning')])
                 );
                 return true;
             }
-            $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? 'سرویس تست'));
+            $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? $this->catalog->get('messages.user.free_test.default_service')));
             $configText = htmlspecialchars((string) ($claim['config_text'] ?? ''));
             $inquiryLink = trim((string) ($claim['inquiry_link'] ?? ''));
-            $msg = "🎁 <b>تست رایگان شما آماده است</b>\n\n"
-                . "📦 سرویس: <b>{$serviceName}</b>\n"
-                . "🧪 نوع سفارش: <b>تست رایگان</b>\n\n"
-                . "🔗 کانفیگ شما:\n<code>{$configText}</code>";
+            $msg = $this->catalog->get('messages.user.free_test.ready', [
+                'emoji' => $this->catalog->get('emojis.gift'),
+                'service_name' => $serviceName,
+                'config_text' => $configText,
+            ]);
             if ($inquiryLink !== '') {
-                $msg .= "\n\n🌐 لینک استعلام:\n" . htmlspecialchars($inquiryLink);
+                $msg .= "\n\n" . $this->catalog->get('messages.user.free_test.inquiry', ['inquiry_link' => htmlspecialchars($inquiryLink)]);
             }
             $this->telegram->sendMessage($chatId, $msg);
             return true;
         }
 
-        if ($text === KeyboardBuilder::BTN_AGENCY) {
+        if ($text === KeyboardBuilder::agency() || $text === KeyboardBuilder::BTN_AGENCY) {
             if ($this->settings->get('agency_request_enabled', '1') !== '1') {
                 return false;
             }
             $this->database->setUserState($userId, 'await_agency_request');
             $this->telegram->sendMessage(
                 $chatId,
-                "🤝 <b>درخواست نمایندگی</b>\n\n"
-                . "لطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید:\n"
-                . "پیام شما برای تیم ادمین ثبت می‌شود."
+                $this->catalog->get('messages.user.agency.request_intro')
             );
             return true;
         }
 
-        if ($text === KeyboardBuilder::BTN_ADMIN) {
+        if ($text === KeyboardBuilder::admin() || $text === KeyboardBuilder::BTN_ADMIN) {
             if (!$this->database->isAdminUser($userId)) {
                 return false;
             }
@@ -1291,7 +1312,7 @@ final class MessageHandler
             return true;
         }
 
-        if ($text === '↩️ پنل مدیریت') {
+        if ($text === $this->catalog->get('admin.common.back_to_panel')) {
             if (!$this->database->isAdminUser($userId)) {
                 return false;
             }
@@ -1301,47 +1322,47 @@ final class MessageHandler
         }
 
         if ($this->database->isAdminUser($userId)) {
-            if ($text === '⚙️ تنظیمات') {
+            if ($text === $this->catalog->get('buttons.admin.settings')) {
                 $this->openAdminSettingsView($chatId, $userId);
                 return true;
             }
-            if ($text === '👮 ادمین‌ها') {
+            if ($text === $this->catalog->get('buttons.admin.admins')) {
                 $this->openAdminAdminsList($chatId, $userId);
                 return true;
             }
-            if ($text === '📌 پین‌ها') {
+            if ($text === $this->catalog->get('buttons.admin.pins')) {
                 $this->openAdminPinsList($chatId, $userId);
                 return true;
             }
-            if ($text === '🤝 نماینده‌ها') {
+            if ($text === $this->catalog->get('buttons.admin.agencies')) {
                 $this->openAdminAgentsList($chatId, $userId);
                 return true;
             }
-            if ($text === '🖥 پنل‌های 3x-ui') {
+            if ($text === $this->catalog->get('buttons.admin.panels')) {
                 $this->openAdminPanelsList($chatId, $userId);
                 return true;
             }
-            if ($text === '📣 همگانی') {
+            if ($text === $this->catalog->get('buttons.admin.broadcast')) {
                 $this->openAdminBroadcastCompose($chatId, $userId);
                 return true;
             }
-            if ($text === '📦 تحویل سفارش') {
+            if ($text === $this->catalog->get('buttons.admin.delivery')) {
                 $this->openAdminDeliveriesList($chatId, $userId);
                 return true;
             }
-            if ($text === '🗃 بکاپ/تاپیک') {
+            if ($text === $this->catalog->get('buttons.admin.backup_topics')) {
                 $this->openAdminGroupOpsView($chatId, $userId);
                 return true;
             }
-            if ($text === '🧪 تست رایگان') {
+            if ($text === $this->catalog->get('buttons.admin.free_test')) {
                 $this->openAdminFreeTestMenu($chatId, $userId);
                 return true;
             }
-            if ($text === '💳 شارژها') {
+            if ($text === $this->catalog->get('buttons.admin.charges')) {
                 $this->openAdminPaymentsList($chatId, $userId);
                 return true;
             }
-            if ($text === '🗂 درخواست‌ها') {
+            if ($text === $this->catalog->get('buttons.admin.requests')) {
                 $this->openAdminRequestsList($chatId, $userId);
                 return true;
             }
@@ -1352,12 +1373,12 @@ final class MessageHandler
                         $chatId,
                         $userId,
                         $paymentId,
-                        $this->uiText->info('دکمه قدیمی است؛ مسیر canonical برای بررسی پرداخت باز شد.')
+                        $this->uiText->info($this->catalog->get('admin.common.legacy_button_payment'))
                     );
                     return true;
                 }
             }
-            if (preg_match('/^👀\s*درخواست تست\s*#(\d+)$/u', $text, $m) === 1) {
+            if (preg_match('/^' . preg_quote($this->catalog->get('admin.common.legacy_free_request_prefix'), '/') . '\s*#(\d+)$/u', $text, $m) === 1) {
                 $requestId = (int) ($m[1] ?? 0);
                 if ($requestId > 0) {
                     $this->openAdminRequestView(
@@ -1366,12 +1387,12 @@ final class MessageHandler
                         'free',
                         $requestId,
                         'pending',
-                        $this->uiText->info('دکمه قدیمی است؛ مسیر canonical برای بررسی درخواست باز شد.')
+                        $this->uiText->info($this->catalog->get('admin.common.legacy_button_request'))
                     );
                     return true;
                 }
             }
-            if (preg_match('/^👀\s*درخواست نمایندگی\s*#(\d+)$/u', $text, $m) === 1) {
+            if (preg_match('/^' . preg_quote($this->catalog->get('admin.common.legacy_agency_request_prefix'), '/') . '\s*#(\d+)$/u', $text, $m) === 1) {
                 $requestId = (int) ($m[1] ?? 0);
                 if ($requestId > 0) {
                     $this->openAdminRequestView(
@@ -1380,14 +1401,14 @@ final class MessageHandler
                         'agency',
                         $requestId,
                         'pending',
-                        $this->uiText->info('دکمه قدیمی است؛ مسیر canonical برای بررسی درخواست باز شد.')
+                        $this->uiText->info($this->catalog->get('admin.common.legacy_button_request'))
                     );
                     return true;
                 }
             }
         }
 
-        if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === KeyboardBuilder::backMain() || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return true;
@@ -1399,12 +1420,12 @@ final class MessageHandler
     private function startBuyTypeReplyFlow(int $chatId, int $userId): void
     {
         if ($this->settings->get('shop_open', '1') !== '1') {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('فروشگاه در حال حاضر بسته است.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.buy.shop_closed')));
             return;
         }
         $types = $this->database->getActiveTypes();
         if ($types === []) {
-            $this->telegram->sendMessage($chatId, $this->uiText->info('فعلاً سرویسی برای خرید فعال نیست.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.buy.no_active_service')));
             return;
         }
 
@@ -1424,20 +1445,20 @@ final class MessageHandler
         }
 
         if ($optionMap === []) {
-            $this->telegram->sendMessage($chatId, $this->uiText->info('فعلاً سرویسی برای خرید فعال نیست.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.buy.no_active_service')));
             return;
         }
 
-        $buttons[] = [UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'buy.await_type', ['options' => $optionMap, 'stack' => [], 'type_id' => null, 'package_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: '🛒 <b>خرید کانفیگ</b>',
+                title: $this->catalog->get('messages.user.buy.type_selection.title'),
                 lines: [
-                    new UiTextLine('🧩', 'انتخاب نوع سرویس', implode("\n", $lines)),
+                    new UiTextLine($this->catalog->get('emojis.puzzle'), $this->catalog->get('messages.user.buy.type_selection.label'), implode("\n", $lines)),
                 ],
-                tipBlockquote: '💡 ابتدا نوع سرویس را انتخاب کنید؛ در مرحله بعد لیست پکیج‌های همان نوع نمایش داده می‌شود و می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را مدیریت کنید.',
+                tipBlockquote: $this->catalog->get('messages.user.buy.type_selection.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -1467,20 +1488,20 @@ final class MessageHandler
 
         if (($state['state_name'] ?? '') === 'admin.root') {
             $adminRouteMap = [
-                '🧩 نوع/پکیج' => 'admin:types',
-                '📚 موجودی' => 'admin:stock',
-                '👥 کاربران' => 'admin:users',
-                '⚙️ تنظیمات' => 'admin:settings',
-                '🧪 تست رایگان' => 'admin:free_test:menu',
-                '👮 ادمین‌ها' => 'admin:admins',
-                '📣 همگانی' => 'admin:broadcast',
-                '📌 پین‌ها' => 'admin:pins',
-                '🤝 نماینده‌ها' => 'admin:agents',
-                '🖥 پنل‌های 3x-ui' => 'admin:panels',
-                '💳 شارژها' => 'admin:payments',
-                '📦 تحویل سفارش' => 'admin:deliveries',
-                '🗂 درخواست‌ها' => 'admin:requests',
-                '🗃 بکاپ/تاپیک' => 'admin:groupops',
+                $this->catalog->get('buttons.admin.types_packages') => 'admin:types',
+                $this->catalog->get('buttons.admin.inventory') => 'admin:stock',
+                $this->catalog->get('buttons.admin.users') => 'admin:users',
+                $this->catalog->get('buttons.admin.settings') => 'admin:settings',
+                $this->catalog->get('buttons.admin.free_test') => 'admin:free_test:menu',
+                $this->catalog->get('buttons.admin.admins') => 'admin:admins',
+                $this->catalog->get('buttons.admin.broadcast') => 'admin:broadcast',
+                $this->catalog->get('buttons.admin.pins') => 'admin:pins',
+                $this->catalog->get('buttons.admin.agencies') => 'admin:agents',
+                $this->catalog->get('buttons.admin.panels') => 'admin:panels',
+                $this->catalog->get('buttons.admin.charges') => 'admin:payments',
+                $this->catalog->get('buttons.admin.delivery') => 'admin:deliveries',
+                $this->catalog->get('buttons.admin.requests') => 'admin:requests',
+                $this->catalog->get('buttons.admin.backup_topics') => 'admin:groupops',
             ];
             $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {
@@ -1564,7 +1585,7 @@ final class MessageHandler
 
     private function handleAdminTypesPackagesState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::backMain() || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->openAdminRoot($chatId, $userId);
             return;
         }
@@ -1577,18 +1598,18 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_TYPES_ADD) {
+            if ($text === $this->catalog->get('admin.types_packages.actions.add_type') || $text === self::ADMIN_TYPES_ADD) {
                 $this->database->setUserState($userId, 'admin.type.create', ['stack' => ['admin.types.list']]);
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
-                        title: '🆕 <b>افزودن نوع سرویس</b>',
+                        title: $this->catalog->get('admin.types_packages.create_type.title'),
                         lines: [
-                            new UiTextLine('✍️', 'راهنما', 'نام نوع سرویس جدید را ارسال کنید.'),
+                            new UiTextLine($this->catalog->get('emojis.write'), $this->catalog->get('admin.types_packages.create_type.guide_label'), $this->catalog->get('admin.types_packages.create_type.guide_value')),
                         ],
-                        tipBlockquote: '💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید.',
+                        tipBlockquote: $this->catalog->get('admin.types_packages.create_type.tip'),
                     )),
-                    $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
+                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]])
                 );
                 return;
             }
@@ -1600,7 +1621,7 @@ final class MessageHandler
                 $this->openAdminTypeView($chatId, $userId, $typeId);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً یکی از دکمه‌های لیست نوع‌ها را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type_option')));
             return;
         }
 
@@ -1610,11 +1631,11 @@ final class MessageHandler
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('لطفاً نام نوع سرویس را به‌صورت متن معمولی ارسال کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_name_required')));
                 return;
             }
             $typeId = $this->database->addType($text, '');
-            $this->telegram->sendMessage($chatId, $this->uiText->success("نوع سرویس با شناسه <code>{$typeId}</code> ثبت شد."));
+            $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.types_packages.success.type_created', ['type_id' => $typeId])));
             $this->openAdminTypesList($chatId, $userId);
             return;
         }
@@ -1622,42 +1643,42 @@ final class MessageHandler
         if ($stateName === 'admin.type.view') {
             $typeId = (int) ($payload['type_id'] ?? 0);
             if ($typeId <= 0) {
-                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning('نوع سرویس نامعتبر بود. دوباره از لیست انتخاب کنید.'));
+                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
                 $this->openAdminTypesList($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_TYPE_ADD_PACKAGE) {
+            if ($text === $this->catalog->get('admin.types_packages.actions.add_package') || $text === self::ADMIN_TYPE_ADD_PACKAGE) {
                 $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'stack' => ['admin.type.view']]);
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
-                        title: '📦 <b>افزودن پکیج</b>',
+                        title: $this->catalog->get('admin.types_packages.create_package.title'),
                         lines: [
-                            new UiTextLine('🧾', 'فرمت', '<code>نام|حجم(GB)|مدت(روز)|قیمت</code>'),
+                            new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.types_packages.create_package.format_label'), $this->catalog->get('admin.types_packages.create_package.format_value')),
                         ],
-                        tipBlockquote: '💡 مثال: <code>اقتصادی|50|30|120000</code>',
+                        tipBlockquote: $this->catalog->get('admin.types_packages.create_package.tip'),
                     )),
-                    $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
+                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]])
                 );
                 return;
             }
-            if ($text === self::ADMIN_TYPE_TOGGLE) {
+            if ($text === $this->catalog->get('admin.types_packages.actions.toggle_type') || $text === self::ADMIN_TYPE_TOGGLE) {
                 $type = $this->findTypeById($typeId);
                 if ($type === null) {
-                    $this->openAdminTypesList($chatId, $userId, $this->uiText->warning('نوع سرویس پیدا نشد.'));
+                    $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_not_found')));
                     return;
                 }
                 $isActive = ((int) ($type['is_active'] ?? 0)) === 1;
                 $this->database->setTypeActive($typeId, !$isActive);
-                $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->success('وضعیت نوع سرویس بروزرسانی شد.'));
+                $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->success($this->catalog->get('admin.types_packages.success.type_status_updated')));
                 return;
             }
-            if ($text === self::ADMIN_TYPE_DELETE) {
+            if ($text === $this->catalog->get('admin.types_packages.actions.delete_type') || $text === self::ADMIN_TYPE_DELETE) {
                 $this->database->deleteType($typeId);
-                $this->openAdminTypesList($chatId, $userId, $this->uiText->success('نوع سرویس حذف شد.'));
+                $this->openAdminTypesList($chatId, $userId, $this->uiText->success($this->catalog->get('admin.types_packages.success.type_deleted')));
                 return;
             }
 
@@ -1669,14 +1690,14 @@ final class MessageHandler
                 return;
             }
 
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. یکی از پکیج‌ها یا عملیات مدیریتی همین صفحه را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_package_or_action')));
             return;
         }
 
         if ($stateName === 'admin.package.create') {
             $typeId = (int) ($payload['type_id'] ?? 0);
             if ($typeId <= 0) {
-                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning('نوع سرویس معتبر نبود. لطفاً دوباره انتخاب کنید.'));
+                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type_again')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
@@ -1684,12 +1705,12 @@ final class MessageHandler
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت ورودی معتبر نیست. لطفاً مطابق راهنما ارسال کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_create_input')));
                 return;
             }
             $parts = array_map('trim', explode('|', $text));
             if (count($parts) !== 4) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت باید ۴ بخش داشته باشد: نام|حجم|مدت|قیمت'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.create_format')));
                 return;
             }
             [$name, $volumeRaw, $durationRaw, $priceRaw] = $parts;
@@ -1697,11 +1718,11 @@ final class MessageHandler
             $duration = (int) preg_replace('/\D+/', '', $durationRaw);
             $price = (int) preg_replace('/\D+/', '', $priceRaw);
             if ($name === '' || $volume <= 0 || $duration <= 0 || $price <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مقادیر واردشده معتبر نیستند. مثال: <code>اقتصادی|50|30|120000</code>'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_values')));
                 return;
             }
             $packageId = $this->database->addPackage($typeId, $name, $volume, $duration, $price);
-            $this->telegram->sendMessage($chatId, $this->uiText->success("پکیج با شناسه <code>{$packageId}</code> ثبت شد."));
+            $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.types_packages.success.package_created', ['package_id' => $packageId])));
             $this->openAdminTypeView($chatId, $userId, $typeId);
             return;
         }
@@ -1710,31 +1731,31 @@ final class MessageHandler
             $typeId = (int) ($payload['type_id'] ?? 0);
             $packageId = (int) ($payload['package_id'] ?? 0);
             if ($typeId <= 0 || $packageId <= 0) {
-                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning('اطلاعات پکیج معتبر نبود. لطفاً دوباره انتخاب کنید.'));
+                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_package_info')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
                 $this->openAdminTypeView($chatId, $userId, $typeId);
                 return;
             }
-            if ($text === self::ADMIN_PACKAGE_TOGGLE) {
+            if ($text === $this->catalog->get('admin.types_packages.actions.toggle_package') || $text === self::ADMIN_PACKAGE_TOGGLE) {
                 $package = $this->findPackageInType($typeId, $packageId);
                 if ($package === null) {
-                    $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->warning('پکیج پیدا نشد.'));
+                    $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.package_not_found')));
                     return;
                 }
                 $isActive = ((int) ($package['is_active'] ?? 0)) === 1;
                 $this->database->setPackageActive($packageId, !$isActive);
-                $this->openAdminPackageView($chatId, $userId, $typeId, $packageId, $this->uiText->success('وضعیت پکیج بروزرسانی شد.'));
+                $this->openAdminPackageView($chatId, $userId, $typeId, $packageId, $this->uiText->success($this->catalog->get('admin.types_packages.success.package_status_updated')));
                 return;
             }
-            if ($text === self::ADMIN_PACKAGE_DELETE) {
+            if ($text === $this->catalog->get('admin.types_packages.actions.delete_package') || $text === self::ADMIN_PACKAGE_DELETE) {
                 $this->database->deletePackage($packageId);
-                $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->success('پکیج حذف شد.'));
+                $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->success($this->catalog->get('admin.types_packages.success.package_deleted')));
                 return;
             }
 
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً از دکمه‌های مدیریت پکیج استفاده کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_package_action')));
             return;
         }
     }
@@ -1912,14 +1933,14 @@ final class MessageHandler
                 $this->openAdminUserView($chatId, $userId, $targetUid);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً از لیست کاربران انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_user_list_option')));
             return;
         }
 
         if ($stateName === 'admin.user.view') {
             $targetUid = (int) ($payload['target_user_id'] ?? 0);
             if ($targetUid <= 0) {
-                $this->openAdminUsersList($chatId, $userId, $this->uiText->warning('کاربر انتخاب‌شده معتبر نبود.'));
+                $this->openAdminUsersList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_selected_user')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
@@ -1929,24 +1950,24 @@ final class MessageHandler
             if ($text === self::ADMIN_USER_TOGGLE_STATUS) {
                 $target = $this->database->getUser($targetUid);
                 if ($target === null) {
-                    $this->openAdminUsersList($chatId, $userId, $this->uiText->warning('کاربر پیدا نشد.'));
+                    $this->openAdminUsersList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.user_not_found')));
                     return;
                 }
                 $status = (string) ($target['status'] ?? 'unsafe');
                 $nextStatus = $status === 'restricted' ? 'unsafe' : 'restricted';
                 $this->database->setUserStatus($targetUid, $nextStatus);
-                $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->success('وضعیت کاربر بروزرسانی شد.'));
+                $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->success($this->catalog->get('admin.users_stock.success.user_status_updated')));
                 return;
             }
             if ($text === self::ADMIN_USER_TOGGLE_AGENT) {
                 $target = $this->database->getUser($targetUid);
                 if ($target === null) {
-                    $this->openAdminUsersList($chatId, $userId, $this->uiText->warning('کاربر پیدا نشد.'));
+                    $this->openAdminUsersList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.user_not_found')));
                     return;
                 }
                 $isAgent = ((int) ($target['is_agent'] ?? 0)) === 1;
                 $this->database->setUserAgent($targetUid, !$isAgent);
-                $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->success('وضعیت نمایندگی بروزرسانی شد.'));
+                $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->success($this->catalog->get('admin.users_stock.success.agent_status_updated')));
                 return;
             }
             if ($text === self::ADMIN_USER_BALANCE_ADD || $text === self::ADMIN_USER_BALANCE_SUB) {
@@ -1956,29 +1977,29 @@ final class MessageHandler
                     'mode' => $mode,
                     'stack' => ['admin.user.view', 'admin.users.list', 'admin.root'],
                 ]);
-                $modeText = $mode === 'sub' ? 'کاهش' : 'افزایش';
+                $modeText = $this->catalog->get($mode === 'sub' ? 'admin.users_stock.labels.balance_mode_sub' : 'admin.users_stock.labels.balance_mode_add');
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
-                        title: "💵 <b>{$modeText} موجودی کاربر</b>",
+                        title: $this->catalog->get('admin.users_stock.prompts.balance_action_title', ['mode_text' => $modeText]),
                         lines: [
-                            new UiTextLine('👤', 'کاربر', "<code>{$targetUid}</code>"),
-                            new UiTextLine('🔢', 'ورودی', 'مبلغ را به تومان ارسال کنید (فقط عدد).'),
+                            new UiTextLine($this->catalog->get('admin.users_stock.prompts.balance_action_user_emoji'), $this->catalog->get('admin.users_stock.prompts.balance_action_user_label'), "<code>{$targetUid}</code>"),
+                            new UiTextLine($this->catalog->get('admin.users_stock.prompts.balance_action_input_emoji'), $this->catalog->get('admin.users_stock.prompts.balance_action_input_label'), $this->catalog->get('admin.users_stock.prompts.balance_action_input_value')),
                         ],
-                        tipBlockquote: '💡 با دکمه بازگشت می‌توانید به پروفایل کاربر برگردید.',
+                        tipBlockquote: $this->catalog->get('admin.users_stock.prompts.balance_action_tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
                 );
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً از دکمه‌های مدیریت کاربر استفاده کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_user_action_option')));
             return;
         }
 
         if ($stateName === 'admin.user.action') {
             $targetUid = (int) ($payload['target_user_id'] ?? 0);
             if ($targetUid <= 0) {
-                $this->openAdminUsersList($chatId, $userId, $this->uiText->warning('کاربر معتبر نبود.'));
+                $this->openAdminUsersList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_user')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
@@ -1987,13 +2008,13 @@ final class MessageHandler
             }
             $amount = (int) preg_replace('/\D+/', '', $text);
             if ($amount <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مبلغ معتبر وارد کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_amount')));
                 return;
             }
             $mode = (string) ($payload['mode'] ?? 'add');
             $delta = $mode === 'sub' ? -$amount : $amount;
             $this->database->updateUserBalance($targetUid, $delta);
-            $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->success('موجودی کاربر بروزرسانی شد.'));
+            $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->success($this->catalog->get('admin.users_stock.success.user_balance_updated')));
             return;
         }
 
@@ -2032,7 +2053,7 @@ final class MessageHandler
                     $this->openAdminStockPackagesView($chatId, $userId, $typeId);
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. یکی از نوع‌ها را انتخاب کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_stock_type_option')));
                 return;
             }
 
@@ -2050,7 +2071,7 @@ final class MessageHandler
                     $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '');
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. یکی از پکیج‌ها را انتخاب کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_stock_package_option')));
                 return;
             }
 
@@ -2072,11 +2093,11 @@ final class MessageHandler
                     $this->telegram->sendMessage(
                         $chatId,
                         $this->uiText->multi(new UiTextBlock(
-                            title: '➕ <b>افزودن کانفیگ</b>',
+                            title: $this->catalog->get('admin.users_stock.prompts.add_config_title'),
                             lines: [
-                                new UiTextLine('🧾', 'فرمت', "خط اول: نام سرویس\n---\nخط دوم: متن کانفیگ\n---\n(اختیاری) لینک استعلام"),
+                                new UiTextLine($this->catalog->get('admin.users_stock.prompts.add_config_format_emoji'), $this->catalog->get('admin.users_stock.prompts.add_config_format_label'), $this->catalog->get('admin.users_stock.prompts.add_config_format_value')),
                             ],
-                            tipBlockquote: '💡 جداکننده بین بخش‌ها باید دقیقاً --- باشد.',
+                            tipBlockquote: $this->catalog->get('admin.users_stock.prompts.add_config_tip'),
                         )),
                         $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
                     );
@@ -2093,11 +2114,11 @@ final class MessageHandler
                     $this->telegram->sendMessage(
                         $chatId,
                         $this->uiText->multi(new UiTextBlock(
-                            title: '🔎 <b>جستجو در کانفیگ‌ها</b>',
+                            title: $this->catalog->get('admin.users_stock.prompts.search_config_title'),
                             lines: [
-                                new UiTextLine('📝', 'ورودی', 'عبارت جستجو را ارسال کنید. برای پاک‌کردن از "-" استفاده کنید.'),
+                                new UiTextLine($this->catalog->get('admin.users_stock.prompts.search_config_input_emoji'), $this->catalog->get('admin.users_stock.prompts.search_config_input_label'), $this->catalog->get('admin.users_stock.prompts.search_config_input_value')),
                             ],
-                            tipBlockquote: '💡 جستجو روی نام سرویس، متن کانفیگ و لینک استعلام انجام می‌شود.',
+                            tipBlockquote: $this->catalog->get('admin.users_stock.prompts.search_config_tip'),
                         )),
                         $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
                     );
@@ -2114,7 +2135,7 @@ final class MessageHandler
                     $this->openAdminStockConfigDetailView($chatId, $userId, $typeId, $packageId, $configId, $query);
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. از دکمه‌های همین صفحه استفاده کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_configs_option')));
                 return;
             }
 
@@ -2126,7 +2147,7 @@ final class MessageHandler
                 if ($text === self::ADMIN_STOCK_EXPIRE_TOGGLE) {
                     $cfg = $this->findConfigById($packageId, $configId);
                     if ($cfg === null) {
-                        $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, $query, $this->uiText->warning('کانفیگ پیدا نشد.'));
+                        $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, $query, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.config_not_found')));
                         return;
                     }
                     $isExpired = ((int) ($cfg['is_expired'] ?? 0)) === 1;
@@ -2135,15 +2156,15 @@ final class MessageHandler
                     } else {
                         $this->database->expireConfig($configId);
                     }
-                    $this->openAdminStockConfigDetailView($chatId, $userId, $typeId, $packageId, $configId, $query, $this->uiText->success('وضعیت انقضا بروزرسانی شد.'));
+                    $this->openAdminStockConfigDetailView($chatId, $userId, $typeId, $packageId, $configId, $query, $this->uiText->success($this->catalog->get('admin.users_stock.success.config_expire_status_updated')));
                     return;
                 }
                 if ($text === self::ADMIN_STOCK_DELETE_CONFIG) {
                     $this->database->deleteConfig($configId);
-                    $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, $query, $this->uiText->success('کانفیگ حذف شد.'));
+                    $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, $query, $this->uiText->success($this->catalog->get('admin.users_stock.success.config_deleted')));
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. از دکمه‌های مدیریت کانفیگ استفاده کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_config_detail_option')));
                 return;
             }
         }
@@ -2168,12 +2189,12 @@ final class MessageHandler
             if ($mode === 'add_config') {
                 $raw = trim((string) ($message['text'] ?? ''));
                 if ($raw === '' || str_starts_with($raw, '/')) {
-                    $this->telegram->sendMessage($chatId, $this->uiText->warning('لطفاً متن کانفیگ را طبق فرمت ارسال کنید.'));
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.config_text_required')));
                     return;
                 }
                 $chunks = preg_split('/\n---\n/', $raw) ?: [];
                 if (count($chunks) < 2) {
-                    $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت نامعتبر است. جداکننده --- را رعایت کنید.'));
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_config_format')));
                     return;
                 }
                 $serviceName = trim((string) ($chunks[0] ?? ''));
@@ -2188,11 +2209,11 @@ final class MessageHandler
                     }
                 }
                 if ($serviceName === '' || $configText === '' || $typeId <= 0 || $packageId <= 0) {
-                    $this->telegram->sendMessage($chatId, $this->uiText->warning('نام سرویس یا متن کانفیگ معتبر نیست.'));
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_service_or_config_text')));
                     return;
                 }
                 $configId = $this->database->addConfig($typeId, $packageId, $serviceName, $configText, $inquiry);
-                $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->success("کانفیگ با شناسه <code>{$configId}</code> ثبت شد."));
+                $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->success($this->catalog->get('admin.users_stock.success.config_created', ['config_id' => $configId])));
                 return;
             }
         }
@@ -2464,13 +2485,24 @@ final class MessageHandler
 
         $stateName = (string) ($state['state_name'] ?? '');
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
+        $paymentsRefreshLabel = $this->catalog->get('admin.payments_requests.actions.payments_refresh', ['emoji' => $this->catalog->get('emojis.sync')]);
+        $paymentVerifyChainLabel = $this->catalog->get('admin.payments_requests.actions.payment_verify_chain', ['emoji' => $this->catalog->get('emojis.compass')]);
+        $paymentApproveLabel = $this->catalog->get('admin.payments_requests.actions.payment_approve', ['emoji' => $this->catalog->get('emojis.success')]);
+        $paymentRejectLabel = $this->catalog->get('admin.payments_requests.actions.payment_reject', ['emoji' => $this->catalog->get('emojis.error')]);
+        $requestsFreeLabel = $this->catalog->get('admin.payments_requests.actions.requests_free', ['emoji' => $this->catalog->get('emojis.gift')]);
+        $requestsAgencyLabel = $this->catalog->get('admin.payments_requests.actions.requests_agency', ['emoji' => $this->catalog->get('emojis.briefcase')]);
+        $requestsPendingLabel = $this->catalog->get('admin.payments_requests.actions.requests_pending', ['emoji' => $this->catalog->get('emojis.warning')]);
+        $requestsApprovedLabel = $this->catalog->get('admin.payments_requests.actions.requests_approved', ['emoji' => $this->catalog->get('emojis.success')]);
+        $requestsRejectedLabel = $this->catalog->get('admin.payments_requests.actions.requests_rejected', ['emoji' => $this->catalog->get('emojis.error')]);
+        $requestApproveLabel = $this->catalog->get('admin.payments_requests.actions.request_approve', ['emoji' => $this->catalog->get('emojis.success')]);
+        $requestRejectLabel = $this->catalog->get('admin.payments_requests.actions.request_reject', ['emoji' => $this->catalog->get('emojis.error')]);
 
         if ($stateName === 'admin.payments.list') {
             if ($text === UiLabels::BTN_BACK) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_PAYMENTS_REFRESH) {
+            if ($text === $paymentsRefreshLabel || $text === self::ADMIN_PAYMENTS_REFRESH) {
                 $this->openAdminPaymentsList($chatId, $userId);
                 return;
             }
@@ -2481,21 +2513,21 @@ final class MessageHandler
                 $this->openAdminPaymentView($chatId, $userId, $paymentId);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. یکی از پرداخت‌ها را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_payment_option')));
             return;
         }
 
         if ($stateName === 'admin.payment.view') {
             $paymentId = (int) ($payload['payment_id'] ?? 0);
             if ($paymentId <= 0) {
-                $this->openAdminPaymentsList($chatId, $userId, $this->uiText->warning('شناسه پرداخت معتبر نبود.'));
+                $this->openAdminPaymentsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_payment_id')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
                 $this->openAdminPaymentsList($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_PAYMENT_VERIFY_CHAIN) {
+            if ($text === $paymentVerifyChainLabel || $text === self::ADMIN_PAYMENT_VERIFY_CHAIN) {
                 $this->database->setUserState($userId, 'admin.payment.review', [
                     'payment_id' => $paymentId,
                     'action' => 'verify',
@@ -2504,8 +2536,13 @@ final class MessageHandler
                 $this->processAdminPaymentReview($chatId, $userId, $paymentId, 'verify');
                 return;
             }
-            if ($text === self::ADMIN_PAYMENT_APPROVE || $text === self::ADMIN_PAYMENT_REJECT) {
-                $action = $text === self::ADMIN_PAYMENT_APPROVE ? 'approve' : 'reject';
+            if (
+                $text === $paymentApproveLabel
+                || $text === self::ADMIN_PAYMENT_APPROVE
+                || $text === $paymentRejectLabel
+                || $text === self::ADMIN_PAYMENT_REJECT
+            ) {
+                $action = ($text === $paymentApproveLabel || $text === self::ADMIN_PAYMENT_APPROVE) ? 'approve' : 'reject';
                 $this->database->setUserState($userId, 'admin.payment.review', [
                     'payment_id' => $paymentId,
                     'action' => $action,
@@ -2514,14 +2551,14 @@ final class MessageHandler
                 $this->processAdminPaymentReview($chatId, $userId, $paymentId, $action);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. از دکمه‌های بررسی پرداخت استفاده کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_payment_review_action')));
             return;
         }
 
         if ($stateName === 'admin.payment.review') {
             $paymentId = (int) ($payload['payment_id'] ?? 0);
             if ($paymentId <= 0) {
-                $this->openAdminPaymentsList($chatId, $userId, $this->uiText->warning('پرداخت نامعتبر بود.'));
+                $this->openAdminPaymentsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_payment')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
@@ -2541,27 +2578,27 @@ final class MessageHandler
             $kind = (string) ($payload['kind'] ?? '');
             $status = (string) ($payload['status'] ?? 'pending');
             if ($kind === '') {
-                if ($text === self::ADMIN_REQUESTS_FREE) {
+                if ($text === $requestsFreeLabel || $text === self::ADMIN_REQUESTS_FREE) {
                     $this->openAdminRequestsList($chatId, $userId, 'free', 'pending');
                     return;
                 }
-                if ($text === self::ADMIN_REQUESTS_AGENCY) {
+                if ($text === $requestsAgencyLabel || $text === self::ADMIN_REQUESTS_AGENCY) {
                     $this->openAdminRequestsList($chatId, $userId, 'agency', 'pending');
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. نوع درخواست را انتخاب کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_request_kind_option')));
                 return;
             }
 
-            if ($text === self::ADMIN_REQUESTS_PENDING) {
+            if ($text === $requestsPendingLabel || $text === self::ADMIN_REQUESTS_PENDING) {
                 $this->openAdminRequestsList($chatId, $userId, $kind, 'pending');
                 return;
             }
-            if ($text === self::ADMIN_REQUESTS_APPROVED) {
+            if ($text === $requestsApprovedLabel || $text === self::ADMIN_REQUESTS_APPROVED) {
                 $this->openAdminRequestsList($chatId, $userId, $kind, 'approved');
                 return;
             }
-            if ($text === self::ADMIN_REQUESTS_REJECTED) {
+            if ($text === $requestsRejectedLabel || $text === self::ADMIN_REQUESTS_REJECTED) {
                 $this->openAdminRequestsList($chatId, $userId, $kind, 'rejected');
                 return;
             }
@@ -2573,7 +2610,7 @@ final class MessageHandler
                 $this->openAdminRequestView($chatId, $userId, $kind, $requestId, $status);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. یکی از درخواست‌ها را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_request_option')));
             return;
         }
 
@@ -2582,15 +2619,20 @@ final class MessageHandler
             $requestId = (int) ($payload['request_id'] ?? 0);
             $status = (string) ($payload['status'] ?? 'pending');
             if ($kind === '' || $requestId <= 0) {
-                $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->uiText->warning('اطلاعات درخواست معتبر نبود.'));
+                $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_request_info')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
                 $this->openAdminRequestsList($chatId, $userId, $kind, $status);
                 return;
             }
-            if ($text === self::ADMIN_REQUEST_APPROVE || $text === self::ADMIN_REQUEST_REJECT) {
-                $action = $text === self::ADMIN_REQUEST_APPROVE ? 'approve' : 'reject';
+            if (
+                $text === $requestApproveLabel
+                || $text === self::ADMIN_REQUEST_APPROVE
+                || $text === $requestRejectLabel
+                || $text === self::ADMIN_REQUEST_REJECT
+            ) {
+                $action = ($text === $requestApproveLabel || $text === self::ADMIN_REQUEST_APPROVE) ? 'approve' : 'reject';
                 $this->database->setUserState($userId, 'admin.request.review', [
                     'kind' => $kind,
                     'request_id' => $requestId,
@@ -2598,22 +2640,25 @@ final class MessageHandler
                     'action' => $action,
                     'stack' => ['admin.request.view', 'admin.requests.list', 'admin.root'],
                 ]);
-                $actionText = $action === 'approve' ? 'تایید' : 'رد';
+                $actionText = $this->catalog->get($action === 'approve' ? 'admin.payments_requests.labels.action_approve' : 'admin.payments_requests.labels.action_reject');
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
-                        title: "📝 <b>ثبت یادداشت {$actionText}</b>",
+                        title: $this->catalog->get('admin.payments_requests.prompts.request_review_note_title', [
+                            'emoji' => $this->catalog->get('emojis.note'),
+                            'action_text' => $actionText,
+                        ]),
                         lines: [
-                            new UiTextLine('🆔', 'شناسه درخواست', "<code>{$requestId}</code>"),
-                            new UiTextLine('✍️', 'یادداشت', 'یادداشت ادمین را ارسال کنید. اگر یادداشت ندارید، «-» بفرستید.'),
+                            new UiTextLine($this->catalog->get('emojis.support_id'), $this->catalog->get('admin.payments_requests.prompts.request_id_label'), "<code>{$requestId}</code>"),
+                            new UiTextLine($this->catalog->get('emojis.write'), $this->catalog->get('admin.payments_requests.prompts.note_label'), $this->catalog->get('admin.payments_requests.prompts.note_value')),
                         ],
-                        tipBlockquote: '💡 یادداشت به کاربر ارسال می‌شود؛ کوتاه و واضح بنویسید.',
+                        tipBlockquote: $this->catalog->get('admin.payments_requests.prompts.note_tip', ['emoji' => $this->catalog->get('emojis.info')]),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
                 );
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. از دکمه‌های بررسی درخواست استفاده کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_request_review_action')));
             return;
         }
 
@@ -2623,7 +2668,7 @@ final class MessageHandler
             $status = (string) ($payload['status'] ?? 'pending');
             $action = (string) ($payload['action'] ?? '');
             if ($kind === '' || $requestId <= 0 || ($action !== 'approve' && $action !== 'reject')) {
-                $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->uiText->warning('اطلاعات بررسی درخواست معتبر نبود.'));
+                $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_request_review_info')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
@@ -2638,21 +2683,36 @@ final class MessageHandler
                 : $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
             if (!($result['ok'] ?? false)) {
                 $msg = (($result['error'] ?? '') === 'already_reviewed')
-                    ? 'این درخواست قبلاً بررسی شده است.'
-                    : 'ثبت نتیجه بررسی انجام نشد.';
+                    ? $this->catalog->get('admin.payments_requests.errors.request_already_reviewed')
+                    : $this->catalog->get('admin.payments_requests.errors.request_review_failed');
                 $this->telegram->sendMessage($chatId, $this->uiText->error($msg));
                 $this->openAdminRequestsList($chatId, $userId, $kind, 'pending');
                 return;
             }
 
-            $label = $kind === 'free' ? 'درخواست تست رایگان' : 'درخواست نمایندگی';
-            $statusText = $approve ? '✅ تایید شد' : '❌ رد شد';
-            $this->telegram->sendMessage($chatId, $this->uiText->success("{$label} <code>{$requestId}</code> {$statusText}."));
+            $label = $kind === 'free'
+                ? $this->catalog->get('admin.payments_requests.labels.request_free')
+                : $this->catalog->get('admin.payments_requests.labels.request_agency');
+            $statusText = $approve
+                ? $this->catalog->get('admin.payments_requests.labels.status_approved', ['emoji' => $this->catalog->get('emojis.success')])
+                : $this->catalog->get('admin.payments_requests.labels.status_rejected', ['emoji' => $this->catalog->get('emojis.error')]);
+            $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.payments_requests.success.request_reviewed', [
+                'request_label' => $label,
+                'request_id' => $requestId,
+                'status_text' => $statusText,
+            ])));
             $userNotice = $approve
-                ? ($kind === 'free' ? "✅ درخواست تست رایگان شما تایید شد." : "✅ درخواست نمایندگی شما تایید شد.")
-                : ($kind === 'free' ? "❌ درخواست تست رایگان شما رد شد." : "❌ درخواست نمایندگی شما رد شد.");
+                ? ($kind === 'free'
+                    ? $this->catalog->get('admin.payments_requests.user_notice.free_approved', ['emoji' => $this->catalog->get('emojis.success')])
+                    : $this->catalog->get('admin.payments_requests.user_notice.agency_approved', ['emoji' => $this->catalog->get('emojis.success')]))
+                : ($kind === 'free'
+                    ? $this->catalog->get('admin.payments_requests.user_notice.free_rejected', ['emoji' => $this->catalog->get('emojis.error')])
+                    : $this->catalog->get('admin.payments_requests.user_notice.agency_rejected', ['emoji' => $this->catalog->get('emojis.error')]));
             if ($adminNote !== null && $adminNote !== '') {
-                $userNotice .= "\n\n📝 توضیح ادمین:\n" . htmlspecialchars($adminNote);
+                $userNotice .= $this->catalog->get('admin.payments_requests.user_notice.admin_note', [
+                    'emoji' => $this->catalog->get('emojis.note'),
+                    'note' => htmlspecialchars($adminNote),
+                ]);
             }
             $this->telegram->sendMessage((int) ($result['user_id'] ?? 0), $userNotice);
             $this->openAdminRequestsList($chatId, $userId, $kind, 'pending');
@@ -2803,7 +2863,7 @@ final class MessageHandler
             return;
         }
         $this->notifyPaymentDecision((int) ($result['user_id'] ?? 0), (string) ($result['kind'] ?? ''), (int) ($result['amount'] ?? 0), $approve);
-        $statusText = $approve ? '✅ تایید شد' : '❌ رد شد';
+        $statusText = $approve ? $this->catalog->get('admin.legacy.labels.status_approved') : $this->catalog->get('admin.legacy.labels.status_rejected');
         $this->openAdminPaymentsList($chatId, $userId, $this->uiText->success("درخواست <code>{$paymentId}</code> {$statusText}."));
     }
 
@@ -2944,6 +3004,23 @@ final class MessageHandler
         }
         $stateName = (string) ($state['state_name'] ?? '');
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
+        $settingsRefreshLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_refresh', ['emoji' => $this->catalog->get('emojis.sync')]);
+        $settingsToggleBotLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_bot', ['emoji' => $this->catalog->get('emojis.admin_panel')]);
+        $settingsToggleFreeTestLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_free_test', ['emoji' => $this->catalog->get('emojis.gift')]);
+        $settingsToggleAgencyLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_agency', ['emoji' => $this->catalog->get('emojis.briefcase')]);
+        $settingsToggleGwCardLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_card', ['emoji' => $this->catalog->get('emojis.cash')]);
+        $settingsToggleGwCryptoLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_crypto', ['emoji' => $this->catalog->get('emojis.gift')]);
+        $settingsToggleGwTetraLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_tetra', ['emoji' => $this->catalog->get('emojis.money')]);
+        $settingsSetChannelLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_channel', ['emoji' => $this->catalog->get('emojis.private_channel')]);
+        $settingsEditLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_edit', ['emoji' => $this->catalog->get('emojis.write')]);
+        $adminsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.admins_add', ['emoji' => $this->catalog->get('emojis.success')]);
+        $adminDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.admin_delete', ['emoji' => $this->catalog->get('emojis.error')]);
+        $pinsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.pins_add', ['emoji' => $this->catalog->get('emojis.success')]);
+        $pinEditLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_edit', ['emoji' => $this->catalog->get('emojis.write')]);
+        $pinDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_delete', ['emoji' => $this->catalog->get('emojis.error')]);
+        $pinSendAllLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_send_all', ['emoji' => $this->catalog->get('emojis.megaphone')]);
+        $confirmDeleteWord = $this->catalog->get('admin.settings_admins_pins.keywords.delete_confirm');
+        $confirmSendWord = $this->catalog->get('admin.settings_admins_pins.keywords.send_confirm');
 
         if ($stateName === 'admin.settings.view') {
             if ($text === UiLabels::BTN_BACK) {
@@ -2956,46 +3033,51 @@ final class MessageHandler
                 self::ADMIN_SETTINGS_TOGGLE_GW_CARD => 'gw_card_enabled',
                 self::ADMIN_SETTINGS_TOGGLE_GW_CRYPTO => 'gw_crypto_enabled',
                 self::ADMIN_SETTINGS_TOGGLE_GW_TETRA => 'gw_tetrapay_enabled',
+                $settingsToggleFreeTestLabel => 'free_test_enabled',
+                $settingsToggleAgencyLabel => 'agency_request_enabled',
+                $settingsToggleGwCardLabel => 'gw_card_enabled',
+                $settingsToggleGwCryptoLabel => 'gw_crypto_enabled',
+                $settingsToggleGwTetraLabel => 'gw_tetrapay_enabled',
             ];
-            if ($text === self::ADMIN_SETTINGS_REFRESH) {
+            if ($text === $settingsRefreshLabel || $text === self::ADMIN_SETTINGS_REFRESH) {
                 $this->openAdminSettingsView($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_SETTINGS_TOGGLE_BOT) {
+            if ($text === $settingsToggleBotLabel || $text === self::ADMIN_SETTINGS_TOGGLE_BOT) {
                 $cur = $this->settings->get('bot_status', 'on');
                 $next = $cur === 'on' ? 'update' : ($cur === 'update' ? 'off' : 'on');
                 $this->settings->set('bot_status', $next);
-                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success('وضعیت ربات بروزرسانی شد.'));
+                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.bot_status_updated')));
                 return;
             }
             if (isset($toggleMap[$text])) {
                 $key = $toggleMap[$text];
                 $current = $this->settings->get($key, '0');
                 $this->settings->set($key, $current === '1' ? '0' : '1');
-                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success('تنظیم بروزرسانی شد.'));
+                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.setting_updated')));
                 return;
             }
-            if ($text === self::ADMIN_SETTINGS_SET_CHANNEL) {
+            if ($text === $settingsSetChannelLabel || $text === self::ADMIN_SETTINGS_SET_CHANNEL) {
                 $this->database->setUserState($userId, 'admin.settings.edit', ['mode' => 'channel', 'stack' => ['admin.settings.view', 'admin.root']]);
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
-                        title: '📢 <b>تنظیم کانال قفل</b>',
-                        lines: [new UiTextLine('🧾', 'ورودی', 'آیدی کانال را بفرستید (@channel یا -100...). برای غیرفعال‌سازی «-» ارسال کنید.')],
-                        tipBlockquote: '💡 کانال قفل روی شروع کاربرها اثر مستقیم دارد؛ مقدار را دقیق ثبت کنید.',
+                        title: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_title', ['emoji' => $this->catalog->get('emojis.private_channel')]),
+                        lines: [new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.settings_admins_pins.prompts.input_label'), $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_input_value'))],
+                        tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_tip', ['emoji' => $this->catalog->get('emojis.info')]),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
                 );
                 return;
             }
-            if ($text === self::ADMIN_SETTINGS_EDIT) {
+            if ($text === $settingsEditLabel || $text === self::ADMIN_SETTINGS_EDIT) {
                 $this->database->setUserState($userId, 'admin.settings.edit', ['mode' => 'kv', 'stack' => ['admin.settings.view', 'admin.root']]);
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
-                        title: '✏️ <b>ویرایش دستی تنظیم</b>',
-                        lines: [new UiTextLine('🧾', 'فرمت', '<code>key|value</code>')],
-                        tipBlockquote: '💡 برای کلیدهای حساس مقدار معتبر وارد کنید.',
+                        title: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_title', ['emoji' => $this->catalog->get('emojis.write')]),
+                        lines: [new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.settings_admins_pins.prompts.format_label'), $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_format_value'))],
+                        tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_tip', ['emoji' => $this->catalog->get('emojis.info')]),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
                 );
@@ -3010,7 +3092,7 @@ final class MessageHandler
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('ورودی معتبر ارسال کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_input')));
                 return;
             }
             if ($mode === 'channel') {
@@ -3019,18 +3101,18 @@ final class MessageHandler
                     $value = '';
                 }
                 $this->settings->set('channel_id', $value);
-                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success('کانال قفل بروزرسانی شد.'));
+                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.lock_channel_updated')));
                 return;
             }
             $parts = array_map('trim', explode('|', $text, 2));
             $key = (string) ($parts[0] ?? '');
             $value = (string) ($parts[1] ?? '');
             if ($key === '' || count($parts) < 2) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت باید key|value باشد.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_kv_format')));
                 return;
             }
             $this->settings->set($key, $value);
-            $this->openAdminSettingsView($chatId, $userId, $this->uiText->success('تنظیم ذخیره شد.'));
+            $this->openAdminSettingsView($chatId, $userId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.setting_saved')));
             return;
         }
 
@@ -3039,12 +3121,12 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_ADMINS_ADD) {
+            if ($text === $adminsAddLabel || $text === self::ADMIN_ADMINS_ADD) {
                 $this->database->setUserState($userId, 'admin.admin.create', ['stack' => ['admin.admins.list', 'admin.root']]);
                 $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-                    title: '➕ <b>افزودن ادمین</b>',
-                    lines: [new UiTextLine('🆔', 'راهنما', 'آیدی عددی ادمین جدید را ارسال کنید.')],
-                    tipBlockquote: '💡 سطح دسترسی اولیه با سطح‌های پایه ایجاد می‌شود و قابل ویرایش است.',
+                    title: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_title', ['emoji' => $this->catalog->get('emojis.success')]),
+                    lines: [new UiTextLine($this->catalog->get('emojis.support_id'), $this->catalog->get('admin.settings_admins_pins.prompts.guide_label'), $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_guide_value'))],
+                    tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_tip', ['emoji' => $this->catalog->get('emojis.info')]),
                 )), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
@@ -3064,29 +3146,29 @@ final class MessageHandler
             }
             $targetUid = (int) preg_replace('/\D+/', '', $text);
             if ($targetUid <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('آیدی معتبر ارسال کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_admin_id')));
                 return;
             }
             $this->database->upsertAdminUser($targetUid, $userId, [
                 'types' => true, 'stock' => true, 'users' => true, 'settings' => true, 'payments' => true, 'requests' => true, 'broadcast' => false, 'agents' => false, 'panels' => false,
             ]);
-            $this->openAdminAdminView($chatId, $userId, $targetUid, $this->uiText->success('ادمین جدید ایجاد شد.'));
+            $this->openAdminAdminView($chatId, $userId, $targetUid, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.admin_created')));
             return;
         }
 
         if ($stateName === 'admin.admin.view') {
             $targetUid = (int) ($payload['target_user_id'] ?? 0);
             if ($targetUid <= 0) {
-                $this->openAdminAdminsList($chatId, $userId, $this->uiText->warning('ادمین معتبر نبود.'));
+                $this->openAdminAdminsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_admin')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
                 $this->openAdminAdminsList($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_ADMIN_DELETE) {
+            if ($text === $adminDeleteLabel || $text === self::ADMIN_ADMIN_DELETE) {
                 $this->database->setUserState($userId, 'admin.admin.delete', ['target_user_id' => $targetUid, 'stack' => ['admin.admin.view', 'admin.admins.list', 'admin.root']]);
-                $this->telegram->sendMessage($chatId, $this->uiText->warning("برای حذف ادمین <code>{$targetUid}</code>، عبارت «حذف» را ارسال کنید."), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.prompts.admin_delete_confirm', ['target_uid' => $targetUid, 'confirm_word' => $confirmDeleteWord])), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
             $permMap = is_array($payload['perm_labels'] ?? null) ? $payload['perm_labels'] : [];
@@ -3095,7 +3177,7 @@ final class MessageHandler
                 $perms = $this->database->getAdminPermissions($targetUid);
                 $perms[$permKey] = !((bool) ($perms[$permKey] ?? false));
                 $this->database->upsertAdminUser($targetUid, $userId, $perms);
-                $this->openAdminAdminView($chatId, $userId, $targetUid, $this->uiText->success('دسترسی بروزرسانی شد.'));
+                $this->openAdminAdminView($chatId, $userId, $targetUid, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.permission_updated')));
                 return;
             }
         }
@@ -3106,12 +3188,12 @@ final class MessageHandler
                 $this->openAdminAdminView($chatId, $userId, $targetUid);
                 return;
             }
-            if ($targetUid > 0 && trim($text) === 'حذف' && !in_array($targetUid, Config::adminIds(), true)) {
+            if ($targetUid > 0 && trim($text) === $confirmDeleteWord && !in_array($targetUid, Config::adminIds(), true)) {
                 $this->database->removeAdminUser($targetUid);
-                $this->openAdminAdminsList($chatId, $userId, $this->uiText->success('ادمین حذف شد.'));
+                $this->openAdminAdminsList($chatId, $userId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.admin_deleted')));
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('برای تایید حذف، عبارت «حذف» را ارسال کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.admin_delete_confirm_required', ['confirm_word' => $confirmDeleteWord])));
             return;
         }
 
@@ -3120,9 +3202,9 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_PINS_ADD) {
+            if ($text === $pinsAddLabel || $text === self::ADMIN_PINS_ADD) {
                 $this->database->setUserState($userId, 'admin.pin.create', ['stack' => ['admin.pins.list', 'admin.root']]);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('متن پیام پین را ارسال کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.settings_admins_pins.prompts.pin_text_send')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
@@ -3140,37 +3222,37 @@ final class MessageHandler
                 return;
             }
             if (trim($text) === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('متن پیام پین نمی‌تواند خالی باشد.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.pin_text_empty')));
                 return;
             }
             $pinId = $this->database->addPinnedMessage($text);
-            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->success('پیام پین ثبت شد.'));
+            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.pin_created')));
             return;
         }
 
         if ($stateName === 'admin.pin.view') {
             $pinId = (int) ($payload['pin_id'] ?? 0);
             if ($pinId <= 0) {
-                $this->openAdminPinsList($chatId, $userId, $this->uiText->warning('پیام پین معتبر نبود.'));
+                $this->openAdminPinsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_pin')));
                 return;
             }
             if ($text === UiLabels::BTN_BACK) {
                 $this->openAdminPinsList($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_PIN_EDIT) {
+            if ($text === $pinEditLabel || $text === self::ADMIN_PIN_EDIT) {
                 $this->database->setUserState($userId, 'admin.pin.edit', ['pin_id' => $pinId, 'stack' => ['admin.pin.view', 'admin.pins.list', 'admin.root']]);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('متن جدید پیام پین را ارسال کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.settings_admins_pins.prompts.pin_new_text_send')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
-            if ($text === self::ADMIN_PIN_DELETE) {
+            if ($text === $pinDeleteLabel || $text === self::ADMIN_PIN_DELETE) {
                 $this->database->setUserState($userId, 'admin.pin.delete', ['pin_id' => $pinId, 'stack' => ['admin.pin.view', 'admin.pins.list', 'admin.root']]);
-                $this->telegram->sendMessage($chatId, $this->uiText->warning("برای حذف پیام پین #{$pinId} عبارت «حذف» را ارسال کنید."), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.prompts.pin_delete_confirm', ['pin_id' => $pinId, 'confirm_word' => $confirmDeleteWord])), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
-            if ($text === self::ADMIN_PIN_SEND_ALL) {
+            if ($text === $pinSendAllLabel || $text === self::ADMIN_PIN_SEND_ALL) {
                 $this->database->setUserState($userId, 'admin.pin.send', ['pin_id' => $pinId, 'stack' => ['admin.pin.view', 'admin.pins.list', 'admin.root']]);
-                $this->telegram->sendMessage($chatId, $this->uiText->warning("برای ارسال و پین همگانی #{$pinId} عبارت «ارسال» را ارسال کنید."), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.prompts.pin_send_all_confirm', ['pin_id' => $pinId, 'confirm_word' => $confirmSendWord])), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
         }
@@ -3182,11 +3264,11 @@ final class MessageHandler
                 return;
             }
             if (trim($text) === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('متن معتبر ارسال کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.valid_text_required')));
                 return;
             }
             $this->database->updatePinnedMessage($pinId, $text);
-            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->success('پیام پین ویرایش شد.'));
+            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.pin_updated')));
             return;
         }
 
@@ -3196,12 +3278,12 @@ final class MessageHandler
                 $this->openAdminPinView($chatId, $userId, $pinId);
                 return;
             }
-            if (trim($text) === 'حذف') {
+            if (trim($text) === $confirmDeleteWord) {
                 $this->database->deletePinnedMessage($pinId);
-                $this->openAdminPinsList($chatId, $userId, $this->uiText->success('پیام پین حذف شد.'));
+                $this->openAdminPinsList($chatId, $userId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.pin_deleted')));
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('برای تایید حذف عبارت «حذف» را ارسال کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.pin_delete_confirm_required', ['confirm_word' => $confirmDeleteWord])));
             return;
         }
 
@@ -3211,13 +3293,13 @@ final class MessageHandler
                 $this->openAdminPinView($chatId, $userId, $pinId);
                 return;
             }
-            if (trim($text) !== 'ارسال') {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('برای تایید ارسال همگانی عبارت «ارسال» را بفرستید.'));
+            if (trim($text) !== $confirmSendWord) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.pin_send_confirm_required', ['confirm_word' => $confirmSendWord])));
                 return;
             }
             $pin = $this->database->getPinnedMessage($pinId);
             if ($pin === null) {
-                $this->openAdminPinsList($chatId, $userId, $this->uiText->warning('پیام پین پیدا نشد.'));
+                $this->openAdminPinsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.pin_not_found')));
                 return;
             }
             $sent = 0;
@@ -3240,11 +3322,11 @@ final class MessageHandler
                 } catch (\Throwable $e) {
                 }
             }
-            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->success("ارسال انجام شد. ارسال: <b>{$sent}</b> | پین: <b>{$pinned}</b>"));
+            $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.pin_send_done', ['sent' => $sent, 'pinned' => $pinned])));
             return;
         }
 
-        $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً از دکمه‌های همین بخش استفاده کنید.'));
+        $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_section_option')));
     }
 
     private function openAdminSettingsView(int $chatId, int $userId, ?string $notice = null): void
@@ -3409,13 +3491,31 @@ final class MessageHandler
         }
         $stateName = (string) ($state['state_name'] ?? '');
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
+        $agentsRefreshLabel = $this->catalog->get('admin.final_modules.actions.agents_refresh', ['emoji' => $this->catalog->get('emojis.sync')]);
+        $panelsAddLabel = $this->catalog->get('admin.final_modules.actions.panels_add', ['emoji' => $this->catalog->get('emojis.success')]);
+        $panelToggleLabel = $this->catalog->get('admin.final_modules.actions.panel_toggle', ['emoji' => $this->catalog->get('emojis.sync')]);
+        $panelDeleteLabel = $this->catalog->get('admin.final_modules.actions.panel_delete', ['emoji' => $this->catalog->get('emojis.error')]);
+        $panelPkgAddLabel = $this->catalog->get('admin.final_modules.actions.panel_pkg_add', ['emoji' => $this->catalog->get('emojis.success')]);
+        $broadcastScopeAllLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_all', ['emoji' => $this->catalog->get('emojis.list')]);
+        $broadcastScopeUsersLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_users', ['emoji' => $this->catalog->get('emojis.profile')]);
+        $broadcastScopeAgentsLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_agents', ['emoji' => $this->catalog->get('emojis.briefcase')]);
+        $broadcastScopeAdminsLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_admins', ['emoji' => $this->catalog->get('emojis.shield')]);
+        $broadcastSendLabel = $this->catalog->get('admin.final_modules.actions.broadcast_send', ['emoji' => $this->catalog->get('emojis.megaphone')]);
+        $deliveriesRefreshLabel = $this->catalog->get('admin.final_modules.actions.deliveries_refresh', ['emoji' => $this->catalog->get('emojis.sync')]);
+        $deliveryDoLabel = $this->catalog->get('admin.final_modules.actions.delivery_do', ['emoji' => $this->catalog->get('emojis.package')]);
+        $groupopsSetGroupLabel = $this->catalog->get('admin.final_modules.actions.groupops_set_group', ['emoji' => $this->catalog->get('emojis.folder')]);
+        $groupopsRestoreLabel = $this->catalog->get('admin.final_modules.actions.groupops_restore', ['emoji' => $this->catalog->get('emojis.sync')]);
+        $freetestRuleLabel = $this->catalog->get('admin.final_modules.actions.freetest_rule', ['emoji' => $this->catalog->get('emojis.note')]);
+        $freetestResetLabel = $this->catalog->get('admin.final_modules.actions.freetest_reset', ['emoji' => $this->catalog->get('emojis.sync')]);
+        $deleteConfirmWord = $this->catalog->get('admin.final_modules.keywords.delete_confirm');
+        $deliverConfirmWord = $this->catalog->get('admin.final_modules.keywords.deliver_confirm');
 
         if ($stateName === 'admin.agents.list') {
             if ($text === UiLabels::BTN_BACK) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_AGENTS_REFRESH) {
+            if ($text === $agentsRefreshLabel || $text === self::ADMIN_AGENTS_REFRESH) {
                 $this->openAdminAgentsList($chatId, $userId);
                 return;
             }
@@ -3435,13 +3535,13 @@ final class MessageHandler
             }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
             $selected = $this->extractOptionKey($text);
-            $pkgId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-            if ($pkgId > 0) {
-                $this->database->setUserState($userId, 'admin.agent.edit', ['agent_id' => $agentId, 'package_id' => $pkgId]);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('قیمت را به تومان بفرستید. برای حذف قیمت اختصاصی «-» بفرستید.'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
-                return;
+                $pkgId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+                if ($pkgId > 0) {
+                    $this->database->setUserState($userId, 'admin.agent.edit', ['agent_id' => $agentId, 'package_id' => $pkgId]);
+                    $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.prompts.agent_price_input')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                    return;
+                }
             }
-        }
         if ($stateName === 'admin.agent.edit') {
             $agentId = (int) ($payload['agent_id'] ?? 0);
             $pkgId = (int) ($payload['package_id'] ?? 0);
@@ -3452,16 +3552,16 @@ final class MessageHandler
             $raw = trim($text);
             if ($raw === '-' || $raw === '—') {
                 $this->database->clearAgencyPrice($agentId, $pkgId);
-                $this->openAdminAgentView($chatId, $userId, $agentId, $this->uiText->success('قیمت اختصاصی حذف شد.'));
+                $this->openAdminAgentView($chatId, $userId, $agentId, $this->uiText->success($this->catalog->get('admin.final_modules.success.agent_price_deleted')));
                 return;
             }
             $price = (int) preg_replace('/\D+/', '', $raw);
             if ($price <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('قیمت معتبر وارد کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.valid_price_required')));
                 return;
             }
             $this->database->setAgencyPrice($agentId, $pkgId, $price);
-            $this->openAdminAgentView($chatId, $userId, $agentId, $this->uiText->success('قیمت اختصاصی ثبت شد.'));
+            $this->openAdminAgentView($chatId, $userId, $agentId, $this->uiText->success($this->catalog->get('admin.final_modules.success.agent_price_saved')));
             return;
         }
 
@@ -3470,9 +3570,9 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_PANELS_ADD) {
+            if ($text === $panelsAddLabel || $text === self::ADMIN_PANELS_ADD) {
                 $this->database->setUserState($userId, 'admin.panel.create', []);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('فرمت پنل: name|ip|port|patch|username|password'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.prompts.panel_create_format')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
@@ -3490,17 +3590,17 @@ final class MessageHandler
             }
             $parts = array_map('trim', explode('|', $text));
             if (count($parts) !== 6) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت باید ۶ بخشی باشد.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.panel_format_six_parts')));
                 return;
             }
             [$name, $ip, $portRaw, $patch, $username, $password] = $parts;
             $port = (int) preg_replace('/\D+/', '', $portRaw);
             if ($name === '' || $ip === '' || $port <= 0 || $username === '' || $password === '') {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مقادیر معتبر نیستند.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_values')));
                 return;
             }
             $panelId = $this->database->addPanel($name, $ip, $port, $patch, $username, $password);
-            $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success('پنل ثبت شد.'));
+            $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_created')));
             return;
         }
         if ($stateName === 'admin.panel.view') {
@@ -3509,23 +3609,23 @@ final class MessageHandler
                 $this->openAdminPanelsList($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_PANEL_TOGGLE) {
+            if ($text === $panelToggleLabel || $text === self::ADMIN_PANEL_TOGGLE) {
                 $panel = $this->database->getPanel($panelId);
                 if (is_array($panel)) {
                     $active = ((int) ($panel['is_active'] ?? 0)) === 1;
                     $this->database->updatePanelActive($panelId, !$active);
                 }
-                $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success('وضعیت پنل بروزرسانی شد.'));
+                $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_status_updated')));
                 return;
             }
-            if ($text === self::ADMIN_PANEL_DELETE) {
+            if ($text === $panelDeleteLabel || $text === self::ADMIN_PANEL_DELETE) {
                 $this->database->setUserState($userId, 'admin.panel.delete', ['panel_id' => $panelId]);
-                $this->telegram->sendMessage($chatId, $this->uiText->warning("برای حذف پنل #{$panelId} عبارت «حذف» را ارسال کنید."), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.prompts.panel_delete_confirm', ['panel_id' => $panelId, 'confirm_word' => $deleteConfirmWord])), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
-            if ($text === self::ADMIN_PANEL_PKG_ADD) {
+            if ($text === $panelPkgAddLabel || $text === self::ADMIN_PANEL_PKG_ADD) {
                 $this->database->setUserState($userId, 'admin.panel.pkg.create', ['panel_id' => $panelId]);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('فرمت پکیج پنل: name|volume_gb|duration_days|inbound_id'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.prompts.panel_pkg_create_format')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
         }
@@ -3537,7 +3637,7 @@ final class MessageHandler
             }
             $parts = array_map('trim', explode('|', $text));
             if (count($parts) !== 4) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت معتبر نیست.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_format')));
                 return;
             }
             [$name, $volRaw, $durRaw, $inbRaw] = $parts;
@@ -3545,11 +3645,11 @@ final class MessageHandler
             $dur = (int) preg_replace('/\D+/', '', $durRaw);
             $inb = (int) preg_replace('/\D+/', '', $inbRaw);
             if ($panelId <= 0 || $name === '' || $vol <= 0 || $dur <= 0 || $inb <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مقادیر معتبر نیستند.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_values')));
                 return;
             }
             $this->database->addPanelPackage($panelId, $name, $vol, $dur, $inb);
-            $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success('پکیج پنل ثبت شد.'));
+            $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_package_created')));
             return;
         }
         if ($stateName === 'admin.panel.delete') {
@@ -3558,12 +3658,12 @@ final class MessageHandler
                 $this->openAdminPanelView($chatId, $userId, $panelId);
                 return;
             }
-            if (trim($text) === 'حذف') {
+            if (trim($text) === $deleteConfirmWord) {
                 $this->database->deletePanel($panelId);
-                $this->openAdminPanelsList($chatId, $userId, $this->uiText->success('پنل حذف شد.'));
+                $this->openAdminPanelsList($chatId, $userId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_deleted')));
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('برای تایید حذف عبارت «حذف» را بفرستید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.panel_delete_confirm_required', ['confirm_word' => $deleteConfirmWord])));
             return;
         }
 
@@ -3573,14 +3673,14 @@ final class MessageHandler
                 return;
             }
             if (trim($text) === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('متن پیام را ارسال کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.broadcast_message_required')));
                 return;
             }
             $this->database->setUserState($userId, 'admin.broadcast.confirm', ['message' => $text]);
             $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-                title: '📣 <b>تایید ارسال همگانی</b>',
-                lines: [new UiTextLine('📝', 'پیش‌نمایش', htmlspecialchars($text))],
-                tipBlockquote: '💡 scope را انتخاب کنید و سپس دکمه ارسال را بزنید.',
+                title: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_title', ['emoji' => $this->catalog->get('emojis.megaphone')]),
+                lines: [new UiTextLine($this->catalog->get('emojis.note'), $this->catalog->get('admin.final_modules.prompts.broadcast_preview_label'), htmlspecialchars($text))],
+                tipBlockquote: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_tip', ['emoji' => $this->catalog->get('emojis.info')]),
             )), $this->uiKeyboard->replyMenu([
                 [self::ADMIN_BROADCAST_SCOPE_ALL, self::ADMIN_BROADCAST_SCOPE_USERS],
                 [self::ADMIN_BROADCAST_SCOPE_AGENTS, self::ADMIN_BROADCAST_SCOPE_ADMINS],
@@ -3594,15 +3694,24 @@ final class MessageHandler
                 $this->openAdminBroadcastCompose($chatId, $userId);
                 return;
             }
-            $scopeMap = [self::ADMIN_BROADCAST_SCOPE_ALL => 'all', self::ADMIN_BROADCAST_SCOPE_USERS => 'users', self::ADMIN_BROADCAST_SCOPE_AGENTS => 'agents', self::ADMIN_BROADCAST_SCOPE_ADMINS => 'admins'];
+            $scopeMap = [
+                self::ADMIN_BROADCAST_SCOPE_ALL => 'all',
+                self::ADMIN_BROADCAST_SCOPE_USERS => 'users',
+                self::ADMIN_BROADCAST_SCOPE_AGENTS => 'agents',
+                self::ADMIN_BROADCAST_SCOPE_ADMINS => 'admins',
+                $broadcastScopeAllLabel => 'all',
+                $broadcastScopeUsersLabel => 'users',
+                $broadcastScopeAgentsLabel => 'agents',
+                $broadcastScopeAdminsLabel => 'admins',
+            ];
             $scope = (string) ($payload['scope'] ?? 'all');
             if (isset($scopeMap[$text])) {
                 $scope = $scopeMap[$text];
                 $this->database->setUserState($userId, 'admin.broadcast.confirm', ['message' => (string) ($payload['message'] ?? ''), 'scope' => $scope]);
-                $this->telegram->sendMessage($chatId, $this->uiText->info("scope انتخاب شد: <b>{$scope}</b>"));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.info.scope_selected', ['scope' => $scope])));
                 return;
             }
-            if ($text === self::ADMIN_BROADCAST_SEND) {
+            if ($text === $broadcastSendLabel || $text === self::ADMIN_BROADCAST_SEND) {
                 $msg = (string) ($payload['message'] ?? '');
                 $targets = $this->database->listUserIdsForBroadcast($scope);
                 $sent = 0;
@@ -3617,7 +3726,7 @@ final class MessageHandler
                     }
                 }
                 $this->openAdminRoot($chatId, $userId);
-                $this->telegram->sendMessage($chatId, $this->uiText->success("ارسال همگانی انجام شد. موفق: <b>{$sent}</b>"));
+                $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.final_modules.success.broadcast_done', ['sent' => $sent])));
                 return;
             }
         }
@@ -3627,7 +3736,7 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_DELIVERIES_REFRESH) {
+            if ($text === $deliveriesRefreshLabel || $text === self::ADMIN_DELIVERIES_REFRESH) {
                 $this->openAdminDeliveriesList($chatId, $userId);
                 return;
             }
@@ -3645,9 +3754,9 @@ final class MessageHandler
                 $this->openAdminDeliveriesList($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_DELIVERY_DO) {
+            if ($text === $deliveryDoLabel || $text === self::ADMIN_DELIVERY_DO) {
                 $this->database->setUserState($userId, 'admin.delivery.review', ['order_id' => $orderId]);
-                $this->telegram->sendMessage($chatId, $this->uiText->warning("برای تحویل سفارش #{$orderId} عبارت «تحویل» را ارسال کنید."), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.prompts.delivery_confirm', ['order_id' => $orderId, 'confirm_word' => $deliverConfirmWord])), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
         }
@@ -3657,12 +3766,12 @@ final class MessageHandler
                 $this->openAdminDeliveryView($chatId, $userId, $orderId);
                 return;
             }
-            if (trim($text) === 'تحویل') {
+            if (trim($text) === $deliverConfirmWord) {
                 $res = $this->database->deliverPendingOrder($orderId);
                 if ($res['ok'] ?? false) {
-                    $this->openAdminDeliveriesList($chatId, $userId, $this->uiText->success('تحویل انجام شد.'));
+                    $this->openAdminDeliveriesList($chatId, $userId, $this->uiText->success($this->catalog->get('admin.final_modules.success.delivery_done')));
                 } else {
-                    $this->openAdminDeliveryView($chatId, $userId, $orderId, $this->uiText->warning('تحویل انجام نشد.'));
+                    $this->openAdminDeliveryView($chatId, $userId, $orderId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.delivery_failed')));
                 }
                 return;
             }
@@ -3673,14 +3782,14 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_GROUPOPS_SET_GROUP) {
+            if ($text === $groupopsSetGroupLabel || $text === self::ADMIN_GROUPOPS_SET_GROUP) {
                 $this->database->setUserState($userId, 'admin.groupops.action', ['mode' => 'group_id']);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('Group ID را ارسال کنید (یا - برای غیرفعال‌سازی).'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.prompts.group_id_input')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
-            if ($text === self::ADMIN_GROUPOPS_RESTORE) {
+            if ($text === $groupopsRestoreLabel || $text === self::ADMIN_GROUPOPS_RESTORE) {
                 $this->database->setUserState($userId, 'admin.groupops.action', ['mode' => 'restore']);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('JSON تنظیمات را ارسال کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.prompts.restore_json_input')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
         }
@@ -3693,11 +3802,11 @@ final class MessageHandler
             if ($mode === 'group_id') {
                 $val = trim($text);
                 if ($val !== '-' && !preg_match('/^-?\\d+$/', $val)) {
-                    $this->telegram->sendMessage($chatId, $this->uiText->warning('Group ID باید عددی باشد.'));
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.group_id_numeric')));
                     return;
                 }
                 $this->settings->set('group_id', $val === '-' ? '' : $val);
-                $this->openAdminGroupOpsView($chatId, $userId, $this->uiText->success('Group ID ذخیره شد.'));
+                $this->openAdminGroupOpsView($chatId, $userId, $this->uiText->success($this->catalog->get('admin.final_modules.success.group_id_saved')));
                 return;
             }
             if ($mode === 'restore') {
@@ -3705,7 +3814,7 @@ final class MessageHandler
                 $data = json_decode($raw, true);
                 $settings = is_array($data) ? ($data['settings'] ?? null) : null;
                 if (!is_array($settings)) {
-                    $this->telegram->sendMessage($chatId, $this->uiText->warning('ساختار JSON نامعتبر است.'));
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_json_structure')));
                     return;
                 }
                 foreach ($settings as $k => $v) {
@@ -3714,7 +3823,7 @@ final class MessageHandler
                         $this->settings->set($key, (string) $v);
                     }
                 }
-                $this->openAdminGroupOpsView($chatId, $userId, $this->uiText->success('بازیابی تنظیمات انجام شد.'));
+                $this->openAdminGroupOpsView($chatId, $userId, $this->uiText->success($this->catalog->get('admin.final_modules.success.settings_restored')));
                 return;
             }
         }
@@ -3724,14 +3833,14 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === self::ADMIN_FREETEST_RULE) {
+            if ($text === $freetestRuleLabel || $text === self::ADMIN_FREETEST_RULE) {
                 $this->database->setUserState($userId, 'admin.freetest.rule', []);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('فرمت قانون: package_id|max_claims|cooldown_days'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.prompts.freetest_rule_format')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
-            if ($text === self::ADMIN_FREETEST_RESET) {
+            if ($text === $freetestResetLabel || $text === self::ADMIN_FREETEST_RESET) {
                 $this->database->setUserState($userId, 'admin.freetest.reset', []);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('آیدی عددی کاربر را ارسال کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.prompts.freetest_reset_user_id_input')), $this->uiKeyboard->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
                 return;
             }
         }
@@ -3745,11 +3854,11 @@ final class MessageHandler
             $maxClaims = (int) ($parts[1] ?? 1);
             $cooldownDays = (int) ($parts[2] ?? 0);
             if ($packageId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت نامعتبر است.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_format')));
                 return;
             }
             $this->database->saveFreeTestRule($packageId, $maxClaims, $cooldownDays, true);
-            $this->openAdminFreeTestMenu($chatId, $userId, $this->uiText->success('قانون تست رایگان ذخیره شد.'));
+            $this->openAdminFreeTestMenu($chatId, $userId, $this->uiText->success($this->catalog->get('admin.final_modules.success.freetest_rule_saved')));
             return;
         }
         if ($stateName === 'admin.freetest.reset') {
@@ -3759,11 +3868,11 @@ final class MessageHandler
             }
             $targetUserId = (int) preg_replace('/\D+/', '', $text);
             if ($targetUserId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('آیدی معتبر نیست.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.valid_user_id_required')));
                 return;
             }
             $this->database->resetFreeTestQuota($targetUserId);
-            $this->openAdminFreeTestMenu($chatId, $userId, $this->uiText->success('سهمیه کاربر ریست شد.'));
+            $this->openAdminFreeTestMenu($chatId, $userId, $this->uiText->success($this->catalog->get('admin.final_modules.success.freetest_quota_reset')));
             return;
         }
     }
@@ -3936,7 +4045,7 @@ final class MessageHandler
         $selected = $this->extractOptionKey($text);
         $typeId = isset($options[$selected]) ? (int) $options[$selected] : 0;
         if ($typeId <= 0) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.common.invalid_option')));
             return;
         }
 
@@ -3948,7 +4057,7 @@ final class MessageHandler
         $stockOnly = $this->settings->get('preorder_mode', '0') === '1';
         $packages = $this->database->getActivePackagesByTypeWithStock($typeId, $stockOnly);
         if ($packages === []) {
-            $this->telegram->sendMessage($chatId, $this->uiText->info('پکیجی برای این نوع سرویس یافت نشد.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.buy.no_package_for_type')));
             return;
         }
 
@@ -3962,23 +4071,29 @@ final class MessageHandler
                 continue;
             }
             $price = $this->database->effectivePackagePrice($userId, $pkg);
-            $stockText = isset($pkg['stock']) ? (' | موجودی: ' . (int) $pkg['stock']) : '';
-            $label = sprintf('%s | %sGB | %s روز | %s تومان%s', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $price, $stockText);
+            $stockText = isset($pkg['stock']) ? $this->catalog->get('messages.user.buy.stock_suffix', ['stock' => (int) $pkg['stock']]) : '';
+            $label = $this->catalog->get('messages.user.buy.package_row', [
+                'name' => (string) $pkg['name'],
+                'volume_gb' => (string) $pkg['volume_gb'],
+                'duration_days' => (string) $pkg['duration_days'],
+                'price' => (string) $price,
+                'stock_suffix' => $stockText,
+            ]);
             $lines[] = "{$num}) " . htmlspecialchars($label);
             $optionMap[$num] = $pkgId;
-            $buttons[] = [$num . ' - ' . (string) ($pkg['name'] ?? 'پکیج')];
+            $buttons[] = [$num . ' - ' . (string) ($pkg['name'] ?? $this->catalog->get('messages.user.buy.default_package_name'))];
         }
 
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'buy.await_package', ['options' => $optionMap, 'type_id' => $typeId, 'stack' => ['buy.await_type'], 'package_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: '📦 <b>انتخاب پکیج</b>',
+                title: $this->catalog->get('messages.user.buy.package_selection.title'),
                 lines: [
-                    new UiTextLine('📋', 'لیست پکیج‌ها', implode("\n", $lines)),
+                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('messages.user.buy.package_selection.label'), implode("\n", $lines)),
                 ],
-                tipBlockquote: '💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید نوع سرویس را دوباره تغییر دهید.',
+                tipBlockquote: $this->catalog->get('messages.user.buy.package_selection.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -4000,24 +4115,24 @@ final class MessageHandler
         $selected = $this->extractOptionKey($text);
         $packageId = isset($options[$selected]) ? (int) $options[$selected] : 0;
         if ($packageId <= 0) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.common.invalid_option')));
             return;
         }
 
         if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
             $rulesText = trim($this->settings->get('purchase_rules_text', ''));
-            $rulesText = $rulesText !== '' ? $rulesText : 'لطفاً قوانین خرید را بپذیرید.';
+            $rulesText = $rulesText !== '' ? $rulesText : $this->catalog->get('messages.user.buy.rules.default_text');
             $this->database->setUserState($userId, 'buy.await_rules_accept', ['package_id' => $packageId, 'type_id' => (int) ($state['payload']['type_id'] ?? 0), 'stack' => ['buy.await_type', 'buy.await_package'], 'payment_method' => null]);
             $this->telegram->sendMessage(
                 $chatId,
                 $this->uiText->multi(new UiTextBlock(
-                    title: '📜 <b>قوانین خرید</b>',
+                    title: $this->catalog->get('messages.user.buy.rules.title'),
                     lines: [
-                        new UiTextLine('📝', 'متن قوانین', htmlspecialchars($rulesText)),
+                        new UiTextLine($this->catalog->get('emojis.note'), $this->catalog->get('messages.user.buy.rules.label'), htmlspecialchars($rulesText)),
                     ],
-                    tipBlockquote: '⚠️ با تایید قوانین، خرید شما وارد مرحله انتخاب روش پرداخت می‌شود؛ اگر نیاز به تغییر پکیج دارید از دکمه بازگشت استفاده کنید تا انتخاب قبلی را اصلاح کنید.',
+                    tipBlockquote: $this->catalog->get('messages.user.buy.rules.tip'),
                 )),
-                $this->uiKeyboard->replyMenu([[self::ACCEPT_RULES], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]])
+                $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.accept_rules')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]])
             );
             return;
         }
@@ -4025,34 +4140,34 @@ final class MessageHandler
         $this->database->clearUserState($userId);
         $package = $this->database->getPackage($packageId);
         if ($package === null) {
-            $this->telegram->sendMessage($chatId, $this->uiText->error('پکیج پیدا نشد.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.buy.package_not_found')));
             return;
         }
         $textOut = $this->uiText->multi(new UiTextBlock(
-            title: '💰 <b>پرداخت سفارش</b>',
+            title: $this->catalog->get('messages.user.buy.payment.title'),
             lines: [
-                new UiTextLine('📦', 'پکیج', '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
-                new UiTextLine('💵', 'قیمت', '<b>' . (int) $this->database->effectivePackagePrice($userId, $package) . '</b> تومان'),
+                new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
+                new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
             ],
-            tipBlockquote: '💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود.',
+            tipBlockquote: $this->catalog->get('messages.user.buy.payment.tip'),
         ));
-        $buttons = [[self::PAY_WALLET]];
+        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_CARD];
+            $buttons[] = [$this->catalog->get('buttons.pay.card')];
         }
         if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_CRYPTO];
+            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
         }
         if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_TETRAPAY];
+            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
         }
         if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_SWAPWALLET];
+            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
         }
         if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_TRONPAYS];
+            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'buy.await_payment_method', ['package_id' => $packageId, 'type_id' => (int) ($state['payload']['type_id'] ?? 0), 'stack' => ['buy.await_type', 'buy.await_package'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
@@ -4075,26 +4190,26 @@ final class MessageHandler
             if ($purchaseId <= 0) {
                 continue;
             }
-            $service = trim((string) ($item['service_name'] ?? '-'));
-            $lines[] = "{$num}) سفارش #{$purchaseId} - " . htmlspecialchars($service);
+            $service = trim((string) ($item['service_name'] ?? $this->catalog->get('messages.generic.dash')));
+            $lines[] = $this->catalog->get('messages.user.renew.order_option', ['num' => $num, 'purchase_id' => $purchaseId, 'service_name' => htmlspecialchars($service)]);
             $optionMap[$num] = $purchaseId;
-            $buttons[] = ['♻️ تمدید ' . $num];
+            $buttons[] = [$this->catalog->get('messages.user.renew.option_button', ['num' => $num])];
         }
 
         if ($optionMap === []) {
             return;
         }
 
-        $buttons[] = [UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'renew.await_purchase', ['options' => $optionMap, 'stack' => [], 'purchase_id' => null, 'package_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: '♻️ <b>تمدید سرویس</b>',
+                title: $this->catalog->get('messages.user.renew.select_order.title'),
                 lines: [
-                    new UiTextLine('📋', 'لیست سفارش‌ها', implode("\n", $lines)),
+                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('messages.user.renew.select_order.label'), implode("\n", $lines)),
                 ],
-                tipBlockquote: '💡 برای تمدید، شماره سفارش موردنظر را از دکمه‌ها انتخاب کنید؛ در ادامه پکیج‌های تمدید همان سرویس نمایش داده می‌شود و می‌توانید مسیر را با بازگشت مدیریت کنید.',
+                tipBlockquote: $this->catalog->get('messages.user.renew.select_order.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -4112,24 +4227,24 @@ final class MessageHandler
         $selected = $this->extractOptionKey($text);
         $purchaseId = isset($options[$selected]) ? (int) $options[$selected] : 0;
         if ($purchaseId <= 0) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.common.invalid_option')));
             return;
         }
 
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         if (!is_array($purchase)) {
-            $this->telegram->sendMessage($chatId, $this->uiText->error('سفارش پیدا نشد.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.renew.order_not_found')));
             return;
         }
         if ((int) ($purchase['is_test'] ?? 0) === 1) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('تمدید برای سرویس تست ممکن نیست.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.renew.test_not_renewable')));
             return;
         }
 
         $typeId = (int) ($purchase['type_id'] ?? 0);
         $packages = $this->database->getActivePackagesByType($typeId);
         if ($packages === []) {
-            $this->telegram->sendMessage($chatId, $this->uiText->info('پکیج تمدید یافت نشد.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.renew.no_package')));
             return;
         }
 
@@ -4142,25 +4257,30 @@ final class MessageHandler
             if ($pkgId <= 0) {
                 continue;
             }
-            $label = sprintf('%s | %sGB | %s روز | %s تومان', (string) $pkg['name'], (string) $pkg['volume_gb'], (string) $pkg['duration_days'], (string) $pkg['price']);
+            $label = $this->catalog->get('messages.user.renew.package_row', [
+                'name' => (string) $pkg['name'],
+                'volume_gb' => (string) $pkg['volume_gb'],
+                'duration_days' => (string) $pkg['duration_days'],
+                'price' => (string) $pkg['price'],
+            ]);
             $lines[] = "{$num}) " . htmlspecialchars($label);
             $optionMap[$num] = $pkgId;
-            $buttons[] = ['📦 پکیج ' . $num];
+            $buttons[] = [$this->catalog->get('messages.user.renew.package_button', ['num' => $num])];
         }
 
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'renew.await_package', ['options' => $optionMap, 'purchase_id' => $purchaseId, 'stack' => ['renew.await_purchase'], 'package_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: '♻️ <b>انتخاب پکیج تمدید</b>',
+                title: $this->catalog->get('messages.user.renew.select_package.title'),
                 lines: [
-                    new UiTextLine('🧾', 'سفارش', "<code>#{$purchaseId}</code>"),
-                    new UiTextLine('📡', 'سرویس فعلی', '<b>' . htmlspecialchars((string) ($purchase['service_name'] ?? '-')) . '</b>'),
-                    new UiTextLine('📦', 'پکیج فعلی', '<b>' . htmlspecialchars((string) ($purchase['package_name'] ?? '-')) . '</b>'),
-                    new UiTextLine('📋', 'گزینه‌های تمدید', implode("\n", $lines)),
+                    new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('messages.user.renew.select_package.order_label'), "<code>#{$purchaseId}</code>"),
+                    new UiTextLine($this->catalog->get('emojis.antenna'), $this->catalog->get('messages.user.renew.select_package.current_service_label'), '<b>' . htmlspecialchars((string) ($purchase['service_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
+                    new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('messages.user.renew.select_package.current_package_label'), '<b>' . htmlspecialchars((string) ($purchase['package_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
+                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('messages.user.renew.select_package.options_label'), implode("\n", $lines)),
                 ],
-                tipBlockquote: '💡 پکیج تمدید باید با سرویس فعلی شما سازگار باشد؛ اگر انتخاب را اشتباه انجام دادید با بازگشت به لیست سفارش‌ها برگردید و گزینه درست را انتخاب کنید.',
+                tipBlockquote: $this->catalog->get('messages.user.renew.select_package.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -4183,7 +4303,7 @@ final class MessageHandler
         $packageId = isset($options[$selected]) ? (int) $options[$selected] : 0;
         $purchaseId = (int) ($state['payload']['purchase_id'] ?? 0);
         if ($packageId <= 0 || $purchaseId <= 0) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.common.invalid_option')));
             return;
         }
 
@@ -4191,36 +4311,36 @@ final class MessageHandler
         $package = $this->database->getPackage($packageId);
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         if ($package === null || !is_array($purchase)) {
-            $this->telegram->sendMessage($chatId, $this->uiText->error('داده تمدید معتبر نیست.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.renew.invalid_data')));
             return;
         }
 
         $textOut = $this->uiText->multi(new UiTextBlock(
-            title: '💳 <b>پرداخت تمدید</b>',
+            title: $this->catalog->get('messages.user.renew.payment.title'),
             lines: [
-                new UiTextLine('🧾', 'سفارش', "<code>#{$purchaseId}</code>"),
-                new UiTextLine('📦', 'پکیج تمدید', '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
-                new UiTextLine('💵', 'مبلغ', '<b>' . (int) $package['price'] . '</b> تومان'),
+                new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('messages.user.renew.payment.order_label'), "<code>#{$purchaseId}</code>"),
+                new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('messages.user.renew.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
+                new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('messages.user.renew.payment.amount_label'), $this->catalog->get('messages.user.renew.payment.amount_value', ['amount' => (int) $package['price']])),
             ],
-            tipBlockquote: '💡 روش پرداخت مناسب را انتخاب کنید؛ بعد از تکمیل پرداخت، وضعیت تراکنش را بررسی کنید تا درخواست تمدید در صف تحویل قرار بگیرد.',
+            tipBlockquote: $this->catalog->get('messages.user.renew.payment.tip'),
         ));
-        $buttons = [[self::PAY_WALLET]];
+        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_CARD];
+            $buttons[] = [$this->catalog->get('buttons.pay.card')];
         }
         if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_CRYPTO];
+            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
         }
         if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_TETRAPAY];
+            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
         }
         if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_SWAPWALLET];
+            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
         }
         if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_TRONPAYS];
+            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'renew.await_payment_method', ['purchase_id' => $purchaseId, 'package_id' => $packageId, 'stack' => ['renew.await_purchase', 'renew.await_package'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
@@ -4251,14 +4371,14 @@ final class MessageHandler
             return;
         }
 
-        if ($text === self::PAY_WALLET) {
+        if ($text === $this->catalog->get('buttons.pay.wallet') || $text === self::PAY_WALLET) {
             $this->database->clearUserState($userId);
             $result = $this->database->walletPayPackage($userId, $packageId);
             if (!($result['ok'] ?? false)) {
                 $msg = match ($result['error'] ?? '') {
-                    'insufficient_balance' => 'موجودی کیف پول کافی نیست.',
-                    'no_stock' => 'برای این پکیج موجودی ثبت‌شده وجود ندارد.',
-                    default => 'خطا در ثبت سفارش. دوباره تلاش کنید.',
+                    'insufficient_balance' => $this->catalog->get('messages.user.payment.errors.insufficient_balance'),
+                    'no_stock' => $this->catalog->get('messages.user.payment.errors.no_stock'),
+                    default => $this->catalog->get('messages.user.payment.errors.create_order_failed'),
                 };
                 $this->telegram->sendMessage($chatId, $this->uiText->error($msg));
                 return;
@@ -4271,29 +4391,29 @@ final class MessageHandler
             ]);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ خرید با کیف پول ثبت شد.\n\n"
-                . "شناسه پرداخت: <code>" . (int) $result['payment_id'] . "</code>\n"
-                . "مبلغ: <b>" . (int) $result['price'] . "</b> تومان\n"
-                . "موجودی جدید: <b>" . (int) $result['new_balance'] . "</b> تومان\n\n"
-                . "سفارش شما در صف تحویل قرار گرفت."
+                $this->catalog->get('messages.user.payment.wallet_purchase_success', [
+                    'payment_id' => (int) $result['payment_id'],
+                    'amount' => (int) $result['price'],
+                    'new_balance' => (int) $result['new_balance'],
+                ])
             );
             return;
         }
 
-        if ($text === self::PAY_CARD || $text === self::PAY_CRYPTO || $text === self::PAY_TETRAPAY) {
+        if ($text === $this->catalog->get('buttons.pay.card') || $text === self::PAY_CARD || $text === $this->catalog->get('buttons.pay.crypto') || $text === self::PAY_CRYPTO || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === self::PAY_TETRAPAY) {
             $this->database->clearUserState($userId);
             $this->createPurchasePaymentByMethod($chatId, $userId, $packageId, $text);
             return;
         }
 
-        if ($text === self::PAY_SWAPWALLET || $text === self::PAY_TRONPAYS) {
+        if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === self::PAY_SWAPWALLET || $text === $this->catalog->get('buttons.pay.tronpays') || $text === self::PAY_TRONPAYS) {
             $this->database->clearUserState($userId);
             $this->createPurchaseGatewayInvoice($chatId, $userId, $packageId, $text);
             return;
         }
 
-        if ($text !== self::PAY_WALLET && $text !== self::PAY_CARD && $text !== self::PAY_CRYPTO && $text !== self::PAY_TETRAPAY && $text !== self::PAY_SWAPWALLET && $text !== self::PAY_TRONPAYS) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('لطفاً یکی از روش‌های پرداخت را انتخاب کنید.'));
+        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== self::PAY_WALLET && $text !== $this->catalog->get('buttons.pay.card') && $text !== self::PAY_CARD && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== self::PAY_CRYPTO && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== self::PAY_TETRAPAY && $text !== $this->catalog->get('buttons.pay.swapwallet') && $text !== self::PAY_SWAPWALLET && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== self::PAY_TRONPAYS) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.payment.errors.select_method')));
             return;
         }
     }
@@ -4321,16 +4441,16 @@ final class MessageHandler
             $this->database->clearUserState($userId);
             return;
         }
-        if ($text === self::PAY_WALLET) {
+        if ($text === $this->catalog->get('buttons.pay.wallet') || $text === self::PAY_WALLET) {
             $this->database->clearUserState($userId);
             $result = $this->database->walletPayRenewal($userId, $purchaseId, $packageId);
             if (!($result['ok'] ?? false)) {
                 $msg = match ($result['error'] ?? '') {
-                    'insufficient_balance' => 'موجودی کیف پول کافی نیست.',
-                    'purchase_not_found' => 'سرویس قابل تمدید پیدا نشد.',
-                    'test_not_renewable' => 'تمدید برای سرویس تست مجاز نیست.',
-                    'type_mismatch' => 'پکیج انتخابی برای این سرویس معتبر نیست.',
-                    default => 'پرداخت تمدید انجام نشد.',
+                    'insufficient_balance' => $this->catalog->get('messages.user.payment.errors.insufficient_balance'),
+                    'purchase_not_found' => $this->catalog->get('messages.user.payment.errors.purchase_not_found'),
+                    'test_not_renewable' => $this->catalog->get('messages.user.payment.errors.test_not_renewable'),
+                    'type_mismatch' => $this->catalog->get('messages.user.payment.errors.type_mismatch'),
+                    default => $this->catalog->get('messages.user.payment.errors.renewal_failed'),
                 };
                 $this->telegram->sendMessage($chatId, $this->uiText->error($msg));
                 return;
@@ -4343,37 +4463,37 @@ final class MessageHandler
             ]);
             $this->telegram->sendMessage(
                 $chatId,
-                "✅ <b>پرداخت تمدید با کیف پول انجام شد.</b>\n\n"
-                . "سفارش شما در صف تحویل قرار گرفت.\n"
-                . "شماره سفارش: <code>" . (int) ($result['pending_order_id'] ?? 0) . "</code>"
+                $this->catalog->get('messages.user.payment.wallet_renew_success', [
+                    'pending_order_id' => (int) ($result['pending_order_id'] ?? 0),
+                ])
             );
             return;
         }
 
-        if ($text === self::PAY_CARD || $text === self::PAY_CRYPTO || $text === self::PAY_TETRAPAY) {
+        if ($text === $this->catalog->get('buttons.pay.card') || $text === self::PAY_CARD || $text === $this->catalog->get('buttons.pay.crypto') || $text === self::PAY_CRYPTO || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === self::PAY_TETRAPAY) {
             $this->database->clearUserState($userId);
             $this->createRenewalPaymentByMethod($chatId, $userId, $purchaseId, $packageId, $text);
             return;
         }
 
-        if ($text === self::PAY_SWAPWALLET || $text === self::PAY_TRONPAYS) {
+        if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === self::PAY_SWAPWALLET || $text === $this->catalog->get('buttons.pay.tronpays') || $text === self::PAY_TRONPAYS) {
             $this->database->clearUserState($userId);
             $this->createRenewalGatewayInvoice($chatId, $userId, $purchaseId, $packageId, $text);
             return;
         }
 
-        if ($text !== self::PAY_WALLET && $text !== self::PAY_CARD && $text !== self::PAY_CRYPTO && $text !== self::PAY_TETRAPAY && $text !== self::PAY_SWAPWALLET && $text !== self::PAY_TRONPAYS) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('لطفاً یکی از روش‌های پرداخت را انتخاب کنید.'));
+        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== self::PAY_WALLET && $text !== $this->catalog->get('buttons.pay.card') && $text !== self::PAY_CARD && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== self::PAY_CRYPTO && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== self::PAY_TETRAPAY && $text !== $this->catalog->get('buttons.pay.swapwallet') && $text !== self::PAY_SWAPWALLET && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== self::PAY_TRONPAYS) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.payment.errors.select_method')));
             return;
         }
     }
 
     private function createPurchasePaymentByMethod(int $chatId, int $userId, int $packageId, string $methodLabel): void
     {
-        $method = $methodLabel === self::PAY_CARD ? 'card' : ($methodLabel === self::PAY_CRYPTO ? 'crypto' : 'tetrapay');
+        $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === self::PAY_CARD) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === self::PAY_CRYPTO) ? 'crypto' : 'tetrapay');
         $package = $this->database->getPackage($packageId);
         if ($package === null) {
-            $this->telegram->sendMessage($chatId, $this->uiText->error('پکیج پیدا نشد.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.buy.package_not_found')));
             return;
         }
         $amount = (int) $this->database->effectivePackagePrice($userId, $package);
@@ -4402,13 +4522,13 @@ final class MessageHandler
             $card = htmlspecialchars($this->settings->get('payment_card', '---'));
             $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
             $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
-            $text = "🏦 <b>پرداخت کارت به کارت</b>\n\n"
-                . "شماره کارت: <code>{$card}</code>\n"
-                . ($bank !== '' ? "بانک: {$bank}\n" : '')
-                . ($owner !== '' ? "به نام: {$owner}\n" : '')
-                . "\nشناسه سفارش: <code>{$pendingId}</code>\n"
-                . "مبلغ: <b>{$amount}</b> تومان\n\n"
-                . "پس از واریز، رسید را همینجا (عکس/فایل/متن) ارسال کنید.";
+            $text = $this->catalog->get('messages.user.payment.card_purchase_intro', [
+                'card' => $card,
+                'bank_line' => $bank !== '' ? $this->catalog->get('messages.user.payment.bank_line', ['bank' => $bank]) : '',
+                'owner_line' => $owner !== '' ? $this->catalog->get('messages.user.payment.owner_line', ['owner' => $owner]) : '',
+                'pending_id' => $pendingId,
+                'amount' => $amount,
+            ]);
             $this->database->setUserState($userId, 'await_card_receipt', ['payment_id' => $paymentId]);
             $this->telegram->sendMessage($chatId, $text);
             return;
@@ -4416,13 +4536,11 @@ final class MessageHandler
 
         if ($method === 'crypto') {
             $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
-            $text = "💎 <b>پرداخت کریپتو</b>\n\n"
-                . "شناسه سفارش: <code>{$pendingId}</code>\n"
-                . "ارز: <b>TRON</b>\n"
-                . "مبلغ معادل ریالی: <b>{$amount}</b> تومان\n\n"
-                . ($address !== '' ? "آدرس کیف پول:\n<code>{$address}</code>\n\n" : '')
-                . "پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\n"
-                . "مثال: <code>TX_HASH 12.345</code>";
+            $text = $this->catalog->get('messages.user.payment.crypto_purchase_intro', [
+                'pending_id' => $pendingId,
+                'amount' => $amount,
+                'address_block' => $address !== '' ? $this->catalog->get('messages.user.payment.address_block', ['address' => $address]) : '',
+            ]);
             $this->database->setUserState($userId, 'await_crypto_tx', ['payment_id' => $paymentId]);
             $this->telegram->sendMessage($chatId, $text);
             return;
@@ -4430,7 +4548,7 @@ final class MessageHandler
 
         $tp = $this->gateways->createTetrapayOrder($amount, (string) $pendingId);
         if (!($tp['ok'] ?? false)) {
-            $this->telegram->sendMessage($chatId, "🏧 <b>پرداخت TetraPay</b>\n\nشناسه سفارش: <code>{$pendingId}</code>\nمبلغ: <b>{$amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.");
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tetrapay_unavailable', ['pending_id' => $pendingId, 'amount' => $amount]));
             return;
         }
         $authority = (string) ($tp['authority'] ?? '');
@@ -4438,17 +4556,17 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $authority);
         }
         $payUrl = (string) ($tp['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => '✅ پرداخت تتراپی تایید شد. سفارش شما در صف تحویل قرار گرفت.', 'type_id' => 0, 'package_id' => $packageId, 'payment_method' => 'tetrapay']);
-        $this->sendGatewayPaymentIntro($chatId, "🏧 <b>پرداخت TetraPay</b>", $pendingId, $amount, $payUrl);
+        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_purchase'), 'type_id' => 0, 'package_id' => $packageId, 'payment_method' => 'tetrapay']);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
     }
 
     private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
     {
-        $method = $methodLabel === self::PAY_CARD ? 'card' : ($methodLabel === self::PAY_CRYPTO ? 'crypto' : 'tetrapay');
+        $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === self::PAY_CARD) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === self::PAY_CRYPTO) ? 'crypto' : 'tetrapay');
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         $package = $this->database->getPackage($packageId);
         if (!is_array($purchase) || $package === null) {
-            $this->telegram->sendMessage($chatId, 'داده تمدید معتبر نیست.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.renew.invalid_data'));
             return;
         }
         $amount = (int) $package['price'];
@@ -4477,13 +4595,13 @@ final class MessageHandler
             $card = htmlspecialchars($this->settings->get('payment_card', '---'));
             $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
             $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
-            $text = "🏦 <b>کارت به کارت (تمدید)</b>\n\n"
-                . "شماره کارت: <code>{$card}</code>\n"
-                . ($bank !== '' ? "بانک: {$bank}\n" : '')
-                . ($owner !== '' ? "به نام: {$owner}\n" : '')
-                . "\nشناسه سفارش: <code>{$pendingId}</code>\n"
-                . "مبلغ: <b>{$amount}</b> تومان\n\n"
-                . "پس از واریز، رسید را همینجا ارسال کنید.";
+            $text = $this->catalog->get('messages.user.payment.card_renew_intro', [
+                'card' => $card,
+                'bank_line' => $bank !== '' ? $this->catalog->get('messages.user.payment.bank_line', ['bank' => $bank]) : '',
+                'owner_line' => $owner !== '' ? $this->catalog->get('messages.user.payment.owner_line', ['owner' => $owner]) : '',
+                'pending_id' => $pendingId,
+                'amount' => $amount,
+            ]);
             $this->database->setUserState($userId, 'await_renewal_receipt', ['payment_id' => $paymentId]);
             $this->telegram->sendMessage($chatId, $text);
             return;
@@ -4491,13 +4609,11 @@ final class MessageHandler
 
         if ($method === 'crypto') {
             $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
-            $text = "💎 <b>پرداخت کریپتو (تمدید)</b>\n\n"
-                . "شناسه سفارش: <code>{$pendingId}</code>\n"
-                . "ارز: <b>TRON</b>\n"
-                . "مبلغ معادل ریالی: <b>{$amount}</b> تومان\n\n"
-                . ($address !== '' ? "آدرس کیف پول:\n<code>{$address}</code>\n\n" : '')
-                . "پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\n"
-                . "مثال: <code>TX_HASH 12.345</code>";
+            $text = $this->catalog->get('messages.user.payment.crypto_renew_intro', [
+                'pending_id' => $pendingId,
+                'amount' => $amount,
+                'address_block' => $address !== '' ? $this->catalog->get('messages.user.payment.address_block', ['address' => $address]) : '',
+            ]);
             $this->database->setUserState($userId, 'await_renewal_crypto_tx', ['payment_id' => $paymentId]);
             $this->telegram->sendMessage($chatId, $text);
             return;
@@ -4505,7 +4621,7 @@ final class MessageHandler
 
         $tp = $this->gateways->createTetrapayOrder($amount, (string) $pendingId);
         if (!($tp['ok'] ?? false)) {
-            $this->telegram->sendMessage($chatId, "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\nشناسه سفارش: <code>{$pendingId}</code>\nمبلغ: <b>{$amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.");
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tetrapay_renew_unavailable', ['pending_id' => $pendingId, 'amount' => $amount]));
             return;
         }
         $authority = (string) ($tp['authority'] ?? '');
@@ -4513,8 +4629,8 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $authority);
         }
         $payUrl = (string) ($tp['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => '✅ پرداخت تمدید تایید شد. درخواست شما در صف تحویل قرار گرفت.', 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => 'tetrapay']);
-        $this->sendGatewayPaymentIntro($chatId, "🏧 <b>پرداخت TetraPay (تمدید)</b>", $pendingId, $amount, $payUrl);
+        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => 'tetrapay']);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_renew'), $pendingId, $amount, $payUrl);
     }
 
     private function createPurchaseGatewayInvoice(int $chatId, int $userId, int $packageId, string $methodLabel): void
@@ -4522,7 +4638,7 @@ final class MessageHandler
         $gateway = $methodLabel === self::PAY_SWAPWALLET ? 'swapwallet_crypto' : 'tronpays_rial';
         $package = $this->database->getPackage($packageId);
         if ($package === null) {
-            $this->telegram->sendMessage($chatId, 'پکیج پیدا نشد.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.package_not_found'));
             return;
         }
         $amount = (int) $this->database->effectivePackagePrice($userId, $package);
@@ -4547,7 +4663,7 @@ final class MessageHandler
         if ($gateway === 'swapwallet_crypto') {
             $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Purchase');
             if (!($invoice['ok'] ?? false)) {
-                $this->telegram->sendMessage($chatId, 'خطا در ایجاد فاکتور SwapWallet.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.swapwallet_invoice_error'));
                 return;
             }
             $invoiceId = (string) ($invoice['invoice_id'] ?? '');
@@ -4555,13 +4671,13 @@ final class MessageHandler
                 $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
             }
             $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => '✅ پرداخت SwapWallet تایید شد و سفارش در صف تحویل قرار گرفت.', 'type_id' => 0, 'package_id' => $packageId, 'payment_method' => $gateway]);
-            $this->sendGatewayPaymentIntro($chatId, "💠 <b>پرداخت با SwapWallet</b>", $pendingId, $amount, $payUrl);
+            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'type_id' => 0, 'package_id' => $packageId, 'payment_method' => $gateway]);
+            $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_purchase'), $pendingId, $amount, $payUrl);
             return;
         }
         $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-' . $userId . '-' . $packageId . '-' . time());
         if (!($invoice['ok'] ?? false)) {
-            $this->telegram->sendMessage($chatId, 'خطا در ایجاد فاکتور TronPays.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
             return;
         }
         $invoiceId = (string) ($invoice['invoice_id'] ?? '');
@@ -4569,8 +4685,8 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
         }
         $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => '✅ پرداخت TronPays تایید شد و سفارش در صف تحویل قرار گرفت.', 'type_id' => 0, 'package_id' => $packageId, 'payment_method' => $gateway]);
-        $this->sendGatewayPaymentIntro($chatId, "🧾 <b>پرداخت با TronPays</b>", $pendingId, $amount, $payUrl);
+        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'type_id' => 0, 'package_id' => $packageId, 'payment_method' => $gateway]);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
     }
 
     private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
@@ -4579,7 +4695,7 @@ final class MessageHandler
         $package = $this->database->getPackage($packageId);
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         if ($package === null || !is_array($purchase)) {
-            $this->telegram->sendMessage($chatId, 'داده تمدید معتبر نیست.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.renew.invalid_data'));
             return;
         }
         $amount = (int) $package['price'];
@@ -4604,7 +4720,7 @@ final class MessageHandler
         if ($gateway === 'swapwallet_crypto') {
             $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Renewal');
             if (!($invoice['ok'] ?? false)) {
-                $this->telegram->sendMessage($chatId, 'خطا در ایجاد فاکتور SwapWallet.');
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.swapwallet_invoice_error'));
                 return;
             }
             $invoiceId = (string) ($invoice['invoice_id'] ?? '');
@@ -4612,13 +4728,13 @@ final class MessageHandler
                 $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
             }
             $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => '✅ پرداخت SwapWallet تایید شد و درخواست تمدید در صف تحویل قرار گرفت.', 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => $gateway]);
-            $this->sendGatewayPaymentIntro($chatId, "💠 <b>پرداخت تمدید با SwapWallet</b>", $pendingId, $amount, $payUrl);
+            $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => $gateway]);
+            $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_renew'), $pendingId, $amount, $payUrl);
             return;
         }
         $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'rnw-' . $userId . '-' . $packageId . '-' . time());
         if (!($invoice['ok'] ?? false)) {
-            $this->telegram->sendMessage($chatId, 'خطا در ایجاد فاکتور TronPays.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
             return;
         }
         $invoiceId = (string) ($invoice['invoice_id'] ?? '');
@@ -4626,8 +4742,8 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
         }
         $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => '✅ پرداخت TronPays تایید شد و درخواست تمدید در صف تحویل قرار گرفت.', 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => $gateway]);
-        $this->sendGatewayPaymentIntro($chatId, "🧾 <b>پرداخت تمدید با TronPays</b>", $pendingId, $amount, $payUrl);
+        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => $gateway]);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_renew'), $pendingId, $amount, $payUrl);
     }
 
     private function handleGatewayVerifyState(int $chatId, int $userId, string $text, array $state): void
@@ -4637,20 +4753,20 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
-        if ($text !== self::PAY_VERIFY) {
-            $this->telegram->sendMessage($chatId, $this->uiText->info('برای بررسی وضعیت، دکمه بررسی پرداخت را بزنید.'));
+        if ($text !== $this->catalog->get('buttons.pay.verify') && $text !== self::PAY_VERIFY) {
+            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.payment.verify_hint')));
             return;
         }
         $paymentId = (int) ($state['payload']['payment_id'] ?? 0);
         $gateway = (string) ($state['payload']['gateway'] ?? '');
-        $okText = (string) ($state['payload']['ok_text'] ?? '✅ پرداخت تایید شد.');
+        $okText = (string) ($state['payload']['ok_text'] ?? $this->catalog->get('messages.user.payment.ok.default'));
         if ($paymentId <= 0 || $gateway === '') {
             $this->database->clearUserState($userId);
             return;
         }
         $payment = $this->database->getPaymentById($paymentId);
         if ($payment === null) {
-            $this->telegram->sendMessage($chatId, $this->uiText->error('پرداخت پیدا نشد.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.payment.not_found')));
             return;
         }
         $gatewayRef = (string) ($payment['gateway_ref'] ?? '');
@@ -4684,7 +4800,7 @@ final class MessageHandler
                 return;
             }
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->warning('پرداخت هنوز تایید نشده است.'));
+        $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.payment.not_confirmed')));
     }
 
     private function handlePurchaseRulesAcceptState(int $chatId, int $userId, string $text, array $state): void
@@ -4703,8 +4819,8 @@ final class MessageHandler
             $this->startBuyTypeReplyFlow($chatId, $userId);
             return;
         }
-        if ($text !== self::ACCEPT_RULES) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('لطفاً گزینه تایید قوانین را انتخاب کنید.'));
+        if ($text !== $this->catalog->get('buttons.accept_rules') && $text !== self::ACCEPT_RULES) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.buy.rules.must_accept')));
             return;
         }
         $packageId = (int) ($state['payload']['package_id'] ?? 0);
@@ -4716,34 +4832,34 @@ final class MessageHandler
         $this->database->clearUserState($userId);
         $package = $this->database->getPackage($packageId);
         if ($package === null) {
-            $this->telegram->sendMessage($chatId, 'پکیج پیدا نشد.');
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.package_not_found'));
             return;
         }
         $textOut = $this->uiText->multi(new UiTextBlock(
-            title: '💰 <b>پرداخت سفارش</b>',
+            title: $this->catalog->get('messages.user.buy.payment.title'),
             lines: [
-                new UiTextLine('📦', 'پکیج', '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
-                new UiTextLine('💵', 'قیمت', '<b>' . (int) $this->database->effectivePackagePrice($userId, $package) . '</b> تومان'),
+                new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
+                new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
             ],
-            tipBlockquote: '💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود.',
+            tipBlockquote: $this->catalog->get('messages.user.buy.payment.tip'),
         ));
-        $buttons = [[self::PAY_WALLET]];
+        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_CARD];
+            $buttons[] = [$this->catalog->get('buttons.pay.card')];
         }
         if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_CRYPTO];
+            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
         }
         if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_TETRAPAY];
+            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
         }
         if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_SWAPWALLET];
+            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
         }
         if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
-            $buttons[] = [self::PAY_TRONPAYS];
+            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'buy.await_payment_method', ['package_id' => $packageId, 'type_id' => (int) ($state['payload']['type_id'] ?? 0), 'stack' => ['buy.await_type', 'buy.await_package'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
@@ -4754,32 +4870,32 @@ final class MessageHandler
             paymentId: $pendingId,
             amount: $amount,
             title: $title,
-            tip: '💡 بعد از تکمیل پرداخت، وضعیت تراکنش را از طریق دکمه بررسی پرداخت پیگیری کنید تا سرویس شما سریع‌تر نهایی شود.',
+            tip: $this->catalog->get('messages.user.payment.gateway_intro_tip'),
         );
         if ($payUrl !== '') {
-            $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->inlineUrl('💳 پرداخت', $payUrl));
+            $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->inlineUrl($this->catalog->get('buttons.pay.gateway_pay'), $payUrl));
         } else {
             $this->telegram->sendMessage($chatId, $text);
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->info('برای بررسی پرداخت از دکمه زیر استفاده کنید.'),
-            $this->uiKeyboard->replyMenu([[self::PAY_VERIFY], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN]])
+            $this->uiText->info($this->catalog->get('messages.user.payment.verify_prompt')),
+            $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.pay.verify')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
         );
     }
 
     private function ensurePurchaseAllowedForPackageMessage(int $chatId, int $userId, int $packageId): bool
     {
         if ($this->settings->get('shop_open', '1') !== '1') {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('فروشگاه در حال حاضر بسته است.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.buy.shop_closed')));
             return false;
         }
         if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('ابتدا قوانین خرید را بپذیرید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.buy.rules.need_accept_first')));
             return false;
         }
         if ($this->settings->get('preorder_mode', '0') === '1' && !$this->database->packageHasAvailableStock($packageId)) {
-            $this->telegram->sendMessage($chatId, $this->uiText->info('این پکیج در حال حاضر موجودی ندارد.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.buy.out_of_stock')));
             return false;
         }
         return true;
@@ -4820,19 +4936,19 @@ final class MessageHandler
 
     private function channelLockText(): string
     {
-        return "🔒 برای استفاده از ربات، ابتدا باید در کانال ما عضو شوید.\n\nپس از عضویت، روی «عضو شدم» بزنید.";
+        return $this->catalog->get('messages.channel.lock_simple', ['emoji' => $this->catalog->get('emojis.lock')]);
     }
 
     private function channelLockKeyboard(): array
     {
         $channelId = trim($this->settings->get('channel_id', ''));
         $channelUrl = $this->channelJoinUrl($channelId);
-        return ['inline_keyboard' => [[['text' => '📢 عضویت در کانال', 'url' => $channelUrl]]]];
+        return ['inline_keyboard' => [[['text' => $this->catalog->get('buttons.join_channel'), 'url' => $channelUrl]]]];
     }
 
     private function channelLockReplyKeyboard(): array
     {
-        return $this->replyKeyboard([[KeyboardBuilder::BTN_CHECK_CHANNEL]]);
+        return $this->replyKeyboard([[KeyboardBuilder::checkChannel()]]);
     }
 
     private function channelJoinUrl(string $channelId): string
@@ -4862,6 +4978,20 @@ final class MessageHandler
             return false;
         }
         return in_array($text, [
+            KeyboardBuilder::buy(),
+            KeyboardBuilder::myConfigs(),
+            KeyboardBuilder::freeTest(),
+            KeyboardBuilder::profile(),
+            KeyboardBuilder::wallet(),
+            KeyboardBuilder::support(),
+            KeyboardBuilder::referralButton(),
+            KeyboardBuilder::agency(),
+            KeyboardBuilder::admin(),
+            KeyboardBuilder::backMain(),
+            KeyboardBuilder::backAccount(),
+            KeyboardBuilder::backTypes(),
+            KeyboardBuilder::backPurchases(),
+            KeyboardBuilder::checkChannel(),
             KeyboardBuilder::BTN_BUY,
             KeyboardBuilder::BTN_MY_CONFIGS,
             KeyboardBuilder::BTN_FREE_TEST,
