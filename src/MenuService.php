@@ -22,17 +22,6 @@ final class MenuService
         return "✨ <b>به فروشگاه ConfigFlow خوش آمدید!</b>\n\nاز منوی زیر بخش مورد نظر خود را انتخاب کنید.";
     }
 
-    public function mainMenuKeyboard(int $userId): array
-    {
-        $isAdmin = $this->database->isAdminUser($userId);
-        return KeyboardBuilder::main(
-            $isAdmin,
-            $this->settings->get('referral_enabled', '1') === '1',
-            $this->settings->get('agency_request_enabled', '1') === '1',
-            $this->settings->get('free_test_enabled', '1') === '1',
-        );
-    }
-
     public function mainMenuReplyKeyboard(int $userId): array
     {
         $isAdmin = $this->database->isAdminUser($userId);
