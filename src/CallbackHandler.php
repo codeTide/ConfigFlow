@@ -1240,6 +1240,10 @@ final class CallbackHandler
                     'callback_data' => 'admin:settings:toggle:agency_request_enabled',
                 ]],
                 [[
+                    'text' => '🧪 مدیریت تست رایگان',
+                    'callback_data' => 'admin:free_test:menu',
+                ]],
+                [[
                     'text' => '💳 کارت‌به‌کارت: ' . ($this->settings->get('gw_card_enabled', '0') === '1' ? '✅' : '❌'),
                     'callback_data' => 'admin:settings:toggle:gw_card_enabled',
                 ]],
