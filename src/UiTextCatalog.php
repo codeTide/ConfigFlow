@@ -6,32 +6,34 @@ namespace ConfigFlow\Bot;
 
 final class UiTextCatalog implements UiTextCatalogInterface
 {
-    private const GENERIC_TIPS = [
-        'ادامه دهید',
-        'بعدی',
-        'بعداً تلاش کنید',
-        'تلاش کنید',
-        'ادامه',
-    ];
+    /** @var list<string> */
+    private array $genericTips;
+
+    public function __construct(
+        private ?UiJsonCatalog $catalog = null,
+    ) {
+        $this->catalog ??= new UiJsonCatalog();
+        $this->genericTips = $this->catalog->getList('validation.generic_tips');
+    }
 
     public function success(string $message): string
     {
-        return $this->singleLine('✅', $message);
+        return $this->singleLine($this->catalog->get('emojis.success'), $message);
     }
 
     public function error(string $message): string
     {
-        return $this->singleLine('❌', $message);
+        return $this->singleLine($this->catalog->get('emojis.error'), $message);
     }
 
     public function warning(string $message): string
     {
-        return $this->singleLine('⚠️', $message);
+        return $this->singleLine($this->catalog->get('emojis.warning'), $message);
     }
 
     public function info(string $message): string
     {
-        return $this->singleLine('ℹ️', $message);
+        return $this->singleLine($this->catalog->get('emojis.info'), $message);
     }
 
     public function multi(UiTextBlock $block): string
@@ -63,11 +65,13 @@ final class UiTextCatalog implements UiTextCatalogInterface
 
     public function paymentCreated(int $paymentId, int $amount, string $title, ?string $tip = null): string
     {
+        $escapedTitle = htmlspecialchars(trim($title));
+
         $block = new UiTextBlock(
-            title: '💳 <b>' . htmlspecialchars(trim($title)) . '</b>',
+            title: $this->catalog->get('payments.created.title', ['title' => $escapedTitle]),
             lines: [
-                new UiTextLine('🧾', 'شناسه سفارش', '<code>' . $paymentId . '</code>'),
-                new UiTextLine('💰', 'مبلغ', '<b>' . $amount . '</b> تومان'),
+                new UiTextLine('🧾', $this->catalog->get('payments.created.id_label'), '<code>' . $paymentId . '</code>'),
+                new UiTextLine('💰', $this->catalog->get('payments.created.amount_label'), $this->catalog->get('payments.created.amount_value', ['amount' => $amount])),
             ],
             tipBlockquote: $tip,
         );
@@ -103,7 +107,7 @@ final class UiTextCatalog implements UiTextCatalogInterface
             throw new \InvalidArgumentException('Tip must be at least about 1 to 1.5 lines and context-rich.');
         }
 
-        foreach (self::GENERIC_TIPS as $generic) {
+        foreach ($this->genericTips as $generic) {
             if ($this->stringLower($tip) === $this->stringLower($generic)) {
                 throw new \InvalidArgumentException('Generic tips are not allowed.');
             }

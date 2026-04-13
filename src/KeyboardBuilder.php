@@ -6,6 +6,7 @@ namespace ConfigFlow\Bot;
 
 final class KeyboardBuilder
 {
+    // Legacy constants kept for backward compatibility with non-migrated flows.
     public const BTN_BUY = '🛒 خرید';
     public const BTN_MY_CONFIGS = '📦 کانفیگ‌هام';
     public const BTN_FREE_TEST = '🎁 تست رایگان';
@@ -21,14 +22,30 @@ final class KeyboardBuilder
     public const BTN_BACK_PURCHASES = '🔙 بازگشت به سفارش‌ها';
     public const BTN_CHECK_CHANNEL = '✅ عضو شدم';
 
+    public static function buy(): string { return self::label('buttons.buy', self::BTN_BUY); }
+    public static function myConfigs(): string { return self::label('buttons.my_configs', self::BTN_MY_CONFIGS); }
+    public static function freeTest(): string { return self::label('buttons.free_test', self::BTN_FREE_TEST); }
+    public static function profile(): string { return self::label('buttons.profile', self::BTN_PROFILE); }
+    public static function wallet(): string { return self::label('buttons.wallet', self::BTN_WALLET); }
+    public static function support(): string { return self::label('buttons.support', self::BTN_SUPPORT); }
+    public static function referralButton(): string { return self::label('buttons.referral', self::BTN_REFERRAL); }
+    public static function agency(): string { return self::label('buttons.agency', self::BTN_AGENCY); }
+    public static function admin(): string { return self::label('buttons.admin_panel', self::BTN_ADMIN); }
+    public static function backMain(): string { return self::label('buttons.main_menu', self::BTN_BACK_MAIN); }
+    public static function backAccount(): string { return self::label('buttons.back', self::BTN_BACK_ACCOUNT); }
+    public static function backTypes(): string { return self::label('buttons.back_to_services', self::BTN_BACK_TYPES); }
+    public static function backPurchases(): string { return self::label('buttons.back_to_orders', self::BTN_BACK_PURCHASES); }
+    public static function checkChannel(): string { return self::label('buttons.check_channel', self::BTN_CHECK_CHANNEL); }
+    public static function shareReferralLink(): string { return self::label('buttons.share_referral_link', ''); }
+
     public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
     {
         $keyboard = [];
         if ($isAdmin) {
-            $keyboard[] = [self::BTN_ADMIN];
+            $keyboard[] = [self::admin()];
         }
-        $keyboard[] = [self::BTN_MY_CONFIGS, self::BTN_BUY, self::BTN_PROFILE];
-        $keyboard[] = $freeTestEnabled ? [self::BTN_FREE_TEST, self::BTN_SUPPORT] : [self::BTN_SUPPORT];
+        $keyboard[] = [self::myConfigs(), self::buy(), self::profile()];
+        $keyboard[] = $freeTestEnabled ? [self::freeTest(), self::support()] : [self::support()];
 
         return [
             'keyboard' => $keyboard,
@@ -40,15 +57,15 @@ final class KeyboardBuilder
     public static function accountReply(bool $referralEnabled, bool $agencyEnabled): array
     {
         $keyboard = [
-            [self::BTN_WALLET, self::BTN_REFERRAL],
+            [self::wallet(), self::referralButton()],
         ];
         if (!$referralEnabled) {
-            $keyboard = [[self::BTN_WALLET]];
+            $keyboard = [[self::wallet()]];
         }
         if ($agencyEnabled) {
-            $keyboard[] = [self::BTN_AGENCY];
+            $keyboard[] = [self::agency()];
         }
-        $keyboard[] = [self::BTN_BACK_MAIN];
+        $keyboard[] = [self::backMain()];
 
         return [
             'keyboard' => $keyboard,
@@ -66,7 +83,7 @@ final class KeyboardBuilder
     public static function referral(string $shareUrl): array
     {
         if ($shareUrl !== '') {
-            return ['inline_keyboard' => [[['text' => '📤 اشتراک‌گذاری لینک دعوت', 'url' => $shareUrl]]]];
+            return ['inline_keyboard' => [[['text' => self::shareReferralLink(), 'url' => $shareUrl]]]];
         }
 
         return [];
@@ -81,14 +98,14 @@ final class KeyboardBuilder
     public static function adminPanelReply(): array
     {
         $keyboard = [
-            ['🧩 نوع/پکیج', '📚 موجودی', '👥 کاربران'],
-            ['⚙️ تنظیمات', '🧪 تست رایگان'],
-            ['👮 ادمین‌ها', '📣 همگانی', '📌 پین‌ها'],
-            ['🤝 نماینده‌ها', '🖥 پنل‌های 3x-ui'],
-            ['💳 شارژها', '📦 تحویل سفارش', '🗂 درخواست‌ها'],
-            ['🗃 بکاپ/تاپیک'],
+            [self::label('buttons.admin.types_packages', ''), self::label('buttons.admin.inventory', ''), self::label('buttons.admin.users', '')],
+            [self::label('buttons.admin.settings', ''), self::label('buttons.admin.free_test', '')],
+            [self::label('buttons.admin.admins', ''), self::label('buttons.admin.broadcast', ''), self::label('buttons.admin.pins', '')],
+            [self::label('buttons.admin.agencies', ''), self::label('buttons.admin.panels', '')],
+            [self::label('buttons.admin.charges', ''), self::label('buttons.admin.delivery', ''), self::label('buttons.admin.requests', '')],
+            [self::label('buttons.admin.backup_topics', '')],
         ];
-        $keyboard[] = [self::BTN_BACK_MAIN];
+        $keyboard[] = [self::backMain()];
 
         return [
             'keyboard' => $keyboard,
@@ -145,5 +162,14 @@ final class KeyboardBuilder
         return [
             ...$rows,
         ];
+    }
+
+    private static function label(string $key, string $fallback): string
+    {
+        try {
+            return (new UiJsonCatalog())->get($key);
+        } catch (\Throwable) {
+            return $fallback;
+        }
     }
 }
