@@ -72,7 +72,7 @@
     "profile": {
       "title": "👤 <b>پروفایل کاربری</b>",
       "name_label": "📱 نام",
-      "username_label": "👤 نام کاربری",
+      "username_label": "🌀 نام کاربری",
       "user_id_label": "🔢 آیدی",
       "balance_label": "💰 موجودی",
       "balance_value": "<b>{amount}</b> تومان",
@@ -80,7 +80,7 @@
     },
     "support": {
       "title": "🎧 <b>ارتباط با پشتیبانی</b>",
-      "support_id_label": "👤 آیدی پشتیبانی",
+      "support_id_label": "🌀 آیدی پشتیبانی",
       "support_link_label": "🌐 لینک پشتیبانی",
       "support_link_desc_label": "📝 توضیح لینک",
       "tip": "💡 برای بررسی سریع‌تر، مشکل را همراه با جزئیات مرحله، خطا یا شناسه سفارش ارسال کنید تا تیم پشتیبانی دقیق‌تر راهنمایی کند."
