@@ -2456,7 +2456,7 @@ final class CallbackHandler
                 $this->telegram->editMessageText(
                     $chatId,
                     $messageId,
-                    "💳 <b>شارژ کیف پول</b>\n\nلطفاً مبلغ موردنظر را به تومان ارسال کنید.",
+                    "💳 <b>شارژ کیف پول</b>\n\n💵 لطفاً مبلغ موردنظر را به تومان ارسال کنید:",
                     KeyboardBuilder::backToMain()
                 );
                 $this->telegram->answerCallbackQuery($callbackId);
