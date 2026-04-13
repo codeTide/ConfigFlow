@@ -23,6 +23,9 @@ final class TelegramClient
             'parse_mode' => 'HTML',
         ];
         if ($replyMarkup !== null) {
+            if ($this->containsInlineCallbackData($replyMarkup)) {
+                error_log('Legacy inline callback markup detected in sendMessage().');
+            }
             $payload['reply_markup'] = json_encode($replyMarkup, JSON_UNESCAPED_UNICODE);
         }
 
@@ -39,6 +42,9 @@ final class TelegramClient
             'parse_mode' => 'HTML',
         ];
         if ($replyMarkup !== null) {
+            if ($this->containsInlineCallbackData($replyMarkup)) {
+                error_log('Legacy inline callback markup detected in sendMessageWithResult().');
+            }
             $payload['reply_markup'] = json_encode($replyMarkup, JSON_UNESCAPED_UNICODE);
         }
 
@@ -64,6 +70,9 @@ final class TelegramClient
             'parse_mode' => 'HTML',
         ];
         if ($replyMarkup !== null) {
+            if ($this->containsInlineCallbackData($replyMarkup)) {
+                error_log('Legacy inline callback markup detected in editMessageText().');
+            }
             $payload['reply_markup'] = json_encode($replyMarkup, JSON_UNESCAPED_UNICODE);
         }
 
@@ -134,9 +143,31 @@ final class TelegramClient
             'parse_mode' => 'HTML',
         ];
         if ($replyMarkup !== null) {
+            if ($this->containsInlineCallbackData($replyMarkup)) {
+                error_log('Legacy inline callback markup detected in sendTopicMessage().');
+            }
             $payload['reply_markup'] = json_encode($replyMarkup, JSON_UNESCAPED_UNICODE);
         }
         $this->request('sendMessage', $payload);
+    }
+
+    private function containsInlineCallbackData(array $replyMarkup): bool
+    {
+        $rows = $replyMarkup['inline_keyboard'] ?? null;
+        if (!is_array($rows)) {
+            return false;
+        }
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            foreach ($row as $button) {
+                if (is_array($button) && isset($button['callback_data'])) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public function sendDocumentFile(int $chatId, string $filePath, string $caption = '', ?int $threadId = null): void
