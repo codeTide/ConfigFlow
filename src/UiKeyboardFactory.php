@@ -6,6 +6,12 @@ namespace ConfigFlow\Bot;
 
 final class UiKeyboardFactory implements UiKeyboardFactoryInterface
 {
+    public function __construct(
+        private ?UiJsonCatalog $catalog = null,
+    ) {
+        $this->catalog ??= new UiJsonCatalog();
+    }
+
     public function replyMenu(array $rows, bool $isPersistent = true): array
     {
         return [
@@ -18,12 +24,12 @@ final class UiKeyboardFactory implements UiKeyboardFactoryInterface
 
     public function main(): array
     {
-        return $this->replyMenu([[UiLabels::BTN_MAIN]]);
+        return $this->replyMenu([[UiLabels::main($this->catalog)]]);
     }
 
     public function navBackMain(): array
     {
-        return $this->replyMenu([[UiLabels::BTN_BACK, UiLabels::BTN_MAIN]]);
+        return $this->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]);
     }
 
     public function navBack(): array
@@ -38,17 +44,20 @@ final class UiKeyboardFactory implements UiKeyboardFactoryInterface
 
     public function back(): array
     {
-        return $this->replyMenu([[UiLabels::BTN_BACK]]);
+        return $this->replyMenu([[UiLabels::back($this->catalog)]]);
     }
 
     public function cancel(): array
     {
-        return $this->replyMenu([[UiLabels::BTN_CANCEL]]);
+        return $this->replyMenu([[UiLabels::cancel($this->catalog)]]);
     }
 
     public function confirm(string $yesLabel = UiLabels::BTN_CONFIRM_YES, string $noLabel = UiLabels::BTN_CONFIRM_NO): array
     {
-        return $this->replyMenu([[trim($yesLabel), trim($noLabel)]]);
+        $yes = trim($yesLabel) !== '' ? trim($yesLabel) : UiLabels::confirmYes($this->catalog);
+        $no = trim($noLabel) !== '' ? trim($noLabel) : UiLabels::confirmNo($this->catalog);
+
+        return $this->replyMenu([[$yes, $no]]);
     }
 
     public function choiceList(array $choices, int $columns = 2, bool $includeBack = true, bool $includeMain = true): array
@@ -68,10 +77,10 @@ final class UiKeyboardFactory implements UiKeyboardFactoryInterface
         if ($includeBack || $includeMain) {
             $nav = [];
             if ($includeBack) {
-                $nav[] = UiLabels::BTN_BACK;
+                $nav[] = UiLabels::back($this->catalog);
             }
             if ($includeMain) {
-                $nav[] = UiLabels::BTN_MAIN;
+                $nav[] = UiLabels::main($this->catalog);
             }
             $rows[] = $nav;
         }
@@ -92,7 +101,7 @@ final class UiKeyboardFactory implements UiKeyboardFactoryInterface
             $url = trim((string) ($button['url'] ?? ''));
 
             if ($text === '' || $url === '' || !preg_match('#^(https?://|tg://)#i', $url)) {
-                $message = 'Inline keyboard is URL-only. Invalid or missing URL detected.';
+                $message = $this->catalog->get('errors.inline_keyboard_url_only');
                 error_log($message . ' text=' . $text . ' url=' . $url);
                 throw new InvalidInlineKeyboardException($message);
             }

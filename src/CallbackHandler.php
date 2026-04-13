@@ -29,7 +29,9 @@ final class CallbackHandler
         private SettingsRepository $settings,
         private MenuService $menus,
         private PaymentGatewayService $gateways,
+        private ?UiJsonCatalog $catalog = null,
     ) {
+        $this->catalog ??= new UiJsonCatalog();
     }
 
     public function handle(array $update): void
@@ -55,7 +57,7 @@ final class CallbackHandler
         $this->database->ensureUser($fromUser);
 
         if ($this->database->userStatus($userId) === 'restricted') {
-            $this->telegram->answerCallbackQuery($callbackId, 'دسترسی شما محدود شده است.');
+            $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.restricted'));
             return;
         }
 
@@ -66,13 +68,13 @@ final class CallbackHandler
 
         if ($data === 'check_channel') {
             if ($this->checkChannelMembership($userId)) {
-                $this->telegram->answerCallbackQuery($callbackId, '✅ عضویت تأیید شد!');
+                $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.channel.membership_confirmed'));
                 $this->telegram->editMessageText($chatId, $messageId, $this->menus->mainMenuText());
-                $this->telegram->sendMessage($chatId, 'منوی اصلی:', $this->menus->mainMenuReplyKeyboard($userId));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.generic.main_menu'), $this->menus->mainMenuReplyKeyboard($userId));
             } else {
-                $this->telegram->answerCallbackQuery($callbackId, '❌ هنوز عضو کانال نشده‌اید.');
+                $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.channel.membership_missing'));
                 $this->telegram->editMessageText($chatId, $messageId, $this->channelLockText(), $this->channelLockKeyboard());
-                $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
             }
             return;
         }
@@ -80,28 +82,28 @@ final class CallbackHandler
         if (!$this->checkChannelMembership($userId)) {
             $this->telegram->answerCallbackQuery($callbackId);
             $this->telegram->editMessageText($chatId, $messageId, $this->channelLockText(), $this->channelLockKeyboard());
-            $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
             return;
         }
 
         if ($this->isDeprecatedUserInlineAction($data)) {
             error_log('Deprecated user callback route used. uid=' . $userId . ' data=' . $data);
             $this->database->clearUserState($userId);
-            $this->telegram->answerCallbackQuery($callbackId, '⚠️ مسیر قبلی منقضی شده است. لطفاً از منوی اصلی دوباره شروع کنید.');
+            $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.deprecated_route'));
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
 
         if (str_starts_with($data, 'admin:') || str_starts_with($data, 'pay:')) {
             if (!$this->database->isAdminUser($userId)) {
-                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.admin_access_denied'));
                 return;
             }
             $this->database->clearUserState($userId);
-            $this->telegram->answerCallbackQuery($callbackId, '⚠️ مسیر ادمین قدیمی شده است. از پنل مدیریت جدید ادامه دهید.');
+            $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.admin_legacy'));
             $this->telegram->sendMessage(
                 $chatId,
-                $this->menus->adminRootText() . "\n\n<blockquote>ℹ️ این callback منقضی شده و flow جدید جایگزین آن است.</blockquote>",
+                $this->menus->adminRootText() . "\n\n<blockquote>" . htmlspecialchars($this->catalog->get('messages.callback.admin_legacy_note')) . '</blockquote>',
                 $this->menus->adminRootReplyKeyboard()
             );
             return;
@@ -109,12 +111,12 @@ final class CallbackHandler
 
         if ($data === 'nav:main') {
             $this->telegram->editMessageText($chatId, $messageId, $this->menus->mainMenuText());
-            $this->telegram->sendMessage($chatId, 'منوی اصلی:', $this->menus->mainMenuReplyKeyboard($userId));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.generic.main_menu'), $this->menus->mainMenuReplyKeyboard($userId));
             $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
 
-        $this->telegram->answerCallbackQuery($callbackId, 'عملیات منقضی شده است. از منوی اصلی ادامه دهید.');
+        $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.expired_operation'));
     }
 
     private function isDeprecatedUserInlineAction(string $data): bool
@@ -149,7 +151,7 @@ final class CallbackHandler
         $channelId = trim($this->settings->get('channel_id', ''));
         $title = trim($this->settings->get('channel_title', ''));
         if ($title === '') {
-            $title = 'کانال اطلاع‌رسانی';
+            $title = $this->catalog->get('messages.channel.lock_title_default');
         }
 
         $mention = $channelId;
@@ -157,13 +159,15 @@ final class CallbackHandler
             $mention = '@' . ltrim($mention, '@');
         }
 
-        $line2 = $mention !== '' ? "📣 {$mention}" : '📣 کانال خصوصی';
+        $line2 = $mention !== ''
+            ? $this->catalog->get('messages.channel.mention_line', ['emoji' => $this->catalog->get('emojis.megaphone'), 'mention' => $mention])
+            : $this->catalog->get('messages.channel.private_line', ['emoji' => $this->catalog->get('emojis.private_channel'), 'label' => $this->catalog->get('messages.channel.private')]);
 
-        return "🔒 <b>عضویت اجباری</b>\n\n"
-            . "برای استفاده از ربات، ابتدا عضو کانال زیر شوید:\n"
-            . "• <b>{$title}</b>\n"
-            . "{$line2}\n\n"
-            . "پس از عضویت، روی «✅ عضو شدم» بزنید.";
+        return $this->catalog->get('messages.channel.lock_detailed', [
+            'emoji' => $this->catalog->get('emojis.lock'),
+            'title' => htmlspecialchars($title),
+            'line2' => $line2,
+        ]);
     }
 
     private function channelLockKeyboard(): array
@@ -181,7 +185,7 @@ final class CallbackHandler
 
         $rows = [];
         if ($channelUrl !== '') {
-            $rows[] = [['text' => '📢 ورود به کانال', 'url' => $channelUrl]];
+            $rows[] = [['text' => $this->catalog->get('buttons.enter_channel'), 'url' => $channelUrl]];
         }
 
         return ['inline_keyboard' => $rows];
@@ -191,7 +195,7 @@ final class CallbackHandler
     {
         return [
             'keyboard' => [
-                [KeyboardBuilder::BTN_CHECK_CHANNEL],
+                [KeyboardBuilder::checkChannel()],
             ],
             'resize_keyboard' => true,
             'is_persistent' => true,
