@@ -50,7 +50,11 @@ final class UiTextCatalog implements UiTextCatalogInterface
                 if (!$line instanceof UiTextLine) {
                     throw new \InvalidArgumentException('UiTextBlock lines must be UiTextLine instances.');
                 }
-                $parts[] = sprintf('%s %s: %s', trim($line->emoji), trim($line->label), trim($line->valueHtml));
+                $emoji = trim($line->emoji);
+                $label = trim($line->label);
+                $value = trim($line->valueHtml);
+                $prefix = $emoji !== '' ? ($emoji . ' ' . $label) : $label;
+                $parts[] = sprintf('%s: %s', $prefix, $value);
             }
         }
 
@@ -70,8 +74,8 @@ final class UiTextCatalog implements UiTextCatalogInterface
         $block = new UiTextBlock(
             title: $this->catalog->get('payments.created.title', ['title' => $escapedTitle]),
             lines: [
-                new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('payments.created.id_label'), '<code>' . $paymentId . '</code>'),
-                new UiTextLine($this->catalog->get('emojis.money'), $this->catalog->get('payments.created.amount_label'), $this->catalog->get('payments.created.amount_value', ['amount' => $amount])),
+                new UiTextLine('', $this->catalog->get('payments.created.id_label'), '<code>' . $paymentId . '</code>'),
+                new UiTextLine('', $this->catalog->get('payments.created.amount_label'), $this->catalog->get('payments.created.amount_value', ['amount' => $amount])),
             ],
             tipBlockquote: $tip,
         );
