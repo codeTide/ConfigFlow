@@ -1076,6 +1076,15 @@ ID: <code>{$pinId}</code>");
             return true;
         }
 
+        if ($text === '↩️ پنل مدیریت') {
+            if (!$this->database->isAdminUser($userId)) {
+                return false;
+            }
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, '⚙️ <b>پنل مدیریت</b>', KeyboardBuilder::adminPanelReply());
+            return true;
+        }
+
         if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
@@ -1100,7 +1109,6 @@ ID: <code>{$pinId}</code>");
                 '🗃 بکاپ/تاپیک' => 'admin:groupops',
                 '➕ افزودن/ویرایش قانون' => 'admin:free_test:rule:add',
                 '♻️ ریست سهمیه کاربر' => 'admin:free_test:quota:reset',
-                '🔙 بازگشت' => 'admin:panel',
             ];
             $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {

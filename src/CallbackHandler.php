@@ -1652,7 +1652,11 @@ final class CallbackHandler
             }
             if (count($lines) === 2) {
                 $lines[] = "• قانونی ثبت نشده است.";
-                $lines[] = "<blockquote>برای شروع، یک قانون تست ثبت کنید تا کاربران بتوانند سرویس تست دریافت کنند.</blockquote>";
+                $lines[] = "";
+                $lines[] = "<blockquote>ℹ️ برای شروع، یک قانون تست ثبت کنید تا کاربران بتوانند سرویس تست دریافت کنند.</blockquote>";
+            } else {
+                $lines[] = "";
+                $lines[] = "<blockquote>🧩 برای ویرایش یا ریست سهمیه از دکمه‌های زیر استفاده کنید.</blockquote>";
             }
             $this->telegram->sendMessage(
                 $chatId,
@@ -1660,7 +1664,7 @@ final class CallbackHandler
                 [
                     'keyboard' => [
                         ['➕ افزودن/ویرایش قانون', '♻️ ریست سهمیه کاربر'],
-                        ['🔙 بازگشت', KeyboardBuilder::BTN_BACK_MAIN],
+                        ['↩️ پنل مدیریت', KeyboardBuilder::BTN_BACK_MAIN],
                     ],
                     'resize_keyboard' => true,
                     'is_persistent' => true,
