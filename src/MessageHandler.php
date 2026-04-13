@@ -381,7 +381,7 @@ final class MessageHandler
             $receiptText = $caption !== '' ? $caption : ($text !== '' ? $text : null);
 
             if (($fileId === null || $fileId === '') && ($receiptText === null || $receiptText === '')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.receipt.missing_purchase', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.receipt.missing_purchase'));
                 return;
             }
 
@@ -431,7 +431,7 @@ final class MessageHandler
             $receiptText = $caption !== '' ? $caption : ($text !== '' ? $text : null);
 
             if (($fileId === null || $fileId === '') && ($receiptText === null || $receiptText === '')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.receipt.missing_renew', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.receipt.missing_renew'));
                 return;
             }
 
@@ -479,17 +479,17 @@ final class MessageHandler
                 $claimedAmount = (float) str_replace(',', '.', (string) $parts[1]);
             }
             if ($txHash === '' || str_starts_with($txHash, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid'));
                 return;
             }
             if (strlen($txHash) < 10) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid_length', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid_length'));
                 return;
             }
 
             $ok = $this->database->submitCryptoTxHash($paymentId, $txHash, $claimedAmount);
             if (!$ok) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.submit_failed', ['emoji' => $this->catalog->get('emojis.error')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.submit_failed'));
                 return;
             }
 
@@ -536,17 +536,17 @@ final class MessageHandler
                 $claimedAmount = (float) str_replace(',', '.', (string) $parts[1]);
             }
             if ($txHash === '' || str_starts_with($txHash, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid'));
                 return;
             }
             if (strlen($txHash) < 10) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid_length', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid_length'));
                 return;
             }
 
             $ok = $this->database->submitCryptoTxHash($paymentId, $txHash, $claimedAmount);
             if (!$ok) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.submit_failed', ['emoji' => $this->catalog->get('emojis.error')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.submit_failed'));
                 return;
             }
 
@@ -580,11 +580,11 @@ final class MessageHandler
 
         if ($state['state_name'] === 'await_free_test_note') {
             if ($this->isBotMenuButton($text)) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.note_as_text', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.note_as_text'));
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.note_required', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.note_required'));
                 return;
             }
 
@@ -615,11 +615,11 @@ final class MessageHandler
 
         if ($state['state_name'] === 'await_agency_request') {
             if ($this->isBotMenuButton($text)) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_as_text', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_as_text'));
                 return;
             }
             if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_required', ['emoji' => $this->catalog->get('emojis.warning')]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_required'));
                 return;
             }
 
@@ -723,7 +723,7 @@ final class MessageHandler
                 $msg = (($result['error'] ?? '') === 'already_reviewed')
                     ? $this->catalog->get('admin.legacy.errors.request_already_reviewed')
                     : $this->catalog->get('admin.legacy.errors.request_review_failed');
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.ui.audit.error_prefix', ['emoji' => $this->catalog->get('emojis.error'), 'msg' => $msg]));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.ui.audit.error_prefix', ['msg' => $msg]));
                 $this->openAdminRequestsList($chatId, $userId, $requestKind, 'pending');
                 return;
             }
@@ -1264,7 +1264,7 @@ final class MessageHandler
             $this->database->setUserState($userId, 'await_wallet_amount');
             $this->telegram->sendMessage(
                 $chatId,
-                $this->catalog->get('messages.user.wallet.enter_amount', ['emoji' => $this->catalog->get('emojis.cash')]),
+                $this->catalog->get('messages.user.wallet.enter_amount'),
                 $this->replyKeyboard([[KeyboardBuilder::backAccount(), KeyboardBuilder::backMain()]])
             );
             return true;
@@ -1283,7 +1283,7 @@ final class MessageHandler
             if (($claim['ok'] ?? false) !== true) {
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->catalog->get('messages.user.free_test.not_available', ['emoji' => $this->catalog->get('emojis.warning')])
+                    $this->catalog->get('messages.user.free_test.not_available')
                 );
                 return true;
             }
@@ -1291,7 +1291,6 @@ final class MessageHandler
             $configText = htmlspecialchars((string) ($claim['config_text'] ?? ''));
             $inquiryLink = trim((string) ($claim['inquiry_link'] ?? ''));
             $msg = $this->catalog->get('messages.user.free_test.ready', [
-                'emoji' => $this->catalog->get('emojis.gift'),
                 'service_name' => $serviceName,
                 'config_text' => $configText,
             ]);
@@ -1466,7 +1465,7 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('messages.user.buy.type_selection.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.puzzle'), $this->catalog->get('messages.user.buy.type_selection.label'), implode("\n", $lines)),
+                    new UiTextLine('', $this->catalog->get('messages.user.buy.type_selection.label'), implode("\n", $lines)),
                 ],
                 tipBlockquote: $this->catalog->get('messages.user.buy.type_selection.tip'),
             )),
@@ -1580,7 +1579,7 @@ final class MessageHandler
                     $this->uiText->multi(new UiTextBlock(
                         title: $this->catalog->get('admin.ui.nav.title'),
                         lines: [
-                            new UiTextLine($this->catalog->get('admin.ui.nav.line_emoji'), $this->catalog->get('admin.ui.nav.line_label'), '<code>' . htmlspecialchars($route) . '</code>'),
+                            new UiTextLine('', $this->catalog->get('admin.ui.nav.line_label'), '<code>' . htmlspecialchars($route) . '</code>'),
                         ],
                         tipBlockquote: $this->catalog->get('admin.ui.nav.tip'),
                     )),
@@ -1615,7 +1614,7 @@ final class MessageHandler
                     $this->uiText->multi(new UiTextBlock(
                         title: $this->catalog->get('admin.types_packages.create_type.title'),
                         lines: [
-                            new UiTextLine($this->catalog->get('emojis.write'), $this->catalog->get('admin.types_packages.create_type.guide_label'), $this->catalog->get('admin.types_packages.create_type.guide_value')),
+                            new UiTextLine('', $this->catalog->get('admin.types_packages.create_type.guide_label'), $this->catalog->get('admin.types_packages.create_type.guide_value')),
                         ],
                         tipBlockquote: $this->catalog->get('admin.types_packages.create_type.tip'),
                     )),
@@ -1667,7 +1666,7 @@ final class MessageHandler
                     $this->uiText->multi(new UiTextBlock(
                         title: $this->catalog->get('admin.types_packages.create_package.title'),
                         lines: [
-                            new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.types_packages.create_package.format_label'), $this->catalog->get('admin.types_packages.create_package.format_value')),
+                            new UiTextLine('', $this->catalog->get('admin.types_packages.create_package.format_label'), $this->catalog->get('admin.types_packages.create_package.format_value')),
                         ],
                         tipBlockquote: $this->catalog->get('admin.types_packages.create_package.tip'),
                     )),
@@ -1801,7 +1800,7 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('admin.ui.open.types_list.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.types_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.types_list.empty')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.types_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.types_list.empty')),
                 ],
                 tipBlockquote: $this->catalog->get('admin.ui.open.types_list.tip'),
             )),
@@ -1851,9 +1850,9 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('admin.ui.open.type_view.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.tag'), $this->catalog->get('admin.ui.open.type_view.type_label'), htmlspecialchars((string) ($type['name'] ?? '-')) . " | <code>{$typeId}</code>"),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.type_view.type_label'), htmlspecialchars((string) ($type['name'] ?? '-')) . " | <code>{$typeId}</code>"),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $statusText),
-                    new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('admin.ui.open.type_view.packages_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.type_view.packages_empty')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.type_view.packages_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.type_view.packages_empty')),
                 ],
                 tipBlockquote: $this->catalog->get('admin.ui.open.type_view.tip'),
             )),
@@ -1883,11 +1882,11 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('admin.ui.open.package_view.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.tag'), $this->catalog->get('admin.ui.open.package_view.name_label'), '<b>' . htmlspecialchars((string) ($pkg['name'] ?? '-')) . '</b> | <code>' . $packageId . '</code>'),
-                    new UiTextLine($this->catalog->get('emojis.puzzle'), $this->catalog->get('admin.ui.open.package_view.type_label'), htmlspecialchars((string) ($type['name'] ?? '-')) . ' | <code>' . $typeId . '</code>'),
-                    new UiTextLine($this->catalog->get('admin.ui.open.package_view.volume_emoji'), $this->catalog->get('admin.ui.open.package_view.volume_label'), $this->catalog->get('admin.ui.open.package_view.volume_value', ['volume' => (float) ($pkg['volume_gb'] ?? 0)])),
-                    new UiTextLine($this->catalog->get('admin.ui.open.package_view.duration_emoji'), $this->catalog->get('admin.ui.open.package_view.duration_label'), $this->catalog->get('admin.ui.open.package_view.duration_value', ['days' => (int) ($pkg['duration_days'] ?? 0)])),
-                    new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('admin.ui.open.package_view.price_label'), $this->catalog->get('admin.ui.open.package_view.price_value', ['amount' => (int) ($pkg['price'] ?? 0)])),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.package_view.name_label'), '<b>' . htmlspecialchars((string) ($pkg['name'] ?? '-')) . '</b> | <code>' . $packageId . '</code>'),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.package_view.type_label'), htmlspecialchars((string) ($type['name'] ?? '-')) . ' | <code>' . $typeId . '</code>'),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.package_view.volume_label'), $this->catalog->get('admin.ui.open.package_view.volume_value', ['volume' => (float) ($pkg['volume_gb'] ?? 0)])),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.package_view.duration_label'), $this->catalog->get('admin.ui.open.package_view.duration_value', ['days' => (int) ($pkg['duration_days'] ?? 0)])),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.package_view.price_label'), $this->catalog->get('admin.ui.open.package_view.price_value', ['amount' => (int) ($pkg['price'] ?? 0)])),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $statusText),
                 ],
                 tipBlockquote: $this->catalog->get('admin.ui.open.package_view.tip'),
@@ -1997,8 +1996,8 @@ final class MessageHandler
                     $this->uiText->multi(new UiTextBlock(
                         title: $this->catalog->get('admin.users_stock.prompts.balance_action_title', ['mode_text' => $modeText]),
                         lines: [
-                            new UiTextLine($this->catalog->get('admin.users_stock.prompts.balance_action_user_emoji'), $this->catalog->get('admin.users_stock.prompts.balance_action_user_label'), "<code>{$targetUid}</code>"),
-                            new UiTextLine($this->catalog->get('admin.users_stock.prompts.balance_action_input_emoji'), $this->catalog->get('admin.users_stock.prompts.balance_action_input_label'), $this->catalog->get('admin.users_stock.prompts.balance_action_input_value')),
+                            new UiTextLine('', $this->catalog->get('admin.users_stock.prompts.balance_action_user_label'), "<code>{$targetUid}</code>"),
+                            new UiTextLine('', $this->catalog->get('admin.users_stock.prompts.balance_action_input_label'), $this->catalog->get('admin.users_stock.prompts.balance_action_input_value')),
                         ],
                         tipBlockquote: $this->catalog->get('admin.users_stock.prompts.balance_action_tip'),
                     )),
@@ -2109,7 +2108,7 @@ final class MessageHandler
                         $this->uiText->multi(new UiTextBlock(
                             title: $this->catalog->get('admin.users_stock.prompts.add_config_title'),
                             lines: [
-                                new UiTextLine($this->catalog->get('admin.users_stock.prompts.add_config_format_emoji'), $this->catalog->get('admin.users_stock.prompts.add_config_format_label'), $this->catalog->get('admin.users_stock.prompts.add_config_format_value')),
+                                new UiTextLine('', $this->catalog->get('admin.users_stock.prompts.add_config_format_label'), $this->catalog->get('admin.users_stock.prompts.add_config_format_value')),
                             ],
                             tipBlockquote: $this->catalog->get('admin.users_stock.prompts.add_config_tip'),
                         )),
@@ -2130,7 +2129,7 @@ final class MessageHandler
                         $this->uiText->multi(new UiTextBlock(
                             title: $this->catalog->get('admin.users_stock.prompts.search_config_title'),
                             lines: [
-                                new UiTextLine($this->catalog->get('admin.users_stock.prompts.search_config_input_emoji'), $this->catalog->get('admin.users_stock.prompts.search_config_input_label'), $this->catalog->get('admin.users_stock.prompts.search_config_input_value')),
+                                new UiTextLine('', $this->catalog->get('admin.users_stock.prompts.search_config_input_label'), $this->catalog->get('admin.users_stock.prompts.search_config_input_value')),
                             ],
                             tipBlockquote: $this->catalog->get('admin.users_stock.prompts.search_config_tip'),
                         )),
@@ -2263,11 +2262,11 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.users_list.title', ['emoji' => $this->catalog->get('emojis.profile')]),
+                title: $this->catalog->get('admin.ui.open.users_list.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.users_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.users_list.empty')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.users_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.users_list.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.users_list.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.users_list.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2296,15 +2295,15 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.user_view.title', ['emoji' => $this->catalog->get('emojis.profile')]),
+                title: $this->catalog->get('admin.ui.open.user_view.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.id'), $this->catalog->get('admin.ui.open.user_view.user_label'), "<code>{$targetUid}</code>"),
-                    new UiTextLine($this->catalog->get('emojis.tag'), $this->catalog->get('admin.ui.open.user_view.name_label'), htmlspecialchars((string) ($target['full_name'] ?? $this->catalog->get('messages.generic.dash')))),
-                    new UiTextLine($this->catalog->get('emojis.money'), $this->catalog->get('admin.ui.open.user_view.balance_label'), $this->catalog->get('admin.ui.open.user_view.balance_value', ['amount' => (int) ($target['balance'] ?? 0)])),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.user_view.user_label'), "<code>{$targetUid}</code>"),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.user_view.name_label'), htmlspecialchars((string) ($target['full_name'] ?? $this->catalog->get('messages.generic.dash')))),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.user_view.balance_label'), $this->catalog->get('admin.ui.open.user_view.balance_value', ['amount' => (int) ($target['balance'] ?? 0)])),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $statusText),
-                    new UiTextLine($this->catalog->get('emojis.briefcase'), $this->catalog->get('admin.ui.open.user_view.agent_label'), $agentText),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.user_view.agent_label'), $agentText),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.user_view.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.user_view.tip'),
             )),
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_USER_TOGGLE_STATUS), $this->uiConst(self::ADMIN_USER_TOGGLE_AGENT)],
@@ -2339,11 +2338,11 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.stock.types.title', ['emoji' => $this->catalog->get('emojis.list')]),
+                title: $this->catalog->get('admin.ui.open.stock.types.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.puzzle'), $this->catalog->get('admin.ui.open.stock.types.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.types.empty')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.stock.types.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.types.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.stock.types.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.stock.types.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2379,11 +2378,11 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.stock.packages.title', ['emoji' => $this->catalog->get('emojis.package')]),
+                title: $this->catalog->get('admin.ui.open.stock.packages.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.ui.open.stock.packages.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.packages.empty')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.stock.packages.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.packages.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.stock.packages.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.stock.packages.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2436,13 +2435,13 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.stock.configs.title', ['emoji' => $this->catalog->get('emojis.folder')]),
+                title: $this->catalog->get('admin.ui.open.stock.configs.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('admin.ui.open.stock.configs.package_label'), "<code>{$packageId}</code>"),
-                    new UiTextLine($this->catalog->get('admin.ui.open.stock.configs.search_emoji'), $this->catalog->get('admin.ui.open.stock.configs.search_label'), $queryView),
-                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.stock.configs.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.configs.empty')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.stock.configs.package_label'), "<code>{$packageId}</code>"),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.stock.configs.search_label'), $queryView),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.stock.configs.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.configs.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.stock.configs.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.stock.configs.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2474,13 +2473,13 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.stock.config_detail.title', ['emoji' => $this->catalog->get('emojis.search')]),
+                title: $this->catalog->get('admin.ui.open.stock.config_detail.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.id'), $this->catalog->get('admin.ui.open.stock.config_detail.id_label'), "<code>{$configId}</code>"),
-                    new UiTextLine($this->catalog->get('emojis.tag'), $this->catalog->get('admin.ui.open.stock.config_detail.service_label'), htmlspecialchars((string) ($cfg['service_name'] ?? $this->catalog->get('messages.generic.dash')))),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.stock.config_detail.id_label'), "<code>{$configId}</code>"),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.stock.config_detail.service_label'), htmlspecialchars((string) ($cfg['service_name'] ?? $this->catalog->get('messages.generic.dash')))),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $status),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.stock.config_detail.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.stock.config_detail.tip'),
             )),
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_STOCK_EXPIRE_TOGGLE), $this->uiConst(self::ADMIN_STOCK_DELETE_CONFIG)],
@@ -2509,17 +2508,17 @@ final class MessageHandler
 
         $stateName = (string) ($state['state_name'] ?? '');
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
-        $paymentsRefreshLabel = $this->catalog->get('admin.payments_requests.actions.payments_refresh', ['emoji' => $this->catalog->get('emojis.sync')]);
-        $paymentVerifyChainLabel = $this->catalog->get('admin.payments_requests.actions.payment_verify_chain', ['emoji' => $this->catalog->get('emojis.compass')]);
-        $paymentApproveLabel = $this->catalog->get('admin.payments_requests.actions.payment_approve', ['emoji' => $this->catalog->get('emojis.success')]);
-        $paymentRejectLabel = $this->catalog->get('admin.payments_requests.actions.payment_reject', ['emoji' => $this->catalog->get('emojis.error')]);
-        $requestsFreeLabel = $this->catalog->get('admin.payments_requests.actions.requests_free', ['emoji' => $this->catalog->get('emojis.gift')]);
-        $requestsAgencyLabel = $this->catalog->get('admin.payments_requests.actions.requests_agency', ['emoji' => $this->catalog->get('emojis.briefcase')]);
-        $requestsPendingLabel = $this->catalog->get('admin.payments_requests.actions.requests_pending', ['emoji' => $this->catalog->get('emojis.warning')]);
-        $requestsApprovedLabel = $this->catalog->get('admin.payments_requests.actions.requests_approved', ['emoji' => $this->catalog->get('emojis.success')]);
-        $requestsRejectedLabel = $this->catalog->get('admin.payments_requests.actions.requests_rejected', ['emoji' => $this->catalog->get('emojis.error')]);
-        $requestApproveLabel = $this->catalog->get('admin.payments_requests.actions.request_approve', ['emoji' => $this->catalog->get('emojis.success')]);
-        $requestRejectLabel = $this->catalog->get('admin.payments_requests.actions.request_reject', ['emoji' => $this->catalog->get('emojis.error')]);
+        $paymentsRefreshLabel = $this->catalog->get('admin.payments_requests.actions.payments_refresh');
+        $paymentVerifyChainLabel = $this->catalog->get('admin.payments_requests.actions.payment_verify_chain');
+        $paymentApproveLabel = $this->catalog->get('admin.payments_requests.actions.payment_approve');
+        $paymentRejectLabel = $this->catalog->get('admin.payments_requests.actions.payment_reject');
+        $requestsFreeLabel = $this->catalog->get('admin.payments_requests.actions.requests_free');
+        $requestsAgencyLabel = $this->catalog->get('admin.payments_requests.actions.requests_agency');
+        $requestsPendingLabel = $this->catalog->get('admin.payments_requests.actions.requests_pending');
+        $requestsApprovedLabel = $this->catalog->get('admin.payments_requests.actions.requests_approved');
+        $requestsRejectedLabel = $this->catalog->get('admin.payments_requests.actions.requests_rejected');
+        $requestApproveLabel = $this->catalog->get('admin.payments_requests.actions.request_approve');
+        $requestRejectLabel = $this->catalog->get('admin.payments_requests.actions.request_reject');
 
         if ($stateName === 'admin.payments.list') {
             if ($text === UiLabels::BTN_BACK) {
@@ -2669,14 +2668,13 @@ final class MessageHandler
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
                         title: $this->catalog->get('admin.payments_requests.prompts.request_review_note_title', [
-                            'emoji' => $this->catalog->get('emojis.note'),
                             'action_text' => $actionText,
                         ]),
                         lines: [
-                            new UiTextLine($this->catalog->get('emojis.support_id'), $this->catalog->get('admin.payments_requests.prompts.request_id_label'), "<code>{$requestId}</code>"),
-                            new UiTextLine($this->catalog->get('emojis.write'), $this->catalog->get('admin.payments_requests.prompts.note_label'), $this->catalog->get('admin.payments_requests.prompts.note_value')),
+                            new UiTextLine('', $this->catalog->get('admin.payments_requests.prompts.request_id_label'), "<code>{$requestId}</code>"),
+                            new UiTextLine('', $this->catalog->get('admin.payments_requests.prompts.note_label'), $this->catalog->get('admin.payments_requests.prompts.note_value')),
                         ],
-                        tipBlockquote: $this->catalog->get('admin.payments_requests.prompts.note_tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                        tipBlockquote: $this->catalog->get('admin.payments_requests.prompts.note_tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]])
                 );
@@ -2718,8 +2716,8 @@ final class MessageHandler
                 ? $this->catalog->get('admin.payments_requests.labels.request_free')
                 : $this->catalog->get('admin.payments_requests.labels.request_agency');
             $statusText = $approve
-                ? $this->catalog->get('admin.payments_requests.labels.status_approved', ['emoji' => $this->catalog->get('emojis.success')])
-                : $this->catalog->get('admin.payments_requests.labels.status_rejected', ['emoji' => $this->catalog->get('emojis.error')]);
+                ? $this->catalog->get('admin.payments_requests.labels.status_approved')
+                : $this->catalog->get('admin.payments_requests.labels.status_rejected');
             $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.payments_requests.success.request_reviewed', [
                 'request_label' => $label,
                 'request_id' => $requestId,
@@ -2727,14 +2725,13 @@ final class MessageHandler
             ])));
             $userNotice = $approve
                 ? ($kind === 'free'
-                    ? $this->catalog->get('admin.payments_requests.user_notice.free_approved', ['emoji' => $this->catalog->get('emojis.success')])
-                    : $this->catalog->get('admin.payments_requests.user_notice.agency_approved', ['emoji' => $this->catalog->get('emojis.success')]))
+                    ? $this->catalog->get('admin.payments_requests.user_notice.free_approved')
+                    : $this->catalog->get('admin.payments_requests.user_notice.agency_approved'))
                 : ($kind === 'free'
-                    ? $this->catalog->get('admin.payments_requests.user_notice.free_rejected', ['emoji' => $this->catalog->get('emojis.error')])
-                    : $this->catalog->get('admin.payments_requests.user_notice.agency_rejected', ['emoji' => $this->catalog->get('emojis.error')]));
+                    ? $this->catalog->get('admin.payments_requests.user_notice.free_rejected')
+                    : $this->catalog->get('admin.payments_requests.user_notice.agency_rejected'));
             if ($adminNote !== null && $adminNote !== '') {
                 $userNotice .= $this->catalog->get('admin.payments_requests.user_notice.admin_note', [
-                    'emoji' => $this->catalog->get('emojis.note'),
                     'note' => htmlspecialchars($adminNote),
                 ]);
             }
@@ -2772,11 +2769,11 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.payments.list.title', ['emoji' => $this->catalog->get('emojis.money')]),
+                title: $this->catalog->get('admin.ui.open.payments.list.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.payments.list.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.payments.list.empty')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.payments.list.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.payments.list.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.payments.list.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.payments.list.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2808,15 +2805,15 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.payments.view.title', ['emoji' => $this->catalog->get('emojis.money')]),
+                title: $this->catalog->get('admin.ui.open.payments.view.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.id'), $this->catalog->get('admin.ui.open.payments.view.id_label'), "<code>{$paymentId}</code>"),
-                    new UiTextLine($this->catalog->get('emojis.profile'), $this->catalog->get('admin.ui.open.payments.view.user_label'), '<code>' . (int) ($payment['user_id'] ?? 0) . '</code>'),
-                    new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('admin.ui.open.payments.view.amount_label'), $this->catalog->get('admin.ui.open.payments.view.amount_value', ['amount' => (int) ($payment['amount'] ?? 0)])),
-                    new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.ui.open.payments.view.method_label'), htmlspecialchars($method)),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.payments.view.id_label'), "<code>{$paymentId}</code>"),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.payments.view.user_label'), '<code>' . (int) ($payment['user_id'] ?? 0) . '</code>'),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.payments.view.amount_label'), $this->catalog->get('admin.ui.open.payments.view.amount_value', ['amount' => (int) ($payment['amount'] ?? 0)])),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.payments.view.method_label'), htmlspecialchars($method)),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), htmlspecialchars($status)),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.payments.view.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.payments.view.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2922,11 +2919,11 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->uiText->multi(new UiTextBlock(
-                    title: $this->catalog->get('admin.ui.open.requests.root.title', ['emoji' => $this->catalog->get('emojis.folder')]),
+                    title: $this->catalog->get('admin.ui.open.requests.root.title'),
                     lines: [
-                        new UiTextLine($this->catalog->get('admin.ui.open.requests.root.step_emoji'), $this->catalog->get('admin.ui.open.requests.root.step_label'), $this->catalog->get('admin.ui.open.requests.root.step_value')),
+                        new UiTextLine('', $this->catalog->get('admin.ui.open.requests.root.step_label'), $this->catalog->get('admin.ui.open.requests.root.step_value')),
                     ],
-                    tipBlockquote: $this->catalog->get('admin.ui.open.requests.root.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                    tipBlockquote: $this->catalog->get('admin.ui.open.requests.root.tip'),
                 )),
                 $this->uiKeyboard->replyMenu([
                     [$this->uiConst(self::ADMIN_REQUESTS_FREE)],
@@ -2972,12 +2969,12 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.requests.list.title', ['emoji' => $this->catalog->get('emojis.folder'), 'kind_title' => $kindTitle]),
+                title: $this->catalog->get('admin.ui.open.requests.list.title', ['kind_title' => $kindTitle]),
                 lines: [
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.requests.list.status_filter_label'), htmlspecialchars($status)),
-                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.requests.list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.requests.list.empty')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.requests.list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.requests.list.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.requests.list.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.requests.list.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -3016,15 +3013,15 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.requests.view.title', ['emoji' => $this->catalog->get('emojis.note'), 'kind_title' => $kindTitle]),
+                title: $this->catalog->get('admin.ui.open.requests.view.title', ['kind_title' => $kindTitle]),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.id'), $this->catalog->get('admin.ui.open.requests.view.id_label'), "<code>{$requestId}</code>"),
-                    new UiTextLine($this->catalog->get('emojis.profile'), $this->catalog->get('admin.ui.open.requests.view.user_label'), '<code>' . (int) ($request['user_id'] ?? 0) . '</code>'),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.requests.view.id_label'), "<code>{$requestId}</code>"),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.requests.view.user_label'), '<code>' . (int) ($request['user_id'] ?? 0) . '</code>'),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $statusText),
-                    new UiTextLine($this->catalog->get('admin.ui.open.requests.view.created_emoji'), $this->catalog->get('admin.ui.open.requests.view.created_label'), htmlspecialchars((string) ($request['created_at'] ?? $this->catalog->get('messages.generic.dash')))),
-                    new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.ui.open.requests.view.note_label'), htmlspecialchars((string) ($request['note'] ?? ''))),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.requests.view.created_label'), htmlspecialchars((string) ($request['created_at'] ?? $this->catalog->get('messages.generic.dash')))),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.requests.view.note_label'), htmlspecialchars((string) ($request['note'] ?? ''))),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.requests.view.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                tipBlockquote: $this->catalog->get('admin.ui.open.requests.view.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -3038,21 +3035,21 @@ final class MessageHandler
         }
         $stateName = (string) ($state['state_name'] ?? '');
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
-        $settingsRefreshLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_refresh', ['emoji' => $this->catalog->get('emojis.sync')]);
-        $settingsToggleBotLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_bot', ['emoji' => $this->catalog->get('emojis.admin_panel')]);
-        $settingsToggleFreeTestLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_free_test', ['emoji' => $this->catalog->get('emojis.gift')]);
-        $settingsToggleAgencyLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_agency', ['emoji' => $this->catalog->get('emojis.briefcase')]);
-        $settingsToggleGwCardLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_card', ['emoji' => $this->catalog->get('emojis.cash')]);
-        $settingsToggleGwCryptoLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_crypto', ['emoji' => $this->catalog->get('emojis.gift')]);
-        $settingsToggleGwTetraLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_tetra', ['emoji' => $this->catalog->get('emojis.money')]);
-        $settingsSetChannelLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_channel', ['emoji' => $this->catalog->get('emojis.private_channel')]);
-        $settingsEditLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_edit', ['emoji' => $this->catalog->get('emojis.write')]);
-        $adminsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.admins_add', ['emoji' => $this->catalog->get('emojis.success')]);
-        $adminDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.admin_delete', ['emoji' => $this->catalog->get('emojis.error')]);
-        $pinsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.pins_add', ['emoji' => $this->catalog->get('emojis.success')]);
-        $pinEditLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_edit', ['emoji' => $this->catalog->get('emojis.write')]);
-        $pinDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_delete', ['emoji' => $this->catalog->get('emojis.error')]);
-        $pinSendAllLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_send_all', ['emoji' => $this->catalog->get('emojis.megaphone')]);
+        $settingsRefreshLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_refresh');
+        $settingsToggleBotLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_bot');
+        $settingsToggleFreeTestLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_free_test');
+        $settingsToggleAgencyLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_agency');
+        $settingsToggleGwCardLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_card');
+        $settingsToggleGwCryptoLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_crypto');
+        $settingsToggleGwTetraLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_tetra');
+        $settingsSetChannelLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_channel');
+        $settingsEditLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_edit');
+        $adminsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.admins_add');
+        $adminDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.admin_delete');
+        $pinsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.pins_add');
+        $pinEditLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_edit');
+        $pinDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_delete');
+        $pinSendAllLabel = $this->catalog->get('admin.settings_admins_pins.actions.pin_send_all');
         $confirmDeleteWord = $this->catalog->get('admin.settings_admins_pins.keywords.delete_confirm');
         $confirmSendWord = $this->catalog->get('admin.settings_admins_pins.keywords.send_confirm');
 
@@ -3096,9 +3093,9 @@ final class MessageHandler
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
-                        title: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_title', ['emoji' => $this->catalog->get('emojis.private_channel')]),
-                        lines: [new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.settings_admins_pins.prompts.input_label'), $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_input_value'))],
-                        tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                        title: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_title'),
+                        lines: [new UiTextLine('', $this->catalog->get('admin.settings_admins_pins.prompts.input_label'), $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_input_value'))],
+                        tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]])
                 );
@@ -3109,9 +3106,9 @@ final class MessageHandler
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->multi(new UiTextBlock(
-                        title: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_title', ['emoji' => $this->catalog->get('emojis.write')]),
-                        lines: [new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.settings_admins_pins.prompts.format_label'), $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_format_value'))],
-                        tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                        title: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_title'),
+                        lines: [new UiTextLine('', $this->catalog->get('admin.settings_admins_pins.prompts.format_label'), $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_format_value'))],
+                        tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]])
                 );
@@ -3158,9 +3155,9 @@ final class MessageHandler
             if ($text === $adminsAddLabel || $text === $this->uiConst(self::ADMIN_ADMINS_ADD)) {
                 $this->database->setUserState($userId, 'admin.admin.create', ['stack' => ['admin.admins.list', 'admin.root']]);
                 $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-                    title: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_title', ['emoji' => $this->catalog->get('emojis.success')]),
-                    lines: [new UiTextLine($this->catalog->get('emojis.support_id'), $this->catalog->get('admin.settings_admins_pins.prompts.guide_label'), $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_guide_value'))],
-                    tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                    title: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_title'),
+                    lines: [new UiTextLine('', $this->catalog->get('admin.settings_admins_pins.prompts.guide_label'), $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_guide_value'))],
+                    tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_tip'),
                 )), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
                 return;
             }
@@ -3379,7 +3376,7 @@ final class MessageHandler
         }
         $this->database->setUserState($userId, 'admin.settings.view', ['stack' => ['admin.root']]);
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('admin.ui.open.settings_admins_pins.settings.title', ['emoji' => $this->catalog->get('emojis.admin_panel')]),
+            title: $this->catalog->get('admin.ui.open.settings_admins_pins.settings.title'),
             lines: [
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.bot_status_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.bot_status_label'), htmlspecialchars($vals['bot_status'])),
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.free_test_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.free_test_label'), $vals['free_test_enabled'] === '1' ? $this->catalog->get('emojis.success') : $this->catalog->get('emojis.error')),
@@ -3389,7 +3386,7 @@ final class MessageHandler
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_tetrapay_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_tetrapay_label'), $vals['gw_tetrapay_enabled'] === '1' ? $this->catalog->get('emojis.success') : $this->catalog->get('emojis.error')),
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_label'), $vals['channel_id'] !== '' ? htmlspecialchars($vals['channel_id']) : $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_unset')),
             ],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.settings.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.settings.tip'),
         )), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_SETTINGS_REFRESH), $this->uiConst(self::ADMIN_SETTINGS_EDIT)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
@@ -3423,9 +3420,9 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('admin.ui.open.settings_admins_pins.admins.title', ['emoji' => $this->catalog->get('emojis.shield')]),
-            lines: [new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.settings_admins_pins.admins.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.settings_admins_pins.admins.empty'))],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.admins.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+            title: $this->catalog->get('admin.ui.open.settings_admins_pins.admins.title'),
+            lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.admins.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.settings_admins_pins.admins.empty'))],
+            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.admins.tip'),
         )), $this->uiKeyboard->replyMenu($buttons));
     }
 
@@ -3457,12 +3454,12 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.title', ['emoji' => $this->catalog->get('emojis.shield')]),
+            title: $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.title'),
             lines: [
-                new UiTextLine($this->catalog->get('emojis.id'), $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.admin_label'), "<code>{$targetUid}</code>"),
-                new UiTextLine($this->catalog->get('emojis.lock'), $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.permissions_label'), implode("\n", $lines)),
+                new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.admin_label'), "<code>{$targetUid}</code>"),
+                new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.permissions_label'), implode("\n", $lines)),
             ],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.tip'),
         )), $this->uiKeyboard->replyMenu($rows));
     }
 
@@ -3488,9 +3485,9 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('admin.ui.open.settings_admins_pins.pins.title', ['emoji' => $this->catalog->get('emojis.note')]),
-            lines: [new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.settings_admins_pins.pins.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.settings_admins_pins.pins.empty'))],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.pins.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+            title: $this->catalog->get('admin.ui.open.settings_admins_pins.pins.title'),
+            lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.pins.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.settings_admins_pins.pins.empty'))],
+            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.pins.tip'),
         )), $this->uiKeyboard->replyMenu($buttons));
     }
 
@@ -3507,12 +3504,12 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.title', ['emoji' => $this->catalog->get('emojis.note'), 'pin_id' => $pinId]),
+            title: $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.title', ['pin_id' => $pinId]),
             lines: [
-                new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.text_label'), htmlspecialchars((string) ($pin['text'] ?? ''))),
-                new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.sent_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.sent_label'), (string) $sendCount),
+                new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.text_label'), htmlspecialchars((string) ($pin['text'] ?? ''))),
+                new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.sent_label'), (string) $sendCount),
             ],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.tip', ['emoji' => $this->catalog->get('emojis.info')]),
+            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.tip'),
         )), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_PIN_SEND_ALL)],
             [$this->uiConst(self::ADMIN_PIN_EDIT), $this->uiConst(self::ADMIN_PIN_DELETE)],
@@ -3528,22 +3525,22 @@ final class MessageHandler
         }
         $stateName = (string) ($state['state_name'] ?? '');
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
-        $agentsRefreshLabel = $this->catalog->get('admin.final_modules.actions.agents_refresh', ['emoji' => $this->catalog->get('emojis.sync')]);
-        $panelsAddLabel = $this->catalog->get('admin.final_modules.actions.panels_add', ['emoji' => $this->catalog->get('emojis.success')]);
-        $panelToggleLabel = $this->catalog->get('admin.final_modules.actions.panel_toggle', ['emoji' => $this->catalog->get('emojis.sync')]);
-        $panelDeleteLabel = $this->catalog->get('admin.final_modules.actions.panel_delete', ['emoji' => $this->catalog->get('emojis.error')]);
-        $panelPkgAddLabel = $this->catalog->get('admin.final_modules.actions.panel_pkg_add', ['emoji' => $this->catalog->get('emojis.success')]);
-        $broadcastScopeAllLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_all', ['emoji' => $this->catalog->get('emojis.list')]);
-        $broadcastScopeUsersLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_users', ['emoji' => $this->catalog->get('emojis.profile')]);
-        $broadcastScopeAgentsLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_agents', ['emoji' => $this->catalog->get('emojis.briefcase')]);
-        $broadcastScopeAdminsLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_admins', ['emoji' => $this->catalog->get('emojis.shield')]);
-        $broadcastSendLabel = $this->catalog->get('admin.final_modules.actions.broadcast_send', ['emoji' => $this->catalog->get('emojis.megaphone')]);
-        $deliveriesRefreshLabel = $this->catalog->get('admin.final_modules.actions.deliveries_refresh', ['emoji' => $this->catalog->get('emojis.sync')]);
-        $deliveryDoLabel = $this->catalog->get('admin.final_modules.actions.delivery_do', ['emoji' => $this->catalog->get('emojis.package')]);
-        $groupopsSetGroupLabel = $this->catalog->get('admin.final_modules.actions.groupops_set_group', ['emoji' => $this->catalog->get('emojis.folder')]);
-        $groupopsRestoreLabel = $this->catalog->get('admin.final_modules.actions.groupops_restore', ['emoji' => $this->catalog->get('emojis.sync')]);
-        $freetestRuleLabel = $this->catalog->get('admin.final_modules.actions.freetest_rule', ['emoji' => $this->catalog->get('emojis.note')]);
-        $freetestResetLabel = $this->catalog->get('admin.final_modules.actions.freetest_reset', ['emoji' => $this->catalog->get('emojis.sync')]);
+        $agentsRefreshLabel = $this->catalog->get('admin.final_modules.actions.agents_refresh');
+        $panelsAddLabel = $this->catalog->get('admin.final_modules.actions.panels_add');
+        $panelToggleLabel = $this->catalog->get('admin.final_modules.actions.panel_toggle');
+        $panelDeleteLabel = $this->catalog->get('admin.final_modules.actions.panel_delete');
+        $panelPkgAddLabel = $this->catalog->get('admin.final_modules.actions.panel_pkg_add');
+        $broadcastScopeAllLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_all');
+        $broadcastScopeUsersLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_users');
+        $broadcastScopeAgentsLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_agents');
+        $broadcastScopeAdminsLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_admins');
+        $broadcastSendLabel = $this->catalog->get('admin.final_modules.actions.broadcast_send');
+        $deliveriesRefreshLabel = $this->catalog->get('admin.final_modules.actions.deliveries_refresh');
+        $deliveryDoLabel = $this->catalog->get('admin.final_modules.actions.delivery_do');
+        $groupopsSetGroupLabel = $this->catalog->get('admin.final_modules.actions.groupops_set_group');
+        $groupopsRestoreLabel = $this->catalog->get('admin.final_modules.actions.groupops_restore');
+        $freetestRuleLabel = $this->catalog->get('admin.final_modules.actions.freetest_rule');
+        $freetestResetLabel = $this->catalog->get('admin.final_modules.actions.freetest_reset');
         $deleteConfirmWord = $this->catalog->get('admin.final_modules.keywords.delete_confirm');
         $deliverConfirmWord = $this->catalog->get('admin.final_modules.keywords.deliver_confirm');
 
@@ -3715,9 +3712,9 @@ final class MessageHandler
             }
             $this->database->setUserState($userId, 'admin.broadcast.confirm', ['message' => $text]);
             $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_title', ['emoji' => $this->catalog->get('emojis.megaphone')]),
-                lines: [new UiTextLine($this->catalog->get('emojis.note'), $this->catalog->get('admin.final_modules.prompts.broadcast_preview_label'), htmlspecialchars($text))],
-                tipBlockquote: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_tip', ['emoji' => $this->catalog->get('emojis.info')]),
+                title: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_title'),
+                lines: [new UiTextLine('', $this->catalog->get('admin.final_modules.prompts.broadcast_preview_label'), htmlspecialchars($text))],
+                tipBlockquote: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_tip'),
             )), $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_ALL), $this->uiConst(self::ADMIN_BROADCAST_SCOPE_USERS)],
                 [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_AGENTS), $this->uiConst(self::ADMIN_BROADCAST_SCOPE_ADMINS)],
@@ -3935,7 +3932,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.agents.title'), lines: [new UiTextLine($this->catalog->get('admin.ui.agents.list_emoji'), $this->catalog->get('admin.ui.agents.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.agents.empty'))], tipBlockquote: $this->catalog->get('admin.ui.agents.tip'))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.agents.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.agents.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.agents.empty'))], tipBlockquote: $this->catalog->get('admin.ui.agents.tip'))), $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminAgentView(int $chatId, int $userId, int $agentId, ?string $notice = null): void
@@ -3964,7 +3961,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.agent_view.title', ['agent_id' => $agentId]), lines: [new UiTextLine($this->catalog->get('admin.ui.agent_view.packages_emoji'), $this->catalog->get('admin.ui.agent_view.packages_label'), implode("\n", $lines))], tipBlockquote: $this->catalog->get('admin.ui.agent_view.tip'))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.agent_view.title', ['agent_id' => $agentId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.agent_view.packages_label'), implode("\n", $lines))], tipBlockquote: $this->catalog->get('admin.ui.agent_view.tip'))), $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminPanelsList(int $chatId, int $userId, ?string $notice = null): void
@@ -3990,7 +3987,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panels_list.title'), lines: [new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.panels_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.panels_list.empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.panels_list.tip'))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panels_list.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panels_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.panels_list.empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.panels_list.tip'))), $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminPanelView(int $chatId, int $userId, int $panelId, ?string $notice = null): void
@@ -4009,7 +4006,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->database->setUserState($userId, 'admin.panel.view', ['panel_id' => $panelId]);
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_view.title', ['panel_id' => $panelId]), lines: [new UiTextLine($this->catalog->get('admin.ui.open.panel_view.name_emoji'), $this->catalog->get('admin.ui.open.panel_view.name_label'), htmlspecialchars((string) ($panel['name'] ?? '-'))), new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('admin.ui.open.panel_view.packages_label'), $pkgLines !== [] ? implode("\n", $pkgLines) : $this->catalog->get('admin.ui.open.panel_view.packages_empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.panel_view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_view.title', ['panel_id' => $panelId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.name_label'), htmlspecialchars((string) ($panel['name'] ?? '-'))), new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.packages_label'), $pkgLines !== [] ? implode("\n", $pkgLines) : $this->catalog->get('admin.ui.open.panel_view.packages_empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.panel_view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
     }
 
     private function openAdminBroadcastCompose(int $chatId, int $userId, ?string $notice = null): void
@@ -4018,7 +4015,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.broadcast.title'), lines: [new UiTextLine($this->catalog->get('admin.ui.broadcast.step_emoji'), $this->catalog->get('admin.ui.broadcast.step_label'), $this->catalog->get('admin.ui.broadcast.step_value'))], tipBlockquote: $this->catalog->get('admin.ui.broadcast.tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.broadcast.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.broadcast.step_label'), $this->catalog->get('admin.ui.broadcast.step_value'))], tipBlockquote: $this->catalog->get('admin.ui.broadcast.tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
     }
 
     private function openAdminDeliveriesList(int $chatId, int $userId, ?string $notice = null): void
@@ -4042,7 +4039,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.list.title', ['emoji' => $this->catalog->get('emojis.package')]), lines: [new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('admin.ui.open.deliveries.list.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.deliveries.list.empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.deliveries.list.tip', ['emoji' => $this->catalog->get('emojis.info')]))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.list.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.deliveries.list.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.deliveries.list.empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.deliveries.list.tip'))), $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminDeliveryView(int $chatId, int $userId, int $orderId, ?string $notice = null): void
@@ -4051,7 +4048,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.view.title', ['emoji' => $this->catalog->get('emojis.package'), 'order_id' => $orderId]), lines: [new UiTextLine($this->catalog->get('emojis.admin_panel'), $this->catalog->get('admin.ui.open.deliveries.view.action_label'), $this->catalog->get('admin.ui.open.deliveries.view.action_value'))], tipBlockquote: $this->catalog->get('admin.ui.open.deliveries.view.tip', ['emoji' => $this->catalog->get('emojis.warning')]))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_DELIVERY_DO)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.view.title', ['order_id' => $orderId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.deliveries.view.action_label'), $this->catalog->get('admin.ui.open.deliveries.view.action_value'))], tipBlockquote: $this->catalog->get('admin.ui.open.deliveries.view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_DELIVERY_DO)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
     }
 
     private function openAdminGroupOpsView(int $chatId, int $userId, ?string $notice = null): void
@@ -4061,7 +4058,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $groupId = trim($this->settings->get('group_id', ''));
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.groupops.title', ['emoji' => $this->catalog->get('emojis.folder')]), lines: [new UiTextLine($this->catalog->get('emojis.puzzle'), $this->catalog->get('admin.ui.open.groupops.group_id_label'), $groupId !== '' ? "<code>{$groupId}</code>" : $this->catalog->get('admin.ui.open.groupops.group_id_unset'))], tipBlockquote: $this->catalog->get('admin.ui.open.groupops.tip', ['emoji' => $this->catalog->get('emojis.info')]))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_GROUPOPS_SET_GROUP), $this->uiConst(self::ADMIN_GROUPOPS_RESTORE)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.groupops.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.groupops.group_id_label'), $groupId !== '' ? "<code>{$groupId}</code>" : $this->catalog->get('admin.ui.open.groupops.group_id_unset'))], tipBlockquote: $this->catalog->get('admin.ui.open.groupops.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_GROUPOPS_SET_GROUP), $this->uiConst(self::ADMIN_GROUPOPS_RESTORE)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
     }
 
     private function openAdminFreeTestMenu(int $chatId, int $userId, ?string $notice = null): void
@@ -4074,7 +4071,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.freetest.title'), lines: [new UiTextLine($this->catalog->get('admin.ui.freetest.rules_emoji'), $this->catalog->get('admin.ui.freetest.rules_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.freetest.rules_empty'))], tipBlockquote: $this->catalog->get('admin.ui.freetest.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_FREETEST_RULE), $this->uiConst(self::ADMIN_FREETEST_RESET)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.freetest.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.freetest.rules_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.freetest.rules_empty'))], tipBlockquote: $this->catalog->get('admin.ui.freetest.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_FREETEST_RULE), $this->uiConst(self::ADMIN_FREETEST_RESET)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
     }
 
     private function handleBuyTypeSelectionState(int $chatId, int $userId, string $text, array $state): void
@@ -4135,7 +4132,7 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('messages.user.buy.package_selection.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('messages.user.buy.package_selection.label'), implode("\n", $lines)),
+                    new UiTextLine('', $this->catalog->get('messages.user.buy.package_selection.label'), implode("\n", $lines)),
                 ],
                 tipBlockquote: $this->catalog->get('messages.user.buy.package_selection.tip'),
             )),
@@ -4172,7 +4169,7 @@ final class MessageHandler
                 $this->uiText->multi(new UiTextBlock(
                     title: $this->catalog->get('messages.user.buy.rules.title'),
                     lines: [
-                        new UiTextLine($this->catalog->get('emojis.note'), $this->catalog->get('messages.user.buy.rules.label'), htmlspecialchars($rulesText)),
+                        new UiTextLine('', $this->catalog->get('messages.user.buy.rules.label'), htmlspecialchars($rulesText)),
                     ],
                     tipBlockquote: $this->catalog->get('messages.user.buy.rules.tip'),
                 )),
@@ -4190,8 +4187,8 @@ final class MessageHandler
         $textOut = $this->uiText->multi(new UiTextBlock(
             title: $this->catalog->get('messages.user.buy.payment.title'),
             lines: [
-                new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
-                new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
+                new UiTextLine('', $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
+                new UiTextLine('', $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
             ],
             tipBlockquote: $this->catalog->get('messages.user.buy.payment.tip'),
         ));
@@ -4251,7 +4248,7 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('messages.user.renew.select_order.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('messages.user.renew.select_order.label'), implode("\n", $lines)),
+                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_order.label'), implode("\n", $lines)),
                 ],
                 tipBlockquote: $this->catalog->get('messages.user.renew.select_order.tip'),
             )),
@@ -4319,10 +4316,10 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('messages.user.renew.select_package.title'),
                 lines: [
-                    new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('messages.user.renew.select_package.order_label'), "<code>#{$purchaseId}</code>"),
-                    new UiTextLine($this->catalog->get('emojis.antenna'), $this->catalog->get('messages.user.renew.select_package.current_service_label'), '<b>' . htmlspecialchars((string) ($purchase['service_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
-                    new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('messages.user.renew.select_package.current_package_label'), '<b>' . htmlspecialchars((string) ($purchase['package_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
-                    new UiTextLine($this->catalog->get('emojis.list'), $this->catalog->get('messages.user.renew.select_package.options_label'), implode("\n", $lines)),
+                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.order_label'), "<code>#{$purchaseId}</code>"),
+                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.current_service_label'), '<b>' . htmlspecialchars((string) ($purchase['service_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
+                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.current_package_label'), '<b>' . htmlspecialchars((string) ($purchase['package_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
+                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.options_label'), implode("\n", $lines)),
                 ],
                 tipBlockquote: $this->catalog->get('messages.user.renew.select_package.tip'),
             )),
@@ -4362,9 +4359,9 @@ final class MessageHandler
         $textOut = $this->uiText->multi(new UiTextBlock(
             title: $this->catalog->get('messages.user.renew.payment.title'),
             lines: [
-                new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('messages.user.renew.payment.order_label'), "<code>#{$purchaseId}</code>"),
-                new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('messages.user.renew.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
-                new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('messages.user.renew.payment.amount_label'), $this->catalog->get('messages.user.renew.payment.amount_value', ['amount' => (int) $package['price']])),
+                new UiTextLine('', $this->catalog->get('messages.user.renew.payment.order_label'), "<code>#{$purchaseId}</code>"),
+                new UiTextLine('', $this->catalog->get('messages.user.renew.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
+                new UiTextLine('', $this->catalog->get('messages.user.renew.payment.amount_label'), $this->catalog->get('messages.user.renew.payment.amount_value', ['amount' => (int) $package['price']])),
             ],
             tipBlockquote: $this->catalog->get('messages.user.renew.payment.tip'),
         ));
@@ -4882,8 +4879,8 @@ final class MessageHandler
         $textOut = $this->uiText->multi(new UiTextBlock(
             title: $this->catalog->get('messages.user.buy.payment.title'),
             lines: [
-                new UiTextLine($this->catalog->get('emojis.package'), $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
-                new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
+                new UiTextLine('', $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
+                new UiTextLine('', $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
             ],
             tipBlockquote: $this->catalog->get('messages.user.buy.payment.tip'),
         ));
@@ -4980,7 +4977,7 @@ final class MessageHandler
 
     private function channelLockText(): string
     {
-        return $this->catalog->get('messages.channel.lock_simple', ['emoji' => $this->catalog->get('emojis.lock')]);
+        return $this->catalog->get('messages.channel.lock_simple');
     }
 
     private function channelLockKeyboard(): array

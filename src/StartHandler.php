@@ -54,7 +54,7 @@ final class StartHandler
         if ($botStatus === 'update') {
             $this->telegram->sendMessage(
                 $chatId,
-                $this->catalog->get('messages.start.bot_updating', ['emoji' => $this->catalog->get('emojis.sync')])
+                $this->catalog->get('messages.start.bot_updating')
             );
 
             return;
@@ -63,7 +63,7 @@ final class StartHandler
         if ($this->database->userStatus($userId) === 'restricted') {
             $this->telegram->sendMessage(
                 $chatId,
-                $this->catalog->get('messages.start.access_restricted', ['emoji' => $this->catalog->get('emojis.ban')])
+                $this->catalog->get('messages.start.access_restricted')
             );
 
             return;
@@ -101,7 +101,7 @@ final class StartHandler
 
     private function channelLockText(): string
     {
-        return $this->catalog->get('messages.channel.lock_simple', ['emoji' => $this->catalog->get('emojis.lock')]);
+        return $this->catalog->get('messages.channel.lock_simple');
     }
 
     private function channelLockKeyboard(): array
