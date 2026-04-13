@@ -1653,12 +1653,18 @@ final class CallbackHandler
             if (count($lines) === 2) {
                 $lines[] = "• قانونی ثبت نشده است.";
             }
-            $rows = [
-                [['text' => '➕ افزودن/ویرایش قانون', 'callback_data' => 'admin:free_test:rule:add']],
-                [['text' => '♻️ ریست سهمیه کاربر', 'callback_data' => 'admin:free_test:quota:reset']],
-                [['text' => '🔙 بازگشت', 'callback_data' => 'admin:settings']],
-            ];
-            $this->telegram->editMessageText($chatId, $messageId, implode("\n", $lines), ['inline_keyboard' => $rows]);
+            $this->telegram->sendMessage(
+                $chatId,
+                implode("\n", $lines),
+                [
+                    'keyboard' => [
+                        ['➕ افزودن/ویرایش قانون', '♻️ ریست سهمیه کاربر'],
+                        [KeyboardBuilder::BTN_BACK_MAIN],
+                    ],
+                    'resize_keyboard' => true,
+                    'is_persistent' => true,
+                ]
+            );
             $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
@@ -1669,15 +1675,12 @@ final class CallbackHandler
                 return;
             }
             $this->database->setUserState($userId, 'await_admin_free_test_rule');
-            $this->telegram->editMessageText(
+            $this->telegram->sendMessage(
                 $chatId,
-                $messageId,
                 "🧪 <b>قانون تست رایگان</b>\n\n"
                 . "فرمت را ارسال کنید:\n<code>package_id|max_claims|cooldown_days</code>\n\n"
                 . "نمونه یک‌بار: <code>12|1|0</code>\n"
-                . "نمونه هر 30 روز: <code>12|0|30</code>",
-                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:free_test:menu']]]
-                ]
+                . "نمونه هر 30 روز: <code>12|0|30</code>"
             );
             $this->telegram->answerCallbackQuery($callbackId);
             return;
@@ -1689,12 +1692,9 @@ final class CallbackHandler
                 return;
             }
             $this->database->setUserState($userId, 'await_admin_free_test_reset_user');
-            $this->telegram->editMessageText(
+            $this->telegram->sendMessage(
                 $chatId,
-                $messageId,
-                "♻️ آیدی عددی کاربر را ارسال کنید تا سهمیه تست او ریست شود:",
-                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:free_test:menu']]]
-                ]
+                "♻️ آیدی عددی کاربر را ارسال کنید تا سهمیه تست او ریست شود:"
             );
             $this->telegram->answerCallbackQuery($callbackId);
             return;
