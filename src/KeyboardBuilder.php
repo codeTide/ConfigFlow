@@ -97,13 +97,11 @@ final class KeyboardBuilder
 
     public static function referral(string $shareUrl): array
     {
-        $rows = [];
         if ($shareUrl !== '') {
-            $rows[] = [['text' => '📤 اشتراک‌گذاری لینک دعوت', 'url' => $shareUrl]];
+            return ['inline_keyboard' => [[['text' => '📤 اشتراک‌گذاری لینک دعوت', 'url' => $shareUrl]]]];
         }
-        $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']];
 
-        return ['inline_keyboard' => $rows];
+        return [];
     }
 
     public static function adminPanel(): array

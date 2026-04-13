@@ -153,15 +153,18 @@ final class MenuService
         $stats = $this->database->referralStats($userId);
         $botUsername = Config::botUsername();
         $refLink = $botUsername !== '' ? "https://t.me/{$botUsername}?start=ref_{$userId}" : "ref_{$userId}";
+        $totalReferralsFa = $this->toPersianDigits((string) ($stats['total_referrals'] ?? 0));
+        $purchaseCountFa = $this->toPersianDigits((string) ($stats['purchase_count'] ?? 0));
+        $totalPurchaseAmountFa = $this->toPersianDigits((string) ($stats['total_purchase_amount'] ?? 0));
 
         $banner = trim($this->settings->get('referral_banner_text', ''));
         $intro = $banner !== '' ? $banner . "\n\n" : "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>\n\n";
 
         return $intro
-            . "📊 زیرمجموعه‌ها: <b>{$stats['total_referrals']}</b>\n"
-            . "🛒 خریدهای زیرمجموعه: <b>{$stats['purchase_count']}</b>\n"
-            . "💵 مجموع خرید زیرمجموعه: <b>{$stats['total_purchase_amount']}</b> تومان\n\n"
-            . "🔗 لینک دعوت شما:\n<code>{$refLink}</code>";
+            . "📊 زیرمجموعه‌ها: <b>{$totalReferralsFa}</b>\n"
+            . "🛒 خریدهای زیرمجموعه: <b>{$purchaseCountFa}</b>\n"
+            . "💵 مجموع خرید زیرمجموعه: <b>{$totalPurchaseAmountFa}</b> تومان\n\n"
+            . "🔗 لینک دعوت شما:\n\n<code>{$refLink}</code>";
     }
 
     public function referralShareUrl(int $userId): string
