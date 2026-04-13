@@ -53,81 +53,54 @@
     "error": "❌",
     "warning": "⚠️",
     "info": "💡",
-    "sparkles": "✨",
     "compass": "🧭",
-    "profile": "👤",
-    "phone": "📱",
-    "tag": "👤",
-    "id": "🔢",
-    "money": "💰",
     "support_id": "👤",
-    "web": "🌐",
-    "note": "📝",
-    "folder": "🗂",
-    "chart": "📊",
     "cart": "🛒",
-    "cash": "💵",
-    "link": "🔗",
-    "briefcase": "💼",
-    "lock": "🔒",
-    "megaphone": "📣",
-    "private_channel": "📣",
-    "sync": "🔄",
-    "ban": "🚫",
-    "admin_panel": "⚙️",
-    "shield": "🔐",
-    "gift": "🎁",
-    "puzzle": "🧩",
-    "list": "📋",
-    "package": "📦",
-    "receipt": "🧾",
-    "antenna": "📡",
-    "write": "✍️",
-    "search": "🔎"
+    "package": "📦"
   },
   "menus": {
     "main": {
-      "title": "{emoji} <b>به فروشگاه ConfigFlow خوش آمدید!</b>",
+      "title": "✨ <b>به فروشگاه ConfigFlow خوش آمدید!</b>",
       "guide_label": "راهنما",
       "guide_value": "از منوی زیر بخش مورد نظر خود را انتخاب کنید.",
       "tip": "💡 اگر اولین بار است وارد ربات می‌شوید، ابتدا بخش حساب را باز کنید تا وضعیت موجودی و امکانات فعال خود را ببینید."
     },
     "admin": {
-      "title": "{emoji} <b>پنل مدیریت</b>",
+      "title": "⚙️ <b>پنل مدیریت</b>",
       "guide_label": "راهنما",
       "guide_value": "از دکمه‌های زیر بخش مدیریتی موردنظر را انتخاب کنید.",
       "tip": "💡 هر زمان نیاز داشتید می‌توانید با دکمه‌های بازگشت، انصراف یا منوی اصلی مسیر را کنترل کنید تا عملیات مدیریتی اشتباه ثبت نشود."
     },
     "profile": {
-      "title": "{emoji} <b>پروفایل کاربری</b>",
-      "name_label": "نام",
-      "username_label": "نام کاربری",
-      "user_id_label": "آیدی",
-      "balance_label": "موجودی",
+      "title": "👤 <b>پروفایل کاربری</b>",
+      "name_label": "📱 نام",
+      "username_label": "👤 نام کاربری",
+      "user_id_label": "🔢 آیدی",
+      "balance_label": "💰 موجودی",
       "balance_value": "<b>{amount}</b> تومان",
       "tip": "🔐 اطلاعات حساب شما امن است؛ برای شارژ، دعوت دوستان یا ثبت نمایندگی فقط از دکمه‌های همین بخش استفاده کنید."
     },
     "support": {
       "title": "🎧 <b>ارتباط با پشتیبانی</b>",
       "support_id_label": "آیدی پشتیبانی",
-      "support_link_label": "لینک پشتیبانی",
-      "support_link_desc_label": "توضیح لینک",
+      "support_link_label": "🌐 لینک پشتیبانی",
+      "support_link_desc_label": "📝 توضیح لینک",
       "tip": "💡 برای بررسی سریع‌تر، مشکل را همراه با جزئیات مرحله، خطا یا شناسه سفارش ارسال کنید تا تیم پشتیبانی دقیق‌تر راهنمایی کند."
     },
     "my_configs": {
       "title": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>",
-      "latest_orders_label": "آخرین سفارش‌ها",
+      "latest_orders_label": "🗂 آخرین سفارش‌ها",
       "order_row": "• #{id} | {package} | {service} | {amount} تومان{test_suffix}\n  ⏱ {created_at}",
       "test_suffix": " (تست)",
       "tip": "💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند."
     },
     "referral": {
       "default_intro": "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>",
-      "total_referrals_label": "زیرمجموعه‌ها",
-      "purchase_count_label": "خریدهای زیرمجموعه",
-      "total_purchase_amount_label": "مجموع خرید زیرمجموعه",
+      "total_referrals_label": "📊 زیرمجموعه‌ها",
+      "purchase_count_label": "🛒 خریدهای زیرمجموعه",
+      "total_purchase_amount_label": "💵 مجموع خرید زیرمجموعه",
       "total_purchase_amount_value": "<b>{amount}</b> تومان",
-      "invite_link_label": "لینک دعوت",
+      "invite_link_label": "🔗 لینک دعوت",
       "tip": "💡 لینک دعوت را فقط برای مخاطب واقعی بفرستید؛ ثبت‌نام و خرید زیرمجموعه‌ها خودکار در آمار شما ثبت می‌شود.",
       "share_text": "از لینک من وارد شو:\n{ref_link}"
     }
@@ -138,17 +111,17 @@
       "dash": "-"
     },
     "start": {
-      "bot_updating": "{emoji} <b>ربات در حال بروزرسانی است</b>\n\nفعلاً ربات در حال بروزرسانی می‌باشد، لطفاً بعداً اقدام نمایید.",
-      "access_restricted": "{emoji} <b>دسترسی محدود شده</b>\n\nشما از ربات محدود شده‌اید و نمی‌توانید از آن استفاده کنید."
+      "bot_updating": "🔄 <b>ربات در حال بروزرسانی است</b>\n\nفعلاً ربات در حال بروزرسانی می‌باشد، لطفاً بعداً اقدام نمایید.",
+      "access_restricted": "🚫 <b>دسترسی محدود شده</b>\n\nشما از ربات محدود شده‌اید و نمی‌توانید از آن استفاده کنید."
     },
     "channel": {
       "after_join_prompt": "بعد از عضویت، از دکمه معمولی زیر استفاده کنید:",
-      "lock_simple": "{emoji} برای استفاده از ربات، ابتدا باید در کانال ما عضو شوید.\n\nپس از عضویت، روی «عضو شدم» بزنید.",
+      "lock_simple": "🔒 برای استفاده از ربات، ابتدا باید در کانال ما عضو شوید.\n\nپس از عضویت، روی «عضو شدم» بزنید.",
       "lock_title_default": "کانال اطلاع‌رسانی",
       "private": "کانال خصوصی",
-      "mention_line": "{emoji} {mention}",
-      "private_line": "{emoji} {label}",
-      "lock_detailed": "{emoji} <b>عضویت اجباری</b>\n\nبرای استفاده از ربات، ابتدا عضو کانال زیر شوید:\n• <b>{title}</b>\n{line2}\n\nپس از عضویت، روی «✅ عضو شدم» بزنید.",
+      "mention_line": "📣 {mention}",
+      "private_line": "📣 {label}",
+      "lock_detailed": "🔒 <b>عضویت اجباری</b>\n\nبرای استفاده از ربات، ابتدا عضو کانال زیر شوید:\n• <b>{title}</b>\n{line2}\n\nپس از عضویت، روی «✅ عضو شدم» بزنید.",
       "membership_confirmed": "✅ عضویت تأیید شد!",
       "membership_missing": "❌ هنوز عضو کانال نشده‌اید."
     },
@@ -162,23 +135,23 @@
     },
     "user": {
       "wallet": {
-        "enter_amount": "{emoji} لطفاً مبلغ موردنظر را به تومان ارسال کنید:",
+        "enter_amount": "💵 لطفاً مبلغ موردنظر را به تومان ارسال کنید:",
         "invalid_amount": "مبلغ وارد شده معتبر نیست. لطفاً فقط عدد صحیح وارد کنید.",
         "request_submitted": "✅ درخواست شارژ کیف پول ثبت شد.\n\nشماره درخواست: <code>{payment_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nبعد از تایید ادمین موجودی شما شارژ می‌شود."
       },
       "free_test": {
-        "not_available": "{emoji} فعلاً تست آماده نداریم یا سهمیه‌تان پر شده است.",
+        "not_available": "⚠️ فعلاً تست آماده نداریم یا سهمیه‌تان پر شده است.",
         "default_service": "سرویس تست",
-        "ready": "{emoji} <b>تست رایگان شما آماده است</b>\n\n📦 سرویس: <b>{service_name}</b>\n🧪 نوع سفارش: <b>تست رایگان</b>\n\n🔗 کانفیگ شما:\n<code>{config_text}</code>",
+        "ready": "🎁 <b>تست رایگان شما آماده است</b>\n\n📦 سرویس: <b>{service_name}</b>\n🧪 نوع سفارش: <b>تست رایگان</b>\n\n🔗 کانفیگ شما:\n<code>{config_text}</code>",
         "inquiry": "🌐 لینک استعلام:\n{inquiry_link}",
-        "note_as_text": "{emoji} لطفاً متن توضیح ارسال کنید، نه دکمه‌های منو.",
-        "note_required": "{emoji} لطفاً توضیح کوتاه تست را ارسال کنید.",
+        "note_as_text": "⚠️ لطفاً متن توضیح ارسال کنید، نه دکمه‌های منو.",
+        "note_required": "⚠️ لطفاً توضیح کوتاه تست را ارسال کنید.",
         "request_submitted": "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید.\nشناسه درخواست: <code>{request_id}</code>"
       },
       "agency": {
         "request_intro": "🤝 <b>درخواست نمایندگی</b>\n\nلطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید:\nپیام شما برای تیم ادمین ثبت می‌شود.",
-        "note_as_text": "{emoji} لطفاً متن درخواست نمایندگی را تایپ کنید، نه دکمه‌های منو.",
-        "note_required": "{emoji} لطفاً متن درخواست نمایندگی را ارسال کنید.",
+        "note_as_text": "⚠️ لطفاً متن درخواست نمایندگی را تایپ کنید، نه دکمه‌های منو.",
+        "note_required": "⚠️ لطفاً متن درخواست نمایندگی را ارسال کنید.",
         "request_submitted": "✅ درخواست نمایندگی ثبت شد و برای بررسی ادمین ارسال گردید.\nشناسه درخواست: <code>{request_id}</code>"
       },
       "common": {
@@ -194,26 +167,26 @@
         "package_not_found": "پکیج پیدا نشد.",
         "type_selection": {
           "title": "🛒 <b>خرید کانفیگ</b>",
-          "label": "انتخاب نوع سرویس",
+          "label": "🧩 انتخاب نوع سرویس",
           "tip": "💡 ابتدا نوع سرویس را انتخاب کنید؛ در مرحله بعد لیست پکیج‌های همان نوع نمایش داده می‌شود و می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را مدیریت کنید."
         },
         "package_selection": {
           "title": "📦 <b>انتخاب پکیج</b>",
-          "label": "لیست پکیج‌ها",
+          "label": "📋 لیست پکیج‌ها",
           "tip": "💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید نوع سرویس را دوباره تغییر دهید."
         },
         "rules": {
           "default_text": "لطفاً قوانین خرید را بپذیرید.",
           "title": "📜 <b>قوانین خرید</b>",
-          "label": "متن قوانین",
+          "label": "📝 متن قوانین",
           "tip": "⚠️ با تایید قوانین، خرید شما وارد مرحله انتخاب روش پرداخت می‌شود؛ اگر نیاز به تغییر پکیج دارید از دکمه بازگشت استفاده کنید تا انتخاب قبلی را اصلاح کنید.",
           "must_accept": "لطفاً گزینه تایید قوانین را انتخاب کنید.",
           "need_accept_first": "ابتدا قوانین خرید را بپذیرید."
         },
         "payment": {
           "title": "💰 <b>پرداخت سفارش</b>",
-          "package_label": "پکیج",
-          "price_label": "قیمت",
+          "package_label": "📦 پکیج",
+          "price_label": "💵 قیمت",
           "price_value": "<b>{amount}</b> تومان",
           "tip": "💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود."
         },
@@ -224,7 +197,7 @@
         "option_button": "♻️ تمدید {num}",
         "select_order": {
           "title": "♻️ <b>تمدید سرویس</b>",
-          "label": "لیست سفارش‌ها",
+          "label": "📋 لیست سفارش‌ها",
           "tip": "💡 برای تمدید، شماره سفارش موردنظر را از دکمه‌ها انتخاب کنید؛ در ادامه پکیج‌های تمدید همان سرویس نمایش داده می‌شود و می‌توانید مسیر را با بازگشت مدیریت کنید."
         },
         "order_not_found": "سفارش پیدا نشد.",
@@ -234,17 +207,17 @@
         "invalid_data": "داده تمدید معتبر نیست.",
         "select_package": {
           "title": "♻️ <b>انتخاب پکیج تمدید</b>",
-          "order_label": "سفارش",
-          "current_service_label": "سرویس فعلی",
-          "current_package_label": "پکیج فعلی",
-          "options_label": "گزینه‌های تمدید",
+          "order_label": "🧾 سفارش",
+          "current_service_label": "📡 سرویس فعلی",
+          "current_package_label": "📦 پکیج فعلی",
+          "options_label": "📋 گزینه‌های تمدید",
           "tip": "💡 پکیج تمدید باید با سرویس فعلی شما سازگار باشد؛ اگر انتخاب را اشتباه انجام دادید با بازگشت به لیست سفارش‌ها برگردید و گزینه درست را انتخاب کنید."
         },
         "payment": {
           "title": "💳 <b>پرداخت تمدید</b>",
-          "order_label": "سفارش",
-          "package_label": "پکیج تمدید",
-          "amount_label": "مبلغ",
+          "order_label": "🧾 سفارش",
+          "package_label": "📦 پکیج تمدید",
+          "amount_label": "💵 مبلغ",
           "amount_value": "<b>{amount}</b> تومان",
           "tip": "💡 روش پرداخت مناسب را انتخاب کنید؛ بعد از تکمیل پرداخت، وضعیت تراکنش را بررسی کنید تا درخواست تمدید در صف تحویل قرار بگیرد."
         },
@@ -299,15 +272,15 @@
         "gateway_intro_tip": "💡 بعد از تکمیل پرداخت، وضعیت تراکنش را از طریق دکمه بررسی پرداخت پیگیری کنید تا سرویس شما سریع‌تر نهایی شود.",
         "verify_prompt": "برای بررسی پرداخت از دکمه زیر استفاده کنید.",
         "receipt": {
-          "missing_purchase": "{emoji} لطفاً رسید را به‌صورت عکس/فایل یا متن ارسال کنید.",
+          "missing_purchase": "⚠️ لطفاً رسید را به‌صورت عکس/فایل یا متن ارسال کنید.",
           "saved_purchase": "✅ رسید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>",
-          "missing_renew": "{emoji} لطفاً رسید تمدید را به‌صورت عکس/فایل یا متن ارسال کنید.",
+          "missing_renew": "⚠️ لطفاً رسید تمدید را به‌صورت عکس/فایل یا متن ارسال کنید.",
           "saved_renew": "✅ رسید تمدید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>"
         },
         "tx": {
-          "invalid": "{emoji} لطفاً TX Hash معتبر ارسال کنید.",
-          "invalid_length": "{emoji} طول TX Hash معتبر نیست.",
-          "submit_failed": "{emoji} ثبت TX Hash انجام نشد. لطفاً دوباره تلاش کنید.",
+          "invalid": "⚠️ لطفاً TX Hash معتبر ارسال کنید.",
+          "invalid_length": "⚠️ طول TX Hash معتبر نیست.",
+          "submit_failed": "❌ ثبت TX Hash انجام نشد. لطفاً دوباره تلاش کنید.",
           "saved_purchase": "✅ TX Hash ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>",
           "saved_renew": "✅ TX Hash تمدید ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>"
         }
@@ -317,8 +290,8 @@
   "payments": {
     "created": {
       "title": "💳 <b>{title}</b>",
-      "id_label": "شناسه سفارش",
-      "amount_label": "مبلغ",
+      "id_label": "🧾 شناسه سفارش",
+      "amount_label": "💰 مبلغ",
       "amount_value": "<b>{amount}</b> تومان"
     }
   },
@@ -437,32 +410,32 @@
     },
     "payments_requests": {
       "actions": {
-        "payments_refresh": "{emoji} بروزرسانی پرداخت‌ها",
-        "payment_verify_chain": "{emoji} بررسی on-chain",
-        "payment_approve": "{emoji} تایید پرداخت",
-        "payment_reject": "{emoji} رد پرداخت",
-        "requests_free": "{emoji} درخواست‌های تست رایگان",
-        "requests_agency": "{emoji} درخواست‌های نمایندگی",
-        "requests_pending": "{emoji} pending",
-        "requests_approved": "{emoji} approved",
-        "requests_rejected": "{emoji} rejected",
-        "request_approve": "{emoji} تایید درخواست",
-        "request_reject": "{emoji} رد درخواست"
+        "payments_refresh": "🔄 بروزرسانی پرداخت‌ها",
+        "payment_verify_chain": "🧭 بررسی on-chain",
+        "payment_approve": "✅ تایید پرداخت",
+        "payment_reject": "❌ رد پرداخت",
+        "requests_free": "🎁 درخواست‌های تست رایگان",
+        "requests_agency": "💼 درخواست‌های نمایندگی",
+        "requests_pending": "⚠️ pending",
+        "requests_approved": "✅ approved",
+        "requests_rejected": "❌ rejected",
+        "request_approve": "✅ تایید درخواست",
+        "request_reject": "❌ رد درخواست"
       },
       "labels": {
         "action_approve": "تایید",
         "action_reject": "رد",
         "request_free": "درخواست تست رایگان",
         "request_agency": "درخواست نمایندگی",
-        "status_approved": "{emoji} تایید شد",
-        "status_rejected": "{emoji} رد شد"
+        "status_approved": "✅ تایید شد",
+        "status_rejected": "❌ رد شد"
       },
       "prompts": {
-        "request_review_note_title": "{emoji} <b>ثبت یادداشت {action_text}</b>",
-        "request_id_label": "شناسه درخواست",
-        "note_label": "یادداشت",
+        "request_review_note_title": "📝 <b>ثبت یادداشت {action_text}</b>",
+        "request_id_label": "👤 شناسه درخواست",
+        "note_label": "✍️ یادداشت",
         "note_value": "یادداشت ادمین را ارسال کنید. اگر یادداشت ندارید، «-» بفرستید.",
-        "note_tip": "{emoji} یادداشت به کاربر ارسال می‌شود؛ کوتاه و واضح بنویسید."
+        "note_tip": "💡 یادداشت به کاربر ارسال می‌شود؛ کوتاه و واضح بنویسید."
       },
       "errors": {
         "invalid_payment_option": "گزینه نامعتبر است. یکی از پرداخت‌ها را انتخاب کنید.",
@@ -481,48 +454,48 @@
         "request_reviewed": "{request_label} <code>{request_id}</code> {status_text}."
       },
       "user_notice": {
-        "free_approved": "{emoji} درخواست تست رایگان شما تایید شد.",
-        "agency_approved": "{emoji} درخواست نمایندگی شما تایید شد.",
-        "free_rejected": "{emoji} درخواست تست رایگان شما رد شد.",
-        "agency_rejected": "{emoji} درخواست نمایندگی شما رد شد.",
-        "admin_note": "\n\n{emoji} توضیح ادمین:\n{note}"
+        "free_approved": "✅ درخواست تست رایگان شما تایید شد.",
+        "agency_approved": "✅ درخواست نمایندگی شما تایید شد.",
+        "free_rejected": "❌ درخواست تست رایگان شما رد شد.",
+        "agency_rejected": "❌ درخواست نمایندگی شما رد شد.",
+        "admin_note": "\n\n📝 توضیح ادمین:\n{note}"
       }
     },
     "settings_admins_pins": {
       "actions": {
-        "settings_refresh": "{emoji} بروزرسانی",
-        "settings_toggle_bot": "{emoji} وضعیت ربات",
-        "settings_toggle_free_test": "{emoji} تست رایگان",
-        "settings_toggle_agency": "{emoji} نمایندگی",
-        "settings_toggle_gw_card": "{emoji} کارت‌به‌کارت",
-        "settings_toggle_gw_crypto": "{emoji} کریپتو",
-        "settings_toggle_gw_tetra": "{emoji} درگاه TetraPay",
-        "settings_set_channel": "{emoji} کانال قفل",
-        "settings_edit": "{emoji} ویرایش دستی",
-        "admins_add": "{emoji} افزودن ادمین",
-        "admin_delete": "{emoji} حذف ادمین",
-        "pins_add": "{emoji} افزودن پیام پین",
-        "pin_edit": "{emoji} ویرایش پیام پین",
-        "pin_delete": "{emoji} حذف پیام پین",
-        "pin_send_all": "{emoji} ارسال و پین همگانی"
+        "settings_refresh": "🔄 بروزرسانی",
+        "settings_toggle_bot": "⚙️ وضعیت ربات",
+        "settings_toggle_free_test": "🎁 تست رایگان",
+        "settings_toggle_agency": "💼 نمایندگی",
+        "settings_toggle_gw_card": "💵 کارت‌به‌کارت",
+        "settings_toggle_gw_crypto": "🎁 کریپتو",
+        "settings_toggle_gw_tetra": "💰 درگاه TetraPay",
+        "settings_set_channel": "📣 کانال قفل",
+        "settings_edit": "✍️ ویرایش دستی",
+        "admins_add": "✅ افزودن ادمین",
+        "admin_delete": "❌ حذف ادمین",
+        "pins_add": "✅ افزودن پیام پین",
+        "pin_edit": "✍️ ویرایش پیام پین",
+        "pin_delete": "❌ حذف پیام پین",
+        "pin_send_all": "📣 ارسال و پین همگانی"
       },
       "keywords": {
         "delete_confirm": "حذف",
         "send_confirm": "ارسال"
       },
       "prompts": {
-        "set_channel_title": "{emoji} <b>تنظیم کانال قفل</b>",
-        "input_label": "ورودی",
+        "set_channel_title": "📣 <b>تنظیم کانال قفل</b>",
+        "input_label": "🧾 ورودی",
         "set_channel_input_value": "آیدی کانال را بفرستید (@channel یا -100...). برای غیرفعال‌سازی «-» ارسال کنید.",
-        "set_channel_tip": "{emoji} کانال قفل روی شروع کاربرها اثر مستقیم دارد؛ مقدار را دقیق ثبت کنید.",
-        "edit_setting_title": "{emoji} <b>ویرایش دستی تنظیم</b>",
-        "format_label": "فرمت",
+        "set_channel_tip": "💡 کانال قفل روی شروع کاربرها اثر مستقیم دارد؛ مقدار را دقیق ثبت کنید.",
+        "edit_setting_title": "✍️ <b>ویرایش دستی تنظیم</b>",
+        "format_label": "🧾 فرمت",
         "edit_setting_format_value": "<code>key|value</code>",
-        "edit_setting_tip": "{emoji} برای کلیدهای حساس مقدار معتبر وارد کنید.",
-        "add_admin_title": "{emoji} <b>افزودن ادمین</b>",
-        "guide_label": "راهنما",
+        "edit_setting_tip": "💡 برای کلیدهای حساس مقدار معتبر وارد کنید.",
+        "add_admin_title": "✅ <b>افزودن ادمین</b>",
+        "guide_label": "👤 راهنما",
         "add_admin_guide_value": "آیدی عددی ادمین جدید را ارسال کنید.",
-        "add_admin_tip": "{emoji} سطح دسترسی اولیه با سطح‌های پایه ایجاد می‌شود و قابل ویرایش است.",
+        "add_admin_tip": "💡 سطح دسترسی اولیه با سطح‌های پایه ایجاد می‌شود و قابل ویرایش است.",
         "admin_delete_confirm": "برای حذف ادمین <code>{target_uid}</code>، عبارت «{confirm_word}» را ارسال کنید.",
         "pin_text_send": "متن پیام پین را ارسال کنید.",
         "pin_new_text_send": "متن جدید پیام پین را ارسال کنید.",
@@ -559,22 +532,22 @@
     },
     "final_modules": {
       "actions": {
-        "agents_refresh": "{emoji} بروزرسانی نماینده‌ها",
-        "panels_add": "{emoji} افزودن پنل",
-        "panel_toggle": "{emoji} تغییر وضعیت پنل",
-        "panel_delete": "{emoji} حذف پنل",
-        "panel_pkg_add": "{emoji} افزودن پکیج پنل",
-        "broadcast_scope_all": "{emoji} همه",
-        "broadcast_scope_users": "{emoji} کاربران",
-        "broadcast_scope_agents": "{emoji} نماینده‌ها",
-        "broadcast_scope_admins": "{emoji} ادمین‌ها",
-        "broadcast_send": "{emoji} ارسال همگانی",
-        "deliveries_refresh": "{emoji} بروزرسانی تحویل‌ها",
-        "delivery_do": "{emoji} تحویل سفارش",
-        "groupops_set_group": "{emoji} تنظیم Group ID",
-        "groupops_restore": "{emoji} بازیابی تنظیمات",
-        "freetest_rule": "{emoji} قانون تست رایگان",
-        "freetest_reset": "{emoji} ریست سهمیه تست",
+        "agents_refresh": "🔄 بروزرسانی نماینده‌ها",
+        "panels_add": "✅ افزودن پنل",
+        "panel_toggle": "🔄 تغییر وضعیت پنل",
+        "panel_delete": "❌ حذف پنل",
+        "panel_pkg_add": "✅ افزودن پکیج پنل",
+        "broadcast_scope_all": "📋 همه",
+        "broadcast_scope_users": "👤 کاربران",
+        "broadcast_scope_agents": "💼 نماینده‌ها",
+        "broadcast_scope_admins": "🔐 ادمین‌ها",
+        "broadcast_send": "📣 ارسال همگانی",
+        "deliveries_refresh": "🔄 بروزرسانی تحویل‌ها",
+        "delivery_do": "📦 تحویل سفارش",
+        "groupops_set_group": "🗂 تنظیم Group ID",
+        "groupops_restore": "🔄 بازیابی تنظیمات",
+        "freetest_rule": "📝 قانون تست رایگان",
+        "freetest_reset": "🔄 ریست سهمیه تست",
         "agent_set_price": "💵 ثبت قیمت",
         "panels_refresh": "🔄 بروزرسانی پنل‌ها"
       },
@@ -587,9 +560,9 @@
         "panel_create_format": "فرمت پنل: name|ip|port|patch|username|password",
         "panel_delete_confirm": "برای حذف پنل #{panel_id} عبارت «{confirm_word}» را ارسال کنید.",
         "panel_pkg_create_format": "فرمت پکیج پنل: name|volume_gb|duration_days|inbound_id",
-        "broadcast_confirm_title": "{emoji} <b>تایید ارسال همگانی</b>",
-        "broadcast_preview_label": "پیش‌نمایش",
-        "broadcast_confirm_tip": "{emoji} scope را انتخاب کنید و سپس دکمه ارسال را بزنید.",
+        "broadcast_confirm_title": "📣 <b>تایید ارسال همگانی</b>",
+        "broadcast_preview_label": "📝 پیش‌نمایش",
+        "broadcast_confirm_tip": "💡 scope را انتخاب کنید و سپس دکمه ارسال را بزنید.",
         "delivery_confirm": "برای تحویل سفارش #{order_id} عبارت «{confirm_word}» را ارسال کنید.",
         "group_id_input": "Group ID را ارسال کنید (یا - برای غیرفعال‌سازی).",
         "restore_json_input": "JSON تنظیمات را ارسال کنید.",
@@ -707,13 +680,13 @@
       },
       "create_type": {
         "title": "🆕 <b>افزودن نوع سرویس</b>",
-        "guide_label": "راهنما",
+        "guide_label": "✍️ راهنما",
         "guide_value": "نام نوع سرویس جدید را ارسال کنید.",
         "tip": "💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید."
       },
       "create_package": {
         "title": "📦 <b>افزودن پکیج</b>",
-        "format_label": "فرمت",
+        "format_label": "🧾 فرمت",
         "format_value": "<code>نام|حجم(GB)|مدت(روز)|قیمت</code>",
         "tip": "💡 مثال: <code>اقتصادی|50|30|120000</code>"
       },
@@ -793,7 +766,7 @@
       "open": {
         "types_list": {
           "title": "🧩 <b>مدیریت نوع/پکیج</b>",
-          "list_label": "لیست نوع‌ها",
+          "list_label": "📋 لیست نوع‌ها",
           "empty": "هنوز نوع سرویسی ثبت نشده است.",
           "tip": "💡 یک نوع را انتخاب کنید تا پکیج‌ها و عملیات همان نوع باز شود."
         },
@@ -805,30 +778,30 @@
         },
         "type_view": {
           "title": "🧩 <b>جزئیات نوع سرویس</b>",
-          "type_label": "نوع",
-          "packages_label": "پکیج‌ها",
+          "type_label": "👤 نوع",
+          "packages_label": "📦 پکیج‌ها",
           "packages_empty": "برای این نوع هنوز پکیجی ثبت نشده است.",
           "tip": "💡 برای مدیریت هر پکیج، شماره همان پکیج را انتخاب کنید.",
           "not_found": "نوع سرویس پیدا نشد."
         },
         "package_view": {
           "title": "📦 <b>جزئیات پکیج</b>",
-          "name_label": "نام",
-          "type_label": "نوع",
+          "name_label": "👤 نام",
+          "type_label": "🧩 نوع",
           "volume_emoji": "💾",
           "volume_label": "حجم",
           "volume_value": "{volume} GB",
           "duration_emoji": "⏳",
           "duration_label": "مدت",
           "duration_value": "{days} روز",
-          "price_label": "قیمت",
+          "price_label": "💵 قیمت",
           "price_value": "{amount} تومان",
           "tip": "💡 در این صفحه می‌توانید وضعیت پکیج را تغییر دهید یا آن را حذف کنید.",
           "not_found_in_type": "پکیج پیدا نشد یا با نوع انتخابی سازگار نیست."
         },
         "panels_list": {
           "title": "🖥 <b>مدیریت پنل‌ها</b>",
-          "list_label": "پنل‌ها",
+          "list_label": "📋 پنل‌ها",
           "empty": "پنلی ثبت نشده است.",
           "tip": "💡 پنل را انتخاب کنید تا تغییرات مدیریت شود.",
           "button": "{num} - پنل {id}"
@@ -837,15 +810,15 @@
           "title": "🖥 <b>پنل #{panel_id}</b>",
           "name_emoji": "📛",
           "name_label": "نام",
-          "packages_label": "پکیج‌ها",
+          "packages_label": "📦 پکیج‌ها",
           "packages_empty": "پکیجی ثبت نشده است.",
           "tip": "💡 عملیات حساس مانند حذف پنل نیازمند تایید هستند."
         },
         "users_list": {
-          "title": "{emoji} <b>مدیریت کاربران</b>",
-          "list_label": "آخرین کاربران",
+          "title": "👤 <b>مدیریت کاربران</b>",
+          "list_label": "📋 آخرین کاربران",
           "empty": "کاربری یافت نشد.",
-          "tip": "{emoji} یکی از کاربران را انتخاب کنید تا جزئیات و عملیات مدیریتی نمایش داده شود.",
+          "tip": "💡 یکی از کاربران را انتخاب کنید تا جزئیات و عملیات مدیریتی نمایش داده شود.",
           "status_restricted_emoji": "⛔️",
           "status_active_emoji": "✅",
           "row": "{num}) {status_emoji} {name} | U:{uid} | Bal:{balance}",
@@ -858,74 +831,74 @@
             "status_symbol_ready": "🟢"
           },
           "types": {
-            "title": "{emoji} <b>موجودی کانفیگ‌ها</b>",
-            "label": "انتخاب نوع سرویس",
+            "title": "📋 <b>موجودی کانفیگ‌ها</b>",
+            "label": "🧩 انتخاب نوع سرویس",
             "empty": "نوع سرویسی برای موجودی یافت نشد.",
-            "tip": "{emoji} ابتدا نوع سرویس را انتخاب کنید تا لیست پکیج‌ها نمایش داده شود.",
+            "tip": "💡 ابتدا نوع سرویس را انتخاب کنید تا لیست پکیج‌ها نمایش داده شود.",
             "row": "{num}) {name} | ID: {type_id}",
             "button": "{num} - {name}"
           },
           "packages": {
             "invalid_type": "نوع سرویس معتبر نبود.",
-            "title": "{emoji} <b>پکیج‌های موجودی</b>",
-            "label": "لیست پکیج‌ها",
+            "title": "📦 <b>پکیج‌های موجودی</b>",
+            "label": "🧾 لیست پکیج‌ها",
             "empty": "برای این نوع پکیجی ثبت نشده است.",
-            "tip": "{emoji} با انتخاب پکیج، لیست کانفیگ‌های موجودی همان پکیج باز می‌شود.",
+            "tip": "💡 با انتخاب پکیج، لیست کانفیگ‌های موجودی همان پکیج باز می‌شود.",
             "default_name": "پکیج",
             "row": "{num}) {name} | P:{package_id} | موجود: {available}",
             "button": "{num} - {name}"
           },
           "configs": {
             "invalid_type_package": "نوع/پکیج معتبر نبود.",
-            "title": "{emoji} <b>لیست کانفیگ‌های پکیج</b>",
-            "package_label": "پکیج",
+            "title": "🗂 <b>لیست کانفیگ‌های پکیج</b>",
+            "package_label": "📦 پکیج",
             "search_emoji": "🔎",
             "search_label": "فیلتر جستجو",
-            "list_label": "کانفیگ‌ها",
+            "list_label": "📋 کانفیگ‌ها",
             "empty": "کانفیگی مطابق فیلتر پیدا نشد.",
-            "tip": "{emoji} برای جزئیات هر کانفیگ، شماره همان مورد را انتخاب کنید.",
+            "tip": "💡 برای جزئیات هر کانفیگ، شماره همان مورد را انتخاب کنید.",
             "query_none": "ندارد",
             "row": "{num}) {status} {service} | C:{config_id}",
             "option_button": "{num} - کانفیگ"
           },
           "config_detail": {
             "not_found": "کانفیگ پیدا نشد.",
-            "title": "{emoji} <b>جزئیات کانفیگ</b>",
-            "id_label": "شناسه",
-            "service_label": "سرویس",
+            "title": "🔎 <b>جزئیات کانفیگ</b>",
+            "id_label": "🔢 شناسه",
+            "service_label": "👤 سرویس",
             "status_expired": "⏳ منقضی",
             "status_sold": "🔴 فروخته‌شده",
             "status_ready": "🟢 آماده",
-            "tip": "{emoji} حذف کانفیگ غیرقابل بازگشت است."
+            "tip": "💡 حذف کانفیگ غیرقابل بازگشت است."
           }
         },
         "payments": {
           "list": {
-            "title": "{emoji} <b>مدیریت پرداخت‌ها</b>",
-            "label": "پرداخت‌های در انتظار",
+            "title": "💰 <b>مدیریت پرداخت‌ها</b>",
+            "label": "📋 پرداخت‌های در انتظار",
             "empty": "پرداختی در انتظار بررسی نیست.",
-            "tip": "{emoji} یک پرداخت را انتخاب کنید تا عملیات بررسی/تایید/رد انجام شود.",
+            "tip": "💡 یک پرداخت را انتخاب کنید تا عملیات بررسی/تایید/رد انجام شود.",
             "row": "{num}) #{payment_id} | {kind} | U:{uid} | {amount} | {method}",
             "button": "{num} - پرداخت #{payment_id}"
           },
           "view": {
             "not_found": "پرداخت پیدا نشد.",
-            "title": "{emoji} <b>جزئیات پرداخت</b>",
-            "id_label": "شناسه",
-            "user_label": "کاربر",
-            "amount_label": "مبلغ",
+            "title": "💰 <b>جزئیات پرداخت</b>",
+            "id_label": "🔢 شناسه",
+            "user_label": "👤 کاربر",
+            "amount_label": "💵 مبلغ",
             "amount_value": "{amount} تومان",
-            "method_label": "روش",
-            "tip": "{emoji} ابتدا وضعیت و روش پرداخت را بررسی کنید، سپس تایید یا رد انجام دهید."
+            "method_label": "🧾 روش",
+            "tip": "💡 ابتدا وضعیت و روش پرداخت را بررسی کنید، سپس تایید یا رد انجام دهید."
           }
         },
         "requests": {
           "root": {
-            "title": "{emoji} <b>مدیریت درخواست‌ها</b>",
+            "title": "🗂 <b>مدیریت درخواست‌ها</b>",
             "step_emoji": "📌",
             "step_label": "مرحله اول",
             "step_value": "نوع درخواست را انتخاب کنید.",
-            "tip": "{emoji} بعد از انتخاب نوع، می‌توانید وضعیت pending/approved/rejected را فیلتر کنید."
+            "tip": "💡 بعد از انتخاب نوع، می‌توانید وضعیت pending/approved/rejected را فیلتر کنید."
           },
           "list": {
             "filter_pending": "⏳ pending",
@@ -935,11 +908,11 @@
             "button": "{num} - درخواست #{request_id}",
             "kind_free": "تست رایگان",
             "kind_agency": "نمایندگی",
-            "title": "{emoji} <b>درخواست‌های {kind_title}</b>",
+            "title": "🗂 <b>درخواست‌های {kind_title}</b>",
             "status_filter_label": "فیلتر وضعیت",
-            "list_label": "لیست درخواست‌ها",
+            "list_label": "📋 لیست درخواست‌ها",
             "empty": "درخواستی برای این فیلتر یافت نشد.",
-            "tip": "{emoji} با تغییر فیلتر وضعیت می‌توانید سوابق تایید/رد را هم بررسی کنید."
+            "tip": "💡 با تغییر فیلتر وضعیت می‌توانید سوابق تایید/رد را هم بررسی کنید."
           },
           "view": {
             "not_found": "درخواست پیدا نشد.",
@@ -948,18 +921,18 @@
             "status_pending": "⏳ pending",
             "kind_free": "درخواست تست رایگان",
             "kind_agency": "درخواست نمایندگی",
-            "title": "{emoji} <b>{kind_title}</b>",
-            "id_label": "شناسه",
-            "user_label": "کاربر",
+            "title": "📝 <b>{kind_title}</b>",
+            "id_label": "🔢 شناسه",
+            "user_label": "👤 کاربر",
             "created_emoji": "🕒",
             "created_label": "زمان ثبت",
-            "note_label": "متن درخواست",
-            "tip": "{emoji} قبل از تایید یا رد، متن درخواست را کامل بررسی کنید."
+            "note_label": "🧾 متن درخواست",
+            "tip": "💡 قبل از تایید یا رد، متن درخواست را کامل بررسی کنید."
           }
         },
         "settings_admins_pins": {
           "settings": {
-            "title": "{emoji} <b>تنظیمات سریع</b>",
+            "title": "⚙️ <b>تنظیمات سریع</b>",
             "bot_status_emoji": "🤖",
             "bot_status_label": "bot_status",
             "free_test_emoji": "🎁",
@@ -975,13 +948,13 @@
             "channel_emoji": "📢",
             "channel_label": "channel_id",
             "channel_unset": "❌ تنظیم نشده",
-            "tip": "{emoji} تغییرات این صفحه فوری اعمال می‌شوند."
+            "tip": "💡 تغییرات این صفحه فوری اعمال می‌شوند."
           },
           "admins": {
-            "title": "{emoji} <b>مدیریت ادمین‌ها</b>",
-            "list_label": "لیست ادمین‌ها",
+            "title": "🔐 <b>مدیریت ادمین‌ها</b>",
+            "list_label": "📋 لیست ادمین‌ها",
             "empty": "ادمینی ثبت نشده است.",
-            "tip": "{emoji} OWNERها فقط نمایش داده می‌شوند و قابل حذف نیستند.",
+            "tip": "💡 OWNERها فقط نمایش داده می‌شوند و قابل حذف نیستند.",
             "row": "{num}) U:{uid}",
             "button": "{num} - ادمین {uid}",
             "owner_emoji": "👑",
@@ -990,67 +963,67 @@
           "admin_view": {
             "owner_locked": "این کاربر owner است و قابل ویرایش نیست.",
             "perm_row": "{status} {perm}",
-            "title": "{emoji} <b>دسترسی‌های ادمین</b>",
-            "admin_label": "ادمین",
-            "permissions_label": "دسترسی‌ها",
-            "tip": "{emoji} با لمس هر دسترسی، وضعیت آن روشن/خاموش می‌شود."
+            "title": "🔐 <b>دسترسی‌های ادمین</b>",
+            "admin_label": "🔢 ادمین",
+            "permissions_label": "🔒 دسترسی‌ها",
+            "tip": "💡 با لمس هر دسترسی، وضعیت آن روشن/خاموش می‌شود."
           },
           "pins": {
-            "title": "{emoji} <b>مدیریت پیام‌های پین</b>",
-            "list_label": "پیام‌ها",
+            "title": "📝 <b>مدیریت پیام‌های پین</b>",
+            "list_label": "📋 پیام‌ها",
             "empty": "پیامی ثبت نشده است.",
-            "tip": "{emoji} قبل از ارسال همگانی، متن پین را مرور کنید.",
+            "tip": "💡 قبل از ارسال همگانی، متن پین را مرور کنید.",
             "row": "{num}) #{pin_id} | {preview}",
             "button": "{num} - پین #{pin_id}"
           },
           "pin_view": {
             "not_found": "پیام پین پیدا نشد.",
-            "title": "{emoji} <b>پیام پین #{pin_id}</b>",
-            "text_label": "متن",
+            "title": "📝 <b>پیام پین #{pin_id}</b>",
+            "text_label": "🧾 متن",
             "sent_emoji": "📤",
             "sent_label": "ارسال‌شده",
-            "tip": "{emoji} ارسال همگانی ممکن است زمان‌بر باشد."
+            "tip": "💡 ارسال همگانی ممکن است زمان‌بر باشد."
           }
         },
         "user_view": {
           "not_found": "کاربر پیدا نشد.",
-          "title": "{emoji} <b>جزئیات کاربر</b>",
-          "user_label": "کاربر",
-          "name_label": "نام",
-          "balance_label": "موجودی",
+          "title": "👤 <b>جزئیات کاربر</b>",
+          "user_label": "🔢 کاربر",
+          "name_label": "👤 نام",
+          "balance_label": "💰 موجودی",
           "balance_value": "{amount} تومان",
-          "agent_label": "نماینده",
+          "agent_label": "💼 نماینده",
           "status_restricted": "⛔️ محدود",
           "status_active": "✅ فعال",
           "agent_yes": "✅ بله",
           "agent_no": "❌ خیر",
-          "tip": "{emoji} تغییرات وضعیت/موجودی فوری اعمال می‌شود."
+          "tip": "💡 تغییرات وضعیت/موجودی فوری اعمال می‌شود."
         },
         "deliveries": {
           "list": {
-            "title": "{emoji} <b>تحویل سفارش‌ها</b>",
-            "label": "سفارش‌های معلق",
+            "title": "📦 <b>تحویل سفارش‌ها</b>",
+            "label": "📋 سفارش‌های معلق",
             "empty": "سفارشی برای تحویل وجود ندارد.",
-            "tip": "{emoji} سفارش را انتخاب کنید و سپس تحویل را تایید کنید.",
+            "tip": "💡 سفارش را انتخاب کنید و سپس تحویل را تایید کنید.",
             "row": "{num}) #{order_id} | U:{user_id} | P:{package_id}",
             "button": "{num} - سفارش {order_id}"
           },
           "view": {
-            "title": "{emoji} <b>سفارش #{order_id}</b>",
-            "action_label": "عملیات",
+            "title": "📦 <b>سفارش #{order_id}</b>",
+            "action_label": "⚙️ عملیات",
             "action_value": "برای تحویل نهایی از دکمه زیر استفاده کنید.",
-            "tip": "{emoji} تحویل، عملیات حساس و غیرقابل بازگشت است."
+            "tip": "⚠️ تحویل، عملیات حساس و غیرقابل بازگشت است."
           }
         },
         "groupops": {
-          "title": "{emoji} <b>گروه/بکاپ</b>",
-          "group_id_label": "Group ID فعلی",
+          "title": "🗂 <b>گروه/بکاپ</b>",
+          "group_id_label": "🧩 Group ID فعلی",
           "group_id_unset": "❌ تنظیم نشده",
-          "tip": "{emoji} بازیابی تنظیمات فقط با JSON معتبر انجام می‌شود."
+          "tip": "💡 بازیابی تنظیمات فقط با JSON معتبر انجام می‌شود."
         }
       },
       "audit": {
-        "error_prefix": "{emoji} {msg}",
+        "error_prefix": "❌ {msg}",
         "package_default_name": "پکیج",
         "type_view": {
           "package_row": "{num}) {status} {name} | ID: {package_id} | {volume}GB | {days} روز | {price} تومان"

@@ -26,7 +26,7 @@ final class MenuService
         }
 
         return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.main.title', ['emoji' => $this->catalog->get('emojis.sparkles')]),
+            title: $this->catalog->get('menus.main.title'),
             lines: [
                 new UiTextLine(
                     $this->catalog->get('emojis.compass'),
@@ -71,7 +71,7 @@ final class MenuService
     public function adminRootText(): string
     {
         return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.admin.title', ['emoji' => $this->catalog->get('emojis.admin_panel')]),
+            title: $this->catalog->get('menus.admin.title'),
             lines: [
                 new UiTextLine(
                     $this->catalog->get('emojis.compass'),
@@ -115,12 +115,12 @@ final class MenuService
         $userIdFa = $this->toPersianDigits((string) $userId);
 
         return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.profile.title', ['emoji' => $this->catalog->get('emojis.profile')]),
+            title: $this->catalog->get('menus.profile.title'),
             lines: [
-                new UiTextLine($this->catalog->get('emojis.phone'), $this->catalog->get('menus.profile.name_label'), htmlspecialchars((string) ($user['full_name'] ?? $this->catalog->get('messages.generic.dash')))),
-                new UiTextLine($this->catalog->get('emojis.tag'), $this->catalog->get('menus.profile.username_label'), htmlspecialchars((string) $username)),
-                new UiTextLine($this->catalog->get('emojis.id'), $this->catalog->get('menus.profile.user_id_label'), "<code>{$userIdFa}</code>"),
-                new UiTextLine($this->catalog->get('emojis.money'), $this->catalog->get('menus.profile.balance_label'), $this->catalog->get('menus.profile.balance_value', ['amount' => $balanceFa])),
+                new UiTextLine('', $this->catalog->get('menus.profile.name_label'), htmlspecialchars((string) ($user['full_name'] ?? $this->catalog->get('messages.generic.dash')))),
+                new UiTextLine('', $this->catalog->get('menus.profile.username_label'), htmlspecialchars((string) $username)),
+                new UiTextLine('', $this->catalog->get('menus.profile.user_id_label'), "<code>{$userIdFa}</code>"),
+                new UiTextLine('', $this->catalog->get('menus.profile.balance_label'), $this->catalog->get('menus.profile.balance_value', ['amount' => $balanceFa])),
             ],
             tipBlockquote: $this->catalog->get('menus.profile.tip'),
         ));
@@ -156,10 +156,10 @@ final class MenuService
             ),
         ];
         if ($link !== '') {
-            $lines[] = new UiTextLine($this->catalog->get('emojis.web'), $this->catalog->get('menus.support.support_link_label'), htmlspecialchars($link));
+            $lines[] = new UiTextLine('', $this->catalog->get('menus.support.support_link_label'), htmlspecialchars($link));
         }
         if ($linkDesc !== '') {
-            $lines[] = new UiTextLine($this->catalog->get('emojis.note'), $this->catalog->get('menus.support.support_link_desc_label'), htmlspecialchars($linkDesc));
+            $lines[] = new UiTextLine('', $this->catalog->get('menus.support.support_link_desc_label'), htmlspecialchars($linkDesc));
         }
 
         return $this->uiText->multi(new UiTextBlock(
@@ -197,7 +197,7 @@ final class MenuService
         return $this->uiText->multi(new UiTextBlock(
             title: $this->catalog->get('menus.my_configs.title', ['count' => $count]),
             lines: [
-                new UiTextLine($this->catalog->get('emojis.folder'), $this->catalog->get('menus.my_configs.latest_orders_label'), implode("\n", $lines)),
+                new UiTextLine('', $this->catalog->get('menus.my_configs.latest_orders_label'), implode("\n", $lines)),
             ],
             tipBlockquote: $this->catalog->get('menus.my_configs.tip'),
         ));
@@ -224,10 +224,10 @@ final class MenuService
         return $this->uiText->multi(new UiTextBlock(
             title: $title,
             lines: [
-                new UiTextLine($this->catalog->get('emojis.chart'), $this->catalog->get('menus.referral.total_referrals_label'), "<b>{$totalReferralsFa}</b>"),
-                new UiTextLine($this->catalog->get('emojis.cart'), $this->catalog->get('menus.referral.purchase_count_label'), "<b>{$purchaseCountFa}</b>"),
-                new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('menus.referral.total_purchase_amount_label'), $this->catalog->get('menus.referral.total_purchase_amount_value', ['amount' => $totalPurchaseAmountFa])),
-                new UiTextLine($this->catalog->get('emojis.link'), $this->catalog->get('menus.referral.invite_link_label'), "\n\n<code>{$refLink}</code>"),
+                new UiTextLine('', $this->catalog->get('menus.referral.total_referrals_label'), "<b>{$totalReferralsFa}</b>"),
+                new UiTextLine('', $this->catalog->get('menus.referral.purchase_count_label'), "<b>{$purchaseCountFa}</b>"),
+                new UiTextLine('', $this->catalog->get('menus.referral.total_purchase_amount_label'), $this->catalog->get('menus.referral.total_purchase_amount_value', ['amount' => $totalPurchaseAmountFa])),
+                new UiTextLine('', $this->catalog->get('menus.referral.invite_link_label'), "\n\n<code>{$refLink}</code>"),
             ],
             tipBlockquote: $this->catalog->get('menus.referral.tip'),
         ));
