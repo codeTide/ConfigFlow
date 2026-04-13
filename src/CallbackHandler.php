@@ -1240,6 +1240,10 @@ final class CallbackHandler
                     'callback_data' => 'admin:settings:toggle:agency_request_enabled',
                 ]],
                 [[
+                    'text' => '🧪 مدیریت تست رایگان',
+                    'callback_data' => 'admin:free_test:menu',
+                ]],
+                [[
                     'text' => '💳 کارت‌به‌کارت: ' . ($this->settings->get('gw_card_enabled', '0') === '1' ? '✅' : '❌'),
                     'callback_data' => 'admin:settings:toggle:gw_card_enabled',
                 ]],
@@ -1628,6 +1632,71 @@ final class CallbackHandler
                 'message' => $message,
                 'data' => 'admin:settings',
             ]]);
+            return;
+        }
+
+        if ($data === 'admin:free_test:menu') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $lines = ["🧪 <b>مدیریت تست رایگان</b>", ""];
+            foreach ($this->database->listFreeTestRules() as $rule) {
+                $pkgId = (int) ($rule['package_id'] ?? 0);
+                $name = (string) ($rule['package_name'] ?? ('پکیج #' . $pkgId));
+                $maxClaims = (int) ($rule['max_claims'] ?? 1);
+                $cooldown = (int) ($rule['cooldown_days'] ?? 0);
+                $enabled = ((int) ($rule['is_enabled'] ?? 0)) === 1 ? '✅' : '❌';
+                $mode = $maxClaims === 1 && $cooldown === 0 ? 'یک‌بار' : ("سهمیه={$maxClaims} | هر {$cooldown} روز");
+                $lines[] = "• #{$pkgId} {$enabled} " . htmlspecialchars($name) . " | {$mode}";
+            }
+            if (count($lines) === 2) {
+                $lines[] = "• قانونی ثبت نشده است.";
+            }
+            $rows = [
+                [['text' => '➕ افزودن/ویرایش قانون', 'callback_data' => 'admin:free_test:rule:add']],
+                [['text' => '♻️ ریست سهمیه کاربر', 'callback_data' => 'admin:free_test:quota:reset']],
+                [['text' => '🔙 بازگشت', 'callback_data' => 'admin:settings']],
+            ];
+            $this->telegram->editMessageText($chatId, $messageId, implode("\n", $lines), ['inline_keyboard' => $rows]);
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:free_test:rule:add') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->database->setUserState($userId, 'await_admin_free_test_rule');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "🧪 <b>قانون تست رایگان</b>\n\n"
+                . "فرمت را ارسال کنید:\n<code>package_id|max_claims|cooldown_days</code>\n\n"
+                . "نمونه یک‌بار: <code>12|1|0</code>\n"
+                . "نمونه هر 30 روز: <code>12|0|30</code>",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:free_test:menu']]]
+                ]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        if ($data === 'admin:free_test:quota:reset') {
+            if (!$isAdmin) {
+                $this->telegram->answerCallbackQuery($callbackId, 'شما دسترسی ادمین ندارید.');
+                return;
+            }
+            $this->database->setUserState($userId, 'await_admin_free_test_reset_user');
+            $this->telegram->editMessageText(
+                $chatId,
+                $messageId,
+                "♻️ آیدی عددی کاربر را ارسال کنید تا سهمیه تست او ریست شود:",
+                ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:free_test:menu']]]
+                ]
+            );
+            $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
 
@@ -2456,7 +2525,7 @@ final class CallbackHandler
                 $this->telegram->editMessageText(
                     $chatId,
                     $messageId,
-                    "💳 <b>شارژ کیف پول</b>\n\nلطفاً مبلغ موردنظر را به تومان ارسال کنید.",
+                    "💳 <b>شارژ کیف پول</b>\n\n💵 لطفاً مبلغ موردنظر را به تومان ارسال کنید:",
                     KeyboardBuilder::backToMain()
                 );
                 $this->telegram->answerCallbackQuery($callbackId);
@@ -2499,15 +2568,27 @@ final class CallbackHandler
         }
 
         if ($data === 'test:start') {
-            $this->database->setUserState($userId, 'await_free_test_note');
-            $this->telegram->editMessageText(
-                $chatId,
-                $messageId,
-                "🎁 <b>درخواست تست رایگان</b>\n\n"
-                . "لطفاً یک توضیح کوتاه ارسال کنید (مثلاً نوع مصرف/مدت موردنیاز).\n"
-                . "درخواست شما برای ادمین ارسال می‌شود.",
-                KeyboardBuilder::backToMain()
-            );
+            $claim = $this->database->claimFreeTest($userId);
+            if (($claim['ok'] ?? false) !== true) {
+                $this->telegram->editMessageText(
+                    $chatId,
+                    $messageId,
+                    "🎁 <b>تست رایگان</b>\n\nدر حال حاضر سرویس تست آماده نداریم یا سهمیه شما کامل شده است."
+                );
+                $this->telegram->answerCallbackQuery($callbackId);
+                return;
+            }
+            $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? 'سرویس تست'));
+            $configText = htmlspecialchars((string) ($claim['config_text'] ?? ''));
+            $inquiryLink = trim((string) ($claim['inquiry_link'] ?? ''));
+            $msg = "🎁 <b>تست رایگان شما آماده است</b>\n\n"
+                . "📦 سرویس: <b>{$serviceName}</b>\n"
+                . "🧪 نوع سفارش: <b>تست رایگان</b>\n\n"
+                . "🔗 کانفیگ شما:\n<code>{$configText}</code>";
+            if ($inquiryLink !== '') {
+                $msg .= "\n\n🌐 لینک استعلام:\n" . htmlspecialchars($inquiryLink);
+            }
+            $this->telegram->editMessageText($chatId, $messageId, $msg);
             $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
@@ -2518,7 +2599,7 @@ final class CallbackHandler
                 $chatId,
                 $messageId,
                 "🤝 <b>درخواست نمایندگی</b>\n\n"
-                . "لطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید.\n"
+                . "لطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید:\n"
                 . "پیام شما برای تیم ادمین ثبت می‌شود.",
                 KeyboardBuilder::backToMain()
             );
