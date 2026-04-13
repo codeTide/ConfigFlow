@@ -26,7 +26,7 @@ final class MenuService
         }
 
         return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.main.title', ['emoji' => $this->catalog->get('emojis.sparkles')]),
+            title: $this->catalog->get('menus.main.title'),
             lines: [
                 new UiTextLine(
                     $this->catalog->get('emojis.compass'),
@@ -71,7 +71,7 @@ final class MenuService
     public function adminRootText(): string
     {
         return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.admin.title', ['emoji' => $this->catalog->get('emojis.admin_panel')]),
+            title: $this->catalog->get('menus.admin.title'),
             lines: [
                 new UiTextLine(
                     $this->catalog->get('emojis.compass'),
@@ -115,7 +115,7 @@ final class MenuService
         $userIdFa = $this->toPersianDigits((string) $userId);
 
         return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.profile.title', ['emoji' => $this->catalog->get('emojis.profile')]),
+            title: $this->catalog->get('menus.profile.title'),
             lines: [
                 new UiTextLine($this->catalog->get('emojis.phone'), $this->catalog->get('menus.profile.name_label'), htmlspecialchars((string) ($user['full_name'] ?? $this->catalog->get('messages.generic.dash')))),
                 new UiTextLine($this->catalog->get('emojis.tag'), $this->catalog->get('menus.profile.username_label'), htmlspecialchars((string) $username)),

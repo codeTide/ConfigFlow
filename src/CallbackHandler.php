@@ -160,11 +160,10 @@ final class CallbackHandler
         }
 
         $line2 = $mention !== ''
-            ? $this->catalog->get('messages.channel.mention_line', ['emoji' => $this->catalog->get('emojis.megaphone'), 'mention' => $mention])
-            : $this->catalog->get('messages.channel.private_line', ['emoji' => $this->catalog->get('emojis.private_channel'), 'label' => $this->catalog->get('messages.channel.private')]);
+            ? $this->catalog->get('messages.channel.mention_line', ['mention' => $mention])
+            : $this->catalog->get('messages.channel.private_line', ['label' => $this->catalog->get('messages.channel.private')]);
 
         return $this->catalog->get('messages.channel.lock_detailed', [
-            'emoji' => $this->catalog->get('emojis.lock'),
             'title' => htmlspecialchars($title),
             'line2' => $line2,
         ]);
