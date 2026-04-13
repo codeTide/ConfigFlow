@@ -25,6 +25,7 @@ ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-b
 ```text
 ConfigFlow/
 ├── webhook.php
+├── migrate.php
 ├── install.php
 ├── public/
 │   └── WorkerApi.php
@@ -33,6 +34,7 @@ ConfigFlow/
 │   ├── schema.sql
 │   ├── PhpWorkerRuntime.php
 │   └── BackupRuntime.php
+├── migrations/
 ├── src/
 └── env.example
 ```
@@ -167,6 +169,18 @@ Manual schema init (if `.env` already exists):
 
 ```bash
 php scripts/InitDb.php
+```
+
+Apply pending migrations (CLI):
+
+```bash
+php migrate.php
+```
+
+Apply pending migrations (Web):
+
+```text
+https://YOUR_DOMAIN/migrate.php
 ```
 
 ### 4) Permissions (important on shared/VPS hosts)

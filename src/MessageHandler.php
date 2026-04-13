@@ -376,6 +376,10 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_free_test_note') {
+            if ($this->isBotMenuButton($text)) {
+                $this->telegram->sendMessage($chatId, '⚠️ لطفاً متن توضیح ارسال کنید، نه دکمه‌های منو.');
+                return;
+            }
             if ($text === '' || str_starts_with($text, '/')) {
                 $this->telegram->sendMessage($chatId, '⚠️ لطفاً توضیح کوتاه تست را ارسال کنید.');
                 return;
@@ -408,6 +412,10 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_agency_request') {
+            if ($this->isBotMenuButton($text)) {
+                $this->telegram->sendMessage($chatId, '⚠️ لطفاً متن درخواست نمایندگی را تایپ کنید، نه دکمه‌های منو.');
+                return;
+            }
             if ($text === '' || str_starts_with($text, '/')) {
                 $this->telegram->sendMessage($chatId, '⚠️ لطفاً متن درخواست نمایندگی را ارسال کنید.');
                 return;
@@ -436,6 +444,41 @@ final class MessageHandler
                     ]
                 );
             }
+            return;
+        }
+
+        if ($state['state_name'] === 'await_admin_free_test_rule') {
+            if (!in_array($userId, Config::adminIds(), true)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $parts = array_map('trim', explode('|', $text));
+            $packageId = (int) ($parts[0] ?? 0);
+            $maxClaims = (int) ($parts[1] ?? 1);
+            $cooldownDays = (int) ($parts[2] ?? 0);
+            if ($packageId <= 0) {
+                $this->telegram->sendMessage($chatId, '⚠️ فرمت نامعتبر است. نمونه: <code>12|1|0</code>');
+                return;
+            }
+            $this->database->saveFreeTestRule($packageId, $maxClaims, $cooldownDays, true);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, '✅ قانون تست رایگان ذخیره شد.');
+            return;
+        }
+
+        if ($state['state_name'] === 'await_admin_free_test_reset_user') {
+            if (!in_array($userId, Config::adminIds(), true)) {
+                $this->database->clearUserState($userId);
+                return;
+            }
+            $targetUserId = (int) preg_replace('/\D+/', '', $text);
+            if ($targetUserId <= 0) {
+                $this->telegram->sendMessage($chatId, '⚠️ آیدی عددی معتبر ارسال کنید.');
+                return;
+            }
+            $this->database->resetFreeTestQuota($targetUserId);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, "✅ سهمیه تست کاربر <code>{$targetUserId}</code> ریست شد.");
             return;
         }
 
@@ -989,13 +1032,26 @@ ID: <code>{$pinId}</code>");
             if ($this->settings->get('free_test_enabled', '1') !== '1') {
                 return false;
             }
-            $this->database->setUserState($userId, 'await_free_test_note');
-            $this->telegram->sendMessage(
-                $chatId,
-                "🎁 <b>درخواست تست رایگان</b>\n\n"
-                . "لطفاً یک توضیح کوتاه ارسال کنید (مثلاً نوع مصرف/مدت موردنیاز).\n"
-                . "درخواست شما برای ادمین ارسال می‌شود."
-            );
+            $claim = $this->database->claimFreeTest($userId);
+            if (($claim['ok'] ?? false) !== true) {
+                $this->telegram->sendMessage(
+                    $chatId,
+                    "🎁 <b>تست رایگان</b>\n\n"
+                    . "در حال حاضر سرویس تست آماده نداریم یا سهمیه شما کامل شده است."
+                );
+                return true;
+            }
+            $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? 'سرویس تست'));
+            $configText = htmlspecialchars((string) ($claim['config_text'] ?? ''));
+            $inquiryLink = trim((string) ($claim['inquiry_link'] ?? ''));
+            $msg = "🎁 <b>تست رایگان شما آماده است</b>\n\n"
+                . "📦 سرویس: <b>{$serviceName}</b>\n"
+                . "🧪 نوع سفارش: <b>تست رایگان</b>\n\n"
+                . "🔗 کانفیگ شما:\n<code>{$configText}</code>";
+            if ($inquiryLink !== '') {
+                $msg .= "\n\n🌐 لینک استعلام:\n" . htmlspecialchars($inquiryLink);
+            }
+            $this->telegram->sendMessage($chatId, $msg);
             return true;
         }
 
@@ -1007,7 +1063,7 @@ ID: <code>{$pinId}</code>");
             $this->telegram->sendMessage(
                 $chatId,
                 "🤝 <b>درخواست نمایندگی</b>\n\n"
-                . "لطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید.\n"
+                . "لطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید:\n"
                 . "پیام شما برای تیم ادمین ثبت می‌شود."
             );
             return true;
@@ -1939,5 +1995,27 @@ ID: <code>{$pinId}</code>");
             return;
         }
         $this->telegram->sendTopicMessage((int) $groupIdRaw, (int) $topicIdRaw, $text);
+    }
+
+    private function isBotMenuButton(string $text): bool
+    {
+        if ($text === '') {
+            return false;
+        }
+        return in_array($text, [
+            KeyboardBuilder::BTN_BUY,
+            KeyboardBuilder::BTN_MY_CONFIGS,
+            KeyboardBuilder::BTN_FREE_TEST,
+            KeyboardBuilder::BTN_PROFILE,
+            KeyboardBuilder::BTN_WALLET,
+            KeyboardBuilder::BTN_SUPPORT,
+            KeyboardBuilder::BTN_REFERRAL,
+            KeyboardBuilder::BTN_AGENCY,
+            KeyboardBuilder::BTN_ADMIN,
+            KeyboardBuilder::BTN_BACK_MAIN,
+            KeyboardBuilder::BTN_BACK_ACCOUNT,
+            KeyboardBuilder::BTN_BACK_TYPES,
+            KeyboardBuilder::BTN_BACK_PURCHASES,
+        ], true);
     }
 }
