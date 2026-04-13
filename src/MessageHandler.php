@@ -1783,11 +1783,13 @@ final class MessageHandler
                 continue;
             }
             $isActive = ((int) ($type['is_active'] ?? 0)) === 1;
-            $status = $isActive ? '🟢' : '🔴';
-            $name = trim((string) ($type['name'] ?? '—'));
-            $lines[] = "{$num}) {$status} {$name} | ID: {$typeId}";
+            $status = $isActive
+                ? $this->catalog->get('admin.ui.open.types_list.status_active_symbol')
+                : $this->catalog->get('admin.ui.open.types_list.status_inactive_symbol');
+            $name = trim((string) ($type['name'] ?? $this->catalog->get('messages.generic.dash')));
+            $lines[] = $this->catalog->get('admin.ui.open.types_list.row', ['num' => $num, 'status' => $status, 'name' => $name, 'type_id' => $typeId]);
             $options[$num] = $typeId;
-            $buttons[] = ["{$num} - {$name}"];
+            $buttons[] = [$this->catalog->get('admin.ui.open.types_list.button', ['num' => $num, 'name' => $name])];
         }
         $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
         $this->database->setUserState($userId, 'admin.types.list', ['options' => $options, 'stack' => ['admin.root']]);
@@ -1826,14 +1828,16 @@ final class MessageHandler
                 continue;
             }
             $isActive = ((int) ($pkg['is_active'] ?? 0)) === 1;
-            $status = $isActive ? '🟢' : '🔴';
+            $status = $isActive
+                ? $this->catalog->get('admin.ui.open.type_view.status_active_symbol')
+                : $this->catalog->get('admin.ui.open.type_view.status_inactive_symbol');
             $name = trim((string) ($pkg['name'] ?? $this->catalog->get('admin.ui.audit.package_default_name')));
             $price = (int) ($pkg['price'] ?? 0);
             $days = (int) ($pkg['duration_days'] ?? 0);
             $volume = (float) ($pkg['volume_gb'] ?? 0);
             $lines[] = $this->catalog->get('admin.ui.audit.type_view.package_row', ['num' => $num, 'status' => $status, 'name' => $name, 'package_id' => $packageId, 'volume' => $volume, 'days' => $days, 'price' => $price]);
             $options[$num] = $packageId;
-            $buttons[] = ["{$num} - {$name}"];
+            $buttons[] = [$this->catalog->get('admin.ui.open.type_view.package_button', ['num' => $num, 'name' => $name])];
         }
         $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
 
@@ -3922,7 +3926,7 @@ final class MessageHandler
             if ($id <= 0) {
                 continue;
             }
-            $lines[] = "{$num}) U:{$id}";
+            $lines[] = $this->catalog->get('admin.ui.agents.row', ['num' => $num, 'id' => $id]);
             $options[$num] = $id;
             $buttons[] = [$this->catalog->get('admin.ui.agents.button', ['num' => $num, 'id' => $id])];
         }
@@ -3946,7 +3950,12 @@ final class MessageHandler
                 continue;
             }
             $custom = $this->database->getAgencyPrice($agentId, $pkgId);
-            $lines[] = "{$num}) #{$pkgId} " . (string) ($pkg['name'] ?? '-') . ' | ' . ($custom === null ? '-' : (string) $custom);
+            $lines[] = $this->catalog->get('admin.ui.agent_view.row', [
+                'num' => $num,
+                'pkg_id' => $pkgId,
+                'name' => (string) ($pkg['name'] ?? $this->catalog->get('messages.generic.dash')),
+                'custom' => $custom === null ? $this->catalog->get('messages.generic.dash') : (string) $custom,
+            ]);
             $options[$num] = $pkgId;
             $buttons[] = [$this->catalog->get('admin.ui.agent_view.package_button', ['num' => $num, 'id' => $pkgId])];
         }
@@ -3969,8 +3978,10 @@ final class MessageHandler
             if ($panelId <= 0) {
                 continue;
             }
-            $active = ((int) ($panel['is_active'] ?? 0)) === 1 ? '🟢' : '🔴';
-            $lines[] = "{$num}) {$active} #{$panelId} " . (string) ($panel['name'] ?? '-');
+            $active = ((int) ($panel['is_active'] ?? 0)) === 1
+                ? $this->catalog->get('admin.ui.open.panels_list.status_active_symbol')
+                : $this->catalog->get('admin.ui.open.panels_list.status_inactive_symbol');
+            $lines[] = $this->catalog->get('admin.ui.open.panels_list.row', ['num' => $num, 'status' => $active, 'panel_id' => $panelId, 'name' => (string) ($panel['name'] ?? $this->catalog->get('messages.generic.dash'))]);
             $options[$num] = $panelId;
             $buttons[] = [$this->catalog->get('admin.ui.open.panels_list.button', ['num' => $num, 'id' => $panelId])];
         }
