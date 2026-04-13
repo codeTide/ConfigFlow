@@ -1942,6 +1942,12 @@ ID: <code>{$pinId}</code>");
 
     private function dispatchReplyAsCallback(int $chatId, int $messageId, array $fromUser, string $data): void
     {
+        $botMessageId = $messageId;
+        $placeholder = $this->telegram->sendMessageWithResult($chatId, '⏳ در حال بارگذاری...');
+        if (is_array($placeholder)) {
+            $botMessageId = (int) ($placeholder['message_id'] ?? $messageId);
+        }
+
         $fakeId = 'msg-' . substr(md5($chatId . '-' . $messageId . '-' . $data . '-' . microtime(true)), 0, 24);
         $this->callbackHandler->handle([
             'callback_query' => [
@@ -1949,7 +1955,7 @@ ID: <code>{$pinId}</code>");
                 'from' => $fromUser,
                 'message' => [
                     'chat' => ['id' => $chatId],
-                    'message_id' => $messageId,
+                    'message_id' => $botMessageId,
                 ],
                 'data' => $data,
             ],
