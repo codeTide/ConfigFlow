@@ -55,7 +55,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 ?>
 <!doctype html>
-<html lang="fa">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <title>ConfigFlow Migrations</title>
@@ -77,7 +77,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            font-family: Tahoma, Arial, sans-serif;
+            font-family: Inter, Segoe UI, Arial, sans-serif;
             background: linear-gradient(180deg, #eef4ff 0%, var(--bg) 40%);
             color: var(--text);
         }
@@ -141,15 +141,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 <body>
 <div class="wrap">
     <div class="card">
-        <h1>🛠 اجرای مایگریشن‌های ConfigFlow</h1>
-        <p>از این بخش می‌توانید مایگریشن‌های pending را از پوشه <code>/migrations</code> اجرا کنید.</p>
+        <h1>🛠 ConfigFlow Migration Runner</h1>
+        <p>Use this page to apply pending SQL migrations from <code>/migrations</code>.</p>
         <form method="post">
-            <button class="btn" type="submit">اجرای مایگریشن‌ها</button>
+            <button class="btn" type="submit">Apply Pending Migrations</button>
         </form>
         <?php if ($message !== ''): ?>
             <div class="notice <?= $isError ? 'err' : 'ok' ?>"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
-        <div class="hint">پیشنهاد: بعد از هر آپدیت پروژه، یک‌بار این صفحه یا دستور <code>php migrate.php</code> را اجرا کنید.</div>
+        <div class="hint">Tip: after each deployment, run this page once (or use <code>php migrate.php</code>).</div>
     </div>
 </div>
 </body>
