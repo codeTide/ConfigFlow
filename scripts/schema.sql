@@ -98,6 +98,26 @@ CREATE TABLE IF NOT EXISTS agency_requests (
     INDEX idx_agency_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS free_test_package_rules (
+    package_id BIGINT PRIMARY KEY,
+    max_claims INT NOT NULL DEFAULT 1,
+    cooldown_days INT NOT NULL DEFAULT 0,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    INDEX idx_free_test_enabled (is_enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS free_test_claims (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    package_id BIGINT NOT NULL,
+    purchase_id BIGINT NOT NULL,
+    claimed_at DATETIME NOT NULL,
+    INDEX idx_free_test_claims_user_pkg (user_id, package_id),
+    INDEX idx_free_test_claims_pkg (package_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS payments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     kind VARCHAR(32) NOT NULL,
@@ -239,4 +259,3 @@ CREATE TABLE IF NOT EXISTS purchase_rule_acceptances (
     user_id BIGINT PRIMARY KEY,
     accepted_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-

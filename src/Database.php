@@ -23,6 +23,34 @@ final class Database implements WorkerApiStore
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
+
+        $this->ensureRuntimeMigrations();
+    }
+
+    private function ensureRuntimeMigrations(): void
+    {
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS free_test_package_rules (
+                package_id BIGINT PRIMARY KEY,
+                max_claims INT NOT NULL DEFAULT 1,
+                cooldown_days INT NOT NULL DEFAULT 0,
+                is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                INDEX idx_free_test_enabled (is_enabled)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS free_test_claims (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                package_id BIGINT NOT NULL,
+                purchase_id BIGINT NOT NULL,
+                claimed_at DATETIME NOT NULL,
+                INDEX idx_free_test_claims_user_pkg (user_id, package_id),
+                INDEX idx_free_test_claims_pkg (package_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
     }
 
     public function pdo(): PDO
@@ -1611,11 +1639,11 @@ final class Database implements WorkerApiStore
         ];
     }
 
-    private function createPurchase(int $userId, int $packageId, int $configId, int $amount, string $paymentMethod): int
+    private function createPurchase(int $userId, int $packageId, int $configId, int $amount, string $paymentMethod, bool $isTest = false): int
     {
         $purchaseStmt = $this->pdo->prepare(
             'INSERT INTO purchases (user_id, package_id, config_id, amount, payment_method, created_at, is_test)
-             VALUES (:user_id, :package_id, :config_id, :amount, :payment_method, :created_at, 0)'
+             VALUES (:user_id, :package_id, :config_id, :amount, :payment_method, :created_at, :is_test)'
         );
         $purchaseStmt->execute([
             'user_id' => $userId,
@@ -1624,6 +1652,7 @@ final class Database implements WorkerApiStore
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'created_at' => gmdate('Y-m-d H:i:s'),
+            'is_test' => $isTest ? 1 : 0,
         ]);
         $purchaseId = (int) $this->pdo->lastInsertId();
 
@@ -2052,6 +2081,145 @@ final class Database implements WorkerApiStore
             'sold_at' => gmdate('Y-m-d H:i:s'),
             'id' => $cfgId,
         ]);
+    }
+
+    public function listFreeTestRules(): array
+    {
+        $stmt = $this->pdo->query(
+            "SELECT r.package_id, r.max_claims, r.cooldown_days, r.is_enabled, p.name AS package_name
+             FROM free_test_package_rules r
+             LEFT JOIN packages p ON p.id = r.package_id
+             ORDER BY r.package_id ASC"
+        );
+        return $stmt->fetchAll();
+    }
+
+    public function saveFreeTestRule(int $packageId, int $maxClaims, int $cooldownDays, bool $enabled): void
+    {
+        $maxClaims = max(0, $maxClaims);
+        $cooldownDays = max(0, $cooldownDays);
+        $now = gmdate('Y-m-d H:i:s');
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO free_test_package_rules (package_id, max_claims, cooldown_days, is_enabled, created_at, updated_at)
+             VALUES (:package_id, :max_claims, :cooldown_days, :is_enabled, :created_at, :updated_at)
+             ON DUPLICATE KEY UPDATE
+                max_claims = VALUES(max_claims),
+                cooldown_days = VALUES(cooldown_days),
+                is_enabled = VALUES(is_enabled),
+                updated_at = VALUES(updated_at)'
+        );
+        $stmt->execute([
+            'package_id' => $packageId,
+            'max_claims' => $maxClaims,
+            'cooldown_days' => $cooldownDays,
+            'is_enabled' => $enabled ? 1 : 0,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    public function resetFreeTestQuota(int $targetUserId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM free_test_claims WHERE user_id = :user_id');
+        $stmt->execute(['user_id' => $targetUserId]);
+    }
+
+    public function claimFreeTest(int $userId): array
+    {
+        $rules = $this->listFreeTestRules();
+        if ($rules === []) {
+            return ['ok' => false, 'error' => 'no_rule'];
+        }
+
+        $now = gmdate('Y-m-d H:i:s');
+        foreach ($rules as $rule) {
+            if ((int) ($rule['is_enabled'] ?? 0) !== 1) {
+                continue;
+            }
+            $packageId = (int) ($rule['package_id'] ?? 0);
+            if ($packageId <= 0) {
+                continue;
+            }
+
+            $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_claims WHERE user_id = :user_id AND package_id = :package_id');
+            $countStmt->execute(['user_id' => $userId, 'package_id' => $packageId]);
+            $claimCount = (int) $countStmt->fetchColumn();
+            $maxClaims = (int) ($rule['max_claims'] ?? 1);
+            if ($maxClaims > 0 && $claimCount >= $maxClaims) {
+                continue;
+            }
+
+            $cooldownDays = (int) ($rule['cooldown_days'] ?? 0);
+            if ($cooldownDays > 0) {
+                $lastStmt = $this->pdo->prepare(
+                    'SELECT claimed_at FROM free_test_claims WHERE user_id = :user_id AND package_id = :package_id ORDER BY id DESC LIMIT 1'
+                );
+                $lastStmt->execute(['user_id' => $userId, 'package_id' => $packageId]);
+                $lastAt = (string) ($lastStmt->fetchColumn() ?: '');
+                if ($lastAt !== '') {
+                    $lastTs = strtotime($lastAt);
+                    if ($lastTs !== false) {
+                        $nextAllowed = strtotime('+' . $cooldownDays . ' days', $lastTs);
+                        if ($nextAllowed !== false && time() < $nextAllowed) {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            $this->pdo->beginTransaction();
+            try {
+                $cfgStmt = $this->pdo->prepare(
+                    'SELECT id, service_name, config_text, inquiry_link
+                     FROM configs
+                     WHERE package_id = :package_id AND sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired = 0
+                     ORDER BY id ASC LIMIT 1 FOR UPDATE'
+                );
+                $cfgStmt->execute(['package_id' => $packageId]);
+                $cfg = $cfgStmt->fetch();
+                if (!is_array($cfg)) {
+                    $this->pdo->rollBack();
+                    continue;
+                }
+
+                $configId = (int) ($cfg['id'] ?? 0);
+                $purchaseId = $this->createPurchase($userId, $packageId, $configId, 0, 'free_test', true);
+                $updateCfg = $this->pdo->prepare('UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
+                $updateCfg->execute([
+                    'sold_to' => $userId,
+                    'purchase_id' => $purchaseId,
+                    'sold_at' => $now,
+                    'id' => $configId,
+                ]);
+
+                $insertClaim = $this->pdo->prepare(
+                    'INSERT INTO free_test_claims (user_id, package_id, purchase_id, claimed_at)
+                     VALUES (:user_id, :package_id, :purchase_id, :claimed_at)'
+                );
+                $insertClaim->execute([
+                    'user_id' => $userId,
+                    'package_id' => $packageId,
+                    'purchase_id' => $purchaseId,
+                    'claimed_at' => $now,
+                ]);
+
+                $this->pdo->commit();
+                return [
+                    'ok' => true,
+                    'package_id' => $packageId,
+                    'purchase_id' => $purchaseId,
+                    'service_name' => (string) ($cfg['service_name'] ?? ''),
+                    'config_text' => (string) ($cfg['config_text'] ?? ''),
+                    'inquiry_link' => (string) ($cfg['inquiry_link'] ?? ''),
+                ];
+            } catch (\Throwable $e) {
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+            }
+        }
+
+        return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
     }
 
     private function settingValue(string $key, string $default = ''): string
