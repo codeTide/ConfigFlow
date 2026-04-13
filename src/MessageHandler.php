@@ -974,7 +974,7 @@ ID: <code>{$pinId}</code>");
             $this->database->setUserState($userId, 'await_wallet_amount');
             $this->telegram->sendMessage(
                 $chatId,
-                "💬 لطفاً مبلغ موردنظر را به تومان ارسال کنید.",
+                "💵 لطفاً مبلغ موردنظر را به تومان ارسال کنید:",
                 $this->replyKeyboard([[KeyboardBuilder::BTN_BACK_ACCOUNT, KeyboardBuilder::BTN_BACK_MAIN]])
             );
             return true;
