@@ -53,28 +53,26 @@
     "error": "❌",
     "warning": "⚠️",
     "info": "💡",
-    "compass": "🧭",
-    "support_id": "👤",
     "cart": "🛒",
     "package": "📦"
   },
   "menus": {
     "main": {
       "title": "✨ <b>به فروشگاه ConfigFlow خوش آمدید!</b>",
-      "guide_label": "راهنما",
+      "guide_label": "🧭 راهنما",
       "guide_value": "از منوی زیر بخش مورد نظر خود را انتخاب کنید.",
       "tip": "💡 اگر اولین بار است وارد ربات می‌شوید، ابتدا بخش حساب را باز کنید تا وضعیت موجودی و امکانات فعال خود را ببینید."
     },
     "admin": {
       "title": "⚙️ <b>پنل مدیریت</b>",
-      "guide_label": "راهنما",
+      "guide_label": "🧭 راهنما",
       "guide_value": "از دکمه‌های زیر بخش مدیریتی موردنظر را انتخاب کنید.",
       "tip": "💡 هر زمان نیاز داشتید می‌توانید با دکمه‌های بازگشت، انصراف یا منوی اصلی مسیر را کنترل کنید تا عملیات مدیریتی اشتباه ثبت نشود."
     },
     "profile": {
       "title": "👤 <b>پروفایل کاربری</b>",
       "name_label": "📱 نام",
-      "username_label": "🌀 نام کاربری",
+      "username_label": "👤 نام کاربری",
       "user_id_label": "🔢 آیدی",
       "balance_label": "💰 موجودی",
       "balance_value": "<b>{amount}</b> تومان",
@@ -82,7 +80,7 @@
     },
     "support": {
       "title": "🎧 <b>ارتباط با پشتیبانی</b>",
-      "support_id_label": "آیدی پشتیبانی",
+      "support_id_label": "👤 آیدی پشتیبانی",
       "support_link_label": "🌐 لینک پشتیبانی",
       "support_link_desc_label": "📝 توضیح لینک",
       "tip": "💡 برای بررسی سریع‌تر، مشکل را همراه با جزئیات مرحله، خطا یا شناسه سفارش ارسال کنید تا تیم پشتیبانی دقیق‌تر راهنمایی کند."
@@ -614,20 +612,16 @@
       },
       "prompts": {
         "balance_action_title": "💵 <b>{mode_text} موجودی کاربر</b>",
-        "balance_action_user_emoji": "👤",
-        "balance_action_user_label": "کاربر",
-        "balance_action_input_emoji": "🔢",
-        "balance_action_input_label": "ورودی",
+        "balance_action_user_label": "👤 کاربر",
+        "balance_action_input_label": "🔢 ورودی",
         "balance_action_input_value": "مبلغ را به تومان ارسال کنید (فقط عدد).",
         "balance_action_tip": "💡 با دکمه بازگشت می‌توانید به پروفایل کاربر برگردید.",
         "add_config_title": "➕ <b>افزودن کانفیگ</b>",
-        "add_config_format_emoji": "🧾",
-        "add_config_format_label": "فرمت",
+        "add_config_format_label": "🧾 فرمت",
         "add_config_format_value": "خط اول: نام سرویس\n---\nخط دوم: متن کانفیگ\n---\n(اختیاری) لینک استعلام",
         "add_config_tip": "💡 جداکننده بین بخش‌ها باید دقیقاً --- باشد.",
         "search_config_title": "🔎 <b>جستجو در کانفیگ‌ها</b>",
-        "search_config_input_emoji": "📝",
-        "search_config_input_label": "ورودی",
+        "search_config_input_label": "📝 ورودی",
         "search_config_input_value": "عبارت جستجو را ارسال کنید. برای پاک‌کردن از \"-\" استفاده کنید.",
         "search_config_tip": "💡 جستجو روی نام سرویس، متن کانفیگ و لینک استعلام انجام می‌شود."
       },
@@ -727,22 +721,19 @@
       },
       "nav": {
         "title": "⚙️ <b>ناوبری پنل مدیریت</b>",
-        "line_emoji": "📍",
-        "line_label": "ماژول انتخاب‌شده",
+        "line_label": "📍 ماژول انتخاب‌شده",
         "tip": "💡 این ماژول در chunkهای بعدی به‌صورت کامل به reply/state مهاجرت می‌شود. برای ادامه از بازگشت یا منوی اصلی استفاده کنید."
       },
       "agents": {
         "title": "🤝 <b>مدیریت نماینده‌ها</b>",
-        "list_emoji": "📋",
-        "list_label": "لیست",
+        "list_label": "📋 لیست",
         "empty": "نماینده‌ای ثبت نشده است.",
         "tip": "💡 نماینده را انتخاب کنید تا قیمت اختصاصی پکیج‌ها را مدیریت کنید.",
         "button": "{num} - نماینده {id}"
       },
       "agent_view": {
         "title": "🤝 <b>قیمت‌گذاری نماینده {agent_id}</b>",
-        "packages_emoji": "📦",
-        "packages_label": "پکیج‌ها",
+        "packages_label": "📦 پکیج‌ها",
         "tip": "💡 پکیج را انتخاب کنید و قیمت اختصاصی را ثبت یا حذف کنید.",
         "package_button": "{num} - پکیج {id}"
       },
@@ -751,15 +742,13 @@
       },
       "broadcast": {
         "title": "📣 <b>ارسال همگانی</b>",
-        "step_emoji": "📝",
-        "step_label": "مرحله ۱",
+        "step_label": "📝 مرحله ۱",
         "step_value": "متن پیام همگانی را ارسال کنید.",
         "tip": "💡 بعد از متن، scope انتخاب می‌شود و سپس ارسال نهایی تایید می‌گردد."
       },
       "freetest": {
         "title": "🧪 <b>مدیریت تست رایگان</b>",
-        "rules_emoji": "📋",
-        "rules_label": "قوانین",
+        "rules_label": "📋 قوانین",
         "rules_empty": "قانونی ثبت نشده است.",
         "tip": "💡 اگر کاربری به‌اشتباه سهمیه‌اش مصرف شده یا نیاز به بررسی دوباره دارد، از همین بخش می‌توانید سهمیه او را ریست کنید."
       },
@@ -788,11 +777,9 @@
           "title": "📦 <b>جزئیات پکیج</b>",
           "name_label": "👤 نام",
           "type_label": "🧩 نوع",
-          "volume_emoji": "💾",
-          "volume_label": "حجم",
+          "volume_label": "💾 حجم",
           "volume_value": "{volume} GB",
-          "duration_emoji": "⏳",
-          "duration_label": "مدت",
+          "duration_label": "⏳ مدت",
           "duration_value": "{days} روز",
           "price_label": "💵 قیمت",
           "price_value": "{amount} تومان",
@@ -808,8 +795,7 @@
         },
         "panel_view": {
           "title": "🖥 <b>پنل #{panel_id}</b>",
-          "name_emoji": "📛",
-          "name_label": "نام",
+          "name_label": "📛 نام",
           "packages_label": "📦 پکیج‌ها",
           "packages_empty": "پکیجی ثبت نشده است.",
           "tip": "💡 عملیات حساس مانند حذف پنل نیازمند تایید هستند."
@@ -852,8 +838,7 @@
             "invalid_type_package": "نوع/پکیج معتبر نبود.",
             "title": "🗂 <b>لیست کانفیگ‌های پکیج</b>",
             "package_label": "📦 پکیج",
-            "search_emoji": "🔎",
-            "search_label": "فیلتر جستجو",
+            "search_label": "🔎 فیلتر جستجو",
             "list_label": "📋 کانفیگ‌ها",
             "empty": "کانفیگی مطابق فیلتر پیدا نشد.",
             "tip": "💡 برای جزئیات هر کانفیگ، شماره همان مورد را انتخاب کنید.",
@@ -895,8 +880,7 @@
         "requests": {
           "root": {
             "title": "🗂 <b>مدیریت درخواست‌ها</b>",
-            "step_emoji": "📌",
-            "step_label": "مرحله اول",
+            "step_label": "📌 مرحله اول",
             "step_value": "نوع درخواست را انتخاب کنید.",
             "tip": "💡 بعد از انتخاب نوع، می‌توانید وضعیت pending/approved/rejected را فیلتر کنید."
           },
@@ -924,8 +908,7 @@
             "title": "📝 <b>{kind_title}</b>",
             "id_label": "🔢 شناسه",
             "user_label": "👤 کاربر",
-            "created_emoji": "🕒",
-            "created_label": "زمان ثبت",
+            "created_label": "🕒 زمان ثبت",
             "note_label": "🧾 متن درخواست",
             "tip": "💡 قبل از تایید یا رد، متن درخواست را کامل بررسی کنید."
           }
@@ -980,8 +963,7 @@
             "not_found": "پیام پین پیدا نشد.",
             "title": "📝 <b>پیام پین #{pin_id}</b>",
             "text_label": "🧾 متن",
-            "sent_emoji": "📤",
-            "sent_label": "ارسال‌شده",
+            "sent_label": "📤 ارسال‌شده",
             "tip": "💡 ارسال همگانی ممکن است زمان‌بر باشد."
           }
         },

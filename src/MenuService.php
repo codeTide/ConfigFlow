@@ -29,7 +29,7 @@ final class MenuService
             title: $this->catalog->get('menus.main.title'),
             lines: [
                 new UiTextLine(
-                    $this->catalog->get('emojis.compass'),
+                    '',
                     $this->catalog->get('menus.main.guide_label'),
                     $this->catalog->get('menus.main.guide_value')
                 ),
@@ -74,7 +74,7 @@ final class MenuService
             title: $this->catalog->get('menus.admin.title'),
             lines: [
                 new UiTextLine(
-                    $this->catalog->get('emojis.compass'),
+                    '',
                     $this->catalog->get('menus.admin.guide_label'),
                     $this->catalog->get('menus.admin.guide_value')
                 ),
@@ -150,7 +150,7 @@ final class MenuService
 
         $lines = [
             new UiTextLine(
-                $this->catalog->get('emojis.support_id'),
+                '',
                 $this->catalog->get('menus.support.support_id_label'),
                 htmlspecialchars($username !== '' ? $username : $this->catalog->get('messages.generic.dash'))
             ),
