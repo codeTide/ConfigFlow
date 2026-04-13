@@ -29,10 +29,6 @@ final class KeyboardBuilder
             ],
         ];
 
-        if ($freeTestEnabled) {
-            $keyboard[] = [['text' => self::BTN_FREE_TEST, 'callback_data' => 'test:start']];
-        }
-
         $keyboard[] = [
             ['text' => self::BTN_PROFILE, 'callback_data' => 'profile'],
             ['text' => self::BTN_WALLET, 'callback_data' => 'wallet:charge'],
@@ -41,10 +37,6 @@ final class KeyboardBuilder
 
         if ($referralEnabled) {
             $keyboard[] = [['text' => self::BTN_REFERRAL, 'callback_data' => 'referral:menu']];
-        }
-
-        if ($agencyEnabled) {
-            $keyboard[] = [['text' => self::BTN_AGENCY, 'callback_data' => 'agency:request']];
         }
 
         if ($isAdmin) {
@@ -97,13 +89,11 @@ final class KeyboardBuilder
 
     public static function referral(string $shareUrl): array
     {
-        $rows = [];
         if ($shareUrl !== '') {
-            $rows[] = [['text' => '📤 اشتراک‌گذاری لینک دعوت', 'url' => $shareUrl]];
+            return ['inline_keyboard' => [[['text' => '📤 اشتراک‌گذاری لینک دعوت', 'url' => $shareUrl]]]];
         }
-        $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'nav:main']];
 
-        return ['inline_keyboard' => $rows];
+        return [];
     }
 
     public static function adminPanel(): array
@@ -135,6 +125,7 @@ final class KeyboardBuilder
             '📚 موجودی',
             '👥 کاربران',
             '⚙️ تنظیمات',
+            '🧪 تست رایگان',
             '👮 ادمین‌ها',
             '📣 همگانی',
             '📌 پین‌ها',

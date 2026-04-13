@@ -9,6 +9,7 @@ require_once __DIR__ . '/../src/Bootstrap.php';
 require_once __DIR__ . '/../src/Config.php';
 require_once __DIR__ . '/../src/WorkerApiStore.php';
 require_once __DIR__ . '/../src/Database.php';
+require_once __DIR__ . '/../src/MigrationRunner.php';
 
 Bootstrap::loadEnv(__DIR__ . '/../.env');
 
@@ -62,6 +63,8 @@ $pdo->exec(
         INDEX idx_agency_status (status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
 );
+$migrator = new \ConfigFlow\Bot\MigrationRunner($pdo, __DIR__ . '/../migrations');
+$migrator->applyAll();
 
 $defaults = [
     'bot_status' => 'on',
