@@ -42,6 +42,7 @@ if (PHP_SAPI === 'cli') {
 header('Content-Type: text/html; charset=utf-8');
 $message = '';
 $applied = [];
+$isError = false;
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
         $applied = $runner->applyAll();
@@ -49,23 +50,107 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } catch (Throwable $e) {
         http_response_code(500);
         $message = 'Migration failed: ' . $e->getMessage();
+        $isError = true;
     }
 }
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="fa">
 <head>
     <meta charset="utf-8">
     <title>ConfigFlow Migrations</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --ok-bg: #ecfdf3;
+            --ok-text: #166534;
+            --err-bg: #fef2f2;
+            --err-text: #991b1b;
+            --border: #e2e8f0;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Tahoma, Arial, sans-serif;
+            background: linear-gradient(180deg, #eef4ff 0%, var(--bg) 40%);
+            color: var(--text);
+        }
+        .wrap {
+            max-width: 860px;
+            margin: 48px auto;
+            padding: 0 16px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+            padding: 28px;
+        }
+        h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+        p {
+            margin: 0 0 18px;
+            color: var(--muted);
+            line-height: 1.8;
+        }
+        .btn {
+            appearance: none;
+            border: none;
+            border-radius: 10px;
+            padding: 11px 18px;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn:hover { background: var(--primary-hover); }
+        .notice {
+            margin-top: 18px;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px;
+            border: 1px solid var(--border);
+            white-space: pre-wrap;
+        }
+        .notice.ok {
+            background: var(--ok-bg);
+            color: var(--ok-text);
+            border-color: #bbf7d0;
+        }
+        .notice.err {
+            background: var(--err-bg);
+            color: var(--err-text);
+            border-color: #fecaca;
+        }
+        .hint {
+            margin-top: 14px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+    </style>
 </head>
-<body style="font-family: sans-serif; max-width: 820px; margin: 2rem auto;">
-<h2>ConfigFlow Migration Runner</h2>
-<p>This page applies pending SQL files from <code>/migrations</code>.</p>
-<form method="post">
-    <button type="submit">Apply pending migrations</button>
-</form>
-<?php if ($message !== ''): ?>
-    <pre style="margin-top:1rem;padding:0.75rem;background:#f4f4f4;white-space:pre-wrap;"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></pre>
-<?php endif; ?>
+<body>
+<div class="wrap">
+    <div class="card">
+        <h1>🛠 اجرای مایگریشن‌های ConfigFlow</h1>
+        <p>از این بخش می‌توانید مایگریشن‌های pending را از پوشه <code>/migrations</code> اجرا کنید.</p>
+        <form method="post">
+            <button class="btn" type="submit">اجرای مایگریشن‌ها</button>
+        </form>
+        <?php if ($message !== ''): ?>
+            <div class="notice <?= $isError ? 'err' : 'ok' ?>"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></div>
+        <?php endif; ?>
+        <div class="hint">پیشنهاد: بعد از هر آپدیت پروژه، یک‌بار این صفحه یا دستور <code>php migrate.php</code> را اجرا کنید.</div>
+    </div>
+</div>
 </body>
 </html>

@@ -31,24 +31,15 @@ final class MigrationRunner
                 throw new RuntimeException("Migration file is empty or unreadable: {$name}");
             }
 
-            $this->pdo->beginTransaction();
-            try {
-                $this->pdo->exec($sql);
-                $insert = $this->pdo->prepare(
-                    'INSERT INTO schema_migrations (migration_name, applied_at) VALUES (:migration_name, :applied_at)'
-                );
-                $insert->execute([
-                    'migration_name' => $name,
-                    'applied_at' => gmdate('Y-m-d H:i:s'),
-                ]);
-                $this->pdo->commit();
-                $ran[] = $name;
-            } catch (\Throwable $e) {
-                if ($this->pdo->inTransaction()) {
-                    $this->pdo->rollBack();
-                }
-                throw $e;
-            }
+            $this->pdo->exec($sql);
+            $insert = $this->pdo->prepare(
+                'INSERT INTO schema_migrations (migration_name, applied_at) VALUES (:migration_name, :applied_at)'
+            );
+            $insert->execute([
+                'migration_name' => $name,
+                'applied_at' => gmdate('Y-m-d H:i:s'),
+            ]);
+            $ran[] = $name;
         }
 
         return $ran;
