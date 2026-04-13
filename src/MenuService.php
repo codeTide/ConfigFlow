@@ -59,9 +59,11 @@ final class MenuService
             return '⚠️ اطلاعات حساب پیدا نشد.';
         }
 
-        $username = $user['username'] ?? '';
-        if ($username === '' || $username === null) {
+        $username = trim((string) ($user['username'] ?? ''));
+        if ($username === '') {
             $username = '-';
+        } elseif (!str_starts_with($username, '@')) {
+            $username = '@' . $username;
         }
 
         $balance = (int) ($user['balance'] ?? 0);
@@ -71,7 +73,7 @@ final class MenuService
         return "👤 <b>پروفایل کاربری</b>\n\n"
             . "📱 نام: " . htmlspecialchars((string) ($user['full_name'] ?? '-')) . "\n"
             . "🏷 نام کاربری: " . htmlspecialchars((string) $username) . "\n"
-            . "🪪 آیدی: <code>{$userIdFa}</code>\n\n"
+            . "🔢 آیدی: <code>{$userIdFa}</code>\n\n"
             . "💰 موجودی: <b>{$balanceFa}</b> تومان\n\n"
             . "<blockquote>🔐 حساب شما امن نگه داشته شده؛ برای شارژ، دعوت یا نمایندگی از دکمه‌های همین بخش استفاده کنید.</blockquote>";
     }
