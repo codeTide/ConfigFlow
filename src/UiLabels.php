@@ -7,11 +7,11 @@ namespace ConfigFlow\Bot;
 final class UiLabels
 {
     // Backward-compatible constants for flows that are not migrated yet.
-    public const BTN_BACK = '↩️ بازگشت';
-    public const BTN_MAIN = '🏠 منوی اصلی';
-    public const BTN_CANCEL = '❌ انصراف';
+    public const BTN_BACK = '[legacy] buttons.back';
+    public const BTN_MAIN = '[legacy] buttons.main_menu';
+    public const BTN_CANCEL = '[legacy] buttons.cancel';
 
-    public const BTN_CONFIRM_YES = '✅ تایید';
+    public const BTN_CONFIRM_YES = '[legacy] buttons.confirm_yes';
     public const BTN_CONFIRM_NO = self::BTN_CANCEL;
 
     private function __construct()

@@ -70,8 +70,8 @@ final class UiTextCatalog implements UiTextCatalogInterface
         $block = new UiTextBlock(
             title: $this->catalog->get('payments.created.title', ['title' => $escapedTitle]),
             lines: [
-                new UiTextLine('🧾', $this->catalog->get('payments.created.id_label'), '<code>' . $paymentId . '</code>'),
-                new UiTextLine('💰', $this->catalog->get('payments.created.amount_label'), $this->catalog->get('payments.created.amount_value', ['amount' => $amount])),
+                new UiTextLine($this->catalog->get('emojis.receipt'), $this->catalog->get('payments.created.id_label'), '<code>' . $paymentId . '</code>'),
+                new UiTextLine($this->catalog->get('emojis.money'), $this->catalog->get('payments.created.amount_label'), $this->catalog->get('payments.created.amount_value', ['amount' => $amount])),
             ],
             tipBlockquote: $tip,
         );

@@ -12,7 +12,9 @@ final class DatabaseBackupService
         private Database $database,
         private TelegramClient $telegram,
         private SettingsRepository $settings,
+        private ?UiJsonCatalog $catalog = null,
     ) {
+        $this->catalog ??= new UiJsonCatalog();
     }
 
     public function sendBackup(?int $targetChatId = null): bool
@@ -28,7 +30,7 @@ final class DatabaseBackupService
             return false;
         }
 
-        $caption = '🗄 بکاپ دیتابیس\n' . gmdate('Y-m-d H:i:s') . ' UTC';
+        $caption = $this->catalog->get('admin.ui.backup.caption', ['datetime' => gmdate('Y-m-d H:i:s')]);
         $this->telegram->sendDocumentFile($chatId, $file, $caption);
 
         $groupIdRaw = trim($this->settings->get('group_id', ''));
