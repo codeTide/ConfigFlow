@@ -42,7 +42,17 @@ final class MessageHandler
 
         $text = trim((string) ($message['text'] ?? ''));
         if (!str_starts_with($text, '/start') && !$this->checkChannelMembership($userId)) {
+            if ($text === KeyboardBuilder::BTN_CHECK_CHANNEL) {
+                if ($this->checkChannelMembership($userId)) {
+                    $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+                } else {
+                    $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
+                    $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
+                }
+                return;
+            }
             $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
+            $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
             return;
         }
 
@@ -99,6 +109,22 @@ final class MessageHandler
             return;
         }
 
+        if ($state['state_name'] === 'await_admin_stock_results_open') {
+            if ($text === '📚 نمایش نتایج موجودی') {
+                $route = (string) (($state['payload'] ?? [])['route'] ?? '');
+                if ($route !== '') {
+                    $this->database->clearUserState($userId);
+                    $this->dispatchReplyAsCallback($chatId, $messageId, $fromUser, $route);
+                }
+                return;
+            }
+            if ($text === KeyboardBuilder::BTN_ADMIN) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, '⚙️ <b>پنل مدیریت</b>', KeyboardBuilder::adminPanelReply());
+                return;
+            }
+        }
+
         if ($state['state_name'] === 'await_wallet_amount') {
             if ($text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->database->clearUserState($userId);
@@ -138,14 +164,10 @@ final class MessageHandler
                 . 'بعد از تایید ادمین موجودی شما شارژ می‌شود.'
             );
 
-            $adminKeyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
-                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
-                    ],
-                ],
-            ];
+            $adminKeyboard = $this->replyKeyboard([
+                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
+                [KeyboardBuilder::BTN_ADMIN],
+            ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
@@ -189,14 +211,10 @@ final class MessageHandler
                 "✅ رسید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
             );
 
-            $adminKeyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
-                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
-                    ],
-                ],
-            ];
+            $adminKeyboard = $this->replyKeyboard([
+                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
+                [KeyboardBuilder::BTN_ADMIN],
+            ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
@@ -239,14 +257,10 @@ final class MessageHandler
                 "✅ رسید تمدید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
             );
 
-            $adminKeyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
-                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
-                    ],
-                ],
-            ];
+            $adminKeyboard = $this->replyKeyboard([
+                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
+                [KeyboardBuilder::BTN_ADMIN],
+            ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
@@ -296,14 +310,10 @@ final class MessageHandler
                 "✅ TX Hash ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
             );
 
-            $adminKeyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
-                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
-                    ],
-                ],
-            ];
+            $adminKeyboard = $this->replyKeyboard([
+                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
+                [KeyboardBuilder::BTN_ADMIN],
+            ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
@@ -353,14 +363,10 @@ final class MessageHandler
                 "✅ TX Hash تمدید ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{$paymentId}</code>"
             );
 
-            $adminKeyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '✅ تایید', 'callback_data' => 'pay:approve:' . $paymentId],
-                        ['text' => '❌ رد', 'callback_data' => 'pay:reject:' . $paymentId],
-                    ],
-                ],
-            ];
+            $adminKeyboard = $this->replyKeyboard([
+                ["✅ تایید #{$paymentId}", "❌ رد #{$paymentId}"],
+                [KeyboardBuilder::BTN_ADMIN],
+            ]);
             foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
@@ -400,12 +406,11 @@ final class MessageHandler
                     . "شناسه: <code>{$requestId}</code>\n"
                     . "کاربر: <code>{$userId}</code>\n"
                     . "توضیح:\n" . htmlspecialchars($text),
-                    [
-                        'inline_keyboard' => [
-                            [['text' => '👀 مشاهده درخواست', 'callback_data' => 'admin:req:free:view:' . $requestId]],
-                            [['text' => '🗂 مدیریت درخواست‌ها', 'callback_data' => 'admin:requests']],
-                        ],
-                    ]
+                    $this->replyKeyboard([
+                        ["👀 درخواست تست #{$requestId}"],
+                        ['🗂 درخواست‌ها'],
+                        [KeyboardBuilder::BTN_ADMIN],
+                    ])
                 );
             }
             return;
@@ -436,12 +441,11 @@ final class MessageHandler
                     . "شناسه: <code>{$requestId}</code>\n"
                     . "کاربر: <code>{$userId}</code>\n"
                     . "متن درخواست:\n" . htmlspecialchars($text),
-                    [
-                        'inline_keyboard' => [
-                            [['text' => '👀 مشاهده درخواست', 'callback_data' => 'admin:req:agency:view:' . $requestId]],
-                            [['text' => '🗂 مدیریت درخواست‌ها', 'callback_data' => 'admin:requests']],
-                        ],
-                    ]
+                    $this->replyKeyboard([
+                        ["👀 درخواست نمایندگی #{$requestId}"],
+                        ['🗂 درخواست‌ها'],
+                        [KeyboardBuilder::BTN_ADMIN],
+                    ])
                 );
             }
             return;
@@ -524,8 +528,7 @@ final class MessageHandler
                 $this->telegram->editMessageText(
                     $sourceChatId,
                     $sourceMessageId,
-                    "{$label} <code>{$requestId}</code> {$statusText}.",
-                    ['inline_keyboard' => [[['text' => '🔙 بازگشت', 'callback_data' => 'admin:requests']]]]
+                    "{$label} <code>{$requestId}</code> {$statusText}."
                 );
             }
             $this->telegram->sendMessage(
@@ -675,13 +678,14 @@ final class MessageHandler
                 $query === ''
                     ? "✅ جستجو پاک شد. برای مشاهده نتایج روی دکمه زیر بزنید."
                     : "✅ جستجو ثبت شد: <code>" . htmlspecialchars($query) . "</code>\nبرای مشاهده نتایج روی دکمه زیر بزنید.",
-                [
-                    'inline_keyboard' => [[[
-                        'text' => '📚 نمایش نتایج موجودی',
-                        'callback_data' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':1:' . $statusToken . ':' . $token,
-                    ]]],
-                ]
+                $this->replyKeyboard([
+                    ['📚 نمایش نتایج موجودی'],
+                    [KeyboardBuilder::BTN_ADMIN],
+                ])
             );
+            $this->database->setUserState($userId, 'await_admin_stock_results_open', [
+                'route' => 'admin:stock:pkg:' . $packageId . ':' . $typeId . ':1:' . $statusToken . ':' . $token,
+            ]);
             return;
         }
 
@@ -1092,6 +1096,26 @@ ID: <code>{$pinId}</code>");
         }
 
         if ($this->database->isAdminUser($userId)) {
+            if (preg_match('/^✅\s*تایید\s*#(\d+)$/u', $text, $m) === 1) {
+                $this->dispatchReplyAsCallback($chatId, $messageId, $fromUser, 'pay:approve:' . (int) $m[1]);
+                return true;
+            }
+            if (preg_match('/^❌\s*رد\s*#(\d+)$/u', $text, $m) === 1) {
+                $this->dispatchReplyAsCallback($chatId, $messageId, $fromUser, 'pay:reject:' . (int) $m[1]);
+                return true;
+            }
+            if (preg_match('/^👀\s*درخواست تست\s*#(\d+)$/u', $text, $m) === 1) {
+                $this->dispatchReplyAsCallback($chatId, $messageId, $fromUser, 'admin:req:free:view:' . (int) $m[1]);
+                return true;
+            }
+            if (preg_match('/^👀\s*درخواست نمایندگی\s*#(\d+)$/u', $text, $m) === 1) {
+                $this->dispatchReplyAsCallback($chatId, $messageId, $fromUser, 'admin:req:agency:view:' . (int) $m[1]);
+                return true;
+            }
+            if (preg_match('/^✅\s*تایید تمدید\s*#(\d+):(\d+)$/u', $text, $m) === 1) {
+                $this->dispatchReplyAsCallback($chatId, $messageId, $fromUser, 'renew:confirm:' . (int) $m[1] . ':' . (int) $m[2]);
+                return true;
+            }
             $adminRouteMap = [
                 '🧩 نوع/پکیج' => 'admin:types',
                 '📚 موجودی' => 'admin:stock',
@@ -1987,10 +2011,12 @@ ID: <code>{$pinId}</code>");
     {
         $channelId = trim($this->settings->get('channel_id', ''));
         $channelUrl = $this->channelJoinUrl($channelId);
-        return ['inline_keyboard' => [
-            [['text' => '📢 عضویت در کانال', 'url' => $channelUrl]],
-            [['text' => '✅ عضو شدم', 'callback_data' => 'check_channel']],
-        ]];
+        return ['inline_keyboard' => [[['text' => '📢 عضویت در کانال', 'url' => $channelUrl]]]];
+    }
+
+    private function channelLockReplyKeyboard(): array
+    {
+        return $this->replyKeyboard([[KeyboardBuilder::BTN_CHECK_CHANNEL]]);
     }
 
     private function channelJoinUrl(string $channelId): string
@@ -2033,6 +2059,7 @@ ID: <code>{$pinId}</code>");
             KeyboardBuilder::BTN_BACK_ACCOUNT,
             KeyboardBuilder::BTN_BACK_TYPES,
             KeyboardBuilder::BTN_BACK_PURCHASES,
+            KeyboardBuilder::BTN_CHECK_CHANNEL,
         ], true);
     }
 }

@@ -69,6 +69,7 @@ final class StartHandler
 
         if (!$this->checkChannelMembership($userId)) {
             $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
+            $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
             return;
         }
 
@@ -105,10 +106,16 @@ final class StartHandler
     {
         $channelId = trim($this->settings->get('channel_id', ''));
         $channelUrl = $this->channelJoinUrl($channelId);
-        return ['inline_keyboard' => [
-            [['text' => '📢 عضویت در کانال', 'url' => $channelUrl]],
-            [['text' => '✅ عضو شدم', 'callback_data' => 'check_channel']],
-        ]];
+        return ['inline_keyboard' => [[['text' => '📢 عضویت در کانال', 'url' => $channelUrl]]]];
+    }
+
+    private function channelLockReplyKeyboard(): array
+    {
+        return [
+            'keyboard' => [[KeyboardBuilder::BTN_CHECK_CHANNEL]],
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+        ];
     }
 
     private function channelJoinUrl(string $channelId): string

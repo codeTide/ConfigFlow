@@ -67,6 +67,7 @@ final class CallbackHandler
             } else {
                 $this->telegram->answerCallbackQuery($callbackId, '❌ هنوز عضو کانال نشده‌اید.');
                 $this->telegram->editMessageText($chatId, $messageId, $this->channelLockText(), $this->channelLockKeyboard());
+                $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
             }
             return;
         }
@@ -74,6 +75,7 @@ final class CallbackHandler
         if (!$this->checkChannelMembership($userId)) {
             $this->telegram->answerCallbackQuery($callbackId);
             $this->telegram->editMessageText($chatId, $messageId, $this->channelLockText(), $this->channelLockKeyboard());
+            $this->telegram->sendMessage($chatId, 'بعد از عضویت، از دکمه معمولی زیر استفاده کنید:', $this->channelLockReplyKeyboard());
             return;
         }
 
@@ -3454,7 +3456,11 @@ final class CallbackHandler
             . "پکیج تمدید: <b>{$pkgName}</b>\n"
             . "مبلغ: <b>{$amount}</b> تومان";
         $keyboard = $configId > 0
-            ? ['inline_keyboard' => [[['text' => '✅ تایید تمدید', 'callback_data' => 'renew:confirm:' . $configId . ':' . $userId]]]]
+            ? [
+                'keyboard' => [["✅ تایید تمدید #{$configId}:{$userId}"], [KeyboardBuilder::BTN_ADMIN]],
+                'resize_keyboard' => true,
+                'is_persistent' => true,
+            ]
             : null;
         foreach (Config::adminIds() as $adminId) {
             $this->telegram->sendMessage((int) $adminId, $text, $keyboard);
@@ -3486,10 +3492,16 @@ final class CallbackHandler
     {
         $channelId = trim($this->settings->get('channel_id', ''));
         $channelUrl = $this->channelJoinUrl($channelId);
-        return ['inline_keyboard' => [
-            [['text' => '📢 عضویت در کانال', 'url' => $channelUrl]],
-            [['text' => '✅ عضو شدم', 'callback_data' => 'check_channel']],
-        ]];
+        return ['inline_keyboard' => [[['text' => '📢 عضویت در کانال', 'url' => $channelUrl]]]];
+    }
+
+    private function channelLockReplyKeyboard(): array
+    {
+        return [
+            'keyboard' => [[KeyboardBuilder::BTN_CHECK_CHANNEL]],
+            'resize_keyboard' => true,
+            'is_persistent' => true,
+        ];
     }
 
     private function channelJoinUrl(string $channelId): string

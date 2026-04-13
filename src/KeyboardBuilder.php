@@ -19,32 +19,7 @@ final class KeyboardBuilder
     public const BTN_BACK_ACCOUNT = '↩️ بازگشت';
     public const BTN_BACK_TYPES = '🔙 بازگشت به سرویس‌ها';
     public const BTN_BACK_PURCHASES = '🔙 بازگشت به سفارش‌ها';
-
-    public static function main(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
-    {
-        $keyboard = [
-            [
-                ['text' => self::BTN_BUY, 'callback_data' => 'buy:start'],
-                ['text' => self::BTN_MY_CONFIGS, 'callback_data' => 'my_configs'],
-            ],
-        ];
-
-        $keyboard[] = [
-            ['text' => self::BTN_PROFILE, 'callback_data' => 'profile'],
-            ['text' => self::BTN_WALLET, 'callback_data' => 'wallet:charge'],
-        ];
-        $keyboard[] = [['text' => self::BTN_SUPPORT, 'callback_data' => 'support']];
-
-        if ($referralEnabled) {
-            $keyboard[] = [['text' => self::BTN_REFERRAL, 'callback_data' => 'referral:menu']];
-        }
-
-        if ($isAdmin) {
-            $keyboard[] = [['text' => self::BTN_ADMIN, 'callback_data' => 'admin:panel']];
-        }
-
-        return ['inline_keyboard' => $keyboard];
-    }
+    public const BTN_CHECK_CHANNEL = '✅ عضو شدم';
 
     public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
     {
