@@ -59,9 +59,11 @@ final class MenuService
             return '⚠️ اطلاعات حساب پیدا نشد.';
         }
 
-        $username = $user['username'] ?? '';
-        if ($username === '' || $username === null) {
+        $username = trim((string) ($user['username'] ?? ''));
+        if ($username === '') {
             $username = '-';
+        } elseif (!str_starts_with($username, '@')) {
+            $username = '@' . $username;
         }
 
         $balance = (int) ($user['balance'] ?? 0);
@@ -71,7 +73,7 @@ final class MenuService
         return "👤 <b>پروفایل کاربری</b>\n\n"
             . "📱 نام: " . htmlspecialchars((string) ($user['full_name'] ?? '-')) . "\n"
             . "🏷 نام کاربری: " . htmlspecialchars((string) $username) . "\n"
-            . "🪪 آیدی: <code>{$userIdFa}</code>\n\n"
+            . "🔢 آیدی: <code>{$userIdFa}</code>\n\n"
             . "💰 موجودی: <b>{$balanceFa}</b> تومان\n\n"
             . "<blockquote>🔐 حساب شما امن نگه داشته شده؛ برای شارژ، دعوت یا نمایندگی از دکمه‌های همین بخش استفاده کنید.</blockquote>";
     }
@@ -151,15 +153,18 @@ final class MenuService
         $stats = $this->database->referralStats($userId);
         $botUsername = Config::botUsername();
         $refLink = $botUsername !== '' ? "https://t.me/{$botUsername}?start=ref_{$userId}" : "ref_{$userId}";
+        $totalReferralsFa = $this->toPersianDigits((string) ($stats['total_referrals'] ?? 0));
+        $purchaseCountFa = $this->toPersianDigits((string) ($stats['purchase_count'] ?? 0));
+        $totalPurchaseAmountFa = $this->toPersianDigits((string) ($stats['total_purchase_amount'] ?? 0));
 
         $banner = trim($this->settings->get('referral_banner_text', ''));
         $intro = $banner !== '' ? $banner . "\n\n" : "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>\n\n";
 
         return $intro
-            . "📊 زیرمجموعه‌ها: <b>{$stats['total_referrals']}</b>\n"
-            . "🛒 خریدهای زیرمجموعه: <b>{$stats['purchase_count']}</b>\n"
-            . "💵 مجموع خرید زیرمجموعه: <b>{$stats['total_purchase_amount']}</b> تومان\n\n"
-            . "🔗 لینک دعوت شما:\n<code>{$refLink}</code>";
+            . "📊 زیرمجموعه‌ها: <b>{$totalReferralsFa}</b>\n"
+            . "🛒 خریدهای زیرمجموعه: <b>{$purchaseCountFa}</b>\n"
+            . "💵 مجموع خرید زیرمجموعه: <b>{$totalPurchaseAmountFa}</b> تومان\n\n"
+            . "🔗 لینک دعوت شما:\n\n<code>{$refLink}</code>";
     }
 
     public function referralShareUrl(int $userId): string
