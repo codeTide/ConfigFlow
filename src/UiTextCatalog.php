@@ -99,16 +99,34 @@ final class UiTextCatalog implements UiTextCatalogInterface
         }
 
         $words = preg_split('/\s+/u', $tip) ?: [];
-        if (count($words) < 8 || mb_strlen($tip) < 45) {
+        if (count($words) < 8 || $this->stringLength($tip) < 45) {
             throw new \InvalidArgumentException('Tip must be at least about 1 to 1.5 lines and context-rich.');
         }
 
         foreach (self::GENERIC_TIPS as $generic) {
-            if (mb_strtolower($tip) === mb_strtolower($generic)) {
+            if ($this->stringLower($tip) === $this->stringLower($generic)) {
                 throw new \InvalidArgumentException('Generic tips are not allowed.');
             }
         }
 
         return $tip;
+    }
+
+    private function stringLength(string $value): int
+    {
+        if (function_exists('mb_strlen')) {
+            return mb_strlen($value, 'UTF-8');
+        }
+
+        return strlen($value);
+    }
+
+    private function stringLower(string $value): string
+    {
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower($value, 'UTF-8');
+        }
+
+        return strtolower($value);
     }
 }
