@@ -1435,7 +1435,7 @@ final class MessageHandler
         }
         $types = $this->database->getActiveTypes();
         if ($types === []) {
-            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.buy.no_active_service')));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('emojis.cart') . ' ' . $this->catalog->get('messages.user.buy.no_active_service'));
             return;
         }
 
@@ -1455,7 +1455,7 @@ final class MessageHandler
         }
 
         if ($optionMap === []) {
-            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.buy.no_active_service')));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('emojis.cart') . ' ' . $this->catalog->get('messages.user.buy.no_active_service'));
             return;
         }
 
@@ -4074,7 +4074,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.freetest.title'), lines: [new UiTextLine($this->catalog->get('admin.ui.freetest.rules_emoji'), $this->catalog->get('admin.ui.freetest.rules_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.freetest.rules_empty'))], tipBlockquote: $this->catalog->get('admin.ui.freetest.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_FREETEST_RULE), $this->uiConst(self::ADMIN_FREETEST_RESET)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.freetest.title'), lines: [new UiTextLine($this->catalog->get('admin.ui.freetest.rules_emoji'), $this->catalog->get('admin.ui.freetest.rules_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.freetest.rules_empty'))], tipBlockquote: $this->catalog->get('admin.ui.freetest.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_FREETEST_RULE), $this->uiConst(self::ADMIN_FREETEST_RESET)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
     }
 
     private function handleBuyTypeSelectionState(int $chatId, int $userId, string $text, array $state): void

@@ -173,7 +173,7 @@ final class MenuService
     {
         $count = $this->database->countUserPurchases($userId);
         if ($count === 0) {
-            return $this->uiText->info($this->catalog->get('errors.no_configs'));
+            return $this->catalog->get('emojis.package') . ' ' . $this->catalog->get('errors.no_configs');
         }
 
         $items = $this->database->listUserPurchasesSummary($userId, 8);
@@ -227,7 +227,7 @@ final class MenuService
                 new UiTextLine($this->catalog->get('emojis.chart'), $this->catalog->get('menus.referral.total_referrals_label'), "<b>{$totalReferralsFa}</b>"),
                 new UiTextLine($this->catalog->get('emojis.cart'), $this->catalog->get('menus.referral.purchase_count_label'), "<b>{$purchaseCountFa}</b>"),
                 new UiTextLine($this->catalog->get('emojis.cash'), $this->catalog->get('menus.referral.total_purchase_amount_label'), $this->catalog->get('menus.referral.total_purchase_amount_value', ['amount' => $totalPurchaseAmountFa])),
-                new UiTextLine($this->catalog->get('emojis.link'), $this->catalog->get('menus.referral.invite_link_label'), "<code>{$refLink}</code>"),
+                new UiTextLine($this->catalog->get('emojis.link'), $this->catalog->get('menus.referral.invite_link_label'), "\n\n<code>{$refLink}</code>"),
             ],
             tipBlockquote: $this->catalog->get('menus.referral.tip'),
         ));
