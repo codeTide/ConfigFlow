@@ -2567,46 +2567,6 @@ final class CallbackHandler
             return;
         }
 
-        if ($data === 'test:start') {
-            $claim = $this->database->claimFreeTest($userId);
-            if (($claim['ok'] ?? false) !== true) {
-                $this->telegram->editMessageText(
-                    $chatId,
-                    $messageId,
-                    "🎁 <b>تست رایگان</b>\n\nدر حال حاضر سرویس تست آماده نداریم یا سهمیه شما کامل شده است."
-                );
-                $this->telegram->answerCallbackQuery($callbackId);
-                return;
-            }
-            $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? 'سرویس تست'));
-            $configText = htmlspecialchars((string) ($claim['config_text'] ?? ''));
-            $inquiryLink = trim((string) ($claim['inquiry_link'] ?? ''));
-            $msg = "🎁 <b>تست رایگان شما آماده است</b>\n\n"
-                . "📦 سرویس: <b>{$serviceName}</b>\n"
-                . "🧪 نوع سفارش: <b>تست رایگان</b>\n\n"
-                . "🔗 کانفیگ شما:\n<code>{$configText}</code>";
-            if ($inquiryLink !== '') {
-                $msg .= "\n\n🌐 لینک استعلام:\n" . htmlspecialchars($inquiryLink);
-            }
-            $this->telegram->editMessageText($chatId, $messageId, $msg);
-            $this->telegram->answerCallbackQuery($callbackId);
-            return;
-        }
-
-        if ($data === 'agency:request') {
-            $this->database->setUserState($userId, 'await_agency_request');
-            $this->telegram->editMessageText(
-                $chatId,
-                $messageId,
-                "🤝 <b>درخواست نمایندگی</b>\n\n"
-                . "لطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید:\n"
-                . "پیام شما برای تیم ادمین ثبت می‌شود.",
-                KeyboardBuilder::backToMain()
-            );
-            $this->telegram->answerCallbackQuery($callbackId);
-            return;
-        }
-
         if (str_starts_with($data, 'buy:type:')) {
             $typeId = (int) substr($data, strlen('buy:type:'));
             $stockOnly = $this->settings->get('preorder_mode', '0') === '1';
@@ -3432,7 +3392,7 @@ final class CallbackHandler
 
     private function isDeprecatedUserInlineAction(string $data): bool
     {
-        if (in_array($data, ['profile', 'support', 'my_configs', 'wallet:charge', 'buy:start', 'test:start', 'agency:request'], true)) {
+        if (in_array($data, ['profile', 'support', 'my_configs', 'wallet:charge', 'buy:start'], true)) {
             return true;
         }
         foreach (['referral:', 'buy:', 'renew:', 'rpay:', 'pay:swapwallet_crypto:', 'pay:tronpays_rial:'] as $prefix) {

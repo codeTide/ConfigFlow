@@ -1036,8 +1036,7 @@ ID: <code>{$pinId}</code>");
             if (($claim['ok'] ?? false) !== true) {
                 $this->telegram->sendMessage(
                     $chatId,
-                    "🎁 <b>تست رایگان</b>\n\n"
-                    . "در حال حاضر سرویس تست آماده نداریم یا سهمیه شما کامل شده است."
+                    "⚠️ در حال حاضر سرویس تست آماده نداریم یا سهمیه شما کامل شده است."
                 );
                 return true;
             }
@@ -1089,6 +1088,7 @@ ID: <code>{$pinId}</code>");
                 '📚 موجودی' => 'admin:stock',
                 '👥 کاربران' => 'admin:users',
                 '⚙️ تنظیمات' => 'admin:settings',
+                '🧪 تست رایگان' => 'admin:free_test:menu',
                 '👮 ادمین‌ها' => 'admin:admins',
                 '📣 همگانی' => 'admin:broadcast',
                 '📌 پین‌ها' => 'admin:pins',
