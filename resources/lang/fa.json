@@ -74,7 +74,7 @@
     "profile": {
       "title": "👤 <b>پروفایل کاربری</b>",
       "name_label": "📱 نام",
-      "username_label": "👤 نام کاربری",
+      "username_label": "🌀 نام کاربری",
       "user_id_label": "🔢 آیدی",
       "balance_label": "💰 موجودی",
       "balance_value": "<b>{amount}</b> تومان",
