@@ -8,6 +8,9 @@ use PDO;
 
 final class Database implements WorkerApiStore
 {
+    private const DELIVERY_MODE_STOCK_ONLY = 'stock_only';
+    private const DELIVERY_MODE_PANEL_ONLY = 'panel_only';
+
     private PDO $pdo;
 
     public function __construct()
@@ -831,95 +834,6 @@ final class Database implements WorkerApiStore
         ]);
     }
 
-    public function listPanels(): array
-    {
-        return $this->pdo->query(
-            'SELECT id, name, ip, port, patch, username, password, is_active, created_at
-             FROM panels
-             ORDER BY id DESC'
-        )->fetchAll();
-    }
-
-    public function getPanel(int $panelId): ?array
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT id, name, ip, port, patch, username, password, is_active, created_at
-             FROM panels
-             WHERE id = :id
-             LIMIT 1'
-        );
-        $stmt->execute(['id' => $panelId]);
-        $row = $stmt->fetch();
-        return is_array($row) ? $row : null;
-    }
-
-    public function addPanel(string $name, string $ip, int $port, string $patch, string $username, string $password): int
-    {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO panels (name, ip, port, patch, username, password, is_active, created_at)
-             VALUES (:name, :ip, :port, :patch, :username, :password, 1, :created_at)'
-        );
-        $stmt->execute([
-            'name' => trim($name),
-            'ip' => trim($ip),
-            'port' => $port,
-            'patch' => trim($patch),
-            'username' => trim($username),
-            'password' => trim($password),
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        return (int) $this->pdo->lastInsertId();
-    }
-
-    public function updatePanelActive(int $panelId, bool $active): void
-    {
-        $stmt = $this->pdo->prepare('UPDATE panels SET is_active = :active WHERE id = :id');
-        $stmt->execute([
-            'active' => $active ? 1 : 0,
-            'id' => $panelId,
-        ]);
-    }
-
-    public function deletePanel(int $panelId): void
-    {
-        $stmt = $this->pdo->prepare('DELETE FROM panels WHERE id = :id');
-        $stmt->execute(['id' => $panelId]);
-    }
-
-    public function listPanelPackages(int $panelId): array
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT id, panel_id, name, volume_gb, duration_days, inbound_id
-             FROM panel_packages
-             WHERE panel_id = :panel_id
-             ORDER BY id DESC'
-        );
-        $stmt->execute(['panel_id' => $panelId]);
-        return $stmt->fetchAll();
-    }
-
-    public function addPanelPackage(int $panelId, string $name, float $volumeGb, int $durationDays, int $inboundId): int
-    {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO panel_packages (panel_id, name, volume_gb, duration_days, inbound_id)
-             VALUES (:panel_id, :name, :volume_gb, :duration_days, :inbound_id)'
-        );
-        $stmt->execute([
-            'panel_id' => $panelId,
-            'name' => trim($name),
-            'volume_gb' => $volumeGb,
-            'duration_days' => $durationDays,
-            'inbound_id' => $inboundId,
-        ]);
-        return (int) $this->pdo->lastInsertId();
-    }
-
-    public function deletePanelPackage(int $panelPackageId): void
-    {
-        $stmt = $this->pdo->prepare('DELETE FROM panel_packages WHERE id = :id');
-        $stmt->execute(['id' => $panelPackageId]);
-    }
-
     public function isWorkerApiEnabled(): bool
     {
         $stmt = $this->pdo->prepare("SELECT `value` FROM settings WHERE `key` = 'worker_api_enabled' LIMIT 1");
@@ -932,124 +846,6 @@ final class Database implements WorkerApiStore
         $stmt = $this->pdo->prepare("SELECT `value` FROM settings WHERE `key` = 'worker_api_key' LIMIT 1");
         $stmt->execute();
         return trim((string) ($stmt->fetchColumn() ?: ''));
-    }
-
-    public function listPendingXuiJobs(int $limit = 20): array
-    {
-        $limit = max(1, min($limit, 100));
-        $sql = "SELECT j.id, j.job_uuid, j.order_id, j.user_id, j.panel_id, j.panel_package_id, j.status, j.retry_count, j.created_at,\n"
-            . "       p.ip, p.port, p.patch, p.username, p.password,\n"
-            . "       pp.name AS pkg_name, pp.volume_gb, pp.duration_days, pp.inbound_id\n"
-            . "FROM xui_jobs j\n"
-            . "JOIN panels p ON p.id = j.panel_id\n"
-            . "JOIN panel_packages pp ON pp.id = j.panel_package_id\n"
-            . "WHERE j.status IN ('pending','failed') AND j.retry_count < 5 AND p.is_active = 1\n"
-            . "ORDER BY j.created_at ASC\n"
-            . "LIMIT {$limit}";
-        return $this->pdo->query($sql)->fetchAll();
-    }
-
-    public function markXuiJobProcessing(int $jobId): array
-    {
-        $this->pdo->beginTransaction();
-        try {
-            $stmt = $this->pdo->prepare('SELECT id, status FROM xui_jobs WHERE id = :id LIMIT 1 FOR UPDATE');
-            $stmt->execute(['id' => $jobId]);
-            $row = $stmt->fetch();
-            if (!is_array($row)) {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'not_found'];
-            }
-            $status = (string) ($row['status'] ?? '');
-            if (!in_array($status, ['pending', 'failed'], true)) {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'not_actionable', 'status' => $status];
-            }
-            $upd = $this->pdo->prepare('UPDATE xui_jobs SET status = :status, updated_at = :updated_at WHERE id = :id');
-            $upd->execute([
-                'status' => 'processing',
-                'updated_at' => gmdate('Y-m-d H:i:s'),
-                'id' => $jobId,
-            ]);
-            $this->pdo->commit();
-            return ['ok' => true];
-        } catch (\Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['ok' => false, 'error' => 'db_error'];
-        }
-    }
-
-    public function markXuiJobDone(int $jobId, string $resultConfig, string $resultLink): array
-    {
-        $stmt = $this->pdo->prepare(
-            'UPDATE xui_jobs
-             SET status = :status, result_config = :result_config, result_link = :result_link, error_msg = NULL, updated_at = :updated_at
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            'status' => 'done',
-            'result_config' => $resultConfig,
-            'result_link' => $resultLink,
-            'updated_at' => gmdate('Y-m-d H:i:s'),
-            'id' => $jobId,
-        ]);
-        if ($stmt->rowCount() <= 0) {
-            return ['ok' => false, 'error' => 'not_found'];
-        }
-        return ['ok' => true];
-    }
-
-    public function markXuiJobError(int $jobId, string $errorMsg): array
-    {
-        $this->pdo->beginTransaction();
-        try {
-            $stmt = $this->pdo->prepare('SELECT retry_count FROM xui_jobs WHERE id = :id LIMIT 1 FOR UPDATE');
-            $stmt->execute(['id' => $jobId]);
-            $row = $stmt->fetch();
-            if (!is_array($row)) {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'not_found'];
-            }
-            $retry = XuiJobState::nextRetryCount((int) ($row['retry_count'] ?? 0));
-            $status = XuiJobState::statusAfterError($retry);
-            $upd = $this->pdo->prepare(
-                'UPDATE xui_jobs
-                 SET status = :status, error_msg = :error_msg, retry_count = :retry_count, updated_at = :updated_at
-                 WHERE id = :id'
-            );
-            $upd->execute([
-                'status' => $status,
-                'error_msg' => mb_substr($errorMsg, 0, 500),
-                'retry_count' => $retry,
-                'updated_at' => gmdate('Y-m-d H:i:s'),
-                'id' => $jobId,
-            ]);
-            $this->pdo->commit();
-            return ['ok' => true, 'retry_count' => $retry];
-        } catch (\Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['ok' => false, 'error' => 'db_error'];
-        }
-    }
-
-    public function getXuiJob(int $jobId): ?array
-    {
-        $stmt = $this->pdo->prepare('SELECT * FROM xui_jobs WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $jobId]);
-        $row = $stmt->fetch();
-        return is_array($row) ? $row : null;
-    }
-
-    public function getXuiJobByOrderId(int $orderId): ?array
-    {
-        $stmt = $this->pdo->prepare('SELECT * FROM xui_jobs WHERE order_id = :order_id ORDER BY id DESC LIMIT 1 FOR UPDATE');
-        $stmt->execute(['order_id' => $orderId]);
-        $row = $stmt->fetch();
-        return is_array($row) ? $row : null;
     }
 
     public function setUserStatus(int $userId, string $status): void
@@ -1112,7 +908,7 @@ final class Database implements WorkerApiStore
         $stmt->execute([
             'kind' => $data['kind'],
             'user_id' => $data['user_id'],
-            'package_id' => $data['package_id'],
+            'package_id' => $data['package_id'] ?? null,
             'amount' => $data['amount'],
             'payment_method' => $data['payment_method'],
             'gateway_ref' => $data['gateway_ref'] ?? null,
@@ -1129,7 +925,7 @@ final class Database implements WorkerApiStore
             return ['ok' => false, 'error' => 'package_not_found'];
         }
 
-        if ($this->settingValue('preorder_mode', '0') === '1' && !$this->packageHasAvailableStock($packageId)) {
+        if ($this->deliveryMode() === self::DELIVERY_MODE_STOCK_ONLY && !$this->packageHasAvailableStock($packageId)) {
             return ['ok' => false, 'error' => 'no_stock'];
         }
 
@@ -1157,23 +953,85 @@ final class Database implements WorkerApiStore
                 'created_at' => gmdate('Y-m-d H:i:s'),
             ]);
 
-            $pendingStmt = $this->pdo->prepare(
-                'INSERT INTO pending_orders (user_id, package_id, payment_id, amount, payment_method, created_at, status)
-                 VALUES (:user_id, :package_id, :payment_id, :amount, :payment_method, :created_at, :status)'
-            );
-            $pendingStmt->execute([
+            $pendingId = $this->createPendingOrder([
                 'user_id' => $userId,
                 'package_id' => $packageId,
+                'order_mode' => self::DELIVERY_MODE_STOCK_ONLY,
+                'service_id' => null,
+                'selected_volume_gb' => null,
+                'computed_amount' => null,
                 'payment_id' => $paymentId,
                 'amount' => $price,
                 'payment_method' => 'wallet',
                 'created_at' => gmdate('Y-m-d H:i:s'),
                 'status' => 'paid_waiting_delivery',
             ]);
-
-            $pendingId = (int) $this->pdo->lastInsertId();
             $this->pdo->commit();
             return ['ok' => true, 'payment_id' => $paymentId, 'pending_order_id' => $pendingId, 'price' => $price, 'new_balance' => $newBalance];
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'db_error'];
+        }
+    }
+
+    public function walletPayPanelService(int $userId, int $serviceId, float $selectedVolumeGb): array
+    {
+        $service = $this->getProvisioningService($serviceId);
+        if (!is_array($service)) {
+            return ['ok' => false, 'error' => 'service_not_found'];
+        }
+        if (!$this->validatePanelServiceVolume($service, $selectedVolumeGb)) {
+            return ['ok' => false, 'error' => 'invalid_volume'];
+        }
+
+        $amount = $this->calculatePanelServiceAmount($service, $selectedVolumeGb);
+        $this->pdo->beginTransaction();
+        try {
+            $user = $this->getUser($userId);
+            $balance = (int) ($user['balance'] ?? 0);
+            if ($balance < $amount) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'insufficient_balance', 'amount' => $amount, 'balance' => $balance];
+            }
+
+            $newBalance = $balance - $amount;
+            $update = $this->pdo->prepare('UPDATE users SET balance = :balance WHERE user_id = :user_id');
+            $update->execute(['balance' => $newBalance, 'user_id' => $userId]);
+
+            $paymentId = $this->createPayment([
+                'kind' => 'purchase',
+                'user_id' => $userId,
+                'package_id' => null,
+                'amount' => $amount,
+                'payment_method' => 'wallet',
+                'status' => 'paid',
+                'created_at' => gmdate('Y-m-d H:i:s'),
+            ]);
+
+            $pendingId = $this->createPendingOrder([
+                'user_id' => $userId,
+                'package_id' => null,
+                'order_mode' => self::DELIVERY_MODE_PANEL_ONLY,
+                'service_id' => $serviceId,
+                'selected_volume_gb' => $selectedVolumeGb,
+                'computed_amount' => $amount,
+                'payment_id' => $paymentId,
+                'amount' => $amount,
+                'payment_method' => 'wallet',
+                'created_at' => gmdate('Y-m-d H:i:s'),
+                'status' => 'paid_waiting_delivery',
+            ]);
+
+            $this->pdo->commit();
+            return [
+                'ok' => true,
+                'payment_id' => $paymentId,
+                'pending_order_id' => $pendingId,
+                'amount' => $amount,
+                'new_balance' => $newBalance,
+            ];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -1223,21 +1081,19 @@ final class Database implements WorkerApiStore
                 'created_at' => gmdate('Y-m-d H:i:s'),
             ]);
 
-            $pendingStmt = $this->pdo->prepare(
-                'INSERT INTO pending_orders (user_id, package_id, payment_id, amount, payment_method, created_at, status)
-                 VALUES (:user_id, :package_id, :payment_id, :amount, :payment_method, :created_at, :status)'
-            );
-            $pendingStmt->execute([
+            $pendingId = $this->createPendingOrder([
                 'user_id' => $userId,
                 'package_id' => $packageId,
+                'order_mode' => self::DELIVERY_MODE_STOCK_ONLY,
+                'service_id' => null,
+                'selected_volume_gb' => null,
+                'computed_amount' => null,
                 'payment_id' => $paymentId,
                 'amount' => $price,
                 'payment_method' => 'wallet',
                 'created_at' => gmdate('Y-m-d H:i:s'),
                 'status' => 'paid_waiting_delivery',
             ]);
-
-            $pendingId = (int) $this->pdo->lastInsertId();
             $this->pdo->commit();
             return ['ok' => true, 'payment_id' => $paymentId, 'pending_order_id' => $pendingId, 'price' => $price, 'new_balance' => $newBalance];
         } catch (\Throwable $e) {
@@ -1408,17 +1264,29 @@ final class Database implements WorkerApiStore
     public function createPendingOrder(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO pending_orders (user_id, package_id, payment_id, amount, payment_method, created_at, status)
-             VALUES (:user_id, :package_id, :payment_id, :amount, :payment_method, :created_at, :status)'
+            'INSERT INTO pending_orders (user_id, package_id, order_mode, service_id, selected_volume_gb, computed_amount, payment_id, amount, payment_method, created_at, status)
+             VALUES (:user_id, :package_id, :order_mode, :service_id, :selected_volume_gb, :computed_amount, :payment_id, :amount, :payment_method, :created_at, :status)'
         );
-        $stmt->execute($data);
+        $stmt->execute([
+            'user_id' => (int) ($data['user_id'] ?? 0),
+            'package_id' => isset($data['package_id']) ? (int) $data['package_id'] : null,
+            'order_mode' => (string) ($data['order_mode'] ?? self::DELIVERY_MODE_STOCK_ONLY),
+            'service_id' => isset($data['service_id']) ? (int) $data['service_id'] : null,
+            'selected_volume_gb' => isset($data['selected_volume_gb']) ? (float) $data['selected_volume_gb'] : null,
+            'computed_amount' => isset($data['computed_amount']) ? (int) $data['computed_amount'] : null,
+            'payment_id' => isset($data['payment_id']) ? (int) $data['payment_id'] : null,
+            'amount' => (int) ($data['amount'] ?? 0),
+            'payment_method' => (string) ($data['payment_method'] ?? ''),
+            'created_at' => (string) ($data['created_at'] ?? gmdate('Y-m-d H:i:s')),
+            'status' => (string) ($data['status'] ?? 'waiting'),
+        ]);
         return (int) $this->pdo->lastInsertId();
     }
 
     public function listPendingDeliveries(int $limit = 20): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT id, user_id, package_id, payment_id, amount, created_at
+            "SELECT id, user_id, package_id, order_mode, service_id, selected_volume_gb, computed_amount, payment_id, amount, created_at
              FROM pending_orders
              WHERE status = 'paid_waiting_delivery'
              ORDER BY id ASC
@@ -1434,7 +1302,7 @@ final class Database implements WorkerApiStore
         $this->pdo->beginTransaction();
         try {
             $orderStmt = $this->pdo->prepare(
-                "SELECT id, user_id, package_id, payment_id, amount, payment_method, status
+                "SELECT id, user_id, package_id, order_mode, service_id, selected_volume_gb, computed_amount, payment_id, amount, payment_method, status
                  FROM pending_orders
                  WHERE id = :id
                  LIMIT 1
@@ -1452,79 +1320,21 @@ final class Database implements WorkerApiStore
                 return ['ok' => false, 'error' => 'not_actionable'];
             }
 
-            $existingJob = $this->getXuiJobByOrderId((int) $order['id']);
-            if (is_array($existingJob)) {
-                $jobStatus = (string) ($existingJob['status'] ?? '');
-                if (in_array($jobStatus, ['pending', 'failed', 'processing'], true)) {
-                    $ordUpdate = $this->pdo->prepare("UPDATE pending_orders SET status = 'worker_queued' WHERE id = :id");
-                    $ordUpdate->execute(['id' => $orderId]);
-                    $this->pdo->commit();
-                    return [
-                        'ok' => true,
-                        'queued_worker' => true,
-                        'job_id' => (int) ($existingJob['id'] ?? 0),
-                        'job_status' => $jobStatus,
-                    ];
-                }
+            $orderMode = trim((string) ($order['order_mode'] ?? ''));
+            $mode = in_array($orderMode, [self::DELIVERY_MODE_STOCK_ONLY, self::DELIVERY_MODE_PANEL_ONLY], true)
+                ? $orderMode
+                : $this->deliveryMode();
 
-                if ($jobStatus === 'done') {
-                    $resultConfig = trim((string) ($existingJob['result_config'] ?? ''));
-                    $resultLink = trim((string) ($existingJob['result_link'] ?? ''));
-                    if ($resultConfig !== '' || $resultLink !== '') {
-                        return $this->finalizeWorkerDelivery($order, $existingJob);
-                    }
+            if ($mode === self::DELIVERY_MODE_STOCK_ONLY) {
+                $config = $this->findAvailableConfigForPackage((int) $order['package_id']);
+                if (!is_array($config)) {
+                    $this->pdo->rollBack();
+                    return ['ok' => false, 'error' => 'out_of_stock'];
                 }
-            }
-
-            $configStmt = $this->pdo->prepare(
-                "SELECT id, service_name, config_text, inquiry_link
-                 FROM configs
-                 WHERE package_id = :package_id
-                   AND sold_to IS NULL
-                   AND reserved_payment_id IS NULL
-                   AND is_expired = 0
-                 ORDER BY id ASC
-                 LIMIT 1
-                 FOR UPDATE"
-            );
-            $configStmt->execute(['package_id' => (int) $order['package_id']]);
-            $config = $configStmt->fetch();
-            if (is_array($config)) {
                 return $this->finalizeStockDelivery($order, $config);
             }
 
-            $panelPackage = $this->matchPanelPackageForPackage((int) $order['package_id']);
-            if (!is_array($panelPackage)) {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'no_stock'];
-            }
-
-            $jobUuid = bin2hex(random_bytes(16));
-            $insert = $this->pdo->prepare(
-                'INSERT INTO xui_jobs (job_uuid, order_id, user_id, panel_id, panel_package_id, status, retry_count, created_at, updated_at)
-                 VALUES (:job_uuid, :order_id, :user_id, :panel_id, :panel_package_id, :status, 0, :created_at, :updated_at)'
-            );
-            $now = gmdate('Y-m-d H:i:s');
-            $insert->execute([
-                'job_uuid' => $jobUuid,
-                'order_id' => (int) $order['id'],
-                'user_id' => (int) $order['user_id'],
-                'panel_id' => (int) $panelPackage['panel_id'],
-                'panel_package_id' => (int) $panelPackage['id'],
-                'status' => 'pending',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-
-            $ordUpdate = $this->pdo->prepare("UPDATE pending_orders SET status = 'worker_queued' WHERE id = :id");
-            $ordUpdate->execute(['id' => $orderId]);
-            $this->pdo->commit();
-            return [
-                'ok' => true,
-                'queued_worker' => true,
-                'job_id' => (int) $this->pdo->lastInsertId(),
-                'job_status' => 'pending',
-            ];
+            return $this->finalizePanelOnlyDelivery($order);
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -1533,22 +1343,279 @@ final class Database implements WorkerApiStore
         }
     }
 
-    private function matchPanelPackageForPackage(int $packageId): ?array
+    private function findAvailableConfigForPackage(int $packageId): mixed
+    {
+        $configStmt = $this->pdo->prepare(
+            "SELECT id, service_name, config_text, inquiry_link
+             FROM configs
+             WHERE package_id = :package_id
+               AND sold_to IS NULL
+               AND reserved_payment_id IS NULL
+               AND is_expired = 0
+             ORDER BY id ASC
+             LIMIT 1
+             FOR UPDATE"
+        );
+        $configStmt->execute(['package_id' => $packageId]);
+        return $configStmt->fetch();
+    }
+
+    private function finalizePanelOnlyDelivery(array $order): array
+    {
+        $serviceId = (int) ($order['service_id'] ?? 0);
+        $service = $this->getProvisioningService($serviceId);
+        if (!is_array($service)) {
+            $this->pdo->rollBack();
+            return ['ok' => false, 'error' => 'service_not_found'];
+        }
+
+        $provider = $this->buildPasarGuardProvider($service);
+        if (!is_array($provider)) {
+            $this->pdo->rollBack();
+            return ['ok' => false, 'error' => 'provider_not_configured'];
+        }
+
+        $username = $this->buildProvisionUsername((int) ($order['user_id'] ?? 0), (int) ($order['id'] ?? 0));
+        $volumeGb = (float) ($order['selected_volume_gb'] ?? 0);
+        if ($volumeGb <= 0) {
+            $this->pdo->rollBack();
+            return ['ok' => false, 'error' => 'invalid_volume'];
+        }
+
+        $durationPolicy = (string) ($service['duration_policy'] ?? 'fixed_days');
+        $durationDays = $durationPolicy === 'fixed_days' ? (int) ($service['duration_days'] ?? 0) : 0;
+        $dataLimitBytes = (int) max(1, round($volumeGb * 1024 * 1024 * 1024));
+        $expireAt = $durationDays > 0 ? (time() + ($durationDays * 86400)) : 0;
+
+        /** @var ProvisioningProviderInterface $providerService */
+        $providerService = $provider['service'];
+        $result = $providerService->provisionUser($username, $dataLimitBytes, $expireAt, $provider['group_ids']);
+        if (!($result['ok'] ?? false)) {
+            $this->pdo->rollBack();
+            return ['ok' => false, 'error' => (string) ($result['error'] ?? 'panel_provision_failed')];
+        }
+
+        $subscriptionUrl = trim((string) ($result['subscription_url'] ?? ''));
+        if ($subscriptionUrl === '') {
+            $this->pdo->rollBack();
+            return ['ok' => false, 'error' => 'subscription_missing'];
+        }
+
+        $configInsert = $this->pdo->prepare(
+            'INSERT INTO configs (type_id, package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
+             VALUES (:type_id, :package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
+        );
+        $configInsert->execute([
+            'type_id' => 0,
+            'package_id' => 0,
+            'service_name' => (string) ($service['title'] ?? 'PasarGuard Service'),
+            'config_text' => $subscriptionUrl,
+            'inquiry_link' => $subscriptionUrl,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $configId = (int) $this->pdo->lastInsertId();
+
+        $purchaseId = $this->createPurchase(
+            (int) ($order['user_id'] ?? 0),
+            null,
+            $configId,
+            (int) ($order['amount'] ?? 0),
+            (string) ($order['payment_method'] ?? 'panel')
+        );
+
+        $cfgUpdate = $this->pdo->prepare(
+            'UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id'
+        );
+        $cfgUpdate->execute([
+            'sold_to' => (int) ($order['user_id'] ?? 0),
+            'purchase_id' => $purchaseId,
+            'sold_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $configId,
+        ]);
+
+        $this->markOrderDelivered((int) ($order['id'] ?? 0), (int) ($order['payment_id'] ?? 0));
+        $this->pdo->commit();
+
+        return [
+            'ok' => true,
+            'user_id' => (int) ($order['user_id'] ?? 0),
+            'config_text' => $subscriptionUrl,
+            'service_name' => (string) ($service['title'] ?? 'PasarGuard Service'),
+            'inquiry_link' => $subscriptionUrl,
+        ];
+    }
+
+    private function buildProvisionUsername(int $userId, int $orderId): string
+    {
+        return 'cf-' . $userId . '-' . $orderId . '-' . substr(bin2hex(random_bytes(4)), 0, 8);
+    }
+
+    /** @param array<string,mixed> $serviceRow
+     *  @return array{service:ProvisioningProviderInterface,group_ids:array<int>}|null
+     */
+    private function buildPasarGuardProvider(array $serviceRow): ?array
+    {
+        $baseUrl = trim($this->settingValue('pg_base_url', ''));
+        $username = trim($this->settingValue('pg_username', ''));
+        $password = trim($this->settingValue('pg_password', ''));
+        if ($baseUrl === '' || $username === '' || $password === '') {
+            return null;
+        }
+
+        $groupIds = $this->parseGroupIds((string) ($serviceRow['provider_group_ids'] ?? ''));
+        if ($groupIds === []) {
+            return null;
+        }
+
+        return [
+            'service' => new PasarGuardProvisioningProvider($baseUrl, $username, $password, $groupIds),
+            'group_ids' => $groupIds,
+        ];
+    }
+
+    /** @return array<int> */
+    private function parseGroupIds(string $raw): array
+    {
+        $parts = preg_split('/[\\s,]+/', trim($raw)) ?: [];
+        $ids = [];
+        foreach ($parts as $part) {
+            $id = (int) preg_replace('/\\D+/', '', $part);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        return array_values(array_unique($ids));
+    }
+
+    private function deliveryMode(): string
+    {
+        $mode = trim($this->settingValue('delivery_mode', self::DELIVERY_MODE_STOCK_ONLY));
+        if (!in_array($mode, [self::DELIVERY_MODE_STOCK_ONLY, self::DELIVERY_MODE_PANEL_ONLY], true)) {
+            return self::DELIVERY_MODE_STOCK_ONLY;
+        }
+        return $mode;
+    }
+
+    public function listActiveProvisioningServices(string $provider = 'pasarguard'): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT pp.id, pp.panel_id, pp.name
-             FROM packages p
-             JOIN panel_packages pp
-               ON pp.volume_gb = p.volume_gb
-              AND pp.duration_days = p.duration_days
-             JOIN panels pnl ON pnl.id = pp.panel_id
-             WHERE p.id = :package_id AND pnl.is_active = 1
-             ORDER BY pp.id ASC
+            'SELECT id, title, description, min_gb, max_gb, step_gb, price_per_gb, duration_policy, duration_days, provider, provider_group_ids, is_active
+             FROM provisioning_services
+             WHERE is_active = 1 AND provider = :provider
+             ORDER BY id ASC'
+        );
+        $stmt->execute(['provider' => $provider]);
+        return $stmt->fetchAll();
+    }
+
+    public function getProvisioningService(int $serviceId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, title, description, min_gb, max_gb, step_gb, price_per_gb, duration_policy, duration_days, provider, provider_group_ids, is_active
+             FROM provisioning_services
+             WHERE id = :id AND is_active = 1
              LIMIT 1'
         );
-        $stmt->execute(['package_id' => $packageId]);
+        $stmt->execute(['id' => $serviceId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
+    }
+
+    public function listProvisioningServicesAll(): array
+    {
+        return $this->pdo->query(
+            'SELECT id, title, description, min_gb, max_gb, step_gb, price_per_gb, duration_policy, duration_days, provider, provider_group_ids, is_active
+             FROM provisioning_services
+             ORDER BY id DESC'
+        )->fetchAll();
+    }
+
+    /** @param array<string,mixed> $data */
+    public function createProvisioningService(array $data): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO provisioning_services (title, description, min_gb, max_gb, step_gb, price_per_gb, duration_policy, duration_days, provider, provider_group_ids, is_active, created_at, updated_at)
+             VALUES (:title, :description, :min_gb, :max_gb, :step_gb, :price_per_gb, :duration_policy, :duration_days, :provider, :provider_group_ids, :is_active, :created_at, :updated_at)'
+        );
+        $now = gmdate('Y-m-d H:i:s');
+        $stmt->execute([
+            'title' => trim((string) ($data['title'] ?? '')),
+            'description' => trim((string) ($data['description'] ?? '')),
+            'min_gb' => (float) ($data['min_gb'] ?? 0),
+            'max_gb' => (float) ($data['max_gb'] ?? 0),
+            'step_gb' => (float) ($data['step_gb'] ?? 1),
+            'price_per_gb' => (int) ($data['price_per_gb'] ?? 0),
+            'duration_policy' => (string) ($data['duration_policy'] ?? 'fixed_days'),
+            'duration_days' => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
+            'provider' => trim((string) ($data['provider'] ?? 'pasarguard')),
+            'provider_group_ids' => trim((string) ($data['provider_group_ids'] ?? '')),
+            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    /** @param array<string,mixed> $data */
+    public function updateProvisioningService(int $serviceId, array $data): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE provisioning_services
+             SET title = :title, description = :description, min_gb = :min_gb, max_gb = :max_gb, step_gb = :step_gb, price_per_gb = :price_per_gb,
+                 duration_policy = :duration_policy, duration_days = :duration_days, provider = :provider, provider_group_ids = :provider_group_ids,
+                 is_active = :is_active, updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'title' => trim((string) ($data['title'] ?? '')),
+            'description' => trim((string) ($data['description'] ?? '')),
+            'min_gb' => (float) ($data['min_gb'] ?? 0),
+            'max_gb' => (float) ($data['max_gb'] ?? 0),
+            'step_gb' => (float) ($data['step_gb'] ?? 1),
+            'price_per_gb' => (int) ($data['price_per_gb'] ?? 0),
+            'duration_policy' => (string) ($data['duration_policy'] ?? 'fixed_days'),
+            'duration_days' => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
+            'provider' => trim((string) ($data['provider'] ?? 'pasarguard')),
+            'provider_group_ids' => trim((string) ($data['provider_group_ids'] ?? '')),
+            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $serviceId,
+        ]);
+    }
+
+    public function updateProvisioningServiceActive(int $serviceId, bool $active): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE provisioning_services SET is_active = :active, updated_at = :updated_at WHERE id = :id');
+        $stmt->execute([
+            'active' => $active ? 1 : 0,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $serviceId,
+        ]);
+    }
+
+    public function deleteProvisioningService(int $serviceId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM provisioning_services WHERE id = :id');
+        $stmt->execute(['id' => $serviceId]);
+    }
+
+    public function calculatePanelServiceAmount(array $service, float $selectedVolumeGb): int
+    {
+        $pricePerGb = (int) ($service['price_per_gb'] ?? 0);
+        return max(0, (int) round($pricePerGb * $selectedVolumeGb));
+    }
+
+    public function validatePanelServiceVolume(array $service, float $selectedVolumeGb): bool
+    {
+        $min = (float) ($service['min_gb'] ?? 0);
+        $max = (float) ($service['max_gb'] ?? 0);
+        $step = (float) ($service['step_gb'] ?? 1);
+        if ($step <= 0 || $selectedVolumeGb < $min || $selectedVolumeGb > $max) {
+            return false;
+        }
+
+        $diff = ($selectedVolumeGb - $min) / $step;
+        return abs($diff - round($diff)) < 0.00001;
     }
 
     private function finalizeStockDelivery(array $order, array $config): array
@@ -1585,61 +1652,7 @@ final class Database implements WorkerApiStore
         ];
     }
 
-    private function finalizeWorkerDelivery(array $order, array $job): array
-    {
-        $pkgStmt = $this->pdo->prepare('SELECT type_id, name FROM packages WHERE id = :id LIMIT 1');
-        $pkgStmt->execute(['id' => (int) $order['package_id']]);
-        $pkg = $pkgStmt->fetch();
-        if (!is_array($pkg)) {
-            $this->pdo->rollBack();
-            return ['ok' => false, 'error' => 'package_not_found'];
-        }
-
-        $cfgInsert = $this->pdo->prepare(
-            'INSERT INTO configs (type_id, package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
-             VALUES (:type_id, :package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
-        );
-        $cfgInsert->execute([
-            'type_id' => (int) $pkg['type_id'],
-            'package_id' => (int) $order['package_id'],
-            'service_name' => (string) ($pkg['name'] ?? 'XUI Service'),
-            'config_text' => (string) ($job['result_config'] ?? ''),
-            'inquiry_link' => (string) ($job['result_link'] ?? ''),
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        $configId = (int) $this->pdo->lastInsertId();
-
-        $purchaseId = $this->createPurchase(
-            (int) $order['user_id'],
-            (int) $order['package_id'],
-            $configId,
-            (int) $order['amount'],
-            (string) $order['payment_method']
-        );
-
-        $cfgUpdate = $this->pdo->prepare(
-            'UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id'
-        );
-        $cfgUpdate->execute([
-            'sold_to' => (int) $order['user_id'],
-            'purchase_id' => $purchaseId,
-            'sold_at' => gmdate('Y-m-d H:i:s'),
-            'id' => $configId,
-        ]);
-
-        $this->markOrderDelivered((int) $order['id'], (int) ($order['payment_id'] ?? 0));
-        $this->pdo->commit();
-
-        return [
-            'ok' => true,
-            'user_id' => (int) $order['user_id'],
-            'config_text' => (string) ($job['result_config'] ?? ''),
-            'service_name' => (string) ($pkg['name'] ?? 'XUI Service'),
-            'inquiry_link' => (string) ($job['result_link'] ?? ''),
-        ];
-    }
-
-    private function createPurchase(int $userId, int $packageId, int $configId, int $amount, string $paymentMethod, bool $isTest = false): int
+    private function createPurchase(int $userId, ?int $packageId, int $configId, int $amount, string $paymentMethod, bool $isTest = false): int
     {
         $purchaseStmt = $this->pdo->prepare(
             'INSERT INTO purchases (user_id, package_id, config_id, amount, payment_method, created_at, is_test)
