@@ -188,6 +188,31 @@
           "price_value": "<b>{amount}</b> تومان",
           "tip": "💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود."
         },
+        "panel": {
+          "service_row": "{num}) {title} | {min_gb}-{max_gb}GB | step:{step_gb} | {price_per_gb} تومان/GB",
+          "service_button": "{num} - {title}",
+          "service_selection": {
+            "title": "🛒 <b>خرید سرویس مستقیم</b>",
+            "label": "🧩 انتخاب سرویس",
+            "tip": "💡 یک سرویس را انتخاب کنید؛ سپس حجم دلخواه را در بازه مجاز همان سرویس وارد کنید."
+          },
+          "volume_selection": {
+            "title": "📏 <b>انتخاب حجم برای {title}</b>",
+            "range_label": "📦 بازه مجاز",
+            "range_value": "حداقل: {min_gb} GB | حداکثر: {max_gb} GB | گام: {step_gb} GB",
+            "price_label": "💵 تعرفه",
+            "price_value": "{price_per_gb} تومان به‌ازای هر GB",
+            "tip": "💡 حجم را به‌صورت عددی وارد کنید (مثلاً 10 یا 12.5) تا مبلغ نهایی محاسبه شود."
+          },
+          "payment": {
+            "service_label": "🧩 سرویس",
+            "volume_label": "💾 حجم",
+            "volume_value": "{volume} GB"
+          },
+          "errors": {
+            "invalid_volume": "حجم واردشده معتبر نیست یا با بازه/گام سرویس سازگار نیست."
+          }
+        },
         "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان{stock_suffix}"
       },
       "renew": {

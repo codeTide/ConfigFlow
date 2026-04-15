@@ -18,6 +18,9 @@ use ConfigFlow\Bot\UpdateRouter;
 
 require_once __DIR__ . '/src/Bootstrap.php';
 require_once __DIR__ . '/src/Config.php';
+require_once __DIR__ . '/src/ProvisioningProviderInterface.php';
+require_once __DIR__ . '/src/PGClient.php';
+require_once __DIR__ . '/src/PasarGuardProvisioningProvider.php';
 require_once __DIR__ . '/src/WorkerApiStore.php';
 require_once __DIR__ . '/src/Database.php';
 require_once __DIR__ . '/src/KeyboardBuilder.php';

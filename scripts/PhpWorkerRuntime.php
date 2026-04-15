@@ -8,7 +8,6 @@ use ConfigFlow\Bot\PhpWorkerRuntime;
 
 require_once __DIR__ . '/../src/Bootstrap.php';
 require_once __DIR__ . '/../src/Config.php';
-require_once __DIR__ . '/../src/XuiJobState.php';
 require_once __DIR__ . '/../src/WorkerApiStore.php';
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/PhpWorkerRuntime.php';

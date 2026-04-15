@@ -8,9 +8,11 @@ use ConfigFlow\Bot\WorkerApiApp;
 
 require __DIR__ . '/../src/Bootstrap.php';
 require __DIR__ . '/../src/Config.php';
+require __DIR__ . '/../src/ProvisioningProviderInterface.php';
+require __DIR__ . '/../src/PGClient.php';
+require __DIR__ . '/../src/PasarGuardProvisioningProvider.php';
 require __DIR__ . '/../src/WorkerApiStore.php';
 require __DIR__ . '/../src/Database.php';
-require __DIR__ . '/../src/XuiJobState.php';
 require __DIR__ . '/../src/WorkerApiApp.php';
 
 Bootstrap::loadEnv(__DIR__ . '/../.env');
