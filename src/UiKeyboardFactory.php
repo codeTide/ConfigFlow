@@ -37,19 +37,9 @@ final class UiKeyboardFactory implements UiKeyboardFactoryInterface
         return $this->back();
     }
 
-    public function navCancel(): array
-    {
-        return $this->cancel();
-    }
-
     public function back(): array
     {
         return $this->replyMenu([[UiLabels::back($this->catalog)]]);
-    }
-
-    public function cancel(): array
-    {
-        return $this->replyMenu([[UiLabels::cancel($this->catalog)]]);
     }
 
     public function confirm(string $yesLabel = UiLabels::BTN_CONFIRM_YES, string $noLabel = UiLabels::BTN_CONFIRM_NO): array

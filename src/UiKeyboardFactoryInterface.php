@@ -15,11 +15,7 @@ interface UiKeyboardFactoryInterface
 
     public function navBack(): array;
 
-    public function navCancel(): array;
-
     public function back(): array;
-
-    public function cancel(): array;
 
     public function confirm(string $yesLabel = UiLabels::BTN_CONFIRM_YES, string $noLabel = UiLabels::BTN_CONFIRM_NO): array;
 
