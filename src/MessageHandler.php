@@ -108,6 +108,12 @@ final class MessageHandler
             || $text === KeyboardBuilder::BTN_BACK_MAIN;
     }
 
+    private function isAdminExitInput(string $text): bool
+    {
+        return $text === $this->catalog->get('buttons.admin.exit_panel')
+            || $this->isMainMenuInput($text);
+    }
+
     public function handle(array $update): void
     {
         $message = $update['message'] ?? null;
@@ -1476,6 +1482,12 @@ final class MessageHandler
 
     private function handleAdminNavigationState(int $chatId, int $userId, string $text, array $state): void
     {
+        if (($state['state_name'] ?? '') === 'admin.root' && $this->isAdminExitInput($text)) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+
         if ($this->isMainMenuInput($text)) {
             $this->openAdminRoot($chatId, $userId);
             return;

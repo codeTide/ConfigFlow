@@ -33,7 +33,8 @@
       "charges": "💳 شارژها",
       "delivery": "📦 تحویل سفارش",
       "requests": "🗂 درخواست‌ها",
-      "backup_topics": "🗃 بکاپ/تاپیک"
+      "backup_topics": "🗃 بکاپ/تاپیک",
+      "exit_panel": "🚪 خروج"
     },
     "accept_rules": "✅ قوانین را می‌پذیرم",
     "pay": {
