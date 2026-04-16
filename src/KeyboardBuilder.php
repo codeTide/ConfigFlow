@@ -7,20 +7,20 @@ namespace ConfigFlow\Bot;
 final class KeyboardBuilder
 {
     // Legacy constants kept for backward compatibility with non-migrated flows.
-    public const BTN_BUY = '[legacy] buttons.buy';
-    public const BTN_MY_CONFIGS = '[legacy] buttons.my_configs';
-    public const BTN_FREE_TEST = '[legacy] buttons.free_test';
-    public const BTN_PROFILE = '[legacy] buttons.profile';
-    public const BTN_WALLET = '[legacy] buttons.wallet';
-    public const BTN_SUPPORT = '[legacy] buttons.support';
-    public const BTN_REFERRAL = '[legacy] buttons.referral';
-    public const BTN_AGENCY = '[legacy] buttons.agency';
-    public const BTN_ADMIN = '[legacy] buttons.admin_panel';
-    public const BTN_BACK_MAIN = '[legacy] buttons.main_menu';
-    public const BTN_BACK_ACCOUNT = '[legacy] buttons.back';
-    public const BTN_BACK_TYPES = '[legacy] buttons.back_to_services';
-    public const BTN_BACK_PURCHASES = '[legacy] buttons.back_to_orders';
-    public const BTN_CHECK_CHANNEL = '[legacy] buttons.check_channel';
+    public const BTN_BUY = '🛒 خرید';
+    public const BTN_MY_CONFIGS = '📦 کانفیگ‌هام';
+    public const BTN_FREE_TEST = '🎁 تست رایگان';
+    public const BTN_PROFILE = '👤 حساب';
+    public const BTN_WALLET = '💳 شارژ حساب';
+    public const BTN_SUPPORT = '🎧 پشتیبانی';
+    public const BTN_REFERRAL = '🎁 دعوت';
+    public const BTN_AGENCY = '🤝 نمایندگی';
+    public const BTN_ADMIN = '⚙️ پنل مدیریت';
+    public const BTN_BACK_MAIN = '🏠 منوی اصلی';
+    public const BTN_BACK_ACCOUNT = '↩️ بازگشت';
+    public const BTN_BACK_TYPES = '🔙 بازگشت به سرویس‌ها';
+    public const BTN_BACK_PURCHASES = '🔙 بازگشت به سفارش‌ها';
+    public const BTN_CHECK_CHANNEL = '✅ عضو شدم';
 
     public static function buy(): string { return self::label('buttons.buy', self::BTN_BUY); }
     public static function myConfigs(): string { return self::label('buttons.my_configs', self::BTN_MY_CONFIGS); }

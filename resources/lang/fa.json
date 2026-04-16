@@ -30,7 +30,7 @@
       "broadcast": "📣 همگانی",
       "pins": "📌 پین‌ها",
       "agencies": "🤝 نماینده‌ها",
-      "panels": "🖥 پنل‌های 3x-ui",
+      "panels": "🖥 سرویس‌های پنلی",
       "charges": "💳 شارژها",
       "delivery": "📦 تحویل سفارش",
       "requests": "🗂 درخواست‌ها",
@@ -187,6 +187,31 @@
           "price_label": "💵 قیمت",
           "price_value": "<b>{amount}</b> تومان",
           "tip": "💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود."
+        },
+        "panel": {
+          "service_row": "{num}) {title} | {min_gb}-{max_gb}GB | step:{step_gb} | {price_per_gb} تومان/GB",
+          "service_button": "{num} - {title}",
+          "service_selection": {
+            "title": "🛒 <b>خرید سرویس مستقیم</b>",
+            "label": "🧩 انتخاب سرویس",
+            "tip": "💡 یک سرویس را انتخاب کنید؛ سپس حجم دلخواه را در بازه مجاز همان سرویس وارد کنید."
+          },
+          "volume_selection": {
+            "title": "📏 <b>انتخاب حجم برای {title}</b>",
+            "range_label": "📦 بازه مجاز",
+            "range_value": "حداقل: {min_gb} GB | حداکثر: {max_gb} GB | گام: {step_gb} GB",
+            "price_label": "💵 تعرفه",
+            "price_value": "{price_per_gb} تومان به‌ازای هر GB",
+            "tip": "💡 حجم را به‌صورت عددی وارد کنید (مثلاً 10 یا 12.5) تا مبلغ نهایی محاسبه شود."
+          },
+          "payment": {
+            "service_label": "🧩 سرویس",
+            "volume_label": "💾 حجم",
+            "volume_value": "{volume} GB"
+          },
+          "errors": {
+            "invalid_volume": "حجم واردشده معتبر نیست یا با بازه/گام سرویس سازگار نیست."
+          }
         },
         "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان{stock_suffix}"
       },
@@ -531,10 +556,10 @@
     "final_modules": {
       "actions": {
         "agents_refresh": "🔄 بروزرسانی نماینده‌ها",
-        "panels_add": "✅ افزودن پنل",
-        "panel_toggle": "🔄 تغییر وضعیت پنل",
-        "panel_delete": "❌ حذف پنل",
-        "panel_pkg_add": "✅ افزودن پکیج پنل",
+        "panels_add": "➕ افزودن سرویس پنلی",
+        "panel_toggle": "🔄 فعال/غیرفعال‌سازی سرویس",
+        "panel_delete": "🗑 حذف سرویس",
+        "panel_pkg_add": "✏️ ویرایش سرویس",
         "broadcast_scope_all": "📋 همه",
         "broadcast_scope_users": "👤 کاربران",
         "broadcast_scope_agents": "💼 نماینده‌ها",
@@ -547,7 +572,7 @@
         "freetest_rule": "📝 قانون تست رایگان",
         "freetest_reset": "🔄 ریست سهمیه تست",
         "agent_set_price": "💵 ثبت قیمت",
-        "panels_refresh": "🔄 بروزرسانی پنل‌ها"
+        "panels_refresh": "⚙️ تنظیمات پاسارگارد/تحویل"
       },
       "keywords": {
         "delete_confirm": "حذف",
@@ -555,9 +580,9 @@
       },
       "prompts": {
         "agent_price_input": "قیمت را به تومان بفرستید. برای حذف قیمت اختصاصی «-» بفرستید.",
-        "panel_create_format": "فرمت پنل: name|ip|port|patch|username|password",
-        "panel_delete_confirm": "برای حذف پنل #{panel_id} عبارت «{confirm_word}» را ارسال کنید.",
-        "panel_pkg_create_format": "فرمت پکیج پنل: name|volume_gb|duration_days|inbound_id",
+        "panel_create_format": "فرمت سرویس: title|min|max|step|price_per_gb|duration_policy|duration_days|provider|group_ids|description",
+        "panel_delete_confirm": "برای حذف سرویس #{panel_id} عبارت «{confirm_word}» را ارسال کنید.",
+        "panel_pkg_create_format": "فرمت ویرایش سرویس: title|min|max|step|price_per_gb|duration_policy|duration_days|provider|group_ids|description",
         "broadcast_confirm_title": "📣 <b>تایید ارسال همگانی</b>",
         "broadcast_preview_label": "📝 پیش‌نمایش",
         "broadcast_confirm_tip": "💡 scope را انتخاب کنید و سپس دکمه ارسال را بزنید.",
@@ -585,10 +610,10 @@
       "success": {
         "agent_price_deleted": "قیمت اختصاصی حذف شد.",
         "agent_price_saved": "قیمت اختصاصی ثبت شد.",
-        "panel_created": "پنل ثبت شد.",
-        "panel_status_updated": "وضعیت پنل بروزرسانی شد.",
-        "panel_package_created": "پکیج پنل ثبت شد.",
-        "panel_deleted": "پنل حذف شد.",
+        "panel_created": "سرویس پنلی ثبت شد.",
+        "panel_status_updated": "وضعیت سرویس بروزرسانی شد.",
+        "panel_package_created": "سرویس پنلی ویرایش شد.",
+        "panel_deleted": "سرویس پنلی حذف شد.",
         "broadcast_done": "ارسال همگانی انجام شد. موفق: <b>{sent}</b>",
         "delivery_done": "تحویل انجام شد.",
         "group_id_saved": "Group ID ذخیره شد.",
@@ -738,7 +763,7 @@
         "package_button": "{num} - پکیج {id}"
       },
       "panels": {
-        "not_found": "پنل پیدا نشد."
+        "not_found": "سرویس پنلی پیدا نشد."
       },
       "broadcast": {
         "title": "📣 <b>ارسال همگانی</b>",
@@ -787,18 +812,28 @@
           "not_found_in_type": "پکیج پیدا نشد یا با نوع انتخابی سازگار نیست."
         },
         "panels_list": {
-          "title": "🖥 <b>مدیریت پنل‌ها</b>",
-          "list_label": "📋 پنل‌ها",
-          "empty": "پنلی ثبت نشده است.",
-          "tip": "💡 پنل را انتخاب کنید تا تغییرات مدیریت شود.",
-          "button": "{num} - پنل {id}"
+          "title": "🖥 <b>مدیریت سرویس‌های پنلی</b>",
+          "list_label": "📋 سرویس‌ها",
+          "empty": "سرویس پنلی ثبت نشده است.",
+          "tip": "💡 از این بخش می‌توانید سرویس جدید اضافه کنید یا با انتخاب هر سرویس، آن را ویرایش/حذف/فعال‌سازی کنید. تنظیمات پاسارگارد و delivery_mode هم با دکمه تنظیمات در دسترس است.",
+          "button": "{num} - سرویس {id}"
         },
         "panel_view": {
-          "title": "🖥 <b>پنل #{panel_id}</b>",
-          "name_label": "📛 نام",
-          "packages_label": "📦 پکیج‌ها",
-          "packages_empty": "پکیجی ثبت نشده است.",
-          "tip": "💡 عملیات حساس مانند حذف پنل نیازمند تایید هستند."
+          "title": "🖥 <b>سرویس پنلی #{panel_id}</b>",
+          "name_label": "📛 عنوان سرویس",
+          "packages_label": "📦 مشخصات سرویس",
+          "packages_empty": "اطلاعاتی ثبت نشده است.",
+          "tip": "💡 از دکمه‌های همین صفحه برای ویرایش، فعال/غیرفعال‌سازی و حذف سرویس استفاده کنید."
+        },
+        "panel_settings": {
+          "title": "⚙️ <b>تنظیمات PasarGuard / Delivery</b>",
+          "delivery_mode_label": "🚚 delivery_mode",
+          "base_url_label": "🌐 pg_base_url",
+          "username_label": "👤 pg_username",
+          "password_label": "🔐 pg_password",
+          "input_label": "🧾 فرمت بروزرسانی",
+          "input_value": "delivery_mode|pg_base_url|pg_username|pg_password",
+          "tip": "💡 delivery_mode فقط stock_only یا panel_only است. برای بروزرسانی همه مقادیر را با جداکننده | ارسال کنید."
         },
         "users_list": {
           "title": "👤 <b>مدیریت کاربران</b>",

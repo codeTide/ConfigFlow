@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS configs (
 CREATE TABLE IF NOT EXISTS purchases (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    package_id BIGINT NOT NULL,
+    package_id BIGINT NULL,
     config_id BIGINT NOT NULL,
     amount INT NOT NULL,
     payment_method VARCHAR(64) NOT NULL,
@@ -145,14 +145,20 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE TABLE IF NOT EXISTS pending_orders (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    package_id BIGINT NOT NULL,
+    package_id BIGINT NULL,
+    order_mode VARCHAR(32) NOT NULL DEFAULT 'stock_only',
+    service_id BIGINT NULL,
+    selected_volume_gb DECIMAL(10,2) NULL,
+    computed_amount INT NULL,
     payment_id BIGINT NULL,
     amount INT NOT NULL,
     payment_method VARCHAR(64) NOT NULL,
     created_at DATETIME NOT NULL,
     status VARCHAR(64) NOT NULL DEFAULT 'waiting',
     INDEX idx_pending_user (user_id),
-    INDEX idx_pending_status (status)
+    INDEX idx_pending_status (status),
+    INDEX idx_pending_mode (order_mode),
+    INDEX idx_pending_service (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS user_states (
@@ -177,51 +183,6 @@ CREATE TABLE IF NOT EXISTS agency_prices (
     UNIQUE KEY uniq_agency_price (user_id, package_id),
     INDEX idx_agency_user (user_id),
     INDEX idx_agency_package (package_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS panels (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    ip VARCHAR(191) NOT NULL,
-    port INT NOT NULL,
-    patch VARCHAR(191) NULL,
-    username VARCHAR(191) NOT NULL,
-    password VARCHAR(191) NOT NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS panel_packages (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    panel_id BIGINT NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    volume_gb DECIMAL(10,2) NOT NULL,
-    duration_days INT NOT NULL,
-    inbound_id INT NOT NULL DEFAULT 1,
-    FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE CASCADE,
-    INDEX idx_panel_packages_panel (panel_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS xui_jobs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    job_uuid VARCHAR(191) NOT NULL UNIQUE,
-    order_id BIGINT NULL,
-    user_id BIGINT NOT NULL,
-    panel_id BIGINT NOT NULL,
-    panel_package_id BIGINT NOT NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'pending',
-    retry_count INT NOT NULL DEFAULT 0,
-    result_config TEXT NULL,
-    result_link TEXT NULL,
-    error_msg TEXT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-    UNIQUE KEY uniq_xui_jobs_order (order_id),
-    FOREIGN KEY (order_id) REFERENCES pending_orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (panel_id) REFERENCES panels(id) ON DELETE CASCADE,
-    FOREIGN KEY (panel_package_id) REFERENCES panel_packages(id) ON DELETE CASCADE,
-    INDEX idx_xui_jobs_status (status),
-    INDEX idx_xui_jobs_panel (panel_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS agency_price_config (
@@ -258,4 +219,23 @@ CREATE TABLE IF NOT EXISTS pinned_message_sends (
 CREATE TABLE IF NOT EXISTS purchase_rule_acceptances (
     user_id BIGINT PRIMARY KEY,
     accepted_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS provisioning_services (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    min_gb DECIMAL(10,2) NOT NULL,
+    max_gb DECIMAL(10,2) NOT NULL,
+    step_gb DECIMAL(10,2) NOT NULL DEFAULT 1,
+    price_per_gb INT NOT NULL,
+    duration_policy VARCHAR(32) NOT NULL DEFAULT 'fixed_days',
+    duration_days INT NULL,
+    provider VARCHAR(64) NOT NULL DEFAULT 'pasarguard',
+    provider_group_ids TEXT NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    INDEX idx_provisioning_services_active (is_active),
+    INDEX idx_provisioning_services_provider (provider)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
