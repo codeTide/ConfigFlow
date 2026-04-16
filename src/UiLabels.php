@@ -9,10 +9,9 @@ final class UiLabels
     // Backward-compatible constants for flows that are not migrated yet.
     public const BTN_BACK = '↩️ بازگشت';
     public const BTN_MAIN = '🏠 منوی اصلی';
-    public const BTN_CANCEL = '❌ انصراف';
 
     public const BTN_CONFIRM_YES = '✅ تایید';
-    public const BTN_CONFIRM_NO = self::BTN_CANCEL;
+    public const BTN_CONFIRM_NO = '❌ خیر';
 
     private function __construct()
     {
@@ -26,11 +25,6 @@ final class UiLabels
     public static function main(?UiJsonCatalog $catalog = null): string
     {
         return self::resolve($catalog, 'buttons.main_menu', self::BTN_MAIN);
-    }
-
-    public static function cancel(?UiJsonCatalog $catalog = null): string
-    {
-        return self::resolve($catalog, 'buttons.cancel', self::BTN_CANCEL);
     }
 
     public static function confirmYes(?UiJsonCatalog $catalog = null): string

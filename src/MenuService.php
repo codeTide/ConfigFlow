@@ -92,7 +92,7 @@ final class MenuService
             [$this->catalog->get('buttons.admin.agencies'), $this->catalog->get('buttons.admin.panels')],
             [$this->catalog->get('buttons.admin.charges'), $this->catalog->get('buttons.admin.delivery'), $this->catalog->get('buttons.admin.requests')],
             [$this->catalog->get('buttons.admin.backup_topics')],
-            [UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
+            [$this->catalog->get('buttons.admin.exit_panel')],
         ]);
     }
 
