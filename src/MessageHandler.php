@@ -704,7 +704,7 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -713,7 +713,7 @@ final class MessageHandler
             $requestKind = (string) ($payload['request_kind'] ?? '');
             $requestId = (int) ($payload['request_id'] ?? 0);
             $approve = ((int) ($payload['approve'] ?? 0)) === 1;
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 if ($requestKind === 'free' || $requestKind === 'agency') {
                     $this->openAdminRequestView($chatId, $userId, $requestKind, $requestId, 'pending', $this->uiText->info($this->catalog->get('admin.legacy.info.request_note_legacy_redirect')));
                 } else {
@@ -767,11 +767,11 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminTypesList($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.type_name_legacy_redirect')));
                 return;
             }
@@ -790,7 +790,7 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -800,7 +800,7 @@ final class MessageHandler
             }
             $payload = $state['payload'] ?? [];
             $typeId = (int) ($payload['type_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 if ($typeId > 0) {
                     $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->info($this->catalog->get('admin.legacy.info.legacy_use_canonical')));
                 } else {
@@ -832,14 +832,14 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
             $payload = $state['payload'] ?? [];
             $targetUid = (int) ($payload['target_user_id'] ?? 0);
             $mode = (string) ($payload['mode'] ?? 'add');
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminUserView($chatId, $userId, $targetUid, $this->uiText->info($this->catalog->get('admin.legacy.info.user_balance_legacy_redirect')));
                 return;
             }
@@ -859,14 +859,14 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
             $payload = $state['payload'] ?? [];
             $typeId = (int) ($payload['type_id'] ?? 0);
             $packageId = (int) ($payload['package_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->info($this->catalog->get('admin.legacy.info.stock_add_config_legacy_redirect')));
                 return;
             }
@@ -905,14 +905,14 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
             $payload = $state['payload'] ?? [];
             $packageId = (int) ($payload['package_id'] ?? 0);
             $typeId = (int) ($payload['type_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, '', $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
@@ -929,11 +929,11 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminAdminsList($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
@@ -1039,11 +1039,11 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminSettingsView($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
@@ -1132,11 +1132,11 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPinsList($chatId, $userId, $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
@@ -1156,11 +1156,11 @@ final class MessageHandler
                 return;
             }
             $pinId = (int) (($state['payload'] ?? [])['pin_id'] ?? 0);
-            if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPinView($chatId, $userId, $pinId, $this->uiText->info($this->catalog->get('admin.legacy.info.settings_legacy_redirect')));
                 return;
             }
@@ -1469,16 +1469,16 @@ final class MessageHandler
 
     private function handleAdminNavigationState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_CANCEL) {
+        if ($text === UiLabels::cancel($this->catalog)) {
             $this->openAdminRoot($chatId, $userId);
             return;
         }
-        if ($text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
-        if ($text === UiLabels::BTN_BACK) {
+        if ($text === UiLabels::back($this->catalog)) {
             $this->openAdminRoot($chatId, $userId);
             return;
         }
@@ -1591,7 +1591,7 @@ final class MessageHandler
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
 
         if ($stateName === 'admin.types.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -1623,7 +1623,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.type.create') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminTypesList($chatId, $userId);
                 return;
             }
@@ -1643,7 +1643,7 @@ final class MessageHandler
                 $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminTypesList($chatId, $userId);
                 return;
             }
@@ -1697,7 +1697,7 @@ final class MessageHandler
                 $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type_again')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminTypeView($chatId, $userId, $typeId);
                 return;
             }
@@ -1731,7 +1731,7 @@ final class MessageHandler
                 $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_package_info')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminTypeView($chatId, $userId, $typeId);
                 return;
             }
@@ -1778,7 +1778,7 @@ final class MessageHandler
             $options[$num] = $typeId;
             $buttons[] = [$this->catalog->get('admin.ui.open.types_list.button', ['num' => $num, 'name' => $name])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.types.list', ['options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -1826,7 +1826,7 @@ final class MessageHandler
             $options[$num] = $packageId;
             $buttons[] = [$this->catalog->get('admin.ui.open.type_view.package_button', ['num' => $num, 'name' => $name])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
 
         $this->database->setUserState($userId, 'admin.type.view', ['type_id' => $typeId, 'options' => $options, 'stack' => ['admin.types.list', 'admin.root']]);
         if ($notice !== null && $notice !== '') {
@@ -1881,7 +1881,7 @@ final class MessageHandler
             )),
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_PACKAGE_TOGGLE), $this->uiConst(self::ADMIN_PACKAGE_DELETE)],
-                [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
             ])
         );
     }
@@ -1910,7 +1910,7 @@ final class MessageHandler
 
     private function handleAdminUsersStockState(int $chatId, int $userId, string $text, array $state, array $message): void
     {
-        if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->openAdminRoot($chatId, $userId);
             return;
         }
@@ -1919,7 +1919,7 @@ final class MessageHandler
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
 
         if ($stateName === 'admin.users.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -1944,7 +1944,7 @@ final class MessageHandler
                 $this->openAdminUsersList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_selected_user')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminUsersList($chatId, $userId);
                 return;
             }
@@ -2003,7 +2003,7 @@ final class MessageHandler
                 $this->openAdminUsersList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_user')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminUserView($chatId, $userId, $targetUid);
                 return;
             }
@@ -2021,7 +2021,7 @@ final class MessageHandler
 
         if ($stateName === 'admin.stock.view') {
             $level = (string) ($payload['level'] ?? 'types');
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 if ($level === 'packages') {
                     $this->openAdminStockTypesView($chatId, $userId);
                     return;
@@ -2174,7 +2174,7 @@ final class MessageHandler
             $mode = (string) ($payload['mode'] ?? '');
             $typeId = (int) ($payload['type_id'] ?? 0);
             $packageId = (int) ($payload['package_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $query = (string) ($payload['query'] ?? '');
                 $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, $query);
                 return;
@@ -2242,7 +2242,7 @@ final class MessageHandler
             $options[$num] = $uid;
             $buttons[] = [$this->catalog->get('admin.ui.open.users_list.button', ['num' => $num, 'name' => $name])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.users.list', ['options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -2296,7 +2296,7 @@ final class MessageHandler
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_USER_TOGGLE_STATUS), $this->uiConst(self::ADMIN_USER_TOGGLE_AGENT)],
                 [$this->uiConst(self::ADMIN_USER_BALANCE_ADD), $this->uiConst(self::ADMIN_USER_BALANCE_SUB)],
-                [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
             ])
         );
     }
@@ -2318,7 +2318,7 @@ final class MessageHandler
             $options[$num] = $typeId;
             $buttons[] = [$this->catalog->get('admin.ui.open.stock.types.button', ['num' => $num, 'name' => $name])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.stock.view', ['level' => 'types', 'options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -2358,7 +2358,7 @@ final class MessageHandler
             $options[$num] = $packageId;
             $buttons[] = [$this->catalog->get('admin.ui.open.stock.packages.button', ['num' => $num, 'name' => $name])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.stock.view', ['level' => 'packages', 'type_id' => $typeId, 'options' => $options, 'stack' => ['admin.stock.view', 'admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -2407,7 +2407,7 @@ final class MessageHandler
         foreach (array_keys($options) as $num) {
             $buttons[] = [$this->catalog->get('admin.ui.open.stock.configs.option_button', ['num' => $num])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.stock.view', [
             'level' => 'configs',
             'type_id' => $typeId,
@@ -2471,7 +2471,7 @@ final class MessageHandler
             )),
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_STOCK_EXPIRE_TOGGLE), $this->uiConst(self::ADMIN_STOCK_DELETE_CONFIG)],
-                [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
             ])
         );
     }
@@ -2489,7 +2489,7 @@ final class MessageHandler
 
     private function handleAdminPaymentsRequestsState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->openAdminRoot($chatId, $userId);
             return;
         }
@@ -2509,7 +2509,7 @@ final class MessageHandler
         $requestRejectLabel = $this->catalog->get('admin.payments_requests.actions.request_reject');
 
         if ($stateName === 'admin.payments.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -2534,7 +2534,7 @@ final class MessageHandler
                 $this->openAdminPaymentsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_payment_id')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPaymentsList($chatId, $userId);
                 return;
             }
@@ -2572,7 +2572,7 @@ final class MessageHandler
                 $this->openAdminPaymentsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_payment')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPaymentView($chatId, $userId, $paymentId);
                 return;
             }
@@ -2581,7 +2581,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.requests.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -2633,7 +2633,7 @@ final class MessageHandler
                 $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_request_info')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRequestsList($chatId, $userId, $kind, $status);
                 return;
             }
@@ -2681,7 +2681,7 @@ final class MessageHandler
                 $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->uiText->warning($this->catalog->get('admin.payments_requests.errors.invalid_request_review_info')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRequestView($chatId, $userId, $kind, $requestId, $status);
                 return;
             }
@@ -2749,7 +2749,7 @@ final class MessageHandler
             $options[$num] = $paymentId;
             $buttons[] = [$this->catalog->get('admin.ui.open.payments.list.button', ['num' => $num, 'payment_id' => $paymentId])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.payments.list', ['options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -2787,7 +2787,7 @@ final class MessageHandler
         if ($status === 'waiting_admin') {
             $buttons[] = [$this->uiConst(self::ADMIN_PAYMENT_APPROVE), $this->uiConst(self::ADMIN_PAYMENT_REJECT)];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
 
         $this->database->setUserState($userId, 'admin.payment.view', ['payment_id' => $paymentId, 'stack' => ['admin.payments.list', 'admin.root']]);
         $this->telegram->sendMessage(
@@ -2916,7 +2916,7 @@ final class MessageHandler
                 $this->uiKeyboard->replyMenu([
                     [$this->uiConst(self::ADMIN_REQUESTS_FREE)],
                     [$this->uiConst(self::ADMIN_REQUESTS_AGENCY)],
-                    [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL],
+                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
                 ])
             );
             return;
@@ -2944,7 +2944,7 @@ final class MessageHandler
             $options[$num] = $requestId;
             $buttons[] = [$this->catalog->get('admin.ui.open.requests.list.button', ['num' => $num, 'request_id' => $requestId])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.requests.list', [
             'kind' => $kind,
             'status' => $status,
@@ -2991,7 +2991,7 @@ final class MessageHandler
         if ($status === 'pending') {
             $buttons[] = [$this->uiConst(self::ADMIN_REQUEST_APPROVE), $this->uiConst(self::ADMIN_REQUEST_REJECT)];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.request.view', [
             'kind' => $kind,
             'request_id' => $requestId,
@@ -3017,7 +3017,7 @@ final class MessageHandler
 
     private function handleAdminSettingsAdminsPinsState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->openAdminRoot($chatId, $userId);
             return;
         }
@@ -3042,7 +3042,7 @@ final class MessageHandler
         $confirmSendWord = $this->catalog->get('admin.settings_admins_pins.keywords.send_confirm');
 
         if ($stateName === 'admin.settings.view') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3106,7 +3106,7 @@ final class MessageHandler
 
         if ($stateName === 'admin.settings.edit') {
             $mode = (string) ($payload['mode'] ?? 'kv');
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminSettingsView($chatId, $userId);
                 return;
             }
@@ -3136,7 +3136,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.admins.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3159,7 +3159,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.admin.create') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminAdminsList($chatId, $userId);
                 return;
             }
@@ -3181,7 +3181,7 @@ final class MessageHandler
                 $this->openAdminAdminsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_admin')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminAdminsList($chatId, $userId);
                 return;
             }
@@ -3203,7 +3203,7 @@ final class MessageHandler
 
         if ($stateName === 'admin.admin.delete') {
             $targetUid = (int) ($payload['target_user_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminAdminView($chatId, $userId, $targetUid);
                 return;
             }
@@ -3217,7 +3217,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.pins.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3236,7 +3236,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.pin.create') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPinsList($chatId, $userId);
                 return;
             }
@@ -3255,7 +3255,7 @@ final class MessageHandler
                 $this->openAdminPinsList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_pin')));
                 return;
             }
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPinsList($chatId, $userId);
                 return;
             }
@@ -3278,7 +3278,7 @@ final class MessageHandler
 
         if ($stateName === 'admin.pin.edit') {
             $pinId = (int) ($payload['pin_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPinView($chatId, $userId, $pinId);
                 return;
             }
@@ -3293,7 +3293,7 @@ final class MessageHandler
 
         if ($stateName === 'admin.pin.delete') {
             $pinId = (int) ($payload['pin_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPinView($chatId, $userId, $pinId);
                 return;
             }
@@ -3308,7 +3308,7 @@ final class MessageHandler
 
         if ($stateName === 'admin.pin.send') {
             $pinId = (int) ($payload['pin_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPinView($chatId, $userId, $pinId);
                 return;
             }
@@ -3380,7 +3380,7 @@ final class MessageHandler
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_FREE_TEST), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CARD), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CRYPTO), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_TETRA)],
-            [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL],
+            [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
         ]));
     }
 
@@ -3402,7 +3402,7 @@ final class MessageHandler
         foreach (Config::adminIds() as $ownerId) {
             $lines[] = $this->catalog->get('admin.ui.open.settings_admins_pins.admins.owner_row', ['emoji' => $this->catalog->get('admin.ui.open.settings_admins_pins.admins.owner_emoji'), 'owner_id' => $ownerId]);
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.admins.list', ['options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -3436,7 +3436,7 @@ final class MessageHandler
             $lines[] = $label;
         }
         $rows[] = [$this->uiConst(self::ADMIN_ADMIN_DELETE)];
-        $rows[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $rows[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.admin.view', ['target_user_id' => $targetUid, 'perm_labels' => $permLabels, 'stack' => ['admin.admins.list', 'admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -3467,7 +3467,7 @@ final class MessageHandler
             $options[$num] = $pinId;
             $buttons[] = [$this->catalog->get('admin.ui.open.settings_admins_pins.pins.button', ['num' => $num, 'pin_id' => $pinId])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.pins.list', ['options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -3501,13 +3501,13 @@ final class MessageHandler
         )), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_PIN_SEND_ALL)],
             [$this->uiConst(self::ADMIN_PIN_EDIT), $this->uiConst(self::ADMIN_PIN_DELETE)],
-            [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL],
+            [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
         ]));
     }
 
     private function handleAdminFinalModulesState(int $chatId, int $userId, string $text, array $state, array $message): void
     {
-        if ($text === UiLabels::BTN_CANCEL || $text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::cancel($this->catalog) || $text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->openAdminRoot($chatId, $userId);
             return;
         }
@@ -3515,6 +3515,7 @@ final class MessageHandler
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
         $agentsRefreshLabel = $this->catalog->get('admin.final_modules.actions.agents_refresh');
         $panelsAddLabel = $this->catalog->get('admin.final_modules.actions.panels_add');
+        $panelsSettingsLabel = $this->catalog->get('admin.final_modules.actions.panels_refresh');
         $panelToggleLabel = $this->catalog->get('admin.final_modules.actions.panel_toggle');
         $panelDeleteLabel = $this->catalog->get('admin.final_modules.actions.panel_delete');
         $panelPkgAddLabel = $this->catalog->get('admin.final_modules.actions.panel_pkg_add');
@@ -3533,7 +3534,7 @@ final class MessageHandler
         $deliverConfirmWord = $this->catalog->get('admin.final_modules.keywords.deliver_confirm');
 
         if ($stateName === 'admin.agents.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3551,7 +3552,7 @@ final class MessageHandler
         }
         if ($stateName === 'admin.agent.view') {
             $agentId = (int) ($payload['agent_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminAgentsList($chatId, $userId);
                 return;
             }
@@ -3567,7 +3568,7 @@ final class MessageHandler
         if ($stateName === 'admin.agent.edit') {
             $agentId = (int) ($payload['agent_id'] ?? 0);
             $pkgId = (int) ($payload['package_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminAgentView($chatId, $userId, $agentId);
                 return;
             }
@@ -3588,7 +3589,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.panels.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3597,9 +3598,8 @@ final class MessageHandler
                 $this->telegram->sendMessage($chatId, $this->uiText->info('فرمت سرویس: title|min|max|step|price_per_gb|duration_policy|duration_days|provider|group_ids|description'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
                 return;
             }
-            if ($text === $panelPkgAddLabel || $text === $this->uiConst(self::ADMIN_PANEL_PKG_ADD)) {
-                $this->database->setUserState($userId, 'admin.panel.settings', []);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('فرمت تنظیمات: delivery_mode|pg_base_url|pg_username|pg_password (delivery_mode فقط stock_only یا panel_only)'));
+            if ($text === $panelsSettingsLabel || $text === $this->uiConst(self::ADMIN_PANELS_REFRESH)) {
+                $this->openAdminPanelSettings($chatId, $userId);
                 return;
             }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
@@ -3611,7 +3611,7 @@ final class MessageHandler
             }
         }
         if ($stateName === 'admin.panel.create') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPanelsList($chatId, $userId);
                 return;
             }
@@ -3656,7 +3656,7 @@ final class MessageHandler
         }
         if ($stateName === 'admin.panel.view') {
             $serviceId = (int) ($payload['panel_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPanelsList($chatId, $userId);
                 return;
             }
@@ -3682,7 +3682,7 @@ final class MessageHandler
         }
         if ($stateName === 'admin.panel.edit') {
             $panelId = (int) ($payload['panel_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPanelView($chatId, $userId, $panelId);
                 return;
             }
@@ -3723,7 +3723,7 @@ final class MessageHandler
             return;
         }
         if ($stateName === 'admin.panel.settings') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPanelsList($chatId, $userId);
                 return;
             }
@@ -3741,12 +3741,12 @@ final class MessageHandler
             $this->settings->set('pg_base_url', $baseUrl);
             $this->settings->set('pg_username', $username);
             $this->settings->set('pg_password', $password);
-            $this->openAdminPanelsList($chatId, $userId, $this->uiText->success('تنظیمات تحویل/پاسارگارد ذخیره شد.'));
+            $this->openAdminPanelSettings($chatId, $userId, $this->uiText->success('تنظیمات تحویل/پاسارگارد ذخیره شد.'));
             return;
         }
         if ($stateName === 'admin.panel.delete') {
             $panelId = (int) ($payload['panel_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminPanelView($chatId, $userId, $panelId);
                 return;
             }
@@ -3760,7 +3760,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.broadcast.compose') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3777,12 +3777,12 @@ final class MessageHandler
                 [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_ALL), $this->uiConst(self::ADMIN_BROADCAST_SCOPE_USERS)],
                 [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_AGENTS), $this->uiConst(self::ADMIN_BROADCAST_SCOPE_ADMINS)],
                 [$this->uiConst(self::ADMIN_BROADCAST_SEND)],
-                [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
             ]));
             return;
         }
         if ($stateName === 'admin.broadcast.confirm') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminBroadcastCompose($chatId, $userId);
                 return;
             }
@@ -3824,7 +3824,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.deliveries.list') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3842,7 +3842,7 @@ final class MessageHandler
         }
         if ($stateName === 'admin.delivery.view') {
             $orderId = (int) ($payload['order_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminDeliveriesList($chatId, $userId);
                 return;
             }
@@ -3854,7 +3854,7 @@ final class MessageHandler
         }
         if ($stateName === 'admin.delivery.review') {
             $orderId = (int) ($payload['order_id'] ?? 0);
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminDeliveryView($chatId, $userId, $orderId);
                 return;
             }
@@ -3870,7 +3870,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.groupops.view') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3887,7 +3887,7 @@ final class MessageHandler
         }
         if ($stateName === 'admin.groupops.action') {
             $mode = (string) ($payload['mode'] ?? '');
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminGroupOpsView($chatId, $userId);
                 return;
             }
@@ -3921,7 +3921,7 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.freetest.menu') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
@@ -3937,7 +3937,7 @@ final class MessageHandler
             }
         }
         if ($stateName === 'admin.freetest.rule') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminFreeTestMenu($chatId, $userId);
                 return;
             }
@@ -3954,7 +3954,7 @@ final class MessageHandler
             return;
         }
         if ($stateName === 'admin.freetest.reset') {
-            if ($text === UiLabels::BTN_BACK) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminFreeTestMenu($chatId, $userId);
                 return;
             }
@@ -3985,7 +3985,7 @@ final class MessageHandler
             $options[$num] = $id;
             $buttons[] = [$this->catalog->get('admin.ui.agents.button', ['num' => $num, 'id' => $id])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.agents.list', ['options' => $options]);
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
@@ -4014,7 +4014,7 @@ final class MessageHandler
             $options[$num] = $pkgId;
             $buttons[] = [$this->catalog->get('admin.ui.agent_view.package_button', ['num' => $num, 'id' => $pkgId])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.agent.view', ['agent_id' => $agentId, 'options' => $options]);
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
@@ -4026,7 +4026,7 @@ final class MessageHandler
     {
         $options = [];
         $lines = [];
-        $buttons = [[$this->uiConst(self::ADMIN_PANELS_ADD), $this->uiConst(self::ADMIN_PANEL_PKG_ADD)]];
+        $buttons = [[$this->uiConst(self::ADMIN_PANELS_ADD), $this->uiConst(self::ADMIN_PANELS_REFRESH)]];
         foreach (array_values($this->database->listProvisioningServicesAll()) as $idx => $panel) {
             $num = (string) ($idx + 1);
             $panelId = (int) ($panel['id'] ?? 0);
@@ -4040,12 +4040,42 @@ final class MessageHandler
             $options[$num] = $panelId;
             $buttons[] = [$this->catalog->get('admin.ui.open.panels_list.button', ['num' => $num, 'id' => $panelId])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.panels.list', ['options' => $options]);
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panels_list.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panels_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.panels_list.empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.panels_list.tip'))), $this->uiKeyboard->replyMenu($buttons));
+    }
+
+    private function openAdminPanelSettings(int $chatId, int $userId, ?string $notice = null): void
+    {
+        $deliveryMode = trim($this->settings->get('delivery_mode', 'stock_only'));
+        $baseUrl = trim($this->settings->get('pg_base_url', ''));
+        $username = trim($this->settings->get('pg_username', ''));
+        $password = trim($this->settings->get('pg_password', ''));
+        $passwordMasked = $password === '' ? '-' : str_repeat('*', min(strlen($password), 10));
+        $this->database->setUserState($userId, 'admin.panel.settings', []);
+        if ($notice) {
+            $this->telegram->sendMessage($chatId, $notice);
+        }
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->uiText->multi(new UiTextBlock(
+                title: $this->catalog->get('admin.ui.open.panel_settings.title'),
+                lines: [
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.delivery_mode_label'), htmlspecialchars($deliveryMode !== '' ? $deliveryMode : '-')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.base_url_label'), htmlspecialchars($baseUrl !== '' ? $baseUrl : '-')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.username_label'), htmlspecialchars($username !== '' ? $username : '-')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.password_label'), htmlspecialchars($passwordMasked)),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.input_label'), $this->catalog->get('admin.ui.open.panel_settings.input_value')),
+                ],
+                tipBlockquote: $this->catalog->get('admin.ui.open.panel_settings.tip')
+            )),
+            $this->uiKeyboard->replyMenu([
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)],
+            ])
+        );
     }
 
     private function openAdminPanelView(int $chatId, int $userId, int $panelId, ?string $notice = null): void
@@ -4072,7 +4102,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->database->setUserState($userId, 'admin.panel.view', ['panel_id' => $panelId]);
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_view.title', ['panel_id' => $panelId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.name_label'), htmlspecialchars((string) ($panel['title'] ?? '-'))), new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.packages_label'), htmlspecialchars($summary))], tipBlockquote: $this->catalog->get('admin.ui.open.panel_view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_view.title', ['panel_id' => $panelId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.name_label'), htmlspecialchars((string) ($panel['title'] ?? '-'))), new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.packages_label'), htmlspecialchars($summary))], tipBlockquote: $this->catalog->get('admin.ui.open.panel_view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
     }
 
     private function openAdminBroadcastCompose(int $chatId, int $userId, ?string $notice = null): void
@@ -4100,7 +4130,7 @@ final class MessageHandler
             $options[$num] = $id;
             $buttons[] = [$this->catalog->get('admin.ui.open.deliveries.list.button', ['num' => $num, 'order_id' => $id])];
         }
-        $buttons[] = [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL];
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)];
         $this->database->setUserState($userId, 'admin.deliveries.list', ['options' => $options]);
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
@@ -4114,7 +4144,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.view.title', ['order_id' => $orderId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.deliveries.view.action_label'), $this->catalog->get('admin.ui.open.deliveries.view.action_value'))], tipBlockquote: $this->catalog->get('admin.ui.open.deliveries.view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_DELIVERY_DO)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.view.title', ['order_id' => $orderId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.deliveries.view.action_label'), $this->catalog->get('admin.ui.open.deliveries.view.action_value'))], tipBlockquote: $this->catalog->get('admin.ui.open.deliveries.view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_DELIVERY_DO)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
     }
 
     private function openAdminGroupOpsView(int $chatId, int $userId, ?string $notice = null): void
@@ -4124,7 +4154,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $groupId = trim($this->settings->get('group_id', ''));
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.groupops.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.groupops.group_id_label'), $groupId !== '' ? "<code>{$groupId}</code>" : $this->catalog->get('admin.ui.open.groupops.group_id_unset'))], tipBlockquote: $this->catalog->get('admin.ui.open.groupops.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_GROUPOPS_SET_GROUP), $this->uiConst(self::ADMIN_GROUPOPS_RESTORE)], [UiLabels::BTN_BACK, UiLabels::BTN_MAIN, UiLabels::BTN_CANCEL]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.groupops.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.groupops.group_id_label'), $groupId !== '' ? "<code>{$groupId}</code>" : $this->catalog->get('admin.ui.open.groupops.group_id_unset'))], tipBlockquote: $this->catalog->get('admin.ui.open.groupops.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_GROUPOPS_SET_GROUP), $this->uiConst(self::ADMIN_GROUPOPS_RESTORE)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog), UiLabels::cancel($this->catalog)]]));
     }
 
     private function openAdminFreeTestMenu(int $chatId, int $userId, ?string $notice = null): void
@@ -4147,7 +4177,7 @@ final class MessageHandler
             return;
         }
 
-        if ($text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN || $text === UiLabels::BTN_CANCEL) {
+        if ($text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN || $text === UiLabels::cancel($this->catalog)) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -4260,7 +4290,7 @@ final class MessageHandler
 
     private function handlePanelServiceSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -4303,11 +4333,11 @@ final class MessageHandler
 
     private function handlePanelVolumeInputState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_BACK) {
+        if ($text === UiLabels::back($this->catalog)) {
             $this->openPanelServiceSelection($chatId, $userId);
             return;
         }
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -4354,11 +4384,11 @@ final class MessageHandler
 
     private function handleBuyPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_BACK || $text === KeyboardBuilder::BTN_BACK_TYPES) {
+        if ($text === UiLabels::back($this->catalog) || $text === KeyboardBuilder::BTN_BACK_TYPES) {
             $this->startBuyTypeReplyFlow($chatId, $userId);
             return;
         }
-        if ($text === UiLabels::BTN_MAIN || $text === KeyboardBuilder::BTN_BACK_MAIN || $text === UiLabels::BTN_CANCEL) {
+        if ($text === UiLabels::main($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN || $text === UiLabels::cancel($this->catalog)) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -4470,7 +4500,7 @@ final class MessageHandler
 
     private function handleRenewPurchaseSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -4541,11 +4571,11 @@ final class MessageHandler
 
     private function handleRenewPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_BACK || $text === KeyboardBuilder::BTN_BACK_PURCHASES) {
+        if ($text === UiLabels::back($this->catalog) || $text === KeyboardBuilder::BTN_BACK_PURCHASES) {
             $this->showMyConfigsWithReplyFlow($chatId, $userId);
             return;
         }
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -4600,7 +4630,7 @@ final class MessageHandler
 
     private function handleBuyPaymentSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_BACK) {
+        if ($text === UiLabels::back($this->catalog)) {
             $typeId = (int) ($state['payload']['type_id'] ?? 0);
             if ($typeId > 0) {
                 $this->showBuyPackageSelection($chatId, $userId, $typeId);
@@ -4610,7 +4640,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -4710,7 +4740,7 @@ final class MessageHandler
 
     private function handlePanelBuyPaymentSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_BACK) {
+        if ($text === UiLabels::back($this->catalog)) {
             $serviceId = (int) ($state['payload']['service_id'] ?? 0);
             $service = $this->database->getProvisioningService($serviceId);
             if (!is_array($service)) {
@@ -4738,7 +4768,7 @@ final class MessageHandler
             );
             return;
         }
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -4799,7 +4829,7 @@ final class MessageHandler
 
     private function handleRenewPaymentSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_BACK) {
+        if ($text === UiLabels::back($this->catalog)) {
             $purchaseId = (int) ($state['payload']['purchase_id'] ?? 0);
             if ($purchaseId > 0) {
                 $this->showMyConfigsWithReplyFlow($chatId, $userId);
@@ -4809,7 +4839,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -5265,7 +5295,7 @@ final class MessageHandler
 
     private function handleGatewayVerifyState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
@@ -5322,12 +5352,12 @@ final class MessageHandler
 
     private function handlePurchaseRulesAcceptState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::BTN_MAIN || $text === UiLabels::BTN_CANCEL || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === UiLabels::main($this->catalog) || $text === UiLabels::cancel($this->catalog) || $text === KeyboardBuilder::BTN_BACK_MAIN) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
-        if ($text === UiLabels::BTN_BACK || $text === KeyboardBuilder::BTN_BACK_TYPES) {
+        if ($text === UiLabels::back($this->catalog) || $text === KeyboardBuilder::BTN_BACK_TYPES) {
             if ((string) ($state['payload']['order_mode'] ?? '') === 'panel_only') {
                 $this->openPanelServiceSelection($chatId, $userId);
                 return;
