@@ -494,6 +494,7 @@
         "settings_toggle_gw_crypto": "🎁 کریپتو",
         "settings_toggle_gw_tetra": "💰 درگاه TetraPay",
         "settings_set_channel": "📣 کانال قفل",
+        "settings_set_delivery_mode": "🚚 حالت تحویل",
         "settings_edit": "✍️ ویرایش دستی",
         "admins_add": "✅ افزودن ادمین",
         "admin_delete": "❌ حذف ادمین",
@@ -572,7 +573,7 @@
         "freetest_rule": "📝 قانون تست رایگان",
         "freetest_reset": "🔄 ریست سهمیه تست",
         "agent_set_price": "💵 ثبت قیمت",
-        "panels_refresh": "⚙️ تنظیمات پاسارگارد/تحویل"
+        "panels_refresh": "⚙️ تنظیمات اتصال پنل"
       },
       "keywords": {
         "delete_confirm": "حذف",
@@ -580,9 +581,9 @@
       },
       "prompts": {
         "agent_price_input": "قیمت را به تومان بفرستید. برای حذف قیمت اختصاصی «-» بفرستید.",
-        "panel_create_format": "فرمت سرویس: title|min|max|step|price_per_gb|duration_policy|duration_days|provider|group_ids|description",
+        "panel_create_format": "ثبت سرویس پنلی به‌صورت مرحله‌ای انجام می‌شود.",
         "panel_delete_confirm": "برای حذف سرویس #{panel_id} عبارت «{confirm_word}» را ارسال کنید.",
-        "panel_pkg_create_format": "فرمت ویرایش سرویس: title|min|max|step|price_per_gb|duration_policy|duration_days|provider|group_ids|description",
+        "panel_pkg_create_format": "ویرایش سرویس پنلی به‌صورت مرحله‌ای انجام می‌شود.",
         "broadcast_confirm_title": "📣 <b>تایید ارسال همگانی</b>",
         "broadcast_preview_label": "📝 پیش‌نمایش",
         "broadcast_confirm_tip": "💡 scope را انتخاب کنید و سپس دکمه ارسال را بزنید.",
@@ -707,7 +708,7 @@
         "title": "📦 <b>افزودن پکیج</b>",
         "format_label": "🧾 فرمت",
         "format_value": "<code>نام|حجم(GB)|مدت(روز)|قیمت</code>",
-        "tip": "💡 مثال: <code>اقتصادی|50|30|120000</code>"
+        "tip": "💡 اطلاعات پکیج را به‌صورت مرحله‌ای و گام‌به‌گام وارد کنید."
       },
       "errors": {
         "invalid_type_option": "گزینه نامعتبر است. لطفاً یکی از دکمه‌های لیست نوع‌ها را انتخاب کنید.",
@@ -717,8 +718,8 @@
         "invalid_package_or_action": "گزینه نامعتبر است. یکی از پکیج‌ها یا عملیات مدیریتی همین صفحه را انتخاب کنید.",
         "invalid_type_again": "نوع سرویس معتبر نبود. لطفاً دوباره انتخاب کنید.",
         "invalid_create_input": "فرمت ورودی معتبر نیست. لطفاً مطابق راهنما ارسال کنید.",
-        "create_format": "فرمت باید ۴ بخش داشته باشد: نام|حجم|مدت|قیمت",
-        "invalid_values": "مقادیر واردشده معتبر نیستند. مثال: <code>اقتصادی|50|30|120000</code>",
+        "create_format": "ورودی‌ها باید مرحله‌به‌مرحله وارد شوند.",
+        "invalid_values": "مقادیر واردشده معتبر نیستند. لطفاً مقدار درست وارد کنید.",
         "invalid_package_info": "اطلاعات پکیج معتبر نبود. لطفاً دوباره انتخاب کنید.",
         "package_not_found": "پکیج پیدا نشد.",
         "invalid_package_action": "گزینه نامعتبر است. لطفاً از دکمه‌های مدیریت پکیج استفاده کنید."
@@ -815,7 +816,7 @@
           "title": "🖥 <b>مدیریت سرویس‌های پنلی</b>",
           "list_label": "📋 سرویس‌ها",
           "empty": "سرویس پنلی ثبت نشده است.",
-          "tip": "💡 از این بخش می‌توانید سرویس جدید اضافه کنید یا با انتخاب هر سرویس، آن را ویرایش/حذف/فعال‌سازی کنید. تنظیمات پاسارگارد و delivery_mode هم با دکمه تنظیمات در دسترس است.",
+          "tip": "💡 از این بخش می‌توانید سرویس پنلی را به‌صورت مرحله‌ای اضافه/ویرایش کنید و وضعیت آن را مدیریت کنید.",
           "button": "{num} - سرویس {id}"
         },
         "panel_view": {
@@ -826,14 +827,13 @@
           "tip": "💡 از دکمه‌های همین صفحه برای ویرایش، فعال/غیرفعال‌سازی و حذف سرویس استفاده کنید."
         },
         "panel_settings": {
-          "title": "⚙️ <b>تنظیمات PasarGuard / Delivery</b>",
-          "delivery_mode_label": "🚚 delivery_mode",
-          "base_url_label": "🌐 pg_base_url",
-          "username_label": "👤 pg_username",
-          "password_label": "🔐 pg_password",
+          "title": "⚙️ <b>تنظیمات اتصال پنل</b>",
+          "base_url_label": "🌐 آدرس پنل",
+          "username_label": "👤 نام کاربری پنل",
+          "password_label": "🔐 رمز عبور پنل",
           "input_label": "🧾 فرمت بروزرسانی",
-          "input_value": "delivery_mode|pg_base_url|pg_username|pg_password",
-          "tip": "💡 delivery_mode فقط stock_only یا panel_only است. برای بروزرسانی همه مقادیر را با جداکننده | ارسال کنید."
+          "input_value": "ثبت مرحله‌ای",
+          "tip": "💡 اطلاعات اتصال پنل را مرحله‌به‌مرحله وارد کنید."
         },
         "users_list": {
           "title": "👤 <b>مدیریت کاربران</b>",

@@ -1662,18 +1662,8 @@ final class MessageHandler
                 return;
             }
             if ($text === $this->catalog->get('admin.types_packages.actions.add_package') || $text === $this->uiConst(self::ADMIN_TYPE_ADD_PACKAGE)) {
-                $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'stack' => ['admin.type.view']]);
-                $this->telegram->sendMessage(
-                    $chatId,
-                    $this->uiText->multi(new UiTextBlock(
-                        title: $this->catalog->get('admin.types_packages.create_package.title'),
-                        lines: [
-                            new UiTextLine('', $this->catalog->get('admin.types_packages.create_package.format_label'), $this->catalog->get('admin.types_packages.create_package.format_value')),
-                        ],
-                        tipBlockquote: $this->catalog->get('admin.types_packages.create_package.tip'),
-                    )),
-                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
-                );
+                $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.type.view']]);
+                $this->telegram->sendMessage($chatId, $this->uiText->info('عنوان پکیج را وارد کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $this->catalog->get('admin.types_packages.actions.toggle_type') || $text === $this->uiConst(self::ADMIN_TYPE_TOGGLE)) {
@@ -1712,27 +1702,24 @@ final class MessageHandler
                 return;
             }
             if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminTypeView($chatId, $userId, $typeId);
+                $step = (string) ($payload['step'] ?? 'name');
+                $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+                if ($step === 'name') {
+                    $this->openAdminTypeView($chatId, $userId, $typeId);
+                    return;
+                }
+                $prev = ['volume' => 'name', 'duration' => 'volume', 'price' => 'duration', 'confirm' => 'price'];
+                $backStep = $prev[$step] ?? 'name';
+                $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'step' => $backStep, 'data' => $data, 'stack' => ['admin.type.view']]);
+                $this->promptPackageWizardStep($chatId, $userId, $typeId, $backStep, $data);
                 return;
             }
-            if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_create_input')));
+            $step = (string) ($payload['step'] ?? 'name');
+            $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            if (!$this->applyPackageWizardInput($chatId, $userId, $typeId, $step, $text, $data)) {
                 return;
             }
-            $parts = array_map('trim', explode('|', $text));
-            if (count($parts) !== 4) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.create_format')));
-                return;
-            }
-            [$name, $volumeRaw, $durationRaw, $priceRaw] = $parts;
-            $volume = (float) str_replace(',', '.', $volumeRaw);
-            $duration = (int) preg_replace('/\D+/', '', $durationRaw);
-            $price = (int) preg_replace('/\D+/', '', $priceRaw);
-            if ($name === '' || $volume <= 0 || $duration <= 0 || $price <= 0) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_values')));
-                return;
-            }
-            $packageId = $this->database->addPackage($typeId, $name, $volume, $duration, $price);
+            $packageId = $this->database->addPackage($typeId, (string) ($data['name'] ?? ''), (float) ($data['volume'] ?? 0), (int) ($data['duration'] ?? 0), (int) ($data['price'] ?? 0));
             $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.types_packages.success.package_created', ['package_id' => $packageId])));
             $this->openAdminTypeView($chatId, $userId, $typeId);
             return;
@@ -1898,6 +1885,75 @@ final class MessageHandler
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
+    }
+
+    /** @param array<string,mixed> $data */
+    private function promptPackageWizardStep(int $chatId, int $userId, int $typeId, string $step, array $data): void
+    {
+        $text = match ($step) {
+            'name' => 'عنوان پکیج را وارد کنید.',
+            'volume' => 'حجم پکیج (GB) را وارد کنید.',
+            'duration' => 'مدت پکیج (روز) را وارد کنید.',
+            'price' => 'قیمت پکیج (تومان) را وارد کنید.',
+            default => '',
+        };
+        $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'step' => $step, 'data' => $data, 'stack' => ['admin.type.view']]);
+        $this->telegram->sendMessage($chatId, $this->uiText->info($text), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+    }
+
+    /** @param array<string,mixed> $data */
+    private function applyPackageWizardInput(int $chatId, int $userId, int $typeId, string $step, string $text, array &$data): bool
+    {
+        $raw = trim($text);
+        if ($raw === '' || str_starts_with($raw, '/')) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_create_input')));
+            return false;
+        }
+        if ($step === 'name') {
+            $data['name'] = $raw;
+            $this->promptPackageWizardStep($chatId, $userId, $typeId, 'volume', $data);
+            return false;
+        }
+        if ($step === 'volume') {
+            $volume = (float) str_replace(',', '.', $raw);
+            if ($volume <= 0) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_values')));
+                return false;
+            }
+            $data['volume'] = $volume;
+            $this->promptPackageWizardStep($chatId, $userId, $typeId, 'duration', $data);
+            return false;
+        }
+        if ($step === 'duration') {
+            $duration = (int) preg_replace('/\D+/', '', $raw);
+            if ($duration <= 0) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_values')));
+                return false;
+            }
+            $data['duration'] = $duration;
+            $this->promptPackageWizardStep($chatId, $userId, $typeId, 'price', $data);
+            return false;
+        }
+        if ($step === 'price') {
+            $price = (int) preg_replace('/\D+/', '', $raw);
+            if ($price <= 0) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_values')));
+                return false;
+            }
+            $data['price'] = $price;
+            $summary = "عنوان: {$data['name']}\nحجم: {$data['volume']} GB\nمدت: {$data['duration']} روز\nقیمت: {$data['price']} تومان";
+            $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'step' => 'confirm', 'data' => $data, 'stack' => ['admin.type.view']]);
+            $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: 'پیش‌نمایش پکیج', lines: [new UiTextLine('', 'خلاصه', htmlspecialchars($summary))], tipBlockquote: 'برای ثبت نهایی، «تایید» را ارسال کنید.')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            return false;
+        }
+        if ($step === 'confirm') {
+            if (!in_array($raw, ['تایید', 'ثبت'], true)) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning('برای ثبت نهایی «تایید» را ارسال کنید.'));
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 
     private function findTypeById(int $typeId): ?array
@@ -3045,6 +3101,7 @@ final class MessageHandler
         $settingsToggleGwCryptoLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_crypto');
         $settingsToggleGwTetraLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_tetra');
         $settingsSetChannelLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_channel');
+        $settingsSetDeliveryModeLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_delivery_mode');
         $settingsEditLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_edit');
         $adminsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.admins_add');
         $adminDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.admin_delete');
@@ -3103,6 +3160,15 @@ final class MessageHandler
                 );
                 return;
             }
+            if ($text === $settingsSetDeliveryModeLabel) {
+                $this->database->setUserState($userId, 'admin.settings.edit', ['mode' => 'delivery_mode', 'stack' => ['admin.settings.view', 'admin.root']]);
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $this->uiText->info('حالت تحویل را انتخاب کنید: stock_only یا panel_only'),
+                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+                );
+                return;
+            }
             if ($text === $settingsEditLabel || $text === $this->uiConst(self::ADMIN_SETTINGS_EDIT)) {
                 $this->database->setUserState($userId, 'admin.settings.edit', ['mode' => 'kv', 'stack' => ['admin.settings.view', 'admin.root']]);
                 $this->telegram->sendMessage(
@@ -3135,6 +3201,16 @@ final class MessageHandler
                 }
                 $this->settings->set('channel_id', $value);
                 $this->openAdminSettingsView($chatId, $userId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.lock_channel_updated')));
+                return;
+            }
+            if ($mode === 'delivery_mode') {
+                $value = trim($text);
+                if (!in_array($value, ['stock_only', 'panel_only'], true)) {
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning('مقدار معتبر نیست. فقط stock_only یا panel_only.'));
+                    return;
+                }
+                $this->settings->set('delivery_mode', $value);
+                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success('حالت تحویل ذخیره شد.'));
                 return;
             }
             $parts = array_map('trim', explode('|', $text, 2));
@@ -3372,6 +3448,7 @@ final class MessageHandler
             'gw_crypto_enabled' => $this->settings->get('gw_crypto_enabled', '0'),
             'gw_tetrapay_enabled' => $this->settings->get('gw_tetrapay_enabled', '0'),
             'channel_id' => trim($this->settings->get('channel_id', '')),
+            'delivery_mode' => $this->settings->get('delivery_mode', 'stock_only'),
         ];
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -3387,11 +3464,13 @@ final class MessageHandler
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_crypto_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_crypto_label'), $vals['gw_crypto_enabled'] === '1' ? $this->catalog->get('emojis.success') : $this->catalog->get('emojis.error')),
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_tetrapay_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_tetrapay_label'), $vals['gw_tetrapay_enabled'] === '1' ? $this->catalog->get('emojis.success') : $this->catalog->get('emojis.error')),
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_label'), $vals['channel_id'] !== '' ? htmlspecialchars($vals['channel_id']) : $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_unset')),
+                new UiTextLine('🚚', 'حالت تحویل', htmlspecialchars((string) $vals['delivery_mode'])),
             ],
             tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.settings.tip'),
         )), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_SETTINGS_REFRESH), $this->uiConst(self::ADMIN_SETTINGS_EDIT)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
+            [$this->catalog->get('admin.settings_admins_pins.actions.settings_set_delivery_mode')],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_FREE_TEST), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CARD), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CRYPTO), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_TETRA)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
@@ -3608,8 +3687,8 @@ final class MessageHandler
                 return;
             }
             if ($text === $panelsAddLabel || $text === $this->uiConst(self::ADMIN_PANELS_ADD)) {
-                $this->database->setUserState($userId, 'admin.panel.create', []);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('فرمت سرویس: title|min|max|step|price_per_gb|duration_policy|duration_days|provider|group_ids|description'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->database->setUserState($userId, 'admin.panel.create', ['step' => 'title', 'data' => []]);
+                $this->telegram->sendMessage($chatId, $this->uiText->info('نام سرویس پنلی را وارد کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $panelsSettingsLabel || $text === $this->uiConst(self::ADMIN_PANELS_REFRESH)) {
@@ -3626,43 +3705,45 @@ final class MessageHandler
         }
         if ($stateName === 'admin.panel.create') {
             if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminPanelsList($chatId, $userId);
+                $step = (string) ($payload['step'] ?? 'title');
+                $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+                if ($step === 'title') {
+                    $this->openAdminPanelsList($chatId, $userId);
+                    return;
+                }
+                $prev = [
+                    'min_gb' => 'title',
+                    'max_gb' => 'min_gb',
+                    'step_gb' => 'max_gb',
+                    'price_per_gb' => 'step_gb',
+                    'duration_policy' => 'price_per_gb',
+                    'duration_days' => 'duration_policy',
+                    'provider' => 'duration_days',
+                    'group_ids' => 'provider',
+                    'description' => 'group_ids',
+                    'confirm' => 'description',
+                ];
+                $backStep = $prev[$step] ?? 'title';
+                $this->database->setUserState($userId, 'admin.panel.create', ['step' => $backStep, 'data' => $data]);
+                $this->promptPanelWizardStep($chatId, $userId, 'admin.panel.create', $backStep, $data);
                 return;
             }
-            $parts = array_map('trim', explode('|', $text));
-            if (count($parts) < 9) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت نامعتبر است.'));
+            $step = (string) ($payload['step'] ?? 'title');
+            $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            if (!$this->applyPanelWizardInput($chatId, $userId, 'admin.panel.create', $step, $text, $data)) {
                 return;
-            }
-            $title = (string) ($parts[0] ?? '');
-            $minGb = (float) str_replace(',', '.', (string) ($parts[1] ?? '0'));
-            $maxGb = (float) str_replace(',', '.', (string) ($parts[2] ?? '0'));
-            $stepGb = (float) str_replace(',', '.', (string) ($parts[3] ?? '1'));
-            $pricePerGb = (int) preg_replace('/\D+/', '', (string) ($parts[4] ?? '0'));
-            $durationPolicy = (string) ($parts[5] ?? 'fixed_days');
-            $durationRaw = (string) ($parts[6] ?? '');
-            $durationDays = ($durationRaw === '-' || $durationRaw === '') ? null : (int) preg_replace('/\D+/', '', $durationRaw);
-            $provider = (string) ($parts[7] ?? 'pasarguard');
-            $groupIds = (string) ($parts[8] ?? '');
-            $description = (string) ($parts[9] ?? '');
-            if ($title === '' || $minGb <= 0 || $maxGb < $minGb || $stepGb <= 0 || $pricePerGb <= 0 || $groupIds === '') {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مقادیر معتبر نیستند.'));
-                return;
-            }
-            if (!in_array($durationPolicy, ['fixed_days', 'unlimited'], true)) {
-                $durationPolicy = 'fixed_days';
             }
             $serviceId = $this->database->createProvisioningService([
-                'title' => $title,
-                'description' => $description,
-                'min_gb' => $minGb,
-                'max_gb' => $maxGb,
-                'step_gb' => $stepGb,
-                'price_per_gb' => $pricePerGb,
-                'duration_policy' => $durationPolicy,
-                'duration_days' => $durationPolicy === 'fixed_days' ? ($durationDays ?? 30) : null,
-                'provider' => $provider,
-                'provider_group_ids' => $groupIds,
+                'title' => (string) ($data['title'] ?? ''),
+                'description' => (string) ($data['description'] ?? ''),
+                'min_gb' => (float) ($data['min_gb'] ?? 0),
+                'max_gb' => (float) ($data['max_gb'] ?? 0),
+                'step_gb' => (float) ($data['step_gb'] ?? 1),
+                'price_per_gb' => (int) ($data['price_per_gb'] ?? 0),
+                'duration_policy' => (string) ($data['duration_policy'] ?? 'fixed_days'),
+                'duration_days' => (($data['duration_policy'] ?? 'fixed_days') === 'fixed_days') ? (int) ($data['duration_days'] ?? 30) : null,
+                'provider' => (string) ($data['provider'] ?? 'pasarguard'),
+                'provider_group_ids' => (string) ($data['group_ids'] ?? ''),
                 'is_active' => 1,
             ]);
             $this->openAdminPanelView($chatId, $userId, $serviceId, $this->uiText->success('سرویس پنلی ثبت شد.'));
@@ -3689,48 +3770,66 @@ final class MessageHandler
                 return;
             }
             if ($text === $panelPkgAddLabel || $text === $this->uiConst(self::ADMIN_PANEL_PKG_ADD)) {
-                $this->database->setUserState($userId, 'admin.panel.edit', ['panel_id' => $serviceId]);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('فرمت ویرایش: title|min|max|step|price_per_gb|duration_policy|duration_days|provider|group_ids|description'));
+                $panel = $this->database->getProvisioningService($serviceId);
+                $data = is_array($panel) ? [
+                    'title' => (string) ($panel['title'] ?? ''),
+                    'min_gb' => (float) ($panel['min_gb'] ?? 0),
+                    'max_gb' => (float) ($panel['max_gb'] ?? 0),
+                    'step_gb' => (float) ($panel['step_gb'] ?? 1),
+                    'price_per_gb' => (int) ($panel['price_per_gb'] ?? 0),
+                    'duration_policy' => (string) ($panel['duration_policy'] ?? 'fixed_days'),
+                    'duration_days' => (int) ($panel['duration_days'] ?? 30),
+                    'provider' => (string) ($panel['provider'] ?? 'pasarguard'),
+                    'group_ids' => (string) ($panel['provider_group_ids'] ?? ''),
+                    'description' => (string) ($panel['description'] ?? ''),
+                ] : [];
+                $this->database->setUserState($userId, 'admin.panel.edit', ['panel_id' => $serviceId, 'step' => 'title', 'data' => $data]);
+                $this->promptPanelWizardStep($chatId, $userId, 'admin.panel.edit', 'title', $data);
                 return;
             }
         }
         if ($stateName === 'admin.panel.edit') {
             $panelId = (int) ($payload['panel_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminPanelView($chatId, $userId, $panelId);
+                $step = (string) ($payload['step'] ?? 'title');
+                $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+                if ($step === 'title') {
+                    $this->openAdminPanelView($chatId, $userId, $panelId);
+                    return;
+                }
+                $prev = [
+                    'min_gb' => 'title',
+                    'max_gb' => 'min_gb',
+                    'step_gb' => 'max_gb',
+                    'price_per_gb' => 'step_gb',
+                    'duration_policy' => 'price_per_gb',
+                    'duration_days' => 'duration_policy',
+                    'provider' => 'duration_days',
+                    'group_ids' => 'provider',
+                    'description' => 'group_ids',
+                    'confirm' => 'description',
+                ];
+                $backStep = $prev[$step] ?? 'title';
+                $this->database->setUserState($userId, 'admin.panel.edit', ['panel_id' => $panelId, 'step' => $backStep, 'data' => $data]);
+                $this->promptPanelWizardStep($chatId, $userId, 'admin.panel.edit', $backStep, $data);
                 return;
             }
-            $parts = array_map('trim', explode('|', $text));
-            if (count($parts) < 9) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت نامعتبر است.'));
-                return;
-            }
-            $title = (string) ($parts[0] ?? '');
-            $minGb = (float) str_replace(',', '.', (string) ($parts[1] ?? '0'));
-            $maxGb = (float) str_replace(',', '.', (string) ($parts[2] ?? '0'));
-            $stepGb = (float) str_replace(',', '.', (string) ($parts[3] ?? '1'));
-            $pricePerGb = (int) preg_replace('/\D+/', '', (string) ($parts[4] ?? '0'));
-            $durationPolicy = (string) ($parts[5] ?? 'fixed_days');
-            $durationRaw = (string) ($parts[6] ?? '');
-            $durationDays = ($durationRaw === '-' || $durationRaw === '') ? null : (int) preg_replace('/\D+/', '', $durationRaw);
-            $provider = (string) ($parts[7] ?? 'pasarguard');
-            $groupIds = (string) ($parts[8] ?? '');
-            $description = (string) ($parts[9] ?? '');
-            if ($panelId <= 0 || $title === '' || $minGb <= 0 || $maxGb < $minGb || $stepGb <= 0 || $pricePerGb <= 0 || $groupIds === '') {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مقادیر معتبر نیستند.'));
+            $step = (string) ($payload['step'] ?? 'title');
+            $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            if ($panelId <= 0 || !$this->applyPanelWizardInput($chatId, $userId, 'admin.panel.edit', $step, $text, $data, ['panel_id' => $panelId])) {
                 return;
             }
             $this->database->updateProvisioningService($panelId, [
-                'title' => $title,
-                'description' => $description,
-                'min_gb' => $minGb,
-                'max_gb' => $maxGb,
-                'step_gb' => $stepGb,
-                'price_per_gb' => $pricePerGb,
-                'duration_policy' => in_array($durationPolicy, ['fixed_days', 'unlimited'], true) ? $durationPolicy : 'fixed_days',
-                'duration_days' => $durationPolicy === 'fixed_days' ? ($durationDays ?? 30) : null,
-                'provider' => $provider,
-                'provider_group_ids' => $groupIds,
+                'title' => (string) ($data['title'] ?? ''),
+                'description' => (string) ($data['description'] ?? ''),
+                'min_gb' => (float) ($data['min_gb'] ?? 0),
+                'max_gb' => (float) ($data['max_gb'] ?? 0),
+                'step_gb' => (float) ($data['step_gb'] ?? 1),
+                'price_per_gb' => (int) ($data['price_per_gb'] ?? 0),
+                'duration_policy' => (string) ($data['duration_policy'] ?? 'fixed_days'),
+                'duration_days' => (($data['duration_policy'] ?? 'fixed_days') === 'fixed_days') ? (int) ($data['duration_days'] ?? 30) : null,
+                'provider' => (string) ($data['provider'] ?? 'pasarguard'),
+                'provider_group_ids' => (string) ($data['group_ids'] ?? ''),
                 'is_active' => 1,
             ]);
             $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success('سرویس بروزرسانی شد.'));
@@ -3738,23 +3837,51 @@ final class MessageHandler
         }
         if ($stateName === 'admin.panel.settings') {
             if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminPanelsList($chatId, $userId);
+                $step = (string) ($payload['step'] ?? 'base_url');
+                $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+                if ($step === 'base_url') {
+                    $this->openAdminPanelsList($chatId, $userId);
+                    return;
+                }
+                $prev = ['username' => 'base_url', 'password' => 'username', 'confirm' => 'password'];
+                $backStep = $prev[$step] ?? 'base_url';
+                $this->database->setUserState($userId, 'admin.panel.settings', ['step' => $backStep, 'data' => $data]);
+                $this->promptPanelSettingsStep($chatId, $userId, $backStep, $data);
                 return;
             }
-            $parts = array_map('trim', explode('|', $text));
-            if (count($parts) < 4) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('فرمت نامعتبر است.'));
+            $step = (string) ($payload['step'] ?? 'base_url');
+            $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            $raw = trim($text);
+            if ($raw === '' || str_starts_with($raw, '/')) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning('ورودی معتبر نیست.'));
                 return;
             }
-            [$deliveryMode, $baseUrl, $username, $password] = $parts;
-            if (!in_array($deliveryMode, ['stock_only', 'panel_only'], true) || $baseUrl === '' || $username === '' || $password === '') {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('مقادیر تنظیمات معتبر نیست.'));
+            if ($step === 'base_url') {
+                $data['base_url'] = $raw;
+                $this->database->setUserState($userId, 'admin.panel.settings', ['step' => 'username', 'data' => $data]);
+                $this->promptPanelSettingsStep($chatId, $userId, 'username', $data);
                 return;
             }
-            $this->settings->set('delivery_mode', $deliveryMode);
-            $this->settings->set('pg_base_url', $baseUrl);
-            $this->settings->set('pg_username', $username);
-            $this->settings->set('pg_password', $password);
+            if ($step === 'username') {
+                $data['username'] = $raw;
+                $this->database->setUserState($userId, 'admin.panel.settings', ['step' => 'password', 'data' => $data]);
+                $this->promptPanelSettingsStep($chatId, $userId, 'password', $data);
+                return;
+            }
+            if ($step === 'password') {
+                $data['password'] = $raw;
+                $this->database->setUserState($userId, 'admin.panel.settings', ['step' => 'confirm', 'data' => $data]);
+                $summary = "آدرس پنل: {$data['base_url']}\nنام کاربری: {$data['username']}\nرمز عبور: " . str_repeat('*', min(strlen((string) $data['password']), 10));
+                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: 'پیش‌نمایش اتصال پنل', lines: [new UiTextLine('', 'خلاصه', htmlspecialchars($summary))], tipBlockquote: 'برای ثبت نهایی «تایید» را ارسال کنید.')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                return;
+            }
+            if (!in_array($raw, ['تایید', 'ثبت'], true)) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning('برای ثبت، «تایید» را ارسال کنید.'));
+                return;
+            }
+            $this->settings->set('pg_base_url', (string) ($data['base_url'] ?? ''));
+            $this->settings->set('pg_username', (string) ($data['username'] ?? ''));
+            $this->settings->set('pg_password', (string) ($data['password'] ?? ''));
             $this->openAdminPanelSettings($chatId, $userId, $this->uiText->success('تنظیمات تحویل/پاسارگارد ذخیره شد.'));
             return;
         }
@@ -4064,12 +4191,11 @@ final class MessageHandler
 
     private function openAdminPanelSettings(int $chatId, int $userId, ?string $notice = null): void
     {
-        $deliveryMode = trim($this->settings->get('delivery_mode', 'stock_only'));
         $baseUrl = trim($this->settings->get('pg_base_url', ''));
         $username = trim($this->settings->get('pg_username', ''));
         $password = trim($this->settings->get('pg_password', ''));
         $passwordMasked = $password === '' ? '-' : str_repeat('*', min(strlen($password), 10));
-        $this->database->setUserState($userId, 'admin.panel.settings', []);
+        $this->database->setUserState($userId, 'admin.panel.settings', ['step' => 'base_url', 'data' => ['base_url' => $baseUrl, 'username' => $username]]);
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
@@ -4078,11 +4204,10 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('admin.ui.open.panel_settings.title'),
                 lines: [
-                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.delivery_mode_label'), htmlspecialchars($deliveryMode !== '' ? $deliveryMode : '-')),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.base_url_label'), htmlspecialchars($baseUrl !== '' ? $baseUrl : '-')),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.username_label'), htmlspecialchars($username !== '' ? $username : '-')),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.password_label'), htmlspecialchars($passwordMasked)),
-                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.input_label'), $this->catalog->get('admin.ui.open.panel_settings.input_value')),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.input_label'), 'برای ویرایش مرحله‌ای، پاسخ همین پیام را ارسال کنید.'),
                 ],
                 tipBlockquote: $this->catalog->get('admin.ui.open.panel_settings.tip')
             )),
@@ -4090,6 +4215,22 @@ final class MessageHandler
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
+        $this->promptPanelSettingsStep($chatId, $userId, 'base_url', ['base_url' => $baseUrl, 'username' => $username]);
+    }
+
+    /** @param array<string,mixed> $data */
+    private function promptPanelSettingsStep(int $chatId, int $userId, string $step, array $data): void
+    {
+        $current = fn(string $key): string => isset($data[$key]) && (string) $data[$key] !== '' ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
+        $text = match ($step) {
+            'base_url' => 'آدرس پنل را وارد کنید.' . $current('base_url'),
+            'username' => 'نام کاربری پنل را وارد کنید.' . $current('username'),
+            'password' => 'رمز عبور پنل را وارد کنید.',
+            default => '',
+        };
+        if ($text !== '') {
+            $this->telegram->sendMessage($chatId, $this->uiText->info($text), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        }
     }
 
     private function openAdminPanelView(int $chatId, int $userId, int $panelId, ?string $notice = null): void
@@ -4117,6 +4258,107 @@ final class MessageHandler
         }
         $this->database->setUserState($userId, 'admin.panel.view', ['panel_id' => $panelId]);
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_view.title', ['panel_id' => $panelId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.name_label'), htmlspecialchars((string) ($panel['title'] ?? '-'))), new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.packages_label'), htmlspecialchars($summary))], tipBlockquote: $this->catalog->get('admin.ui.open.panel_view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+    }
+
+    /** @param array<string,mixed> $data */
+    private function promptPanelWizardStep(int $chatId, int $userId, string $stateName, string $step, array $data, array $extraPayload = []): void
+    {
+        $current = fn(string $key): string => isset($data[$key]) ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
+        $text = match ($step) {
+            'title' => 'نام سرویس پنلی را وارد کنید' . $current('title'),
+            'min_gb' => 'حداقل حجم (GB) را وارد کنید' . $current('min_gb'),
+            'max_gb' => 'حداکثر حجم (GB) را وارد کنید' . $current('max_gb'),
+            'step_gb' => 'گام افزایش حجم (GB) را وارد کنید' . $current('step_gb'),
+            'price_per_gb' => 'قیمت هر گیگ (تومان) را وارد کنید' . $current('price_per_gb'),
+            'duration_policy' => 'سیاست مدت را وارد کنید: fixed_days یا unlimited' . $current('duration_policy'),
+            'duration_days' => 'تعداد روز را وارد کنید' . $current('duration_days'),
+            'provider' => 'نام ارائه‌دهنده را وارد کنید (مثال: pasarguard)' . $current('provider'),
+            'group_ids' => 'شناسه گروه‌ها را با کاما وارد کنید (مثال: 1,2,3)' . $current('group_ids'),
+            'description' => 'توضیحات را وارد کنید (برای رد شدن «-» بفرستید)' . $current('description'),
+            default => '',
+        };
+        $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => $step, 'data' => $data]));
+        $this->telegram->sendMessage($chatId, $this->uiText->info($text), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+    }
+
+    /** @param array<string,mixed> $data */
+    private function applyPanelWizardInput(int $chatId, int $userId, string $stateName, string $step, string $text, array &$data, array $extraPayload = []): bool
+    {
+        $raw = trim($text);
+        if ($raw === '' || str_starts_with($raw, '/')) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning('ورودی معتبر وارد کنید.'));
+            return false;
+        }
+        $next = '';
+        switch ($step) {
+            case 'title':
+                $data['title'] = $raw;
+                $next = 'min_gb';
+                break;
+            case 'min_gb':
+                $val = (float) str_replace(',', '.', $raw);
+                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning('حداقل حجم معتبر نیست.')); return false; }
+                $data['min_gb'] = $val;
+                $next = 'max_gb';
+                break;
+            case 'max_gb':
+                $val = (float) str_replace(',', '.', $raw);
+                if ($val < (float) ($data['min_gb'] ?? 0)) { $this->telegram->sendMessage($chatId, $this->uiText->warning('حداکثر باید بزرگ‌تر یا مساوی حداقل باشد.')); return false; }
+                $data['max_gb'] = $val;
+                $next = 'step_gb';
+                break;
+            case 'step_gb':
+                $val = (float) str_replace(',', '.', $raw);
+                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning('گام افزایش معتبر نیست.')); return false; }
+                $data['step_gb'] = $val;
+                $next = 'price_per_gb';
+                break;
+            case 'price_per_gb':
+                $val = (int) preg_replace('/\D+/', '', $raw);
+                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning('قیمت معتبر نیست.')); return false; }
+                $data['price_per_gb'] = $val;
+                $next = 'duration_policy';
+                break;
+            case 'duration_policy':
+                $policy = in_array($raw, ['fixed_days', 'unlimited'], true) ? $raw : '';
+                if ($policy === '') { $this->telegram->sendMessage($chatId, $this->uiText->warning('سیاست مدت باید fixed_days یا unlimited باشد.')); return false; }
+                $data['duration_policy'] = $policy;
+                $next = $policy === 'fixed_days' ? 'duration_days' : 'provider';
+                break;
+            case 'duration_days':
+                $val = (int) preg_replace('/\D+/', '', $raw);
+                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning('تعداد روز معتبر نیست.')); return false; }
+                $data['duration_days'] = $val;
+                $next = 'provider';
+                break;
+            case 'provider':
+                $data['provider'] = $raw;
+                $next = 'group_ids';
+                break;
+            case 'group_ids':
+                if ($raw === '') { $this->telegram->sendMessage($chatId, $this->uiText->warning('شناسه گروه‌ها الزامی است.')); return false; }
+                $data['group_ids'] = $raw;
+                $next = 'description';
+                break;
+            case 'description':
+                $data['description'] = ($raw === '-' || $raw === '—') ? '' : $raw;
+                $summary = "نام: {$data['title']}\nحداقل/حداکثر: {$data['min_gb']} / {$data['max_gb']} GB\nگام: {$data['step_gb']} GB\nقیمت هر گیگ: {$data['price_per_gb']} تومان\nمدت: {$data['duration_policy']}" . (($data['duration_policy'] ?? '') === 'fixed_days' ? (' / ' . ((int) ($data['duration_days'] ?? 0)) . ' روز') : '') . "\nارائه‌دهنده: {$data['provider']}\nگروه‌ها: {$data['group_ids']}\nتوضیحات: " . (($data['description'] ?? '') !== '' ? $data['description'] : '-');
+                $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
+                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: 'پیش‌نمایش اطلاعات', lines: [new UiTextLine('', 'خلاصه', htmlspecialchars($summary))], tipBlockquote: 'برای ثبت نهایی، عبارت «تایید» را ارسال کنید.')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                return false;
+            case 'confirm':
+                if (!in_array($raw, ['تایید', 'ثبت'], true)) {
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning('برای ثبت، «تایید» را ارسال کنید.'));
+                    return false;
+                }
+                return true;
+            default:
+                $this->telegram->sendMessage($chatId, $this->uiText->warning('وضعیت نامعتبر است. دوباره تلاش کنید.'));
+                return false;
+        }
+
+        $this->promptPanelWizardStep($chatId, $userId, $stateName, $next, $data, $extraPayload);
+        return false;
     }
 
     private function openAdminBroadcastCompose(int $chatId, int $userId, ?string $notice = null): void
