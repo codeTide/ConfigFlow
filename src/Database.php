@@ -54,6 +54,38 @@ final class Database implements WorkerApiStore
                 INDEX idx_free_test_claims_pkg (package_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS panel (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                provider VARCHAR(64) NOT NULL DEFAULT 'pasarguard',
+                base_url VARCHAR(255) NOT NULL,
+                username VARCHAR(191) NOT NULL,
+                password TEXT NOT NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                INDEX idx_panel_active (is_active),
+                INDEX idx_panel_provider (provider)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS service (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                type_id BIGINT NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                mode VARCHAR(32) NOT NULL DEFAULT 'stock',
+                panel_id BIGINT NULL,
+                panel_ref VARCHAR(255) NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                INDEX idx_service_type (type_id),
+                INDEX idx_service_mode (mode),
+                INDEX idx_service_panel (panel_id),
+                INDEX idx_service_active (is_active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
     }
 
     public function pdo(): PDO
@@ -584,6 +616,130 @@ final class Database implements WorkerApiStore
         $stmt->execute([
             'name' => trim($name),
             'description' => trim($description),
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function listServicesByType(int $typeId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT s.id, s.type_id, s.name, s.mode, s.panel_id, s.panel_ref, s.is_active,
+                    p.name AS panel_name
+             FROM service s
+             LEFT JOIN panel p ON p.id = s.panel_id
+             WHERE s.type_id = :type_id
+             ORDER BY s.id DESC'
+        );
+        $stmt->execute(['type_id' => $typeId]);
+        return $stmt->fetchAll();
+    }
+
+    /** @param array<string,mixed> $data */
+    public function createService(array $data): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO service (type_id, name, mode, panel_id, panel_ref, is_active, created_at, updated_at)
+             VALUES (:type_id, :name, :mode, :panel_id, :panel_ref, :is_active, :created_at, :updated_at)'
+        );
+        $now = gmdate('Y-m-d H:i:s');
+        $stmt->execute([
+            'type_id' => (int) ($data['type_id'] ?? 0),
+            'name' => trim((string) ($data['name'] ?? '')),
+            'mode' => (string) ($data['mode'] ?? 'stock'),
+            'panel_id' => isset($data['panel_id']) ? (int) $data['panel_id'] : null,
+            'panel_ref' => isset($data['panel_ref']) ? trim((string) $data['panel_ref']) : null,
+            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function getService(int $serviceId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT s.id, s.type_id, s.name, s.mode, s.panel_id, s.panel_ref, s.is_active,
+                    p.name AS panel_name, p.provider AS panel_provider
+             FROM service s
+             LEFT JOIN panel p ON p.id = s.panel_id
+             WHERE s.id = :id
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => $serviceId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    public function updateServiceActive(int $serviceId, bool $active): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE service SET is_active = :active, updated_at = :updated_at WHERE id = :id');
+        $stmt->execute([
+            'active' => $active ? 1 : 0,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $serviceId,
+        ]);
+    }
+
+    /** @param array<string,mixed> $data */
+    public function updateServiceBasic(int $serviceId, array $data): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE service
+             SET name = :name, mode = :mode, panel_id = :panel_id, panel_ref = :panel_ref, is_active = :is_active, updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'name' => trim((string) ($data['name'] ?? '')),
+            'mode' => (string) ($data['mode'] ?? 'stock'),
+            'panel_id' => isset($data['panel_id']) ? (int) $data['panel_id'] : null,
+            'panel_ref' => isset($data['panel_ref']) ? trim((string) $data['panel_ref']) : null,
+            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $serviceId,
+        ]);
+    }
+
+    public function listPanels(bool $onlyActive = true): array
+    {
+        $sql = 'SELECT id, name, provider, base_url, username, password, is_active
+                FROM panel';
+        if ($onlyActive) {
+            $sql .= ' WHERE is_active = 1';
+        }
+        $sql .= ' ORDER BY id DESC';
+        return $this->pdo->query($sql)->fetchAll();
+    }
+
+    public function getPanel(int $panelId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, name, provider, base_url, username, password, is_active
+             FROM panel
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => $panelId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    /** @param array<string,mixed> $data */
+    public function createPanel(array $data): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO panel (name, provider, base_url, username, password, is_active, created_at, updated_at)
+             VALUES (:name, :provider, :base_url, :username, :password, :is_active, :created_at, :updated_at)'
+        );
+        $now = gmdate('Y-m-d H:i:s');
+        $stmt->execute([
+            'name' => trim((string) ($data['name'] ?? '')),
+            'provider' => trim((string) ($data['provider'] ?? 'pasarguard')),
+            'base_url' => trim((string) ($data['base_url'] ?? '')),
+            'username' => trim((string) ($data['username'] ?? '')),
+            'password' => trim((string) ($data['password'] ?? '')),
+            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
         return (int) $this->pdo->lastInsertId();
     }
@@ -1408,7 +1564,7 @@ final class Database implements WorkerApiStore
         $configInsert->execute([
             'type_id' => 0,
             'package_id' => 0,
-            'service_name' => (string) ($service['title'] ?? 'PasarGuard Service'),
+            'service_name' => (string) ($service['title'] ?? ''),
             'config_text' => $subscriptionUrl,
             'inquiry_link' => $subscriptionUrl,
             'created_at' => gmdate('Y-m-d H:i:s'),
@@ -1440,7 +1596,7 @@ final class Database implements WorkerApiStore
             'ok' => true,
             'user_id' => (int) ($order['user_id'] ?? 0),
             'config_text' => $subscriptionUrl,
-            'service_name' => (string) ($service['title'] ?? 'PasarGuard Service'),
+            'service_name' => (string) ($service['title'] ?? ''),
             'inquiry_link' => $subscriptionUrl,
         ];
     }
