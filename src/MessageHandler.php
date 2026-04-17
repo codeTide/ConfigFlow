@@ -4305,13 +4305,9 @@ final class MessageHandler
     /** @param array<string,mixed> $data */
     private function promptPanelConnectionStep(int $chatId, int $userId, string $step, array $data): void
     {
-        $baseUrl = trim((string) ($data['base_url'] ?? ''));
-        $username = trim((string) ($data['username'] ?? ''));
-        $currentBaseUrl = $baseUrl !== '' ? $this->catalog->get('admin.panel_settings.wizard.current_value', ['value' => htmlspecialchars($baseUrl)]) : '';
-        $currentUsername = $username !== '' ? $this->catalog->get('admin.panel_settings.wizard.current_value', ['value' => htmlspecialchars($username)]) : '';
         $text = match ($step) {
-            'base_url' => $this->catalog->get('admin.panel_settings.wizard.steps.base_url', ['current_value' => $currentBaseUrl]),
-            'username' => $this->catalog->get('admin.panel_settings.wizard.steps.username', ['current_value' => $currentUsername]),
+            'base_url' => $this->catalog->get('admin.panel_settings.wizard.steps.base_url'),
+            'username' => $this->catalog->get('admin.panel_settings.wizard.steps.username'),
             'password' => $this->catalog->get('admin.panel_settings.wizard.steps.password'),
             default => '',
         };
