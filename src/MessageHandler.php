@@ -992,10 +992,10 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            $this->openAdminPanelsList(
+            $this->openAdminPanelSettings(
                 $chatId,
                 $userId,
-                $this->uiText->info('بخش پنل‌های قدیمی حذف شد. لطفاً از «سرویس‌های پنلی» در منوی ادمین استفاده کنید.')
+                $this->uiText->info('بخش پنل‌های قدیمی حذف شد. لطفاً از «تنظیمات اتصال پنل» در منوی ادمین استفاده کنید.')
             );
             return;
         }
@@ -1344,7 +1344,7 @@ final class MessageHandler
                 return true;
             }
             if ($text === $this->catalog->get('buttons.admin.panels')) {
-                $this->openAdminPanelsList($chatId, $userId);
+                $this->openAdminPanelSettings($chatId, $userId);
                 return true;
             }
             if ($text === $this->catalog->get('buttons.admin.broadcast')) {
@@ -1554,7 +1554,7 @@ final class MessageHandler
                     return;
                 }
                 if ($route === 'admin:panels') {
-                    $this->openAdminPanelsList($chatId, $userId);
+                    $this->openAdminPanelSettings($chatId, $userId);
                     return;
                 }
                 if ($route === 'admin:broadcast') {
@@ -3870,7 +3870,7 @@ final class MessageHandler
             $mode = (string) ($payload['mode'] ?? 'menu');
             if ($mode === 'menu') {
                 if ($text === UiLabels::back($this->catalog)) {
-                    $this->openAdminPanelsList($chatId, $userId);
+                    $this->openAdminRoot($chatId, $userId);
                     return;
                 }
                 if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_add')) {
