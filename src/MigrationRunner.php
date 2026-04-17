@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ConfigFlow\Bot;
 
 use PDO;
+use PDOException;
 use RuntimeException;
 
 final class MigrationRunner
@@ -69,7 +70,18 @@ final class MigrationRunner
             if (str_starts_with($stmt, '--') || str_starts_with($stmt, '#')) {
                 continue;
             }
-            $this->pdo->exec($stmt);
+            try {
+                $this->pdo->exec($stmt);
+            } catch (PDOException $e) {
+                $sqlState = (string) ($e->errorInfo[0] ?? $e->getCode());
+                $driverCode = (int) ($e->errorInfo[1] ?? 0);
+                $ignorable = $sqlState === '42S21' // duplicate column
+                    || $driverCode === 1060     // duplicate column name
+                    || $driverCode === 1061;    // duplicate key name
+                if (!$ignorable) {
+                    throw $e;
+                }
+            }
         }
     }
 

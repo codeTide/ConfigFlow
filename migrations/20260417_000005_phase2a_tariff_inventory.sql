@@ -23,5 +23,5 @@ ALTER TABLE configs
     MODIFY package_id BIGINT NULL,
     ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id,
     ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id,
-    ADD INDEX idx_configs_service (service_id),
-    ADD INDEX idx_configs_tariff (tariff_id);
+    ADD INDEX IF NOT EXISTS idx_configs_service (service_id),
+    ADD INDEX IF NOT EXISTS idx_configs_tariff (tariff_id);
