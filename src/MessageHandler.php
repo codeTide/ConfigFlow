@@ -992,10 +992,10 @@ final class MessageHandler
                 $this->database->clearUserState($userId);
                 return;
             }
-            $this->openAdminPanelsList(
+            $this->openAdminPanelSettings(
                 $chatId,
                 $userId,
-                $this->uiText->info('بخش پنل‌های قدیمی حذف شد. لطفاً از «سرویس‌های پنلی» در منوی ادمین استفاده کنید.')
+                $this->uiText->info('بخش پنل‌های قدیمی حذف شد. لطفاً از «تنظیمات اتصال پنل» در منوی ادمین استفاده کنید.')
             );
             return;
         }
@@ -1344,7 +1344,7 @@ final class MessageHandler
                 return true;
             }
             if ($text === $this->catalog->get('buttons.admin.panels')) {
-                $this->openAdminPanelsList($chatId, $userId);
+                $this->openAdminPanelSettings($chatId, $userId);
                 return true;
             }
             if ($text === $this->catalog->get('buttons.admin.broadcast')) {
@@ -1554,7 +1554,7 @@ final class MessageHandler
                     return;
                 }
                 if ($route === 'admin:panels') {
-                    $this->openAdminPanelsList($chatId, $userId);
+                    $this->openAdminPanelSettings($chatId, $userId);
                     return;
                 }
                 if ($route === 'admin:broadcast') {
@@ -3870,7 +3870,7 @@ final class MessageHandler
             $mode = (string) ($payload['mode'] ?? 'menu');
             if ($mode === 'menu') {
                 if ($text === UiLabels::back($this->catalog)) {
-                    $this->openAdminPanelsList($chatId, $userId);
+                    $this->openAdminRoot($chatId, $userId);
                     return;
                 }
                 if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_add')) {
@@ -3894,13 +3894,26 @@ final class MessageHandler
                     return;
                 }
                 if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_delete')) {
+                    $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'delete_confirm']);
+                    $this->openAdminPanelDeleteConfirm($chatId);
+                    return;
+                }
+                $this->telegram->sendMessage($chatId, $this->uiText->warning('یکی از گزینه‌های مدیریت اتصال پنل را انتخاب کنید.'));
+                return;
+            }
+            if ($mode === 'delete_confirm') {
+                if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_delete_confirm')) {
                     $this->settings->set('pg_base_url', '');
                     $this->settings->set('pg_username', '');
                     $this->settings->set('pg_password', '');
                     $this->openAdminPanelSettings($chatId, $userId, $this->uiText->success('اطلاعات اتصال پنل حذف شد.'));
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('یکی از گزینه‌های مدیریت اتصال پنل را انتخاب کنید.'));
+                if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_delete_cancel') || $text === UiLabels::back($this->catalog)) {
+                    $this->openAdminPanelSettings($chatId, $userId);
+                    return;
+                }
+                $this->telegram->sendMessage($chatId, $this->uiText->warning('برای ادامه حذف، یکی از گزینه‌های تایید یا انصراف را انتخاب کنید.'));
                 return;
             }
             if ($text === UiLabels::back($this->catalog)) {
@@ -3939,7 +3952,7 @@ final class MessageHandler
                 $data['password'] = $raw;
                 $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'wizard', 'step' => 'confirm', 'data' => $data]);
                 $summary = "آدرس پنل: {$data['base_url']}\nنام کاربری: {$data['username']}\nرمز عبور: " . str_repeat('*', min(strlen((string) $data['password']), 10));
-                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: 'پیش‌نمایش اتصال پنل', lines: [new UiTextLine('', 'خلاصه', htmlspecialchars($summary))], tipBlockquote: 'برای ثبت نهایی «تایید» را ارسال کنید.')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_title'), lines: [new UiTextLine('', 'خلاصه', htmlspecialchars($summary))], tipBlockquote: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
                 return;
             }
             if (!in_array($raw, ['تایید', 'ثبت'], true)) {
@@ -4260,7 +4273,7 @@ final class MessageHandler
         if ($hasConnection) {
             $rows[] = [$this->catalog->get('admin.final_modules.actions.panel_conn_delete')];
         }
-        $rows[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $rows[] = [UiLabels::back($this->catalog)];
 
         $this->telegram->sendMessage(
             $chatId,
@@ -4270,43 +4283,49 @@ final class MessageHandler
                     new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.base_url_label'), htmlspecialchars($baseUrl !== '' ? $baseUrl : '-')),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.username_label'), htmlspecialchars($username !== '' ? $username : '-')),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.password_label'), htmlspecialchars($passwordMasked)),
-                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.input_label'), $hasConnection ? 'برای ویرایش یا حذف از دکمه‌های زیر استفاده کنید.' : 'ابتدا از دکمه افزودن اطلاعات پنل استفاده کنید.'),
+                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.status_label'), $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.panel_settings.tip')
+                tipBlockquote: $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty')
             )),
             $this->uiKeyboard->replyMenu($rows)
         );
-        $this->promptPanelSettingsStep($chatId, $userId, 'base_url', ['base_url' => $baseUrl, 'username' => $username]);
-    }
-
-    /** @param array<string,mixed> $data */
-    private function promptPanelSettingsStep(int $chatId, int $userId, string $step, array $data): void
-    {
-        $current = fn(string $key): string => isset($data[$key]) && (string) $data[$key] !== '' ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
-        $text = match ($step) {
-            'base_url' => 'آدرس پنل را وارد کنید.' . $current('base_url'),
-            'username' => 'نام کاربری پنل را وارد کنید.' . $current('username'),
-            'password' => 'رمز عبور پنل را وارد کنید.',
-            default => '',
-        };
-        if ($text !== '') {
-            $this->telegram->sendMessage($chatId, $this->uiText->info($text), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
-        }
     }
 
     /** @param array<string,mixed> $data */
     private function promptPanelConnectionStep(int $chatId, int $userId, string $step, array $data): void
     {
-        $current = fn(string $key): string => isset($data[$key]) && (string) $data[$key] !== '' ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
+        $baseUrl = trim((string) ($data['base_url'] ?? ''));
+        $username = trim((string) ($data['username'] ?? ''));
+        $isEdit = $baseUrl !== '' || $username !== '';
+        $currentBaseUrl = $baseUrl !== '' ? "\nمقدار فعلی: <code>" . htmlspecialchars($baseUrl) . '</code>' : '';
+        $currentUsername = $username !== '' ? "\nمقدار فعلی: <code>" . htmlspecialchars($username) . '</code>' : '';
         $text = match ($step) {
-            'base_url' => 'آدرس پنل را وارد کنید.' . $current('base_url'),
-            'username' => 'نام کاربری پنل را وارد کنید.' . $current('username'),
-            'password' => 'رمز عبور پنل را وارد کنید.',
+            'base_url' => "🌐 لطفاً آدرس پنل را دقیق وارد کنید:\nآدرس باید کامل باشد (ترجیحاً با https://) و بدون فاصله اضافی ارسال شود.\nمثال: <code>https://panel.example.com</code>{$currentBaseUrl}\n> آدرس صحیح، اتصال امن و پایدار را تضمین می‌کند.",
+            'username' => "👤 نام کاربری پنل را ارسال کنید:\nاز همان نام کاربری مدیریتی که برای ورود به پنل استفاده می‌کنید استفاده کنید.\nمثال: <code>admin_user</code>{$currentUsername}\n> نام کاربری باید دقیقاً مطابق اطلاعات پنل باشد.",
+            'password' => "🔐 رمز عبور پنل را وارد کنید:\nبرای امنیت، رمز عبور در پیام‌های بعدی به‌صورت مخفی نمایش داده می‌شود.\n> رمز عبور در دیتابیس ذخیره می‌شود و بعداً قابل ویرایش است.",
             default => '',
         };
         if ($text !== '') {
-            $this->telegram->sendMessage($chatId, $this->uiText->info($text), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $title = $isEdit ? $this->catalog->get('admin.ui.open.panel_settings.wizard_edit_title') : $this->catalog->get('admin.ui.open.panel_settings.wizard_add_title');
+            $message = $this->uiText->multi(new UiTextBlock(
+                title: $title,
+                lines: [new UiTextLine('', '🧭 مرحله', $text)],
+            ));
+            $this->telegram->sendMessage($chatId, $message, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
         }
+    }
+
+    private function openAdminPanelDeleteConfirm(int $chatId): void
+    {
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->uiText->multi(new UiTextBlock(
+                title: $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_title'),
+                lines: [new UiTextLine('', '⚠️ پیام', $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_text'))],
+                tipBlockquote: $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_tip')
+            )),
+            $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.final_modules.actions.panel_conn_delete_confirm'), $this->catalog->get('admin.final_modules.actions.panel_conn_delete_cancel')]])
+        );
     }
 
     private function openAdminPanelView(int $chatId, int $userId, int $panelId, ?string $notice = null): void
