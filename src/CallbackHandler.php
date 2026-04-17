@@ -103,7 +103,7 @@ final class CallbackHandler
             $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.admin_legacy'));
             $this->telegram->sendMessage(
                 $chatId,
-                $this->menus->adminRootText() . "\n\n<blockquote>" . htmlspecialchars($this->catalog->get('messages.callback.admin_legacy_note')) . '</blockquote>',
+                $this->menus->adminRootText() . "\n\n" . htmlspecialchars($this->catalog->get('messages.callback.admin_legacy_note')),
                 $this->menus->adminRootReplyKeyboard()
             );
             return;

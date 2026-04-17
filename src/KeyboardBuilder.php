@@ -6,36 +6,20 @@ namespace ConfigFlow\Bot;
 
 final class KeyboardBuilder
 {
-    // Legacy constants kept for backward compatibility with non-migrated flows.
-    public const BTN_BUY = '🛒 خرید';
-    public const BTN_MY_CONFIGS = '📦 کانفیگ‌هام';
-    public const BTN_FREE_TEST = '🎁 تست رایگان';
-    public const BTN_PROFILE = '👤 حساب';
-    public const BTN_WALLET = '💳 شارژ حساب';
-    public const BTN_SUPPORT = '🎧 پشتیبانی';
-    public const BTN_REFERRAL = '🎁 دعوت';
-    public const BTN_AGENCY = '🤝 نمایندگی';
-    public const BTN_ADMIN = '⚙️ پنل مدیریت';
-    public const BTN_BACK_MAIN = '🏠 منوی اصلی';
-    public const BTN_BACK_ACCOUNT = '↩️ بازگشت';
-    public const BTN_BACK_TYPES = '🔙 بازگشت به سرویس‌ها';
-    public const BTN_BACK_PURCHASES = '🔙 بازگشت به سفارش‌ها';
-    public const BTN_CHECK_CHANNEL = '✅ عضو شدم';
-
-    public static function buy(): string { return self::label('buttons.buy', self::BTN_BUY); }
-    public static function myConfigs(): string { return self::label('buttons.my_configs', self::BTN_MY_CONFIGS); }
-    public static function freeTest(): string { return self::label('buttons.free_test', self::BTN_FREE_TEST); }
-    public static function profile(): string { return self::label('buttons.profile', self::BTN_PROFILE); }
-    public static function wallet(): string { return self::label('buttons.wallet', self::BTN_WALLET); }
-    public static function support(): string { return self::label('buttons.support', self::BTN_SUPPORT); }
-    public static function referralButton(): string { return self::label('buttons.referral', self::BTN_REFERRAL); }
-    public static function agency(): string { return self::label('buttons.agency', self::BTN_AGENCY); }
-    public static function admin(): string { return self::label('buttons.admin_panel', self::BTN_ADMIN); }
-    public static function backMain(): string { return self::label('buttons.main_menu', self::BTN_BACK_MAIN); }
-    public static function backAccount(): string { return self::label('buttons.back', self::BTN_BACK_ACCOUNT); }
-    public static function backTypes(): string { return self::label('buttons.back_to_services', self::BTN_BACK_TYPES); }
-    public static function backPurchases(): string { return self::label('buttons.back_to_orders', self::BTN_BACK_PURCHASES); }
-    public static function checkChannel(): string { return self::label('buttons.check_channel', self::BTN_CHECK_CHANNEL); }
+    public static function buy(): string { return self::label('buttons.buy', 'buy'); }
+    public static function myConfigs(): string { return self::label('buttons.my_configs', 'my_configs'); }
+    public static function freeTest(): string { return self::label('buttons.free_test', 'free_test'); }
+    public static function profile(): string { return self::label('buttons.profile', 'profile'); }
+    public static function wallet(): string { return self::label('buttons.wallet', 'wallet'); }
+    public static function support(): string { return self::label('buttons.support', 'support'); }
+    public static function referralButton(): string { return self::label('buttons.referral', 'referral'); }
+    public static function agency(): string { return self::label('buttons.agency', 'agency'); }
+    public static function admin(): string { return self::label('buttons.admin_panel', 'admin_panel'); }
+    public static function backMain(): string { return self::label('buttons.main_menu', 'main_menu'); }
+    public static function backAccount(): string { return self::label('buttons.back', 'back'); }
+    public static function backTypes(): string { return self::label('buttons.back_to_services', 'back_to_services'); }
+    public static function backPurchases(): string { return self::label('buttons.back_to_orders', 'back_to_orders'); }
+    public static function checkChannel(): string { return self::label('buttons.check_channel', 'check_channel'); }
     public static function shareReferralLink(): string { return self::label('buttons.share_referral_link', ''); }
 
     public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
