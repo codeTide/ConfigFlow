@@ -190,6 +190,23 @@
             "invalid_volume": "حجم واردشده معتبر نیست یا با بازه/گام سرویس سازگار نیست."
           }
         },
+        "service": {
+          "service_row": "{num}) {name} | mode:{mode}",
+          "service_button": "{num} - {name}",
+          "service_selection": {
+            "overview": "🛒 <b>خرید بر اساس سرویس</b>\n\n🧩 سرویس‌های فعال: {services}\n\n<blockquote>💡 سرویس را انتخاب کنید تا تعرفه‌های همان سرویس نمایش داده شود.</blockquote>"
+          },
+          "tariff_row": "{num}) {title} | {summary}",
+          "tariff_button": "{num} - {title}",
+          "tariff_fixed_summary": "{volume_gb}GB / {duration_days} روز / {price} تومان",
+          "tariff_per_gb_summary": "{min_volume_gb}-{max_volume_gb}GB step:{step_volume_gb} / {price_per_gb} تومان هر GB",
+          "tariff_selection": {
+            "overview": "💳 <b>انتخاب تعرفه</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 تعرفه‌ها: {tariffs}\n\n<blockquote>💡 تعرفه را انتخاب کنید تا به پرداخت بروید. در تعرفه‌های per_gb ابتدا حجم پرسیده می‌شود.</blockquote>"
+          },
+          "volume_selection": {
+            "overview": "📏 <b>انتخاب حجم تعرفه</b>\n\n📦 بازه: {min_volume_gb} تا {max_volume_gb} GB\n🪜 گام: {step_volume_gb} GB\n💵 قیمت هر GB: {price_per_gb} تومان"
+          }
+        },
         "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان{stock_suffix}"
       },
       "renew": {

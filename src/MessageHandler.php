@@ -191,6 +191,21 @@ final class MessageHandler
             return;
         }
 
+        if ($state['state_name'] === 'buy.service.await_service') {
+            $this->handleServiceSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'buy.service.await_tariff') {
+            $this->handleServiceTariffSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'buy.service.await_volume') {
+            $this->handleServiceTariffVolumeInputState($chatId, $userId, $text, $state);
+            return;
+        }
+
         if ($state['state_name'] === 'buy.panel.await_volume') {
             $this->handlePanelVolumeInputState($chatId, $userId, $text, $state);
             return;
@@ -218,6 +233,11 @@ final class MessageHandler
 
         if ($state['state_name'] === 'buy.panel.await_payment_method') {
             $this->handlePanelBuyPaymentSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
+
+        if ($state['state_name'] === 'buy.service.await_payment_method') {
+            $this->handleServiceBuyPaymentSelectionState($chatId, $userId, $text, $state);
             return;
         }
 
@@ -5897,7 +5917,51 @@ final class MessageHandler
             return;
         }
 
+        if ($this->database->countServicesWithTariffsByType($typeId) > 0) {
+            $this->showBuyServiceSelection($chatId, $userId, $typeId);
+            return;
+        }
+
         $this->showBuyPackageSelection($chatId, $userId, $typeId);
+    }
+
+    private function showBuyServiceSelection(int $chatId, int $userId, int $typeId): void
+    {
+        $services = $this->database->listActiveServicesByType($typeId);
+        $lines = [];
+        $optionMap = [];
+        $buttons = [];
+        foreach (array_values($services) as $idx => $service) {
+            $serviceId = (int) ($service['id'] ?? 0);
+            if ($serviceId <= 0 || $this->database->countTariffsByService($serviceId) <= 0) {
+                continue;
+            }
+            $num = (string) ($idx + 1);
+            $name = trim((string) ($service['name'] ?? $this->catalog->get('messages.user.buy.panel.default_service_title')));
+            $lines[] = $this->catalog->get('messages.user.buy.service.service_row', [
+                'num' => $num,
+                'name' => htmlspecialchars($name),
+                'mode' => (string) ($service['mode'] ?? 'stock'),
+            ]);
+            $optionMap[$num] = $serviceId;
+            $buttons[] = [$this->catalog->get('messages.user.buy.service.service_button', ['num' => $num, 'name' => $name])];
+        }
+        if ($optionMap === []) {
+            $this->showBuyPackageSelection($chatId, $userId, $typeId);
+            return;
+        }
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $this->database->setUserState($userId, 'buy.service.await_service', [
+            'type_id' => $typeId,
+            'options' => $optionMap,
+        ]);
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->messageRenderer->render('messages.user.buy.service.service_selection.overview', [
+                'services' => implode("\n", $lines),
+            ], ['services']),
+            $this->uiKeyboard->replyMenu($buttons)
+        );
     }
 
     private function showBuyPackageSelection(int $chatId, int $userId, int $typeId): void
@@ -6071,6 +6135,158 @@ final class MessageHandler
         }
 
         $this->openPanelPaymentSelection($chatId, $userId, $service, $volume, $amount);
+    }
+
+    private function handleServiceSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($text === UiLabels::back($this->catalog)) {
+            $this->startBuyTypeReplyFlow($chatId, $userId);
+            return;
+        }
+        if ($this->isMainMenuInput($text)) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+        $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
+        $selected = $this->extractOptionKey($text);
+        $serviceId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        $typeId = (int) ($state['payload']['type_id'] ?? 0);
+        if ($serviceId <= 0 || $typeId <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.common.invalid_option')));
+            return;
+        }
+        $service = $this->database->getService($serviceId);
+        if (!is_array($service) || (int) ($service['type_id'] ?? 0) !== $typeId || (int) ($service['is_active'] ?? 0) !== 1) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.common.invalid_option')));
+            return;
+        }
+        $this->showBuyServiceTariffSelection($chatId, $userId, $typeId, $serviceId);
+    }
+
+    private function showBuyServiceTariffSelection(int $chatId, int $userId, int $typeId, int $serviceId): void
+    {
+        $service = $this->database->getService($serviceId);
+        if (!is_array($service) || (int) ($service['type_id'] ?? 0) !== $typeId) {
+            $this->showBuyServiceSelection($chatId, $userId, $typeId);
+            return;
+        }
+        $tariffs = $this->database->listActiveTariffsByService($serviceId);
+        $lines = [];
+        $optionMap = [];
+        $buttons = [];
+        foreach (array_values($tariffs) as $idx => $tariff) {
+            $tariffId = (int) ($tariff['id'] ?? 0);
+            if ($tariffId <= 0) {
+                continue;
+            }
+            $num = (string) ($idx + 1);
+            $summary = (string) ($tariff['pricing_mode'] ?? 'fixed') === 'fixed'
+                ? $this->catalog->get('messages.user.buy.service.tariff_fixed_summary', [
+                    'volume_gb' => (string) ($tariff['volume_gb'] ?? '0'),
+                    'duration_days' => (string) ($tariff['duration_days'] ?? '0'),
+                    'price' => (string) ($tariff['price'] ?? '0'),
+                ])
+                : $this->catalog->get('messages.user.buy.service.tariff_per_gb_summary', [
+                    'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
+                    'max_volume_gb' => (string) ($tariff['max_volume_gb'] ?? '0'),
+                    'step_volume_gb' => (string) ($tariff['step_volume_gb'] ?? '0'),
+                    'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
+                ]);
+            $lines[] = $this->catalog->get('messages.user.buy.service.tariff_row', [
+                'num' => $num,
+                'title' => htmlspecialchars((string) ($tariff['title'] ?? $this->catalog->get('messages.generic.dash'))),
+                'summary' => $summary,
+            ]);
+            $optionMap[$num] = $tariffId;
+            $buttons[] = [$this->catalog->get('messages.user.buy.service.tariff_button', ['num' => $num, 'title' => (string) ($tariff['title'] ?? $this->catalog->get('messages.generic.dash'))])];
+        }
+        if ($optionMap === []) {
+            $this->showBuyServiceSelection($chatId, $userId, $typeId);
+            return;
+        }
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $this->database->setUserState($userId, 'buy.service.await_tariff', [
+            'type_id' => $typeId,
+            'service_id' => $serviceId,
+            'options' => $optionMap,
+        ]);
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->messageRenderer->render('messages.user.buy.service.tariff_selection.overview', [
+                'service_name' => (string) ($service['name'] ?? $this->catalog->get('messages.user.buy.panel.default_service_title')),
+                'tariffs' => implode("\n", $lines),
+            ], ['tariffs']),
+            $this->uiKeyboard->replyMenu($buttons)
+        );
+    }
+
+    private function handleServiceTariffSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        $typeId = (int) ($state['payload']['type_id'] ?? 0);
+        $serviceId = (int) ($state['payload']['service_id'] ?? 0);
+        if ($text === UiLabels::back($this->catalog)) {
+            $this->showBuyServiceSelection($chatId, $userId, $typeId);
+            return;
+        }
+        if ($this->isMainMenuInput($text)) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+        $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
+        $selected = $this->extractOptionKey($text);
+        $tariffId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        if ($tariffId <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.common.invalid_option')));
+            return;
+        }
+        $tariff = $this->database->getServiceTariffForService($serviceId, $tariffId);
+        if (!is_array($tariff)) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.common.invalid_option')));
+            return;
+        }
+        if ((string) ($tariff['pricing_mode'] ?? 'fixed') === 'per_gb') {
+            $this->database->setUserState($userId, 'buy.service.await_volume', [
+                'type_id' => $typeId,
+                'service_id' => $serviceId,
+                'tariff_id' => $tariffId,
+            ]);
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->messageRenderer->render('messages.user.buy.service.volume_selection.overview', [
+                    'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
+                    'max_volume_gb' => (string) ($tariff['max_volume_gb'] ?? '0'),
+                    'step_volume_gb' => (string) ($tariff['step_volume_gb'] ?? '0'),
+                    'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
+                ]),
+                $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+            );
+            return;
+        }
+        $this->openServicePaymentSelection($chatId, $userId, $typeId, $serviceId, $tariffId, null);
+    }
+
+    private function handleServiceTariffVolumeInputState(int $chatId, int $userId, string $text, array $state): void
+    {
+        $typeId = (int) ($state['payload']['type_id'] ?? 0);
+        $serviceId = (int) ($state['payload']['service_id'] ?? 0);
+        $tariffId = (int) ($state['payload']['tariff_id'] ?? 0);
+        if ($text === UiLabels::back($this->catalog)) {
+            $this->showBuyServiceTariffSelection($chatId, $userId, $typeId, $serviceId);
+            return;
+        }
+        if ($this->isMainMenuInput($text)) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+        $volume = (float) str_replace(',', '.', trim($text));
+        if ($volume <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.buy.panel.errors.invalid_volume')));
+            return;
+        }
+        $this->openServicePaymentSelection($chatId, $userId, $typeId, $serviceId, $tariffId, $volume);
     }
 
     private function handleBuyPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
@@ -6370,6 +6586,135 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.payment.errors.select_method')));
             return;
         }
+    }
+
+    private function openServicePaymentSelection(int $chatId, int $userId, int $typeId, int $serviceId, int $tariffId, ?float $selectedVolumeGb): void
+    {
+        $service = $this->database->getService($serviceId);
+        $tariff = $this->database->getServiceTariffForService($serviceId, $tariffId);
+        if (!is_array($service) || !is_array($tariff) || (int) ($service['type_id'] ?? 0) !== $typeId) {
+            $this->showBuyServiceSelection($chatId, $userId, $typeId);
+            return;
+        }
+        $amount = $this->database->calculateServiceTariffAmount($tariff, $selectedVolumeGb);
+        if ($amount <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.buy.panel.errors.invalid_volume')));
+            return;
+        }
+        if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
+            $rulesText = trim($this->settings->get('purchase_rules_text', ''));
+            $rulesText = $rulesText !== '' ? $rulesText : $this->catalog->get('messages.user.buy.rules.default_text');
+            $this->database->setUserState($userId, 'buy.await_rules_accept', [
+                'type_id' => $typeId,
+                'service_id' => $serviceId,
+                'tariff_id' => $tariffId,
+                'selected_volume_gb' => $selectedVolumeGb,
+                'computed_amount' => $amount,
+                'service_flow' => 1,
+            ]);
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->messageRenderer->render('messages.user.buy.rules.overview', [
+                    'rules_text' => $rulesText,
+                ]),
+                $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.accept_rules')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+            );
+            return;
+        }
+
+        $tariffTitle = (string) ($tariff['title'] ?? $this->catalog->get('messages.generic.dash'));
+        $label = (string) ($service['name'] ?? $this->catalog->get('messages.user.buy.panel.default_service_title')) . ' / ' . $tariffTitle;
+        $textOut = $this->messageRenderer->render('messages.user.buy.payment.overview', [
+            'package_name' => $label,
+            'amount' => $amount,
+        ]);
+        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
+        if ($this->settings->get('gw_card_enabled', '0') === '1') {
+            $buttons[] = [$this->catalog->get('buttons.pay.card')];
+        }
+        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
+            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
+        }
+        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
+            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
+        }
+        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
+            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
+        }
+        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
+            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
+        }
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $this->database->setUserState($userId, 'buy.service.await_payment_method', [
+            'type_id' => $typeId,
+            'service_id' => $serviceId,
+            'tariff_id' => $tariffId,
+            'selected_volume_gb' => $selectedVolumeGb,
+            'computed_amount' => $amount,
+        ]);
+        $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
+    }
+
+    private function handleServiceBuyPaymentSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        $typeId = (int) ($state['payload']['type_id'] ?? 0);
+        $serviceId = (int) ($state['payload']['service_id'] ?? 0);
+        $tariffId = (int) ($state['payload']['tariff_id'] ?? 0);
+        $selectedVolumeGb = isset($state['payload']['selected_volume_gb']) ? (float) $state['payload']['selected_volume_gb'] : null;
+        if ($text === UiLabels::back($this->catalog)) {
+            $this->showBuyServiceTariffSelection($chatId, $userId, $typeId, $serviceId);
+            return;
+        }
+        if ($this->isMainMenuInput($text)) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+        if ($serviceId <= 0 || $tariffId <= 0) {
+            $this->database->clearUserState($userId);
+            return;
+        }
+        if ($text === $this->catalog->get('buttons.pay.wallet') || $text === $this->uiConst(self::PAY_WALLET)) {
+            $this->database->clearUserState($userId);
+            $result = $this->database->walletPayServiceTariff($userId, $serviceId, $tariffId, $selectedVolumeGb);
+            if (!($result['ok'] ?? false)) {
+                $msg = match ($result['error'] ?? '') {
+                    'insufficient_balance' => $this->catalog->get('messages.user.payment.errors.insufficient_balance'),
+                    'no_stock' => $this->catalog->get('messages.user.payment.errors.no_stock'),
+                    'invalid_volume' => $this->catalog->get('messages.user.buy.panel.errors.invalid_volume'),
+                    default => $this->catalog->get('messages.user.payment.errors.create_order_failed'),
+                };
+                $this->telegram->sendMessage($chatId, $this->uiText->error($msg));
+                return;
+            }
+            $this->database->setUserState($userId, 'buy.done', [
+                'type_id' => $typeId,
+                'service_id' => $serviceId,
+                'tariff_id' => $tariffId,
+                'payment_method' => 'wallet',
+                'gateway' => null,
+            ]);
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->catalog->get('messages.user.payment.wallet_purchase_success', [
+                    'payment_id' => (int) $result['payment_id'],
+                    'amount' => (int) ($result['amount'] ?? 0),
+                    'new_balance' => (int) ($result['new_balance'] ?? 0),
+                ])
+            );
+            return;
+        }
+        if ($text === $this->catalog->get('buttons.pay.card') || $text === $this->uiConst(self::PAY_CARD) || $text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+            $this->database->clearUserState($userId);
+            $this->createServicePurchasePaymentByMethod($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb, $text);
+            return;
+        }
+        if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === $this->uiConst(self::PAY_SWAPWALLET) || $text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
+            $this->database->clearUserState($userId);
+            $this->createServicePurchaseGatewayInvoice($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb, $text);
+            return;
+        }
+        $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.payment.errors.select_method')));
     }
 
     private function openPanelPaymentSelection(int $chatId, int $userId, array $service, float $volume, int $amount): void
@@ -6705,6 +7050,89 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
     }
 
+    private function createServicePurchasePaymentByMethod(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb, string $methodLabel): void
+    {
+        $service = $this->database->getService($serviceId);
+        $tariff = $this->database->getServiceTariffForService($serviceId, $tariffId);
+        if (!is_array($service) || !is_array($tariff)) {
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.common.invalid_option')));
+            return;
+        }
+        $amount = $this->database->calculateServiceTariffAmount($tariff, $selectedVolumeGb);
+        if ($amount <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.buy.panel.errors.invalid_volume')));
+            return;
+        }
+        $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
+        $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
+        $paymentId = $this->database->createPayment([
+            'kind' => 'purchase',
+            'user_id' => $userId,
+            'package_id' => null,
+            'service_id' => $serviceId,
+            'tariff_id' => $tariffId,
+            'amount' => $amount,
+            'payment_method' => $paymentMethod,
+            'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
+            'gateway_ref' => null,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $pendingId = $this->database->createPendingOrder([
+            'user_id' => $userId,
+            'package_id' => null,
+            'service_id' => $serviceId,
+            'tariff_id' => $tariffId,
+            'selected_volume_gb' => $selectedVolumeGb,
+            'computed_amount' => $amount,
+            'payment_id' => $paymentId,
+            'amount' => $amount,
+            'payment_method' => $paymentMethod,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+            'status' => 'waiting_payment',
+        ]);
+
+        if ($method === 'card') {
+            $card = htmlspecialchars($this->settings->get('payment_card', '---'));
+            $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
+            $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
+            $text = $this->catalog->get('messages.user.payment.card_purchase_intro', [
+                'card' => $card,
+                'bank_line' => $bank !== '' ? $this->catalog->get('messages.user.payment.bank_line', ['bank' => $bank]) : '',
+                'owner_line' => $owner !== '' ? $this->catalog->get('messages.user.payment.owner_line', ['owner' => $owner]) : '',
+                'pending_id' => $pendingId,
+                'amount' => $amount,
+            ]);
+            $this->database->setUserState($userId, 'await_card_receipt', ['payment_id' => $paymentId]);
+            $this->telegram->sendMessage($chatId, $text);
+            return;
+        }
+
+        if ($method === 'crypto') {
+            $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
+            $text = $this->catalog->get('messages.user.payment.crypto_purchase_intro', [
+                'pending_id' => $pendingId,
+                'amount' => $amount,
+                'address_block' => $address !== '' ? $this->catalog->get('messages.user.payment.address_block', ['address' => $address]) : '',
+            ]);
+            $this->database->setUserState($userId, 'await_crypto_tx', ['payment_id' => $paymentId]);
+            $this->telegram->sendMessage($chatId, $text);
+            return;
+        }
+
+        $tp = $this->gateways->createTetrapayOrder($amount, (string) $pendingId);
+        if (!($tp['ok'] ?? false)) {
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tetrapay_unavailable', ['pending_id' => $pendingId, 'amount' => $amount]));
+            return;
+        }
+        $authority = (string) ($tp['authority'] ?? '');
+        if ($authority !== '') {
+            $this->database->setPaymentGatewayRef($paymentId, $authority);
+        }
+        $payUrl = (string) ($tp['pay_url'] ?? '');
+        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_purchase'), 'service_id' => $serviceId, 'tariff_id' => $tariffId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => 'tetrapay']);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
+    }
+
     private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
     {
         $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
@@ -6896,6 +7324,76 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
     }
 
+    private function createServicePurchaseGatewayInvoice(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb, string $methodLabel): void
+    {
+        $service = $this->database->getService($serviceId);
+        $tariff = $this->database->getServiceTariffForService($serviceId, $tariffId);
+        if (!is_array($service) || !is_array($tariff)) {
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.common.invalid_option')));
+            return;
+        }
+        $amount = $this->database->calculateServiceTariffAmount($tariff, $selectedVolumeGb);
+        if ($amount <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.buy.panel.errors.invalid_volume')));
+            return;
+        }
+
+        $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
+        $paymentId = $this->database->createPayment([
+            'kind' => 'purchase',
+            'user_id' => $userId,
+            'package_id' => null,
+            'service_id' => $serviceId,
+            'tariff_id' => $tariffId,
+            'amount' => $amount,
+            'payment_method' => $gateway,
+            'status' => 'waiting_gateway',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $pendingId = $this->database->createPendingOrder([
+            'user_id' => $userId,
+            'package_id' => null,
+            'service_id' => $serviceId,
+            'tariff_id' => $tariffId,
+            'selected_volume_gb' => $selectedVolumeGb,
+            'computed_amount' => $amount,
+            'payment_id' => $paymentId,
+            'amount' => $amount,
+            'payment_method' => $gateway,
+            'created_at' => gmdate('Y-m-d H:i:s'),
+            'status' => 'waiting_payment',
+        ]);
+
+        if ($gateway === 'swapwallet_crypto') {
+            $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Purchase');
+            if (!($invoice['ok'] ?? false)) {
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.swapwallet_invoice_error'));
+                return;
+            }
+            $invoiceId = (string) ($invoice['invoice_id'] ?? '');
+            if ($invoiceId !== '') {
+                $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
+            }
+            $payUrl = (string) ($invoice['pay_url'] ?? '');
+            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'service_id' => $serviceId, 'tariff_id' => $tariffId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => $gateway]);
+            $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_purchase'), $pendingId, $amount, $payUrl);
+            return;
+        }
+
+        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-service-' . $userId . '-' . $serviceId . '-' . $tariffId . '-' . time());
+        if (!($invoice['ok'] ?? false)) {
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
+            return;
+        }
+        $invoiceId = (string) ($invoice['invoice_id'] ?? '');
+        if ($invoiceId !== '') {
+            $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
+        }
+        $payUrl = (string) ($invoice['pay_url'] ?? '');
+        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'service_id' => $serviceId, 'tariff_id' => $tariffId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => $gateway]);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
+    }
+
     private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
     {
         $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
@@ -7018,6 +7516,14 @@ final class MessageHandler
             return;
         }
         if ($text === UiLabels::back($this->catalog)) {
+            if ((int) ($state['payload']['service_flow'] ?? 0) === 1) {
+                $typeId = (int) ($state['payload']['type_id'] ?? 0);
+                $serviceId = (int) ($state['payload']['service_id'] ?? 0);
+                if ($typeId > 0 && $serviceId > 0) {
+                    $this->showBuyServiceTariffSelection($chatId, $userId, $typeId, $serviceId);
+                    return;
+                }
+            }
             if ((string) ($state['payload']['order_mode'] ?? '') === 'panel_only') {
                 $this->openPanelServiceSelection($chatId, $userId);
                 return;
@@ -7046,6 +7552,20 @@ final class MessageHandler
             }
             $this->database->acceptPurchaseRules($userId);
             $this->openPanelPaymentSelection($chatId, $userId, $service, $selectedVolumeGb, $computedAmount);
+            return;
+        }
+        if ((int) ($state['payload']['service_flow'] ?? 0) === 1) {
+            $typeId = (int) ($state['payload']['type_id'] ?? 0);
+            $serviceId = (int) ($state['payload']['service_id'] ?? 0);
+            $tariffId = (int) ($state['payload']['tariff_id'] ?? 0);
+            $selectedVolumeGb = isset($state['payload']['selected_volume_gb']) ? (float) $state['payload']['selected_volume_gb'] : null;
+            if ($typeId <= 0 || $serviceId <= 0 || $tariffId <= 0) {
+                $this->database->clearUserState($userId);
+                $this->startBuyTypeReplyFlow($chatId, $userId);
+                return;
+            }
+            $this->database->acceptPurchaseRules($userId);
+            $this->openServicePaymentSelection($chatId, $userId, $typeId, $serviceId, $tariffId, $selectedVolumeGb);
             return;
         }
         $packageId = (int) ($state['payload']['package_id'] ?? 0);

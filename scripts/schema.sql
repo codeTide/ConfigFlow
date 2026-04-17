@@ -121,12 +121,16 @@ CREATE TABLE IF NOT EXISTS purchases (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     package_id BIGINT NULL,
+    service_id BIGINT NULL,
+    tariff_id BIGINT NULL,
     config_id BIGINT NOT NULL,
     amount INT NOT NULL,
     payment_method VARCHAR(64) NOT NULL,
     created_at DATETIME NOT NULL,
     is_test TINYINT(1) NOT NULL DEFAULT 0,
-    INDEX idx_purchases_user (user_id)
+    INDEX idx_purchases_user (user_id),
+    INDEX idx_purchases_service (service_id),
+    INDEX idx_purchases_tariff (tariff_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS free_test_requests (
@@ -178,6 +182,8 @@ CREATE TABLE IF NOT EXISTS payments (
     kind VARCHAR(32) NOT NULL,
     user_id BIGINT NOT NULL,
     package_id BIGINT NULL,
+    service_id BIGINT NULL,
+    tariff_id BIGINT NULL,
     amount INT NOT NULL,
     payment_method VARCHAR(64) NOT NULL,
     gateway_ref VARCHAR(191) NULL,
@@ -194,7 +200,9 @@ CREATE TABLE IF NOT EXISTS payments (
     verify_attempts INT NOT NULL DEFAULT 0,
     last_verify_at DATETIME NULL,
     INDEX idx_payments_user (user_id),
-    INDEX idx_payments_status (status)
+    INDEX idx_payments_status (status),
+    INDEX idx_payments_service (service_id),
+    INDEX idx_payments_tariff (tariff_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pending_orders (
@@ -203,6 +211,7 @@ CREATE TABLE IF NOT EXISTS pending_orders (
     package_id BIGINT NULL,
     order_mode VARCHAR(32) NOT NULL DEFAULT 'stock_only',
     service_id BIGINT NULL,
+    tariff_id BIGINT NULL,
     selected_volume_gb DECIMAL(10,2) NULL,
     computed_amount INT NULL,
     payment_id BIGINT NULL,
@@ -213,7 +222,8 @@ CREATE TABLE IF NOT EXISTS pending_orders (
     INDEX idx_pending_user (user_id),
     INDEX idx_pending_status (status),
     INDEX idx_pending_mode (order_mode),
-    INDEX idx_pending_service (service_id)
+    INDEX idx_pending_service (service_id),
+    INDEX idx_pending_tariff (tariff_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS user_states (
