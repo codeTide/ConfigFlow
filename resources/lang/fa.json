@@ -679,15 +679,15 @@
         "connection_missing": "هیچ اطلاعات اتصالی برای پنل ثبت نشده است."
       },
       "summary": {
-        "title_label": "خلاصه",
-        "base_url_label": "آدرس پنل",
-        "username_label": "نام کاربری",
-        "password_label": "رمز عبور",
-        "template": "{base_url_label}: {base_url}\n{username_label}: {username}\n{password_label}: {password_masked}"
+        "title_label": "📋 خلاصه اتصال",
+        "base_url_label": "🌐 آدرس پنل",
+        "username_label": "👤 نام کاربری",
+        "password_label": "🔐 رمز عبور",
+        "template": "🔹 {base_url_label}: {base_url}\n🔹 {username_label}: {username}\n🔹 {password_label}: {password_masked}"
       },
       "confirm_words": {
         "confirm": "تایید",
-        "submit": "ثبت"
+        "submit": "✅ ثبت"
       },
       "wizard": {
         "steps": {
@@ -937,7 +937,7 @@
           "wizard_add_title": "➕ <b>ثبت اتصال پنل</b>",
           "wizard_edit_title": "✏️ <b>ویرایش اتصال پنل</b>",
           "wizard_summary_title": "🧾 <b>پیش‌نمایش اتصال پنل</b>",
-          "wizard_summary_tip": "برای ذخیره نهایی، «تایید» یا «ثبت» را ارسال کنید."
+          "wizard_summary_tip": "💡 اگر اطلاعات بالا کاملاً صحیح است، دکمه «✅ ثبت» را بزنید تا اتصال پنل ذخیره و فعال شود.\n↩️ اگر نیاز به اصلاح دارید، با دکمه بازگشت به مرحله قبل برگردید و موارد را ویرایش کنید."
         },
         "users_list": {
           "title": "👤 <b>مدیریت کاربران</b>",
