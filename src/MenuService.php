@@ -158,6 +158,7 @@ final class MenuService
             ]);
         }
 
+        // Guardrail: row-template + implode is intentionally allowed only for data-driven lists.
         return $this->messageRenderer->render('menus.messages.my_configs_overview', [
             'count' => $count,
             'orders' => implode("\n", $lines),

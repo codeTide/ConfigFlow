@@ -26,8 +26,6 @@ require_once __DIR__ . '/src/Database.php';
 require_once __DIR__ . '/src/KeyboardBuilder.php';
 require_once __DIR__ . '/src/UiLabels.php';
 require_once __DIR__ . '/src/UiTextCatalogInterface.php';
-require_once __DIR__ . '/src/UiTextLine.php';
-require_once __DIR__ . '/src/UiTextBlock.php';
 require_once __DIR__ . '/src/UiJsonCatalog.php';
 require_once __DIR__ . '/src/UiMessageRenderer.php';
 require_once __DIR__ . '/src/UiTextCatalog.php';

@@ -38,37 +38,6 @@ final class UiTextCatalog implements UiTextCatalogInterface
         return $this->singleLine($this->catalog->get('emojis.info'), $message);
     }
 
-    public function multi(UiTextBlock $block): string
-    {
-        $title = trim($block->title);
-        if ($title === '') {
-            throw new \InvalidArgumentException('UiTextBlock title cannot be empty.');
-        }
-
-        $parts = [$title];
-        if ($block->lines !== []) {
-            $parts[] = '';
-            foreach ($block->lines as $line) {
-                if (!$line instanceof UiTextLine) {
-                    throw new \InvalidArgumentException('UiTextBlock lines must be UiTextLine instances.');
-                }
-                $emoji = trim($line->emoji);
-                $label = trim($line->label);
-                $value = trim($line->valueHtml);
-                $prefix = $emoji !== '' ? ($emoji . ' ' . $label) : $label;
-                $parts[] = sprintf('%s: %s', $prefix, $value);
-            }
-        }
-
-        if ($block->tipText !== null && trim($block->tipText) !== '') {
-            $tip = $this->normalizeTip($block->tipText);
-            $parts[] = '';
-            $parts[] = '<blockquote>' . htmlspecialchars($tip) . '</blockquote>';
-        }
-
-        return implode("\n", $parts);
-    }
-
     public function paymentCreated(int $paymentId, int $amount, string $title, ?string $tip = null): string
     {
         $key = $tip !== null && trim($tip) !== '' ? 'payments.created.overview_with_tip' : 'payments.created.overview';

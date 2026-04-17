@@ -1819,6 +1819,7 @@ final class MessageHandler
         }
         $this->telegram->sendMessage(
             $chatId,
+            // Guardrail: row-template + implode is an intentional list-only exception.
             $this->messageRenderer->render('admin.ui.open.types_list.overview', [
                 'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.types_list.empty'),
             ], ['list']),
@@ -4291,20 +4292,27 @@ final class MessageHandler
     /** @param array<string,mixed> $data */
     private function promptPanelWizardStep(int $chatId, int $userId, string $stateName, string $step, array $data, array $extraPayload = []): void
     {
-        $current = fn(string $key): string => isset($data[$key]) ? $this->catalog->get('admin.final_modules.prompts.panel_wizard.current_value', ['value' => htmlspecialchars((string) $data[$key])]) : '';
-        $text = match ($step) {
-            'title' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.title') . $current('title'),
-            'min_gb' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.min_gb') . $current('min_gb'),
-            'max_gb' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.max_gb') . $current('max_gb'),
-            'step_gb' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.step_gb') . $current('step_gb'),
-            'price_per_gb' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.price_per_gb') . $current('price_per_gb'),
-            'duration_policy' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.duration_policy') . $current('duration_policy'),
-            'duration_days' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.duration_days') . $current('duration_days'),
-            'provider' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.provider') . $current('provider'),
-            'group_ids' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.group_ids') . $current('group_ids'),
-            'description' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.description') . $current('description'),
-            default => '',
-        };
+        $baseByStep = [
+            'title' => 'admin.final_modules.prompts.panel_wizard.title',
+            'min_gb' => 'admin.final_modules.prompts.panel_wizard.min_gb',
+            'max_gb' => 'admin.final_modules.prompts.panel_wizard.max_gb',
+            'step_gb' => 'admin.final_modules.prompts.panel_wizard.step_gb',
+            'price_per_gb' => 'admin.final_modules.prompts.panel_wizard.price_per_gb',
+            'duration_policy' => 'admin.final_modules.prompts.panel_wizard.duration_policy',
+            'duration_days' => 'admin.final_modules.prompts.panel_wizard.duration_days',
+            'provider' => 'admin.final_modules.prompts.panel_wizard.provider',
+            'group_ids' => 'admin.final_modules.prompts.panel_wizard.group_ids',
+            'description' => 'admin.final_modules.prompts.panel_wizard.description',
+        ];
+        $baseKey = (string) ($baseByStep[$step] ?? '');
+        $baseText = $baseKey !== '' ? $this->catalog->get($baseKey) : '';
+        $currentText = isset($data[$step])
+            ? $this->catalog->get('admin.final_modules.prompts.panel_wizard.current_value', ['value' => htmlspecialchars((string) $data[$step])])
+            : '';
+        $text = $this->messageRenderer->render('admin.common.notice_with_optional_note', [
+            'notice' => $baseText,
+            'note_line' => $currentText,
+        ], ['notice', 'note_line']);
         $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => $step, 'data' => $data]));
         $this->telegram->sendMessage($chatId, $this->uiText->info($text), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
     }

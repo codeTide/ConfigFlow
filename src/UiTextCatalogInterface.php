@@ -14,7 +14,5 @@ interface UiTextCatalogInterface
 
     public function info(string $message): string;
 
-    public function multi(UiTextBlock $block): string;
-
     public function paymentCreated(int $paymentId, int $amount, string $title, ?string $tip = null): string;
 }
