@@ -58,8 +58,8 @@ final class UiTextCatalog implements UiTextCatalogInterface
             }
         }
 
-        if ($block->tipBlockquote !== null && trim($block->tipBlockquote) !== '') {
-            $tip = $this->normalizeTip($block->tipBlockquote);
+        if ($block->tipText !== null && trim($block->tipText) !== '') {
+            $tip = $this->normalizeTip($block->tipText);
             $parts[] = '';
             $parts[] = '<blockquote>' . htmlspecialchars($tip) . '</blockquote>';
         }
@@ -77,7 +77,7 @@ final class UiTextCatalog implements UiTextCatalogInterface
                 new UiTextLine('', $this->catalog->get('payments.created.id_label'), '<code>' . $paymentId . '</code>'),
                 new UiTextLine('', $this->catalog->get('payments.created.amount_label'), $this->catalog->get('payments.created.amount_value', ['amount' => $amount])),
             ],
-            tipBlockquote: $tip,
+            tipText: $tip,
         );
 
         return $this->multi($block);
@@ -101,7 +101,7 @@ final class UiTextCatalog implements UiTextCatalogInterface
 
     private function normalizeTip(string $tip): string
     {
-        $tip = trim(preg_replace('/\s+/u', ' ', $tip) ?? '');
+        $tip = trim((string) preg_replace('/[^\S\n]+/u', ' ', $tip));
         if ($tip === '') {
             throw new \InvalidArgumentException('Tip cannot be empty.');
         }

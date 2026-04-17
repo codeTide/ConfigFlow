@@ -6,12 +6,12 @@ namespace ConfigFlow\Bot;
 
 final class UiLabels
 {
-    // Backward-compatible constants for flows that are not migrated yet.
-    public const BTN_BACK = '↩️ بازگشت';
-    public const BTN_MAIN = '🏠 منوی اصلی';
+    // Fallback tokens when catalog is unavailable.
+    public const BTN_BACK = 'back';
+    public const BTN_MAIN = 'main_menu';
 
-    public const BTN_CONFIRM_YES = '✅ تایید';
-    public const BTN_CONFIRM_NO = '❌ خیر';
+    public const BTN_CONFIRM_YES = 'confirm_yes';
+    public const BTN_CONFIRM_NO = 'confirm_no';
 
     private function __construct()
     {

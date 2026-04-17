@@ -12,7 +12,7 @@ final class UiTextBlock
     public function __construct(
         public string $title,
         public array $lines = [],
-        public ?string $tipBlockquote = null,
+        public ?string $tipText = null,
     ) {
     }
 }
