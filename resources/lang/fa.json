@@ -524,7 +524,8 @@
         "pin_text_send": "متن پیام پین را ارسال کنید.",
         "pin_new_text_send": "متن جدید پیام پین را ارسال کنید.",
         "pin_delete_confirm": "برای حذف پیام پین #{pin_id} عبارت «{confirm_word}» را ارسال کنید.",
-        "pin_send_all_confirm": "برای ارسال و پین همگانی #{pin_id} عبارت «{confirm_word}» را ارسال کنید."
+        "pin_send_all_confirm": "برای ارسال و پین همگانی #{pin_id} عبارت «{confirm_word}» را ارسال کنید.",
+        "delivery_mode_input": "حالت تحویل را انتخاب کنید: stock_only یا panel_only"
       },
       "errors": {
         "invalid_input": "ورودی معتبر ارسال کنید.",
@@ -538,7 +539,8 @@
         "pin_delete_confirm_required": "برای تایید حذف عبارت «{confirm_word}» را ارسال کنید.",
         "pin_send_confirm_required": "برای تایید ارسال همگانی عبارت «{confirm_word}» را بفرستید.",
         "pin_not_found": "پیام پین پیدا نشد.",
-        "invalid_section_option": "گزینه نامعتبر است. لطفاً از دکمه‌های همین بخش استفاده کنید."
+        "invalid_section_option": "گزینه نامعتبر است. لطفاً از دکمه‌های همین بخش استفاده کنید.",
+        "invalid_delivery_mode": "مقدار معتبر نیست. فقط stock_only یا panel_only."
       },
       "success": {
         "bot_status_updated": "وضعیت ربات بروزرسانی شد.",
@@ -551,7 +553,11 @@
         "pin_created": "پیام پین ثبت شد.",
         "pin_updated": "پیام پین ویرایش شد.",
         "pin_deleted": "پیام پین حذف شد.",
-        "pin_send_done": "ارسال انجام شد. ارسال: <b>{sent}</b> | پین: <b>{pinned}</b>"
+        "pin_send_done": "ارسال انجام شد. ارسال: <b>{sent}</b> | پین: <b>{pinned}</b>",
+        "delivery_mode_saved": "حالت تحویل ذخیره شد."
+      },
+      "labels": {
+        "delivery_mode": "حالت تحویل"
       }
     },
     "final_modules": {
@@ -596,10 +602,29 @@
         "group_id_input": "Group ID را ارسال کنید (یا - برای غیرفعال‌سازی).",
         "restore_json_input": "JSON تنظیمات را ارسال کنید.",
         "freetest_rule_format": "فرمت قانون: package_id|max_claims|cooldown_days",
-        "freetest_reset_user_id_input": "آیدی عددی کاربر را ارسال کنید."
+        "freetest_reset_user_id_input": "آیدی عددی کاربر را ارسال کنید.",
+        "panel_wizard": {
+          "current_value": " (فعلی: {value})",
+          "title": "نام سرویس پنلی را وارد کنید",
+          "min_gb": "حداقل حجم (GB) را وارد کنید",
+          "max_gb": "حداکثر حجم (GB) را وارد کنید",
+          "step_gb": "گام افزایش حجم (GB) را وارد کنید",
+          "price_per_gb": "قیمت هر گیگ (تومان) را وارد کنید",
+          "duration_policy": "سیاست مدت را وارد کنید: fixed_days یا unlimited",
+          "duration_days": "تعداد روز را وارد کنید",
+          "provider": "نام ارائه‌دهنده را وارد کنید (مثال: pasarguard)",
+          "group_ids": "شناسه گروه‌ها را با کاما وارد کنید (مثال: 1,2,3)",
+          "description": "توضیحات را وارد کنید (برای رد شدن «-» بفرستید)",
+          "duration_with_days": "{policy} / {days} روز",
+          "summary_title": "پیش‌نمایش اطلاعات",
+          "summary_label": "خلاصه",
+          "summary_tip": "برای ثبت نهایی، عبارت «تایید» را ارسال کنید.",
+          "summary_template": "نام: {title}\nحداقل/حداکثر: {min_gb} / {max_gb} GB\nگام: {step_gb} GB\nقیمت هر گیگ: {price_per_gb} تومان\nمدت: {duration_value}\nارائه‌دهنده: {provider}\nگروه‌ها: {group_ids}\nتوضیحات: {description}"
+        }
       },
       "info": {
-        "scope_selected": "scope انتخاب شد: <b>{scope}</b>"
+        "scope_selected": "scope انتخاب شد: <b>{scope}</b>",
+        "panels_legacy_removed": "بخش پنل‌های قدیمی حذف شد. لطفاً از «تنظیمات اتصال پنل» در منوی ادمین استفاده کنید."
       },
       "errors": {
         "valid_price_required": "قیمت معتبر وارد کنید.",
@@ -611,7 +636,17 @@
         "delivery_failed": "تحویل انجام نشد.",
         "group_id_numeric": "Group ID باید عددی باشد.",
         "invalid_json_structure": "ساختار JSON نامعتبر است.",
-        "valid_user_id_required": "آیدی معتبر نیست."
+        "valid_user_id_required": "آیدی معتبر نیست.",
+        "panels_route_hint": "برای مدیریت اتصال پنل از گزینه تنظیمات اتصال پنل استفاده کنید.",
+        "valid_input_required": "ورودی معتبر وارد کنید.",
+        "invalid_min_gb": "حداقل حجم معتبر نیست.",
+        "invalid_max_gb": "حداکثر باید بزرگ‌تر یا مساوی حداقل باشد.",
+        "invalid_step_gb": "گام افزایش معتبر نیست.",
+        "invalid_duration_policy": "سیاست مدت باید fixed_days یا unlimited باشد.",
+        "invalid_duration_days": "تعداد روز معتبر نیست.",
+        "group_ids_required": "شناسه گروه‌ها الزامی است.",
+        "panel_wizard_confirm_required": "برای ثبت، «تایید» را ارسال کنید.",
+        "invalid_state": "وضعیت نامعتبر است. دوباره تلاش کنید."
       },
       "success": {
         "agent_price_deleted": "قیمت اختصاصی حذف شد.",
@@ -626,6 +661,45 @@
         "settings_restored": "بازیابی تنظیمات انجام شد.",
         "freetest_rule_saved": "قانون تست رایگان ذخیره شد.",
         "freetest_quota_reset": "سهمیه کاربر ریست شد."
+      }
+    },
+    "panel_settings": {
+      "errors": {
+        "invalid_menu_option": "یکی از گزینه‌های مدیریت اتصال پنل را انتخاب کنید.",
+        "delete_choice_required": "برای ادامه حذف، یکی از گزینه‌های تایید یا انصراف را انتخاب کنید.",
+        "invalid_input": "ورودی معتبر نیست.",
+        "confirm_required": "برای ثبت، «تایید» را ارسال کنید."
+      },
+      "success": {
+        "connection_deleted": "اطلاعات اتصال پنل حذف شد.",
+        "connection_saved": "تنظیمات تحویل/پاسارگارد ذخیره شد."
+      },
+      "info": {
+        "connection_exists": "اتصال پنل ثبت شده است.",
+        "connection_missing": "هیچ اطلاعات اتصالی برای پنل ثبت نشده است."
+      },
+      "summary": {
+        "title_label": "خلاصه",
+        "base_url_label": "آدرس پنل",
+        "username_label": "نام کاربری",
+        "password_label": "رمز عبور",
+        "template": "{base_url_label}: {base_url}\n{username_label}: {username}\n{password_label}: {password_masked}"
+      },
+      "confirm_words": {
+        "confirm": "تایید",
+        "submit": "ثبت"
+      },
+      "wizard": {
+        "step_label": "🧭 مرحله",
+        "current_value": "\nمقدار فعلی: <code>{value}</code>",
+        "steps": {
+          "base_url": "🌐 لطفاً آدرس پنل را دقیق وارد کنید:\nآدرس باید کامل باشد (ترجیحاً با https://) و بدون فاصله اضافی ارسال شود.\nمثال: <code>https://panel.example.com</code>{current_value}\nآدرس صحیح، اتصال امن و پایدار را تضمین می‌کند.",
+          "username": "👤 نام کاربری پنل را ارسال کنید:\nاز همان نام کاربری مدیریتی که برای ورود به پنل استفاده می‌کنید استفاده کنید.\nمثال: <code>admin_user</code>{current_value}\nنام کاربری باید دقیقاً مطابق اطلاعات پنل باشد.",
+          "password": "🔐 رمز عبور پنل را وارد کنید:\nبرای امنیت، رمز عبور در پیام‌های بعدی به‌صورت مخفی نمایش داده می‌شود.\nرمز عبور در دیتابیس ذخیره می‌شود و بعداً قابل ویرایش است."
+        }
+      },
+      "delete": {
+        "message_label": "⚠️ پیام"
       }
     },
     "requests": {
@@ -717,6 +791,20 @@
         "format_value": "<code>نام|حجم(GB)|مدت(روز)|قیمت</code>",
         "tip": "💡 اطلاعات پکیج را به‌صورت مرحله‌ای و گام‌به‌گام وارد کنید."
       },
+      "prompts": {
+        "package_mode_select": "نوع سرویس جدید را انتخاب کنید.",
+        "stock_package_name": "عنوان پکیج را وارد کنید.",
+        "wizard": {
+          "name": "عنوان پکیج را وارد کنید.",
+          "volume": "حجم پکیج (GB) را وارد کنید.",
+          "duration": "مدت پکیج (روز) را وارد کنید.",
+          "price": "قیمت پکیج (تومان) را وارد کنید.",
+          "summary_title": "پیش‌نمایش پکیج",
+          "summary_label": "خلاصه",
+          "summary_tip": "برای ثبت نهایی، «تایید» را ارسال کنید.",
+          "summary_template": "عنوان: {name}\nحجم: {volume} GB\nمدت: {duration} روز\nقیمت: {price} تومان"
+        }
+      },
       "errors": {
         "invalid_type_option": "گزینه نامعتبر است. لطفاً یکی از دکمه‌های لیست نوع‌ها را انتخاب کنید.",
         "type_name_required": "لطفاً نام نوع سرویس را به‌صورت متن معمولی ارسال کنید.",
@@ -729,7 +817,9 @@
         "invalid_values": "مقادیر واردشده معتبر نیستند. لطفاً مقدار درست وارد کنید.",
         "invalid_package_info": "اطلاعات پکیج معتبر نبود. لطفاً دوباره انتخاب کنید.",
         "package_not_found": "پکیج پیدا نشد.",
-        "invalid_package_action": "گزینه نامعتبر است. لطفاً از دکمه‌های مدیریت پکیج استفاده کنید."
+        "invalid_package_action": "گزینه نامعتبر است. لطفاً از دکمه‌های مدیریت پکیج استفاده کنید.",
+        "package_mode_invalid_option": "یکی از گزینه‌های نوع سرویس را انتخاب کنید.",
+        "confirm_required": "برای ثبت نهایی «تایید» را ارسال کنید."
       },
       "success": {
         "type_created": "نوع سرویس با شناسه <code>{type_id}</code> ثبت شد.",
@@ -842,7 +932,7 @@
           "status_empty": "هنوز هیچ اطلاعات اتصالی برای پنل ثبت نشده است.",
           "status_ready": "اطلاعات اتصال پنل ثبت شده است.",
           "guide_empty": "⚙️ هنوز اتصال پنل برای این ربات تکمیل نشده است.\nاز دکمه «➕ تنظیم پنل» استفاده کنید تا اطلاعات اتصال را شروع کنیم.",
-          "guide_ready": "🔌 اطلاعات اتصال پنل با موفقیت ثبت شده و آماده استفاده است.\nاز دکمه‌های زیر برای مدیریت اتصال فعلی استفاده کنید.\n> اگر تغییری در پنل اصلی شما ایجاد شد، همین‌جا می‌توانید سریع اطلاعات را ویرایش یا در صورت نیاز اتصال را حذف کنید.",
+          "guide_ready": "🔌 اطلاعات اتصال پنل با موفقیت ثبت شده و آماده استفاده است.\nاز دکمه‌های زیر برای مدیریت اتصال فعلی استفاده کنید.\nاگر تغییری در پنل اصلی شما ایجاد شد، همین‌جا می‌توانید سریع اطلاعات را ویرایش یا در صورت نیاز اتصال را حذف کنید.",
           "delete_confirm_title": "🗑 <b>تایید حذف اتصال پنل</b>",
           "delete_confirm_text": "با حذف اطلاعات اتصال پنل، ارتباط فعلی ربات با پنل قطع می‌شود.",
           "delete_confirm_tip": "برای ادامه، حذف را تایید کنید یا با انصراف به تنظیمات اتصال برگردید.",

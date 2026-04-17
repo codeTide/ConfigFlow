@@ -104,8 +104,7 @@ final class MessageHandler
     private function isMainMenuInput(string $text): bool
     {
         return $text === UiLabels::main($this->catalog)
-            || $text === KeyboardBuilder::backMain()
-            || $text === KeyboardBuilder::BTN_BACK_MAIN;
+            || $text === KeyboardBuilder::backMain();
     }
 
     private function isAdminExitInput(string $text): bool
@@ -131,7 +130,7 @@ final class MessageHandler
 
         $text = trim((string) ($message['text'] ?? ''));
         if (!str_starts_with($text, '/start') && !$this->checkChannelMembership($userId)) {
-            if ($text === KeyboardBuilder::checkChannel() || $text === KeyboardBuilder::BTN_CHECK_CHANNEL) {
+            if ($text === KeyboardBuilder::checkChannel()) {
                 if ($this->checkChannelMembership($userId)) {
                     $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
                 } else {
@@ -153,7 +152,7 @@ final class MessageHandler
             return;
         }
 
-        if (($text === KeyboardBuilder::admin() || $text === KeyboardBuilder::BTN_ADMIN || $text === $this->catalog->get('admin.common.back_to_panel')) && $this->database->isAdminUser($userId)) {
+        if (($text === KeyboardBuilder::admin() || $text === $this->catalog->get('admin.common.back_to_panel')) && $this->database->isAdminUser($userId)) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.common.legacy_state_reset')));
             $this->openAdminRoot($chatId, $userId);
@@ -325,7 +324,7 @@ final class MessageHandler
                 }
                 return;
             }
-            if ($text === KeyboardBuilder::BTN_ADMIN) {
+            if ($text === KeyboardBuilder::admin()) {
                 $this->database->clearUserState($userId);
                 $this->openAdminRoot($chatId, $userId);
                 return;
@@ -333,12 +332,12 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_wallet_amount') {
-            if ($text === KeyboardBuilder::backMain() || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+            if ($text === KeyboardBuilder::backMain()) {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
                 return;
             }
-            if ($text === KeyboardBuilder::backAccount() || $text === KeyboardBuilder::BTN_BACK_ACCOUNT) {
+            if ($text === KeyboardBuilder::backAccount()) {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->menus->profileText($userId), $this->menus->accountMenuReplyKeyboard());
                 return;
@@ -995,7 +994,7 @@ final class MessageHandler
             $this->openAdminPanelSettings(
                 $chatId,
                 $userId,
-                $this->uiText->info('بخش پنل‌های قدیمی حذف شد. لطفاً از «تنظیمات اتصال پنل» در منوی ادمین استفاده کنید.')
+                $this->uiText->info($this->catalog->get('admin.final_modules.info.panels_legacy_removed'))
             );
             return;
         }
@@ -1229,22 +1228,22 @@ final class MessageHandler
             return false;
         }
 
-        if ($text === KeyboardBuilder::profile() || $text === KeyboardBuilder::BTN_PROFILE) {
+        if ($text === KeyboardBuilder::profile()) {
             $this->telegram->sendMessage($chatId, $this->menus->profileText($userId), $this->menus->accountMenuReplyKeyboard());
             return true;
         }
 
-        if ($text === KeyboardBuilder::support() || $text === KeyboardBuilder::BTN_SUPPORT) {
+        if ($text === KeyboardBuilder::support()) {
             $this->telegram->sendMessage($chatId, $this->menus->supportText());
             return true;
         }
 
-        if ($text === KeyboardBuilder::myConfigs() || $text === KeyboardBuilder::BTN_MY_CONFIGS) {
+        if ($text === KeyboardBuilder::myConfigs()) {
             $this->showMyConfigsWithReplyFlow($chatId, $userId);
             return true;
         }
 
-        if ($text === KeyboardBuilder::referralButton() || $text === KeyboardBuilder::BTN_REFERRAL) {
+        if ($text === KeyboardBuilder::referralButton()) {
             if ($this->settings->get('referral_enabled', '1') !== '1') {
                 return false;
             }
@@ -1256,7 +1255,7 @@ final class MessageHandler
             return true;
         }
 
-        if ($text === KeyboardBuilder::wallet() || $text === KeyboardBuilder::BTN_WALLET) {
+        if ($text === KeyboardBuilder::wallet()) {
             $this->database->setUserState($userId, 'await_wallet_amount');
             $this->telegram->sendMessage(
                 $chatId,
@@ -1266,12 +1265,12 @@ final class MessageHandler
             return true;
         }
 
-        if ($text === KeyboardBuilder::buy() || $text === KeyboardBuilder::BTN_BUY) {
+        if ($text === KeyboardBuilder::buy()) {
             $this->startBuyTypeReplyFlow($chatId, $userId);
             return true;
         }
 
-        if ($text === KeyboardBuilder::freeTest() || $text === KeyboardBuilder::BTN_FREE_TEST) {
+        if ($text === KeyboardBuilder::freeTest()) {
             if ($this->settings->get('free_test_enabled', '1') !== '1') {
                 return false;
             }
@@ -1297,7 +1296,7 @@ final class MessageHandler
             return true;
         }
 
-        if ($text === KeyboardBuilder::agency() || $text === KeyboardBuilder::BTN_AGENCY) {
+        if ($text === KeyboardBuilder::agency()) {
             if ($this->settings->get('agency_request_enabled', '1') !== '1') {
                 return false;
             }
@@ -1309,7 +1308,7 @@ final class MessageHandler
             return true;
         }
 
-        if ($text === KeyboardBuilder::admin() || $text === KeyboardBuilder::BTN_ADMIN) {
+        if ($text === KeyboardBuilder::admin()) {
             if (!$this->database->isAdminUser($userId)) {
                 return false;
             }
@@ -1413,7 +1412,7 @@ final class MessageHandler
             }
         }
 
-        if ($text === KeyboardBuilder::backMain() || $text === KeyboardBuilder::BTN_BACK_MAIN) {
+        if ($text === KeyboardBuilder::backMain()) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return true;
@@ -1469,7 +1468,7 @@ final class MessageHandler
                 lines: [
                     new UiTextLine('', $this->catalog->get('messages.user.buy.type_selection.label'), implode("\n", $lines)),
                 ],
-                tipBlockquote: $this->catalog->get('messages.user.buy.type_selection.tip'),
+                tipText: $this->catalog->get('messages.user.buy.type_selection.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -1584,7 +1583,7 @@ final class MessageHandler
                         lines: [
                             new UiTextLine('', $this->catalog->get('admin.ui.nav.line_label'), '<code>' . htmlspecialchars($route) . '</code>'),
                         ],
-                        tipBlockquote: $this->catalog->get('admin.ui.nav.tip'),
+                        tipText: $this->catalog->get('admin.ui.nav.tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
@@ -1619,7 +1618,7 @@ final class MessageHandler
                         lines: [
                             new UiTextLine('', $this->catalog->get('admin.types_packages.create_type.guide_label'), $this->catalog->get('admin.types_packages.create_type.guide_value')),
                         ],
-                        tipBlockquote: $this->catalog->get('admin.types_packages.create_type.tip'),
+                        tipText: $this->catalog->get('admin.types_packages.create_type.tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
@@ -1666,7 +1665,7 @@ final class MessageHandler
                 $this->database->setUserState($userId, 'admin.package.mode', ['type_id' => $typeId, 'stack' => ['admin.type.view']]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->uiText->info('نوع سرویس جدید را انتخاب کنید.'),
+                    $this->uiText->info($this->catalog->get('admin.types_packages.prompts.package_mode_select')),
                     $this->uiKeyboard->replyMenu([
                         [$this->catalog->get('admin.types_packages.actions.add_stock_package'), $this->catalog->get('admin.types_packages.actions.add_panel_package')],
                         [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
@@ -1715,15 +1714,15 @@ final class MessageHandler
             }
             if ($text === $this->catalog->get('admin.types_packages.actions.add_stock_package')) {
                 $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.type.view']]);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('عنوان پکیج را وارد کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.types_packages.prompts.stock_package_name')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $this->catalog->get('admin.types_packages.actions.add_panel_package')) {
                 $this->database->setUserState($userId, 'admin.panel.create', ['step' => 'title', 'data' => [], 'return_type_id' => $typeId]);
-                $this->telegram->sendMessage($chatId, $this->uiText->info('نام سرویس پنلی را وارد کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.final_modules.prompts.panel_wizard.title')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('یکی از گزینه‌های نوع سرویس را انتخاب کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.package_mode_invalid_option')));
             return;
         }
 
@@ -1823,7 +1822,7 @@ final class MessageHandler
                 lines: [
                     new UiTextLine('', $this->catalog->get('admin.ui.open.types_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.types_list.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.types_list.tip'),
+                tipText: $this->catalog->get('admin.ui.open.types_list.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -1875,7 +1874,7 @@ final class MessageHandler
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $statusText),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.type_view.packages_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.type_view.packages_empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.type_view.tip'),
+                tipText: $this->catalog->get('admin.ui.open.type_view.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -1910,7 +1909,7 @@ final class MessageHandler
                     new UiTextLine('', $this->catalog->get('admin.ui.open.package_view.price_label'), $this->catalog->get('admin.ui.open.package_view.price_value', ['amount' => (int) ($pkg['price'] ?? 0)])),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $statusText),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.package_view.tip'),
+                tipText: $this->catalog->get('admin.ui.open.package_view.tip'),
             )),
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_PACKAGE_TOGGLE), $this->uiConst(self::ADMIN_PACKAGE_DELETE)],
@@ -1923,10 +1922,10 @@ final class MessageHandler
     private function promptPackageWizardStep(int $chatId, int $userId, int $typeId, string $step, array $data): void
     {
         $text = match ($step) {
-            'name' => 'عنوان پکیج را وارد کنید.',
-            'volume' => 'حجم پکیج (GB) را وارد کنید.',
-            'duration' => 'مدت پکیج (روز) را وارد کنید.',
-            'price' => 'قیمت پکیج (تومان) را وارد کنید.',
+            'name' => $this->catalog->get('admin.types_packages.prompts.wizard.name'),
+            'volume' => $this->catalog->get('admin.types_packages.prompts.wizard.volume'),
+            'duration' => $this->catalog->get('admin.types_packages.prompts.wizard.duration'),
+            'price' => $this->catalog->get('admin.types_packages.prompts.wizard.price'),
             default => '',
         };
         $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'step' => $step, 'data' => $data, 'stack' => ['admin.type.view']]);
@@ -1973,14 +1972,19 @@ final class MessageHandler
                 return false;
             }
             $data['price'] = $price;
-            $summary = "عنوان: {$data['name']}\nحجم: {$data['volume']} GB\nمدت: {$data['duration']} روز\nقیمت: {$data['price']} تومان";
+            $summary = $this->catalog->get('admin.types_packages.prompts.wizard.summary_template', [
+                'name' => (string) ($data['name'] ?? ''),
+                'volume' => (string) ($data['volume'] ?? ''),
+                'duration' => (string) ($data['duration'] ?? ''),
+                'price' => (string) ($data['price'] ?? ''),
+            ]);
             $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'step' => 'confirm', 'data' => $data, 'stack' => ['admin.type.view']]);
-            $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: 'پیش‌نمایش پکیج', lines: [new UiTextLine('', 'خلاصه', htmlspecialchars($summary))], tipBlockquote: 'برای ثبت نهایی، «تایید» را ارسال کنید.')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.types_packages.prompts.wizard.summary_title'), lines: [new UiTextLine('', $this->catalog->get('admin.types_packages.prompts.wizard.summary_label'), htmlspecialchars($summary))], tipText: $this->catalog->get('admin.types_packages.prompts.wizard.summary_tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return false;
         }
         if ($step === 'confirm') {
-            if (!in_array($raw, ['تایید', 'ثبت'], true)) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('برای ثبت نهایی «تایید» را ارسال کنید.'));
+            if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.confirm_required')));
                 return false;
             }
             return true;
@@ -2089,7 +2093,7 @@ final class MessageHandler
                             new UiTextLine('', $this->catalog->get('admin.users_stock.prompts.balance_action_user_label'), "<code>{$targetUid}</code>"),
                             new UiTextLine('', $this->catalog->get('admin.users_stock.prompts.balance_action_input_label'), $this->catalog->get('admin.users_stock.prompts.balance_action_input_value')),
                         ],
-                        tipBlockquote: $this->catalog->get('admin.users_stock.prompts.balance_action_tip'),
+                        tipText: $this->catalog->get('admin.users_stock.prompts.balance_action_tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
@@ -2200,7 +2204,7 @@ final class MessageHandler
                             lines: [
                                 new UiTextLine('', $this->catalog->get('admin.users_stock.prompts.add_config_format_label'), $this->catalog->get('admin.users_stock.prompts.add_config_format_value')),
                             ],
-                            tipBlockquote: $this->catalog->get('admin.users_stock.prompts.add_config_tip'),
+                            tipText: $this->catalog->get('admin.users_stock.prompts.add_config_tip'),
                         )),
                         $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                     );
@@ -2221,7 +2225,7 @@ final class MessageHandler
                             lines: [
                                 new UiTextLine('', $this->catalog->get('admin.users_stock.prompts.search_config_input_label'), $this->catalog->get('admin.users_stock.prompts.search_config_input_value')),
                             ],
-                            tipBlockquote: $this->catalog->get('admin.users_stock.prompts.search_config_tip'),
+                            tipText: $this->catalog->get('admin.users_stock.prompts.search_config_tip'),
                         )),
                         $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                     );
@@ -2356,7 +2360,7 @@ final class MessageHandler
                 lines: [
                     new UiTextLine('', $this->catalog->get('admin.ui.open.users_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.users_list.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.users_list.tip'),
+                tipText: $this->catalog->get('admin.ui.open.users_list.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2393,7 +2397,7 @@ final class MessageHandler
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $statusText),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.user_view.agent_label'), $agentText),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.user_view.tip'),
+                tipText: $this->catalog->get('admin.ui.open.user_view.tip'),
             )),
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_USER_TOGGLE_STATUS), $this->uiConst(self::ADMIN_USER_TOGGLE_AGENT)],
@@ -2432,7 +2436,7 @@ final class MessageHandler
                 lines: [
                     new UiTextLine('', $this->catalog->get('admin.ui.open.stock.types.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.types.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.stock.types.tip'),
+                tipText: $this->catalog->get('admin.ui.open.stock.types.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2472,7 +2476,7 @@ final class MessageHandler
                 lines: [
                     new UiTextLine('', $this->catalog->get('admin.ui.open.stock.packages.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.packages.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.stock.packages.tip'),
+                tipText: $this->catalog->get('admin.ui.open.stock.packages.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2531,7 +2535,7 @@ final class MessageHandler
                     new UiTextLine('', $this->catalog->get('admin.ui.open.stock.configs.search_label'), $queryView),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.stock.configs.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.configs.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.stock.configs.tip'),
+                tipText: $this->catalog->get('admin.ui.open.stock.configs.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2569,7 +2573,7 @@ final class MessageHandler
                     new UiTextLine('', $this->catalog->get('admin.ui.open.stock.config_detail.service_label'), htmlspecialchars((string) ($cfg['service_name'] ?? $this->catalog->get('messages.generic.dash')))),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), $status),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.stock.config_detail.tip'),
+                tipText: $this->catalog->get('admin.ui.open.stock.config_detail.tip'),
             )),
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_STOCK_EXPIRE_TOGGLE), $this->uiConst(self::ADMIN_STOCK_DELETE_CONFIG)],
@@ -2764,7 +2768,7 @@ final class MessageHandler
                             new UiTextLine('', $this->catalog->get('admin.payments_requests.prompts.request_id_label'), "<code>{$requestId}</code>"),
                             new UiTextLine('', $this->catalog->get('admin.payments_requests.prompts.note_label'), $this->catalog->get('admin.payments_requests.prompts.note_value')),
                         ],
-                        tipBlockquote: $this->catalog->get('admin.payments_requests.prompts.note_tip'),
+                        tipText: $this->catalog->get('admin.payments_requests.prompts.note_tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
@@ -2863,7 +2867,7 @@ final class MessageHandler
                 lines: [
                     new UiTextLine('', $this->catalog->get('admin.ui.open.payments.list.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.payments.list.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.payments.list.tip'),
+                tipText: $this->catalog->get('admin.ui.open.payments.list.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2903,7 +2907,7 @@ final class MessageHandler
                     new UiTextLine('', $this->catalog->get('admin.ui.open.payments.view.method_label'), htmlspecialchars($method)),
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.common.status_label'), htmlspecialchars($status)),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.payments.view.tip'),
+                tipText: $this->catalog->get('admin.ui.open.payments.view.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -3013,7 +3017,7 @@ final class MessageHandler
                     lines: [
                         new UiTextLine('', $this->catalog->get('admin.ui.open.requests.root.step_label'), $this->catalog->get('admin.ui.open.requests.root.step_value')),
                     ],
-                    tipBlockquote: $this->catalog->get('admin.ui.open.requests.root.tip'),
+                    tipText: $this->catalog->get('admin.ui.open.requests.root.tip'),
                 )),
                 $this->uiKeyboard->replyMenu([
                     [$this->uiConst(self::ADMIN_REQUESTS_FREE)],
@@ -3064,7 +3068,7 @@ final class MessageHandler
                     new UiTextLine($this->catalog->get('admin.ui.open.common.status_emoji'), $this->catalog->get('admin.ui.open.requests.list.status_filter_label'), htmlspecialchars($status)),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.requests.list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.requests.list.empty')),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.requests.list.tip'),
+                tipText: $this->catalog->get('admin.ui.open.requests.list.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -3111,7 +3115,7 @@ final class MessageHandler
                     new UiTextLine('', $this->catalog->get('admin.ui.open.requests.view.created_label'), htmlspecialchars((string) ($request['created_at'] ?? $this->catalog->get('messages.generic.dash')))),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.requests.view.note_label'), htmlspecialchars((string) ($request['note'] ?? ''))),
                 ],
-                tipBlockquote: $this->catalog->get('admin.ui.open.requests.view.tip'),
+                tipText: $this->catalog->get('admin.ui.open.requests.view.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -3186,7 +3190,7 @@ final class MessageHandler
                     $this->uiText->multi(new UiTextBlock(
                         title: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_title'),
                         lines: [new UiTextLine('', $this->catalog->get('admin.settings_admins_pins.prompts.input_label'), $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_input_value'))],
-                        tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_tip'),
+                        tipText: $this->catalog->get('admin.settings_admins_pins.prompts.set_channel_tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
@@ -3196,7 +3200,7 @@ final class MessageHandler
                 $this->database->setUserState($userId, 'admin.settings.edit', ['mode' => 'delivery_mode', 'stack' => ['admin.settings.view', 'admin.root']]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->uiText->info('حالت تحویل را انتخاب کنید: stock_only یا panel_only'),
+                    $this->uiText->info($this->catalog->get('admin.settings_admins_pins.prompts.delivery_mode_input')),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
                 return;
@@ -3208,7 +3212,7 @@ final class MessageHandler
                     $this->uiText->multi(new UiTextBlock(
                         title: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_title'),
                         lines: [new UiTextLine('', $this->catalog->get('admin.settings_admins_pins.prompts.format_label'), $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_format_value'))],
-                        tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_tip'),
+                        tipText: $this->catalog->get('admin.settings_admins_pins.prompts.edit_setting_tip'),
                     )),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
@@ -3238,11 +3242,11 @@ final class MessageHandler
             if ($mode === 'delivery_mode') {
                 $value = trim($text);
                 if (!in_array($value, ['stock_only', 'panel_only'], true)) {
-                    $this->telegram->sendMessage($chatId, $this->uiText->warning('مقدار معتبر نیست. فقط stock_only یا panel_only.'));
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.settings_admins_pins.errors.invalid_delivery_mode')));
                     return;
                 }
                 $this->settings->set('delivery_mode', $value);
-                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success('حالت تحویل ذخیره شد.'));
+                $this->openAdminSettingsView($chatId, $userId, $this->uiText->success($this->catalog->get('admin.settings_admins_pins.success.delivery_mode_saved')));
                 return;
             }
             $parts = array_map('trim', explode('|', $text, 2));
@@ -3267,7 +3271,7 @@ final class MessageHandler
                 $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
                     title: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_title'),
                     lines: [new UiTextLine('', $this->catalog->get('admin.settings_admins_pins.prompts.guide_label'), $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_guide_value'))],
-                    tipBlockquote: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_tip'),
+                    tipText: $this->catalog->get('admin.settings_admins_pins.prompts.add_admin_tip'),
                 )), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
@@ -3496,9 +3500,9 @@ final class MessageHandler
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_crypto_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_crypto_label'), $vals['gw_crypto_enabled'] === '1' ? $this->catalog->get('emojis.success') : $this->catalog->get('emojis.error')),
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_tetrapay_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.gw_tetrapay_label'), $vals['gw_tetrapay_enabled'] === '1' ? $this->catalog->get('emojis.success') : $this->catalog->get('emojis.error')),
                 new UiTextLine($this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_emoji'), $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_label'), $vals['channel_id'] !== '' ? htmlspecialchars($vals['channel_id']) : $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_unset')),
-                new UiTextLine('🚚', 'حالت تحویل', htmlspecialchars((string) $vals['delivery_mode'])),
+                new UiTextLine('🚚', $this->catalog->get('admin.settings_admins_pins.labels.delivery_mode'), htmlspecialchars((string) $vals['delivery_mode'])),
             ],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.settings.tip'),
+            tipText: $this->catalog->get('admin.ui.open.settings_admins_pins.settings.tip'),
         )), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_SETTINGS_REFRESH), $this->uiConst(self::ADMIN_SETTINGS_EDIT)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
@@ -3535,7 +3539,7 @@ final class MessageHandler
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
             title: $this->catalog->get('admin.ui.open.settings_admins_pins.admins.title'),
             lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.admins.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.settings_admins_pins.admins.empty'))],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.admins.tip'),
+            tipText: $this->catalog->get('admin.ui.open.settings_admins_pins.admins.tip'),
         )), $this->uiKeyboard->replyMenu($buttons));
     }
 
@@ -3572,7 +3576,7 @@ final class MessageHandler
                 new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.admin_label'), "<code>{$targetUid}</code>"),
                 new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.permissions_label'), implode("\n", $lines)),
             ],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.tip'),
+            tipText: $this->catalog->get('admin.ui.open.settings_admins_pins.admin_view.tip'),
         )), $this->uiKeyboard->replyMenu($rows));
     }
 
@@ -3600,7 +3604,7 @@ final class MessageHandler
         $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
             title: $this->catalog->get('admin.ui.open.settings_admins_pins.pins.title'),
             lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.pins.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.settings_admins_pins.pins.empty'))],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.pins.tip'),
+            tipText: $this->catalog->get('admin.ui.open.settings_admins_pins.pins.tip'),
         )), $this->uiKeyboard->replyMenu($buttons));
     }
 
@@ -3622,7 +3626,7 @@ final class MessageHandler
                 new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.text_label'), htmlspecialchars((string) ($pin['text'] ?? ''))),
                 new UiTextLine('', $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.sent_label'), (string) $sendCount),
             ],
-            tipBlockquote: $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.tip'),
+            tipText: $this->catalog->get('admin.ui.open.settings_admins_pins.pin_view.tip'),
         )), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_PIN_SEND_ALL)],
             [$this->uiConst(self::ADMIN_PIN_EDIT), $this->uiConst(self::ADMIN_PIN_DELETE)],
@@ -3721,7 +3725,7 @@ final class MessageHandler
                 $this->openAdminPanelSettings($chatId, $userId);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('برای مدیریت اتصال پنل از گزینه تنظیمات اتصال پنل استفاده کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.panels_route_hint')));
         }
         if ($stateName === 'admin.panel.create') {
             $returnTypeId = (int) ($payload['return_type_id'] ?? 0);
@@ -3774,9 +3778,9 @@ final class MessageHandler
                 'is_active' => 1,
             ]);
             if ($returnTypeId > 0) {
-                $this->openAdminTypeView($chatId, $userId, $returnTypeId, $this->uiText->success('سرویس پنلی ثبت شد.'));
+                $this->openAdminTypeView($chatId, $userId, $returnTypeId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_created')));
             } else {
-                $this->openAdminPanelView($chatId, $userId, $serviceId, $this->uiText->success('سرویس پنلی ثبت شد.'));
+                $this->openAdminPanelView($chatId, $userId, $serviceId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_created')));
             }
             return;
         }
@@ -3792,12 +3796,12 @@ final class MessageHandler
                     $active = ((int) ($service['is_active'] ?? 0)) === 1;
                     $this->database->updateProvisioningServiceActive($serviceId, !$active);
                 }
-                $this->openAdminPanelView($chatId, $userId, $serviceId, $this->uiText->success('وضعیت سرویس بروزرسانی شد.'));
+                $this->openAdminPanelView($chatId, $userId, $serviceId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_status_updated')));
                 return;
             }
             if ($text === $panelDeleteLabel || $text === $this->uiConst(self::ADMIN_PANEL_DELETE)) {
                 $this->database->setUserState($userId, 'admin.panel.delete', ['panel_id' => $serviceId]);
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('برای حذف سرویس عبارت «' . $deleteConfirmWord . '» را ارسال کنید.'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.prompts.panel_delete_confirm', ['panel_id' => $serviceId, 'confirm_word' => $deleteConfirmWord])), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $panelPkgAddLabel || $text === $this->uiConst(self::ADMIN_PANEL_PKG_ADD)) {
@@ -3863,7 +3867,7 @@ final class MessageHandler
                 'provider_group_ids' => (string) ($data['group_ids'] ?? ''),
                 'is_active' => 1,
             ]);
-            $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success('سرویس بروزرسانی شد.'));
+            $this->openAdminPanelView($chatId, $userId, $panelId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_package_created')));
             return;
         }
         if ($stateName === 'admin.panel.settings') {
@@ -3898,7 +3902,7 @@ final class MessageHandler
                     $this->openAdminPanelDeleteConfirm($chatId);
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('یکی از گزینه‌های مدیریت اتصال پنل را انتخاب کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.panel_settings.errors.invalid_menu_option')));
                 return;
             }
             if ($mode === 'delete_confirm') {
@@ -3906,14 +3910,14 @@ final class MessageHandler
                     $this->settings->set('pg_base_url', '');
                     $this->settings->set('pg_username', '');
                     $this->settings->set('pg_password', '');
-                    $this->openAdminPanelSettings($chatId, $userId, $this->uiText->success('اطلاعات اتصال پنل حذف شد.'));
+                    $this->openAdminPanelSettings($chatId, $userId, $this->uiText->success($this->catalog->get('admin.panel_settings.success.connection_deleted')));
                     return;
                 }
                 if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_delete_cancel') || $text === UiLabels::back($this->catalog)) {
                     $this->openAdminPanelSettings($chatId, $userId);
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('برای ادامه حذف، یکی از گزینه‌های تایید یا انصراف را انتخاب کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.panel_settings.errors.delete_choice_required')));
                 return;
             }
             if ($text === UiLabels::back($this->catalog)) {
@@ -3933,7 +3937,7 @@ final class MessageHandler
             $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
             $raw = trim($text);
             if ($raw === '' || str_starts_with($raw, '/')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('ورودی معتبر نیست.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.panel_settings.errors.invalid_input')));
                 return;
             }
             if ($step === 'base_url') {
@@ -3951,18 +3955,25 @@ final class MessageHandler
             if ($step === 'password') {
                 $data['password'] = $raw;
                 $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'wizard', 'step' => 'confirm', 'data' => $data]);
-                $summary = "آدرس پنل: {$data['base_url']}\nنام کاربری: {$data['username']}\nرمز عبور: " . str_repeat('*', min(strlen((string) $data['password']), 10));
-                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_title'), lines: [new UiTextLine('', 'خلاصه', htmlspecialchars($summary))], tipBlockquote: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
+                $summary = $this->catalog->get('admin.panel_settings.summary.template', [
+                    'base_url_label' => $this->catalog->get('admin.panel_settings.summary.base_url_label'),
+                    'base_url' => (string) ($data['base_url'] ?? ''),
+                    'username_label' => $this->catalog->get('admin.panel_settings.summary.username_label'),
+                    'username' => (string) ($data['username'] ?? ''),
+                    'password_label' => $this->catalog->get('admin.panel_settings.summary.password_label'),
+                    'password_masked' => str_repeat('*', min(strlen((string) ($data['password'] ?? '')), 10)),
+                ]);
+                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_title'), lines: [new UiTextLine('', $this->catalog->get('admin.panel_settings.summary.title_label'), htmlspecialchars($summary))], tipText: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
                 return;
             }
-            if (!in_array($raw, ['تایید', 'ثبت'], true)) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('برای ثبت، «تایید» را ارسال کنید.'));
+            if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.panel_settings.errors.confirm_required')));
                 return;
             }
             $this->settings->set('pg_base_url', (string) ($data['base_url'] ?? ''));
             $this->settings->set('pg_username', (string) ($data['username'] ?? ''));
             $this->settings->set('pg_password', (string) ($data['password'] ?? ''));
-            $this->openAdminPanelSettings($chatId, $userId, $this->uiText->success('تنظیمات تحویل/پاسارگارد ذخیره شد.'));
+            $this->openAdminPanelSettings($chatId, $userId, $this->uiText->success($this->catalog->get('admin.panel_settings.success.connection_saved')));
             return;
         }
         if ($stateName === 'admin.panel.delete') {
@@ -3973,10 +3984,10 @@ final class MessageHandler
             }
             if (trim($text) === $deleteConfirmWord) {
                 $this->database->deleteProvisioningService($panelId);
-                $this->openAdminPanelsList($chatId, $userId, $this->uiText->success('سرویس حذف شد.'));
+                $this->openAdminPanelsList($chatId, $userId, $this->uiText->success($this->catalog->get('admin.final_modules.success.panel_deleted')));
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('برای تایید حذف عبارت «' . $deleteConfirmWord . '» را ارسال کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.panel_delete_confirm_required', ['confirm_word' => $deleteConfirmWord])));
             return;
         }
 
@@ -3993,7 +4004,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_title'),
                 lines: [new UiTextLine('', $this->catalog->get('admin.final_modules.prompts.broadcast_preview_label'), htmlspecialchars($text))],
-                tipBlockquote: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_tip'),
+                tipText: $this->catalog->get('admin.final_modules.prompts.broadcast_confirm_tip'),
             )), $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_ALL), $this->uiConst(self::ADMIN_BROADCAST_SCOPE_USERS)],
                 [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_AGENTS), $this->uiConst(self::ADMIN_BROADCAST_SCOPE_ADMINS)],
@@ -4211,7 +4222,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.agents.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.agents.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.agents.empty'))], tipBlockquote: $this->catalog->get('admin.ui.agents.tip'))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.agents.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.agents.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.agents.empty'))], tipText: $this->catalog->get('admin.ui.agents.tip'))), $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminAgentView(int $chatId, int $userId, int $agentId, ?string $notice = null): void
@@ -4240,7 +4251,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.agent_view.title', ['agent_id' => $agentId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.agent_view.packages_label'), implode("\n", $lines))], tipBlockquote: $this->catalog->get('admin.ui.agent_view.tip'))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.agent_view.title', ['agent_id' => $agentId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.agent_view.packages_label'), implode("\n", $lines))], tipText: $this->catalog->get('admin.ui.agent_view.tip'))), $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminPanelsList(int $chatId, int $userId, ?string $notice = null): void
@@ -4248,14 +4259,14 @@ final class MessageHandler
         $baseUrl = trim($this->settings->get('pg_base_url', ''));
         $username = trim($this->settings->get('pg_username', ''));
         $hasConnection = $baseUrl !== '' || $username !== '';
-        $lines = [$hasConnection ? 'اتصال پنل ثبت شده است.' : 'هیچ اطلاعات اتصالی برای پنل ثبت نشده است.'];
+        $lines = [$hasConnection ? $this->catalog->get('admin.panel_settings.info.connection_exists') : $this->catalog->get('admin.panel_settings.info.connection_missing')];
         $buttons = [[$this->uiConst(self::ADMIN_PANELS_REFRESH)]];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.panels.list', []);
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panels_list.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panels_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.panels_list.empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.panels_list.tip'))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panels_list.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panels_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.panels_list.empty'))], tipText: $this->catalog->get('admin.ui.open.panels_list.tip'))), $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminPanelSettings(int $chatId, int $userId, ?string $notice = null): void
@@ -4285,7 +4296,7 @@ final class MessageHandler
                     new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.password_label'), htmlspecialchars($passwordMasked)),
                     new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.status_label'), $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty')),
                 ],
-                tipBlockquote: $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty')
+                tipText: $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty')
             )),
             $this->uiKeyboard->replyMenu($rows)
         );
@@ -4297,19 +4308,19 @@ final class MessageHandler
         $baseUrl = trim((string) ($data['base_url'] ?? ''));
         $username = trim((string) ($data['username'] ?? ''));
         $isEdit = $baseUrl !== '' || $username !== '';
-        $currentBaseUrl = $baseUrl !== '' ? "\nمقدار فعلی: <code>" . htmlspecialchars($baseUrl) . '</code>' : '';
-        $currentUsername = $username !== '' ? "\nمقدار فعلی: <code>" . htmlspecialchars($username) . '</code>' : '';
+        $currentBaseUrl = $baseUrl !== '' ? $this->catalog->get('admin.panel_settings.wizard.current_value', ['value' => htmlspecialchars($baseUrl)]) : '';
+        $currentUsername = $username !== '' ? $this->catalog->get('admin.panel_settings.wizard.current_value', ['value' => htmlspecialchars($username)]) : '';
         $text = match ($step) {
-            'base_url' => "🌐 لطفاً آدرس پنل را دقیق وارد کنید:\nآدرس باید کامل باشد (ترجیحاً با https://) و بدون فاصله اضافی ارسال شود.\nمثال: <code>https://panel.example.com</code>{$currentBaseUrl}\n> آدرس صحیح، اتصال امن و پایدار را تضمین می‌کند.",
-            'username' => "👤 نام کاربری پنل را ارسال کنید:\nاز همان نام کاربری مدیریتی که برای ورود به پنل استفاده می‌کنید استفاده کنید.\nمثال: <code>admin_user</code>{$currentUsername}\n> نام کاربری باید دقیقاً مطابق اطلاعات پنل باشد.",
-            'password' => "🔐 رمز عبور پنل را وارد کنید:\nبرای امنیت، رمز عبور در پیام‌های بعدی به‌صورت مخفی نمایش داده می‌شود.\n> رمز عبور در دیتابیس ذخیره می‌شود و بعداً قابل ویرایش است.",
+            'base_url' => $this->catalog->get('admin.panel_settings.wizard.steps.base_url', ['current_value' => $currentBaseUrl]),
+            'username' => $this->catalog->get('admin.panel_settings.wizard.steps.username', ['current_value' => $currentUsername]),
+            'password' => $this->catalog->get('admin.panel_settings.wizard.steps.password'),
             default => '',
         };
         if ($text !== '') {
             $title = $isEdit ? $this->catalog->get('admin.ui.open.panel_settings.wizard_edit_title') : $this->catalog->get('admin.ui.open.panel_settings.wizard_add_title');
             $message = $this->uiText->multi(new UiTextBlock(
                 title: $title,
-                lines: [new UiTextLine('', '🧭 مرحله', $text)],
+                lines: [new UiTextLine('', $this->catalog->get('admin.panel_settings.wizard.step_label'), $text)],
             ));
             $this->telegram->sendMessage($chatId, $message, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
         }
@@ -4321,8 +4332,8 @@ final class MessageHandler
             $chatId,
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_title'),
-                lines: [new UiTextLine('', '⚠️ پیام', $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_text'))],
-                tipBlockquote: $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_tip')
+                lines: [new UiTextLine('', $this->catalog->get('admin.panel_settings.delete.message_label'), $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_text'))],
+                tipText: $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_tip')
             )),
             $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.final_modules.actions.panel_conn_delete_confirm'), $this->catalog->get('admin.final_modules.actions.panel_conn_delete_cancel')]])
         );
@@ -4352,24 +4363,24 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->database->setUserState($userId, 'admin.panel.view', ['panel_id' => $panelId]);
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_view.title', ['panel_id' => $panelId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.name_label'), htmlspecialchars((string) ($panel['title'] ?? '-'))), new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.packages_label'), htmlspecialchars($summary))], tipBlockquote: $this->catalog->get('admin.ui.open.panel_view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_view.title', ['panel_id' => $panelId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.name_label'), htmlspecialchars((string) ($panel['title'] ?? '-'))), new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.packages_label'), htmlspecialchars($summary))], tipText: $this->catalog->get('admin.ui.open.panel_view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
     }
 
     /** @param array<string,mixed> $data */
     private function promptPanelWizardStep(int $chatId, int $userId, string $stateName, string $step, array $data, array $extraPayload = []): void
     {
-        $current = fn(string $key): string => isset($data[$key]) ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
+        $current = fn(string $key): string => isset($data[$key]) ? $this->catalog->get('admin.final_modules.prompts.panel_wizard.current_value', ['value' => htmlspecialchars((string) $data[$key])]) : '';
         $text = match ($step) {
-            'title' => 'نام سرویس پنلی را وارد کنید' . $current('title'),
-            'min_gb' => 'حداقل حجم (GB) را وارد کنید' . $current('min_gb'),
-            'max_gb' => 'حداکثر حجم (GB) را وارد کنید' . $current('max_gb'),
-            'step_gb' => 'گام افزایش حجم (GB) را وارد کنید' . $current('step_gb'),
-            'price_per_gb' => 'قیمت هر گیگ (تومان) را وارد کنید' . $current('price_per_gb'),
-            'duration_policy' => 'سیاست مدت را وارد کنید: fixed_days یا unlimited' . $current('duration_policy'),
-            'duration_days' => 'تعداد روز را وارد کنید' . $current('duration_days'),
-            'provider' => 'نام ارائه‌دهنده را وارد کنید (مثال: pasarguard)' . $current('provider'),
-            'group_ids' => 'شناسه گروه‌ها را با کاما وارد کنید (مثال: 1,2,3)' . $current('group_ids'),
-            'description' => 'توضیحات را وارد کنید (برای رد شدن «-» بفرستید)' . $current('description'),
+            'title' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.title') . $current('title'),
+            'min_gb' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.min_gb') . $current('min_gb'),
+            'max_gb' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.max_gb') . $current('max_gb'),
+            'step_gb' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.step_gb') . $current('step_gb'),
+            'price_per_gb' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.price_per_gb') . $current('price_per_gb'),
+            'duration_policy' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.duration_policy') . $current('duration_policy'),
+            'duration_days' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.duration_days') . $current('duration_days'),
+            'provider' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.provider') . $current('provider'),
+            'group_ids' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.group_ids') . $current('group_ids'),
+            'description' => $this->catalog->get('admin.final_modules.prompts.panel_wizard.description') . $current('description'),
             default => '',
         };
         $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => $step, 'data' => $data]));
@@ -4381,7 +4392,7 @@ final class MessageHandler
     {
         $raw = trim($text);
         if ($raw === '' || str_starts_with($raw, '/')) {
-            $this->telegram->sendMessage($chatId, $this->uiText->warning('ورودی معتبر وارد کنید.'));
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.valid_input_required')));
             return false;
         }
         $next = '';
@@ -4392,37 +4403,37 @@ final class MessageHandler
                 break;
             case 'min_gb':
                 $val = (float) str_replace(',', '.', $raw);
-                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning('حداقل حجم معتبر نیست.')); return false; }
+                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_min_gb'))); return false; }
                 $data['min_gb'] = $val;
                 $next = 'max_gb';
                 break;
             case 'max_gb':
                 $val = (float) str_replace(',', '.', $raw);
-                if ($val < (float) ($data['min_gb'] ?? 0)) { $this->telegram->sendMessage($chatId, $this->uiText->warning('حداکثر باید بزرگ‌تر یا مساوی حداقل باشد.')); return false; }
+                if ($val < (float) ($data['min_gb'] ?? 0)) { $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_max_gb'))); return false; }
                 $data['max_gb'] = $val;
                 $next = 'step_gb';
                 break;
             case 'step_gb':
                 $val = (float) str_replace(',', '.', $raw);
-                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning('گام افزایش معتبر نیست.')); return false; }
+                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_step_gb'))); return false; }
                 $data['step_gb'] = $val;
                 $next = 'price_per_gb';
                 break;
             case 'price_per_gb':
                 $val = (int) preg_replace('/\D+/', '', $raw);
-                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning('قیمت معتبر نیست.')); return false; }
+                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.valid_price_required'))); return false; }
                 $data['price_per_gb'] = $val;
                 $next = 'duration_policy';
                 break;
             case 'duration_policy':
                 $policy = in_array($raw, ['fixed_days', 'unlimited'], true) ? $raw : '';
-                if ($policy === '') { $this->telegram->sendMessage($chatId, $this->uiText->warning('سیاست مدت باید fixed_days یا unlimited باشد.')); return false; }
+                if ($policy === '') { $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_duration_policy'))); return false; }
                 $data['duration_policy'] = $policy;
                 $next = $policy === 'fixed_days' ? 'duration_days' : 'provider';
                 break;
             case 'duration_days':
                 $val = (int) preg_replace('/\D+/', '', $raw);
-                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning('تعداد روز معتبر نیست.')); return false; }
+                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_duration_days'))); return false; }
                 $data['duration_days'] = $val;
                 $next = 'provider';
                 break;
@@ -4431,24 +4442,38 @@ final class MessageHandler
                 $next = 'group_ids';
                 break;
             case 'group_ids':
-                if ($raw === '') { $this->telegram->sendMessage($chatId, $this->uiText->warning('شناسه گروه‌ها الزامی است.')); return false; }
+                if ($raw === '') { $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.group_ids_required'))); return false; }
                 $data['group_ids'] = $raw;
                 $next = 'description';
                 break;
             case 'description':
                 $data['description'] = ($raw === '-' || $raw === '—') ? '' : $raw;
-                $summary = "نام: {$data['title']}\nحداقل/حداکثر: {$data['min_gb']} / {$data['max_gb']} GB\nگام: {$data['step_gb']} GB\nقیمت هر گیگ: {$data['price_per_gb']} تومان\nمدت: {$data['duration_policy']}" . (($data['duration_policy'] ?? '') === 'fixed_days' ? (' / ' . ((int) ($data['duration_days'] ?? 0)) . ' روز') : '') . "\nارائه‌دهنده: {$data['provider']}\nگروه‌ها: {$data['group_ids']}\nتوضیحات: " . (($data['description'] ?? '') !== '' ? $data['description'] : '-');
+                $durationValue = (string) ($data['duration_policy'] ?? '');
+                if (($data['duration_policy'] ?? '') === 'fixed_days') {
+                    $durationValue = $this->catalog->get('admin.final_modules.prompts.panel_wizard.duration_with_days', ['policy' => (string) ($data['duration_policy'] ?? ''), 'days' => (int) ($data['duration_days'] ?? 0)]);
+                }
+                $summary = $this->catalog->get('admin.final_modules.prompts.panel_wizard.summary_template', [
+                    'title' => (string) ($data['title'] ?? ''),
+                    'min_gb' => (string) ($data['min_gb'] ?? ''),
+                    'max_gb' => (string) ($data['max_gb'] ?? ''),
+                    'step_gb' => (string) ($data['step_gb'] ?? ''),
+                    'price_per_gb' => (string) ($data['price_per_gb'] ?? ''),
+                    'duration_value' => $durationValue,
+                    'provider' => (string) ($data['provider'] ?? ''),
+                    'group_ids' => (string) ($data['group_ids'] ?? ''),
+                    'description' => (string) (($data['description'] ?? '') !== '' ? $data['description'] : '-'),
+                ]);
                 $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
-                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: 'پیش‌نمایش اطلاعات', lines: [new UiTextLine('', 'خلاصه', htmlspecialchars($summary))], tipBlockquote: 'برای ثبت نهایی، عبارت «تایید» را ارسال کنید.')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.final_modules.prompts.panel_wizard.summary_title'), lines: [new UiTextLine('', $this->catalog->get('admin.final_modules.prompts.panel_wizard.summary_label'), htmlspecialchars($summary))], tipText: $this->catalog->get('admin.final_modules.prompts.panel_wizard.summary_tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return false;
             case 'confirm':
-                if (!in_array($raw, ['تایید', 'ثبت'], true)) {
-                    $this->telegram->sendMessage($chatId, $this->uiText->warning('برای ثبت، «تایید» را ارسال کنید.'));
+                if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.panel_wizard_confirm_required')));
                     return false;
                 }
                 return true;
             default:
-                $this->telegram->sendMessage($chatId, $this->uiText->warning('وضعیت نامعتبر است. دوباره تلاش کنید.'));
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.invalid_state')));
                 return false;
         }
 
@@ -4462,7 +4487,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.broadcast.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.broadcast.step_label'), $this->catalog->get('admin.ui.broadcast.step_value'))], tipBlockquote: $this->catalog->get('admin.ui.broadcast.tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.broadcast.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.broadcast.step_label'), $this->catalog->get('admin.ui.broadcast.step_value'))], tipText: $this->catalog->get('admin.ui.broadcast.tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
     }
 
     private function openAdminDeliveriesList(int $chatId, int $userId, ?string $notice = null): void
@@ -4486,7 +4511,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.list.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.deliveries.list.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.deliveries.list.empty'))], tipBlockquote: $this->catalog->get('admin.ui.open.deliveries.list.tip'))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.list.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.deliveries.list.label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.deliveries.list.empty'))], tipText: $this->catalog->get('admin.ui.open.deliveries.list.tip'))), $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminDeliveryView(int $chatId, int $userId, int $orderId, ?string $notice = null): void
@@ -4495,7 +4520,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.view.title', ['order_id' => $orderId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.deliveries.view.action_label'), $this->catalog->get('admin.ui.open.deliveries.view.action_value'))], tipBlockquote: $this->catalog->get('admin.ui.open.deliveries.view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_DELIVERY_DO)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.deliveries.view.title', ['order_id' => $orderId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.deliveries.view.action_label'), $this->catalog->get('admin.ui.open.deliveries.view.action_value'))], tipText: $this->catalog->get('admin.ui.open.deliveries.view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_DELIVERY_DO)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
     }
 
     private function openAdminGroupOpsView(int $chatId, int $userId, ?string $notice = null): void
@@ -4505,7 +4530,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $groupId = trim($this->settings->get('group_id', ''));
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.groupops.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.groupops.group_id_label'), $groupId !== '' ? "<code>{$groupId}</code>" : $this->catalog->get('admin.ui.open.groupops.group_id_unset'))], tipBlockquote: $this->catalog->get('admin.ui.open.groupops.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_GROUPOPS_SET_GROUP), $this->uiConst(self::ADMIN_GROUPOPS_RESTORE)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.groupops.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.groupops.group_id_label'), $groupId !== '' ? "<code>{$groupId}</code>" : $this->catalog->get('admin.ui.open.groupops.group_id_unset'))], tipText: $this->catalog->get('admin.ui.open.groupops.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_GROUPOPS_SET_GROUP), $this->uiConst(self::ADMIN_GROUPOPS_RESTORE)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
     }
 
     private function openAdminFreeTestMenu(int $chatId, int $userId, ?string $notice = null): void
@@ -4518,7 +4543,7 @@ final class MessageHandler
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.freetest.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.freetest.rules_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.freetest.rules_empty'))], tipBlockquote: $this->catalog->get('admin.ui.freetest.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_FREETEST_RULE), $this->uiConst(self::ADMIN_FREETEST_RESET)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.freetest.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.freetest.rules_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.freetest.rules_empty'))], tipText: $this->catalog->get('admin.ui.freetest.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_FREETEST_RULE), $this->uiConst(self::ADMIN_FREETEST_RESET)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
     }
 
     private function handleBuyTypeSelectionState(int $chatId, int $userId, string $text, array $state): void
@@ -4586,7 +4611,7 @@ final class MessageHandler
                 lines: [
                     new UiTextLine('', $this->catalog->get('messages.user.buy.package_selection.label'), implode("\n", $lines)),
                 ],
-                tipBlockquote: $this->catalog->get('messages.user.buy.package_selection.tip'),
+                tipText: $this->catalog->get('messages.user.buy.package_selection.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -4633,7 +4658,7 @@ final class MessageHandler
             $this->uiText->multi(new UiTextBlock(
                 title: $this->catalog->get('messages.user.buy.panel.service_selection.title'),
                 lines: [new UiTextLine('', $this->catalog->get('messages.user.buy.panel.service_selection.label'), implode("\n", $lines))],
-                tipBlockquote: $this->catalog->get('messages.user.buy.panel.service_selection.tip'),
+                tipText: $this->catalog->get('messages.user.buy.panel.service_selection.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -4676,7 +4701,7 @@ final class MessageHandler
                         'price_per_gb' => (int) ($service['price_per_gb'] ?? 0),
                     ])),
                 ],
-                tipBlockquote: $this->catalog->get('messages.user.buy.panel.volume_selection.tip'),
+                tipText: $this->catalog->get('messages.user.buy.panel.volume_selection.tip'),
             )),
             $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
         );
@@ -4723,7 +4748,7 @@ final class MessageHandler
                 $this->uiText->multi(new UiTextBlock(
                     title: $this->catalog->get('messages.user.buy.rules.title'),
                     lines: [new UiTextLine('', $this->catalog->get('messages.user.buy.rules.label'), htmlspecialchars($rulesText))],
-                    tipBlockquote: $this->catalog->get('messages.user.buy.rules.tip'),
+                    tipText: $this->catalog->get('messages.user.buy.rules.tip'),
                 )),
                 $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.accept_rules')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
             );
@@ -4735,7 +4760,7 @@ final class MessageHandler
 
     private function handleBuyPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::back($this->catalog) || $text === KeyboardBuilder::BTN_BACK_TYPES) {
+        if ($text === UiLabels::back($this->catalog)) {
             $this->startBuyTypeReplyFlow($chatId, $userId);
             return;
         }
@@ -4764,7 +4789,7 @@ final class MessageHandler
                     lines: [
                         new UiTextLine('', $this->catalog->get('messages.user.buy.rules.label'), htmlspecialchars($rulesText)),
                     ],
-                    tipBlockquote: $this->catalog->get('messages.user.buy.rules.tip'),
+                    tipText: $this->catalog->get('messages.user.buy.rules.tip'),
                 )),
                 $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.accept_rules')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
             );
@@ -4783,7 +4808,7 @@ final class MessageHandler
                 new UiTextLine('', $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
                 new UiTextLine('', $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
             ],
-            tipBlockquote: $this->catalog->get('messages.user.buy.payment.tip'),
+            tipText: $this->catalog->get('messages.user.buy.payment.tip'),
         ));
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
@@ -4843,7 +4868,7 @@ final class MessageHandler
                 lines: [
                     new UiTextLine('', $this->catalog->get('messages.user.renew.select_order.label'), implode("\n", $lines)),
                 ],
-                tipBlockquote: $this->catalog->get('messages.user.renew.select_order.tip'),
+                tipText: $this->catalog->get('messages.user.renew.select_order.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -4914,7 +4939,7 @@ final class MessageHandler
                     new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.current_package_label'), '<b>' . htmlspecialchars((string) ($purchase['package_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
                     new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.options_label'), implode("\n", $lines)),
                 ],
-                tipBlockquote: $this->catalog->get('messages.user.renew.select_package.tip'),
+                tipText: $this->catalog->get('messages.user.renew.select_package.tip'),
             )),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -4922,7 +4947,7 @@ final class MessageHandler
 
     private function handleRenewPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($text === UiLabels::back($this->catalog) || $text === KeyboardBuilder::BTN_BACK_PURCHASES) {
+        if ($text === UiLabels::back($this->catalog)) {
             $this->showMyConfigsWithReplyFlow($chatId, $userId);
             return;
         }
@@ -4956,7 +4981,7 @@ final class MessageHandler
                 new UiTextLine('', $this->catalog->get('messages.user.renew.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
                 new UiTextLine('', $this->catalog->get('messages.user.renew.payment.amount_label'), $this->catalog->get('messages.user.renew.payment.amount_value', ['amount' => (int) $package['price']])),
             ],
-            tipBlockquote: $this->catalog->get('messages.user.renew.payment.tip'),
+            tipText: $this->catalog->get('messages.user.renew.payment.tip'),
         ));
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
@@ -5062,7 +5087,7 @@ final class MessageHandler
                 new UiTextLine('', $this->catalog->get('messages.user.buy.panel.payment.volume_label'), $this->catalog->get('messages.user.buy.panel.payment.volume_value', ['volume' => (string) $volume])),
                 new UiTextLine('', $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => $amount])),
             ],
-            tipBlockquote: $this->catalog->get('messages.user.buy.payment.tip'),
+            tipText: $this->catalog->get('messages.user.buy.payment.tip'),
         ));
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
@@ -5113,7 +5138,7 @@ final class MessageHandler
                             'price_per_gb' => (int) ($service['price_per_gb'] ?? 0),
                         ])),
                     ],
-                    tipBlockquote: $this->catalog->get('messages.user.buy.panel.volume_selection.tip'),
+                    tipText: $this->catalog->get('messages.user.buy.panel.volume_selection.tip'),
                 )),
                 $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
             );
@@ -5708,7 +5733,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
-        if ($text === UiLabels::back($this->catalog) || $text === KeyboardBuilder::BTN_BACK_TYPES) {
+        if ($text === UiLabels::back($this->catalog)) {
             if ((string) ($state['payload']['order_mode'] ?? '') === 'panel_only') {
                 $this->openPanelServiceSelection($chatId, $userId);
                 return;
@@ -5757,7 +5782,7 @@ final class MessageHandler
                 new UiTextLine('', $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
                 new UiTextLine('', $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
             ],
-            tipBlockquote: $this->catalog->get('messages.user.buy.payment.tip'),
+            tipText: $this->catalog->get('messages.user.buy.payment.tip'),
         ));
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
@@ -5908,20 +5933,20 @@ final class MessageHandler
             KeyboardBuilder::backTypes(),
             KeyboardBuilder::backPurchases(),
             KeyboardBuilder::checkChannel(),
-            KeyboardBuilder::BTN_BUY,
-            KeyboardBuilder::BTN_MY_CONFIGS,
-            KeyboardBuilder::BTN_FREE_TEST,
-            KeyboardBuilder::BTN_PROFILE,
-            KeyboardBuilder::BTN_WALLET,
-            KeyboardBuilder::BTN_SUPPORT,
-            KeyboardBuilder::BTN_REFERRAL,
-            KeyboardBuilder::BTN_AGENCY,
-            KeyboardBuilder::BTN_ADMIN,
-            KeyboardBuilder::BTN_BACK_MAIN,
-            KeyboardBuilder::BTN_BACK_ACCOUNT,
-            KeyboardBuilder::BTN_BACK_TYPES,
-            KeyboardBuilder::BTN_BACK_PURCHASES,
-            KeyboardBuilder::BTN_CHECK_CHANNEL,
+            KeyboardBuilder::buy(),
+            KeyboardBuilder::myConfigs(),
+            KeyboardBuilder::freeTest(),
+            KeyboardBuilder::profile(),
+            KeyboardBuilder::wallet(),
+            KeyboardBuilder::support(),
+            KeyboardBuilder::referralButton(),
+            KeyboardBuilder::agency(),
+            KeyboardBuilder::admin(),
+            KeyboardBuilder::backMain(),
+            KeyboardBuilder::backAccount(),
+            KeyboardBuilder::backTypes(),
+            KeyboardBuilder::backPurchases(),
+            KeyboardBuilder::checkChannel(),
         ], true);
     }
 }
