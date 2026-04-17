@@ -61,7 +61,7 @@ final class UiTextCatalog implements UiTextCatalogInterface
         if ($block->tipText !== null && trim($block->tipText) !== '') {
             $tip = $this->normalizeTip($block->tipText);
             $parts[] = '';
-            $parts[] = htmlspecialchars($tip);
+            $parts[] = '<blockquote>' . htmlspecialchars($tip) . '</blockquote>';
         }
 
         return implode("\n", $parts);
