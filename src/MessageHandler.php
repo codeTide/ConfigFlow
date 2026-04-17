@@ -1981,7 +1981,10 @@ final class MessageHandler
                 'price' => (string) ($data['price'] ?? ''),
             ]);
             $this->database->setUserState($userId, 'admin.package.create', ['type_id' => $typeId, 'step' => 'confirm', 'data' => $data, 'stack' => ['admin.type.view']]);
-            $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.types_packages.prompts.wizard.summary_title'), lines: [new UiTextLine('', $this->catalog->get('admin.types_packages.prompts.wizard.summary_label'), htmlspecialchars($summary))], tipText: $this->catalog->get('admin.types_packages.prompts.wizard.summary_tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $summaryText = $this->messageRenderer->render('admin.types_packages.messages.wizard_summary', [
+                'summary' => $summary,
+            ]);
+            $this->telegram->sendMessage($chatId, $summaryText, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return false;
         }
         if ($step === 'confirm') {
@@ -3957,7 +3960,7 @@ final class MessageHandler
             if ($step === 'password') {
                 $data['password'] = $raw;
                 $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'wizard', 'step' => 'confirm', 'data' => $data]);
-                $preview = $this->messageRenderer->render('admin.panel_settings.wizard.preview_message', [
+                $preview = $this->messageRenderer->render('admin.panel_settings.messages.wizard_preview', [
                     'base_url' => (string) ($data['base_url'] ?? ''),
                     'username' => (string) ($data['username'] ?? ''),
                     'password_masked' => str_repeat('*', min(strlen((string) ($data['password'] ?? '')), 10)),
@@ -4356,7 +4359,13 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->database->setUserState($userId, 'admin.panel.view', ['panel_id' => $panelId]);
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_view.title', ['panel_id' => $panelId]), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.name_label'), htmlspecialchars((string) ($panel['title'] ?? '-'))), new UiTextLine('', $this->catalog->get('admin.ui.open.panel_view.packages_label'), htmlspecialchars($summary))], tipText: $this->catalog->get('admin.ui.open.panel_view.tip'))), $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        $panelViewText = $this->messageRenderer->render('admin.panels.messages.panel_view', [
+            'panel_id' => $panelId,
+            'panel_title' => (string) ($panel['title'] ?? '-'),
+            'summary' => $summary,
+            'tip_text' => $this->catalog->get('admin.ui.open.panel_view.tip'),
+        ]);
+        $this->telegram->sendMessage($chatId, $panelViewText, $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
     }
 
     /** @param array<string,mixed> $data */
@@ -4457,7 +4466,10 @@ final class MessageHandler
                     'description' => (string) (($data['description'] ?? '') !== '' ? $data['description'] : '-'),
                 ]);
                 $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
-                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.final_modules.prompts.panel_wizard.summary_title'), lines: [new UiTextLine('', $this->catalog->get('admin.final_modules.prompts.panel_wizard.summary_label'), htmlspecialchars($summary))], tipText: $this->catalog->get('admin.final_modules.prompts.panel_wizard.summary_tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $summaryText = $this->messageRenderer->render('admin.final_modules.messages.panel_wizard_summary', [
+                    'summary' => $summary,
+                ]);
+                $this->telegram->sendMessage($chatId, $summaryText, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return false;
             case 'confirm':
                 if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {

@@ -12,10 +12,12 @@ final class MenuService
         private ?UiTextCatalogInterface $uiText = null,
         private ?UiKeyboardFactoryInterface $uiKeyboard = null,
         private ?UiJsonCatalog $catalog = null,
+        private ?UiMessageRenderer $messageRenderer = null,
     ) {
         $this->uiText ??= new UiTextCatalog();
         $this->uiKeyboard ??= new UiKeyboardFactory();
         $this->catalog ??= new UiJsonCatalog();
+        $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
     }
 
     public function mainMenuText(): string
@@ -25,17 +27,7 @@ final class MenuService
             return $customText;
         }
 
-        return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.main.title'),
-            lines: [
-                new UiTextLine(
-                    '',
-                    $this->catalog->get('menus.main.guide_label'),
-                    $this->catalog->get('menus.main.guide_value')
-                ),
-            ],
-            tipText: $this->catalog->get('menus.main.tip'),
-        ));
+        return $this->messageRenderer->render('menus.messages.main_overview');
     }
 
     public function mainMenuReplyKeyboard(int $userId): array
@@ -70,17 +62,7 @@ final class MenuService
 
     public function adminRootText(): string
     {
-        return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.admin.title'),
-            lines: [
-                new UiTextLine(
-                    '',
-                    $this->catalog->get('menus.admin.guide_label'),
-                    $this->catalog->get('menus.admin.guide_value')
-                ),
-            ],
-            tipText: $this->catalog->get('menus.admin.tip'),
-        ));
+        return $this->messageRenderer->render('menus.messages.admin_overview');
     }
 
     public function adminRootReplyKeyboard(): array
@@ -114,16 +96,12 @@ final class MenuService
         $balanceFa = $this->toPersianDigits((string) $balance);
         $userIdFa = $this->toPersianDigits((string) $userId);
 
-        return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.profile.title'),
-            lines: [
-                new UiTextLine('', $this->catalog->get('menus.profile.name_label'), htmlspecialchars((string) ($user['full_name'] ?? $this->catalog->get('messages.generic.dash')))),
-                new UiTextLine('', $this->catalog->get('menus.profile.username_label'), htmlspecialchars((string) $username)),
-                new UiTextLine('', $this->catalog->get('menus.profile.user_id_label'), "<code>{$userIdFa}</code>"),
-                new UiTextLine('', $this->catalog->get('menus.profile.balance_label'), $this->catalog->get('menus.profile.balance_value', ['amount' => $balanceFa])),
-            ],
-            tipText: $this->catalog->get('menus.profile.tip'),
-        ));
+        return $this->messageRenderer->render('menus.messages.profile_overview', [
+            'full_name' => (string) ($user['full_name'] ?? $this->catalog->get('messages.generic.dash')),
+            'username' => (string) $username,
+            'user_id' => $userIdFa,
+            'balance' => $balanceFa,
+        ], ['user_id']);
     }
 
     private function toPersianDigits(string $value): string
@@ -148,25 +126,11 @@ final class MenuService
         $link = trim($this->settings->get('support_link', ''));
         $linkDesc = trim($this->settings->get('support_link_desc', ''));
 
-        $lines = [
-            new UiTextLine(
-                '',
-                $this->catalog->get('menus.support.support_id_label'),
-                htmlspecialchars($username !== '' ? $username : $this->catalog->get('messages.generic.dash'))
-            ),
-        ];
-        if ($link !== '') {
-            $lines[] = new UiTextLine('', $this->catalog->get('menus.support.support_link_label'), htmlspecialchars($link));
-        }
-        if ($linkDesc !== '') {
-            $lines[] = new UiTextLine('', $this->catalog->get('menus.support.support_link_desc_label'), htmlspecialchars($linkDesc));
-        }
-
-        return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.support.title'),
-            lines: $lines,
-            tipText: $this->catalog->get('menus.support.tip'),
-        ));
+        return $this->messageRenderer->render('menus.messages.support_overview', [
+            'support_id' => $username !== '' ? $username : $this->catalog->get('messages.generic.dash'),
+            'support_link_line' => $link !== '' ? ("\n" . $this->catalog->get('menus.support.support_link_label') . ': ' . $link) : '',
+            'support_link_desc_line' => $linkDesc !== '' ? ("\n" . $this->catalog->get('menus.support.support_link_desc_label') . ': ' . $linkDesc) : '',
+        ]);
     }
 
     public function myConfigsText(int $userId): string

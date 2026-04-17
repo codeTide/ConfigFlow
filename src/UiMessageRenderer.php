@@ -34,6 +34,18 @@ final class UiMessageRenderer
             $pairs['{{' . $name . '}}'] = $stringValue;
         }
 
-        return strtr($template, $pairs);
+        $rendered = strtr($template, $pairs);
+
+        if ($this->hasUnresolvedPlaceholders($rendered)) {
+            error_log(sprintf('UiMessageRenderer unresolved placeholders for key "%s".', $key));
+        }
+
+        return $rendered;
+    }
+
+    private function hasUnresolvedPlaceholders(string $text): bool
+    {
+        return preg_match('/(?<!\{)\{[a-zA-Z0-9_]+\}(?!\})/', $text) === 1
+            || preg_match('/\{\{[a-zA-Z0-9_]+\}\}/', $text) === 1;
     }
 }
