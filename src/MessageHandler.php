@@ -85,10 +85,12 @@ final class MessageHandler
         private ?UiTextCatalogInterface $uiText = null,
         private ?UiKeyboardFactoryInterface $uiKeyboard = null,
         private ?UiJsonCatalog $catalog = null,
+        private ?UiMessageRenderer $messageRenderer = null,
     ) {
         $this->uiText ??= new UiTextCatalog();
         $this->uiKeyboard ??= new UiKeyboardFactory();
         $this->catalog ??= new UiJsonCatalog();
+        $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
     }
 
 
@@ -3955,22 +3957,14 @@ final class MessageHandler
             if ($step === 'password') {
                 $data['password'] = $raw;
                 $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'wizard', 'step' => 'confirm', 'data' => $data]);
-                $summary = $this->catalog->get('admin.panel_settings.summary.template', [
-                    'base_url_label' => $this->catalog->get('admin.panel_settings.summary.base_url_label'),
+                $preview = $this->messageRenderer->render('admin.panel_settings.wizard.preview_message', [
                     'base_url' => (string) ($data['base_url'] ?? ''),
-                    'username_label' => $this->catalog->get('admin.panel_settings.summary.username_label'),
                     'username' => (string) ($data['username'] ?? ''),
-                    'password_label' => $this->catalog->get('admin.panel_settings.summary.password_label'),
                     'password_masked' => str_repeat('*', min(strlen((string) ($data['password'] ?? '')), 10)),
                 ]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_title')
-                    . "\n\n"
-                    . htmlspecialchars($summary)
-                    . "\n\n<blockquote>"
-                    . htmlspecialchars($this->catalog->get('admin.ui.open.panel_settings.wizard_summary_tip'))
-                    . '</blockquote>',
+                    $preview,
                     $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.panel_settings.confirm_words.submit')], [UiLabels::back($this->catalog)]])
                 );
                 return;
@@ -4268,14 +4262,16 @@ final class MessageHandler
         $baseUrl = trim($this->settings->get('pg_base_url', ''));
         $username = trim($this->settings->get('pg_username', ''));
         $hasConnection = $baseUrl !== '' || $username !== '';
-        $lines = [$hasConnection ? $this->catalog->get('admin.panel_settings.info.connection_exists') : $this->catalog->get('admin.panel_settings.info.connection_missing')];
+        $panelsListText = $this->messageRenderer->render('admin.panel_settings.messages.panels_list', [
+            'connection_status' => $hasConnection ? $this->catalog->get('admin.panel_settings.info.connection_exists') : $this->catalog->get('admin.panel_settings.info.connection_missing'),
+        ]);
         $buttons = [[$this->uiConst(self::ADMIN_PANELS_REFRESH)]];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.panels.list', []);
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panels_list.title'), lines: [new UiTextLine('', $this->catalog->get('admin.ui.open.panels_list.list_label'), $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.panels_list.empty'))], tipText: $this->catalog->get('admin.ui.open.panels_list.tip'))), $this->uiKeyboard->replyMenu($buttons));
+        $this->telegram->sendMessage($chatId, $panelsListText, $this->uiKeyboard->replyMenu($buttons));
     }
 
     private function openAdminPanelSettings(int $chatId, int $userId, ?string $notice = null): void
@@ -4294,19 +4290,17 @@ final class MessageHandler
             $rows[] = [$this->catalog->get('admin.final_modules.actions.panel_conn_delete')];
         }
         $rows[] = [UiLabels::back($this->catalog)];
+        $overviewText = $this->messageRenderer->render('admin.panel_settings.messages.menu_overview', [
+            'base_url' => $baseUrl !== '' ? $baseUrl : '-',
+            'username' => $username !== '' ? $username : '-',
+            'password_masked' => $passwordMasked,
+            'status_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
+            'guide_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty'),
+        ]);
 
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.panel_settings.title'),
-                lines: [
-                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.base_url_label'), htmlspecialchars($baseUrl !== '' ? $baseUrl : '-')),
-                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.username_label'), htmlspecialchars($username !== '' ? $username : '-')),
-                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.password_label'), htmlspecialchars($passwordMasked)),
-                    new UiTextLine('', $this->catalog->get('admin.ui.open.panel_settings.status_label'), $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty')),
-                ],
-                tipText: $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty')
-            )),
+            $overviewText,
             $this->uiKeyboard->replyMenu($rows)
         );
     }
@@ -4315,35 +4309,25 @@ final class MessageHandler
     private function promptPanelConnectionStep(int $chatId, int $userId, string $step, array $data): void
     {
         $text = match ($step) {
-            'base_url' => $this->catalog->get('admin.panel_settings.wizard.steps.base_url'),
-            'username' => $this->catalog->get('admin.panel_settings.wizard.steps.username'),
-            'password' => $this->catalog->get('admin.panel_settings.wizard.steps.password'),
+            'base_url' => $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_base_url'),
+            'username' => $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_username'),
+            'password' => $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_password'),
             default => '',
         };
         if ($text !== '') {
-            $message = $text;
-            $tip = null;
-            $parts = preg_split('/\n\n💡/u', $text, 2);
-            if (is_array($parts) && count($parts) === 2) {
-                $message = trim((string) $parts[0]);
-                $tip = '💡' . trim((string) $parts[1]);
-            }
-            if ($tip !== null && $tip !== '') {
-                $message = $this->uiText->multi(new UiTextBlock(title: $message, tipText: $tip));
-            }
-            $this->telegram->sendMessage($chatId, $message, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
+            $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
         }
     }
 
     private function openAdminPanelDeleteConfirm(int $chatId): void
     {
+        $message = $this->messageRenderer->render('admin.panel_settings.messages.delete_confirm', [
+            'delete_text' => $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_text'),
+            'delete_tip' => $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_tip'),
+        ]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_title'),
-                lines: [new UiTextLine('', $this->catalog->get('admin.panel_settings.delete.message_label'), $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_text'))],
-                tipText: $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_tip')
-            )),
+            $message,
             $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.final_modules.actions.panel_conn_delete_confirm'), $this->catalog->get('admin.final_modules.actions.panel_conn_delete_cancel')]])
         );
     }
