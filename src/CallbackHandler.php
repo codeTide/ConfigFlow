@@ -30,8 +30,10 @@ final class CallbackHandler
         private MenuService $menus,
         private PaymentGatewayService $gateways,
         private ?UiJsonCatalog $catalog = null,
+        private ?UiMessageRenderer $messageRenderer = null,
     ) {
         $this->catalog ??= new UiJsonCatalog();
+        $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
     }
 
     public function handle(array $update): void
@@ -103,7 +105,10 @@ final class CallbackHandler
             $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.admin_legacy'));
             $this->telegram->sendMessage(
                 $chatId,
-                $this->menus->adminRootText() . "\n\n" . htmlspecialchars($this->catalog->get('messages.callback.admin_legacy_note')),
+                $this->messageRenderer->render('messages.callback.admin_legacy_overview', [
+                    'admin_overview' => $this->menus->adminRootText(),
+                    'legacy_note' => $this->catalog->get('messages.callback.admin_legacy_note'),
+                ], ['admin_overview']),
                 $this->menus->adminRootReplyKeyboard()
             );
             return;
