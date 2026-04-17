@@ -19,9 +19,9 @@ CREATE TABLE IF NOT EXISTS provisioning_services (
 
 ALTER TABLE pending_orders
     MODIFY package_id BIGINT NULL,
-    ADD COLUMN order_mode VARCHAR(32) NOT NULL DEFAULT 'stock_only' AFTER package_id,
-    ADD COLUMN service_id BIGINT NULL AFTER order_mode,
-    ADD COLUMN selected_volume_gb DECIMAL(10,2) NULL AFTER service_id,
-    ADD COLUMN computed_amount INT NULL AFTER selected_volume_gb,
-    ADD INDEX idx_pending_mode (order_mode),
-    ADD INDEX idx_pending_service (service_id);
+    ADD COLUMN IF NOT EXISTS order_mode VARCHAR(32) NOT NULL DEFAULT 'stock_only' AFTER package_id,
+    ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER order_mode,
+    ADD COLUMN IF NOT EXISTS selected_volume_gb DECIMAL(10,2) NULL AFTER service_id,
+    ADD COLUMN IF NOT EXISTS computed_amount INT NULL AFTER selected_volume_gb,
+    ADD INDEX IF NOT EXISTS idx_pending_mode (order_mode),
+    ADD INDEX IF NOT EXISTS idx_pending_service (service_id);
