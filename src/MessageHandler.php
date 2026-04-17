@@ -1485,11 +1485,6 @@ final class MessageHandler
             return;
         }
 
-        if ($this->settings->get('delivery_mode', 'stock_only') === 'panel_only') {
-            $this->openPanelServiceSelection($chatId, $userId);
-            return;
-        }
-
         $types = $this->database->getActiveTypes();
         if ($types === []) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('emojis.cart') . ' ' . $this->catalog->get('messages.user.buy.no_active_service'));
@@ -1503,6 +1498,9 @@ final class MessageHandler
             $num = (string) ($idx + 1);
             $typeId = (int) ($type['id'] ?? 0);
             if ($typeId <= 0) {
+                continue;
+            }
+            if ($this->database->countServicesWithTariffsByType($typeId) <= 0) {
                 continue;
             }
             $name = trim((string) ($type['name'] ?? '—'));
@@ -5898,11 +5896,6 @@ final class MessageHandler
 
     private function handleBuyTypeSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
-        if ($this->settings->get('delivery_mode', 'stock_only') === 'panel_only') {
-            $this->openPanelServiceSelection($chatId, $userId);
-            return;
-        }
-
         if ($this->isMainMenuInput($text)) {
             $this->database->clearUserState($userId);
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
@@ -5917,12 +5910,11 @@ final class MessageHandler
             return;
         }
 
-        if ($this->database->countServicesWithTariffsByType($typeId) > 0) {
-            $this->showBuyServiceSelection($chatId, $userId, $typeId);
+        if ($this->database->countServicesWithTariffsByType($typeId) <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.buy.no_active_service')));
             return;
         }
-
-        $this->showBuyPackageSelection($chatId, $userId, $typeId);
+        $this->showBuyServiceSelection($chatId, $userId, $typeId);
     }
 
     private function showBuyServiceSelection(int $chatId, int $userId, int $typeId): void
@@ -5947,7 +5939,7 @@ final class MessageHandler
             $buttons[] = [$this->catalog->get('messages.user.buy.service.service_button', ['num' => $num, 'name' => $name])];
         }
         if ($optionMap === []) {
-            $this->showBuyPackageSelection($chatId, $userId, $typeId);
+            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('messages.user.buy.no_active_service')));
             return;
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
@@ -6596,6 +6588,19 @@ final class MessageHandler
             $this->showBuyServiceSelection($chatId, $userId, $typeId);
             return;
         }
+        $serviceMode = (string) ($service['mode'] ?? 'stock');
+        if (!in_array($serviceMode, ['stock', 'panel_auto'], true)) {
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.payment.errors.create_order_failed')));
+            return;
+        }
+        if ($serviceMode === 'panel_auto' && (int) ($service['panel_id'] ?? 0) <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.payment.errors.create_order_failed')));
+            return;
+        }
+        if ($serviceMode === 'stock' && $this->database->countAvailableConfigsByService($serviceId, $tariffId) <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.payment.errors.no_stock')));
+            return;
+        }
         $amount = $this->database->calculateServiceTariffAmount($tariff, $selectedVolumeGb);
         if ($amount <= 0) {
             $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.buy.panel.errors.invalid_volume')));
@@ -7058,6 +7063,10 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.common.invalid_option')));
             return;
         }
+        if ((string) ($service['mode'] ?? 'stock') === 'stock' && $this->database->countAvailableConfigsByService($serviceId, $tariffId) <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.payment.errors.no_stock')));
+            return;
+        }
         $amount = $this->database->calculateServiceTariffAmount($tariff, $selectedVolumeGb);
         if ($amount <= 0) {
             $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.buy.panel.errors.invalid_volume')));
@@ -7330,6 +7339,10 @@ final class MessageHandler
         $tariff = $this->database->getServiceTariffForService($serviceId, $tariffId);
         if (!is_array($service) || !is_array($tariff)) {
             $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.common.invalid_option')));
+            return;
+        }
+        if ((string) ($service['mode'] ?? 'stock') === 'stock' && $this->database->countAvailableConfigsByService($serviceId, $tariffId) <= 0) {
+            $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('messages.user.payment.errors.no_stock')));
             return;
         }
         $amount = $this->database->calculateServiceTariffAmount($tariff, $selectedVolumeGb);

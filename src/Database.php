@@ -932,17 +932,21 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
-    public function countAvailableConfigsByService(int $serviceId): int
+    public function countAvailableConfigsByService(int $serviceId, ?int $tariffId = null): int
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT COUNT(*)
-             FROM configs
-             WHERE service_id = :service_id
-               AND sold_to IS NULL
-               AND reserved_payment_id IS NULL
-               AND is_expired = 0'
-        );
-        $stmt->execute(['service_id' => $serviceId]);
+        $sql = 'SELECT COUNT(*)
+                FROM configs
+                WHERE service_id = :service_id
+                  AND sold_to IS NULL
+                  AND reserved_payment_id IS NULL
+                  AND is_expired = 0';
+        $params = ['service_id' => $serviceId];
+        if ($tariffId !== null && $tariffId > 0) {
+            $sql .= ' AND tariff_id = :tariff_id';
+            $params['tariff_id'] = $tariffId;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
         return (int) $stmt->fetchColumn();
     }
 
