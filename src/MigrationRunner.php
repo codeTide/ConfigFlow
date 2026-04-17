@@ -31,7 +31,7 @@ final class MigrationRunner
                 throw new RuntimeException("Migration file is empty or unreadable: {$name}");
             }
 
-            $this->pdo->exec($sql);
+            $this->executeSqlBatch($sql);
             $insert = $this->pdo->prepare(
                 'INSERT INTO schema_migrations (migration_name, applied_at) VALUES (:migration_name, :applied_at)'
             );
@@ -55,6 +55,22 @@ final class MigrationRunner
                 INDEX idx_schema_migrations_applied_at (applied_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+    }
+
+    private function executeSqlBatch(string $sql): void
+    {
+        $normalized = str_replace("\r\n", "\n", $sql);
+        $chunks = preg_split('/;\n+/', $normalized) ?: [];
+        foreach ($chunks as $chunk) {
+            $stmt = trim($chunk);
+            if ($stmt === '') {
+                continue;
+            }
+            if (str_starts_with($stmt, '--') || str_starts_with($stmt, '#')) {
+                continue;
+            }
+            $this->pdo->exec($stmt);
+        }
     }
 
     /** @return array<string,bool> */
