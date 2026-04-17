@@ -3819,6 +3819,10 @@ final class MessageHandler
                     $this->openAdminPanelDeleteConfirm($chatId);
                     return;
                 }
+                if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_status')) {
+                    $this->sendAdminPanelStatusSnapshot($chatId);
+                    return;
+                }
                 $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.panel_settings.errors.invalid_menu_option')));
                 return;
             }
@@ -3891,7 +3895,8 @@ final class MessageHandler
             $this->settings->set('pg_base_url', (string) ($data['base_url'] ?? ''));
             $this->settings->set('pg_username', (string) ($data['username'] ?? ''));
             $this->settings->set('pg_password', (string) ($data['password'] ?? ''));
-            $this->openAdminPanelSettings($chatId, $userId, $this->uiText->success($this->catalog->get('admin.panel_settings.success.connection_saved')));
+            $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'menu']);
+            $this->telegram->sendMessage($chatId, $this->uiText->success($this->catalog->get('admin.panel_settings.success.connection_saved')));
             return;
         }
         if ($stateName === 'admin.panel.delete') {
@@ -4202,20 +4207,12 @@ final class MessageHandler
 
     private function openAdminPanelSettings(int $chatId, int $userId, ?string $notice = null): void
     {
-        $baseUrl = trim($this->settings->get('pg_base_url', ''));
-        $username = trim($this->settings->get('pg_username', ''));
-        $password = trim($this->settings->get('pg_password', ''));
-        $passwordMasked = $password === '' ? '-' : str_repeat('*', min(strlen($password), 10));
-        $hasConnection = $baseUrl !== '' || $username !== '' || $password !== '';
+        [$baseUrl, $username, $passwordMasked, $hasConnection] = $this->getPanelConnectionSummary();
         $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'menu']);
         if ($notice) {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $rows = [[$hasConnection ? $this->catalog->get('admin.final_modules.actions.panel_conn_edit') : $this->catalog->get('admin.final_modules.actions.panel_conn_add')]];
-        if ($hasConnection) {
-            $rows[] = [$this->catalog->get('admin.final_modules.actions.panel_conn_delete')];
-        }
-        $rows[] = [UiLabels::back($this->catalog)];
+        $rows = $this->buildPanelSettingsKeyboard($hasConnection);
         $overviewText = $this->messageRenderer->render('admin.panel_settings.messages.menu_overview', [
             'base_url' => $baseUrl !== '' ? $baseUrl : '-',
             'username' => $username !== '' ? $username : '-',
@@ -4229,6 +4226,47 @@ final class MessageHandler
             $overviewText,
             $this->uiKeyboard->replyMenu($rows)
         );
+    }
+
+    /** @return array{0:string,1:string,2:string,3:bool} */
+    private function getPanelConnectionSummary(): array
+    {
+        $baseUrl = trim($this->settings->get('pg_base_url', ''));
+        $username = trim($this->settings->get('pg_username', ''));
+        $password = trim($this->settings->get('pg_password', ''));
+        $passwordMasked = $password === '' ? '-' : str_repeat('*', min(strlen($password), 10));
+        $hasConnection = $baseUrl !== '' || $username !== '' || $password !== '';
+
+        return [$baseUrl, $username, $passwordMasked, $hasConnection];
+    }
+
+    /** @return list<list<string>> */
+    private function buildPanelSettingsKeyboard(bool $hasConnection): array
+    {
+        $rows = [[
+            $hasConnection ? $this->catalog->get('admin.final_modules.actions.panel_conn_edit') : $this->catalog->get('admin.final_modules.actions.panel_conn_add'),
+            $this->catalog->get('admin.final_modules.actions.panel_conn_status'),
+        ]];
+        if ($hasConnection) {
+            $rows[] = [$this->catalog->get('admin.final_modules.actions.panel_conn_delete'), UiLabels::back($this->catalog)];
+            return $rows;
+        }
+        $rows[] = [UiLabels::back($this->catalog)];
+
+        return $rows;
+    }
+
+    private function sendAdminPanelStatusSnapshot(int $chatId): void
+    {
+        [$baseUrl, $username, $passwordMasked, $hasConnection] = $this->getPanelConnectionSummary();
+        $snapshotText = $this->messageRenderer->render('admin.panel_settings.messages.menu_status_snapshot', [
+            'base_url' => $baseUrl !== '' ? $baseUrl : '-',
+            'username' => $username !== '' ? $username : '-',
+            'password_masked' => $passwordMasked,
+            'status_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
+            'guide_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty'),
+        ]);
+        $this->telegram->sendMessage($chatId, $snapshotText);
     }
 
     /** @param array<string,mixed> $data */
