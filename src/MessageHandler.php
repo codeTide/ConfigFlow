@@ -3875,7 +3875,7 @@ final class MessageHandler
                 }
                 if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_add')) {
                     $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'wizard', 'step' => 'base_url', 'data' => []]);
-                    $this->promptPanelSettingsStep($chatId, $userId, 'base_url', []);
+                    $this->promptPanelConnectionStep($chatId, $userId, 'base_url', []);
                     return;
                 }
                 if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_edit')) {
@@ -3887,7 +3887,7 @@ final class MessageHandler
                             'username' => trim($this->settings->get('pg_username', '')),
                         ],
                     ]);
-                    $this->promptPanelSettingsStep($chatId, $userId, 'base_url', [
+                    $this->promptPanelConnectionStep($chatId, $userId, 'base_url', [
                         'base_url' => trim($this->settings->get('pg_base_url', '')),
                         'username' => trim($this->settings->get('pg_username', '')),
                     ]);
@@ -3913,7 +3913,7 @@ final class MessageHandler
                 $prev = ['username' => 'base_url', 'password' => 'username', 'confirm' => 'password'];
                 $backStep = $prev[$step] ?? 'base_url';
                 $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'wizard', 'step' => $backStep, 'data' => $data]);
-                $this->promptPanelSettingsStep($chatId, $userId, $backStep, $data);
+                $this->promptPanelConnectionStep($chatId, $userId, $backStep, $data);
                 return;
             }
             $step = (string) ($payload['step'] ?? 'base_url');
@@ -3926,13 +3926,13 @@ final class MessageHandler
             if ($step === 'base_url') {
                 $data['base_url'] = $raw;
                 $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'wizard', 'step' => 'username', 'data' => $data]);
-                $this->promptPanelSettingsStep($chatId, $userId, 'username', $data);
+                $this->promptPanelConnectionStep($chatId, $userId, 'username', $data);
                 return;
             }
             if ($step === 'username') {
                 $data['username'] = $raw;
                 $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'wizard', 'step' => 'password', 'data' => $data]);
-                $this->promptPanelSettingsStep($chatId, $userId, 'password', $data);
+                $this->promptPanelConnectionStep($chatId, $userId, 'password', $data);
                 return;
             }
             if ($step === 'password') {
@@ -4296,6 +4296,21 @@ final class MessageHandler
 
     /** @param array<string,mixed> $data */
     private function promptPanelSettingsStep(int $chatId, int $userId, string $step, array $data): void
+    {
+        $current = fn(string $key): string => isset($data[$key]) && (string) $data[$key] !== '' ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
+        $text = match ($step) {
+            'base_url' => 'آدرس پنل را وارد کنید.' . $current('base_url'),
+            'username' => 'نام کاربری پنل را وارد کنید.' . $current('username'),
+            'password' => 'رمز عبور پنل را وارد کنید.',
+            default => '',
+        };
+        if ($text !== '') {
+            $this->telegram->sendMessage($chatId, $this->uiText->info($text), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        }
+    }
+
+    /** @param array<string,mixed> $data */
+    private function promptPanelConnectionStep(int $chatId, int $userId, string $step, array $data): void
     {
         $current = fn(string $key): string => isset($data[$key]) && (string) $data[$key] !== '' ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
         $text = match ($step) {
