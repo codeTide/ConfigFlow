@@ -34,7 +34,7 @@ final class MenuService
                     $this->catalog->get('menus.main.guide_value')
                 ),
             ],
-            tipBlockquote: $this->catalog->get('menus.main.tip'),
+            tipText: $this->catalog->get('menus.main.tip'),
         ));
     }
 
@@ -79,7 +79,7 @@ final class MenuService
                     $this->catalog->get('menus.admin.guide_value')
                 ),
             ],
-            tipBlockquote: $this->catalog->get('menus.admin.tip'),
+            tipText: $this->catalog->get('menus.admin.tip'),
         ));
     }
 
@@ -122,7 +122,7 @@ final class MenuService
                 new UiTextLine('', $this->catalog->get('menus.profile.user_id_label'), "<code>{$userIdFa}</code>"),
                 new UiTextLine('', $this->catalog->get('menus.profile.balance_label'), $this->catalog->get('menus.profile.balance_value', ['amount' => $balanceFa])),
             ],
-            tipBlockquote: $this->catalog->get('menus.profile.tip'),
+            tipText: $this->catalog->get('menus.profile.tip'),
         ));
     }
 
@@ -165,7 +165,7 @@ final class MenuService
         return $this->uiText->multi(new UiTextBlock(
             title: $this->catalog->get('menus.support.title'),
             lines: $lines,
-            tipBlockquote: $this->catalog->get('menus.support.tip'),
+            tipText: $this->catalog->get('menus.support.tip'),
         ));
     }
 
@@ -199,7 +199,7 @@ final class MenuService
             lines: [
                 new UiTextLine('', $this->catalog->get('menus.my_configs.latest_orders_label'), implode("\n", $lines)),
             ],
-            tipBlockquote: $this->catalog->get('menus.my_configs.tip'),
+            tipText: $this->catalog->get('menus.my_configs.tip'),
         ));
     }
 
@@ -229,7 +229,7 @@ final class MenuService
                 new UiTextLine('', $this->catalog->get('menus.referral.total_purchase_amount_label'), $this->catalog->get('menus.referral.total_purchase_amount_value', ['amount' => $totalPurchaseAmountFa])),
                 new UiTextLine('', $this->catalog->get('menus.referral.invite_link_label'), "\n\n<code>{$refLink}</code>"),
             ],
-            tipBlockquote: $this->catalog->get('menus.referral.tip'),
+            tipText: $this->catalog->get('menus.referral.tip'),
         ));
     }
 
