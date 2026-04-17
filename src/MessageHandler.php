@@ -4307,7 +4307,6 @@ final class MessageHandler
     {
         $baseUrl = trim((string) ($data['base_url'] ?? ''));
         $username = trim((string) ($data['username'] ?? ''));
-        $isEdit = $baseUrl !== '' || $username !== '';
         $currentBaseUrl = $baseUrl !== '' ? $this->catalog->get('admin.panel_settings.wizard.current_value', ['value' => htmlspecialchars($baseUrl)]) : '';
         $currentUsername = $username !== '' ? $this->catalog->get('admin.panel_settings.wizard.current_value', ['value' => htmlspecialchars($username)]) : '';
         $text = match ($step) {
@@ -4317,9 +4316,7 @@ final class MessageHandler
             default => '',
         };
         if ($text !== '') {
-            $title = $isEdit ? $this->catalog->get('admin.ui.open.panel_settings.wizard_edit_title') : $this->catalog->get('admin.ui.open.panel_settings.wizard_add_title');
-            $message = $title . "\n\n" . $text;
-            $this->telegram->sendMessage($chatId, $message, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
+            $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
         }
     }
 
