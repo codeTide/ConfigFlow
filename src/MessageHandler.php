@@ -4295,21 +4295,6 @@ final class MessageHandler
     }
 
     /** @param array<string,mixed> $data */
-    private function promptPanelSettingsStep(int $chatId, int $userId, string $step, array $data): void
-    {
-        $current = fn(string $key): string => isset($data[$key]) && (string) $data[$key] !== '' ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
-        $text = match ($step) {
-            'base_url' => 'آدرس پنل را وارد کنید.' . $current('base_url'),
-            'username' => 'نام کاربری پنل را وارد کنید.' . $current('username'),
-            'password' => 'رمز عبور پنل را وارد کنید.',
-            default => '',
-        };
-        if ($text !== '') {
-            $this->telegram->sendMessage($chatId, $this->uiText->info($text), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
-        }
-    }
-
-    /** @param array<string,mixed> $data */
     private function promptPanelConnectionStep(int $chatId, int $userId, string $step, array $data): void
     {
         $current = fn(string $key): string => isset($data[$key]) && (string) $data[$key] !== '' ? ' (فعلی: ' . htmlspecialchars((string) $data[$key]) . ')' : '';
