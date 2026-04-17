@@ -128,8 +128,8 @@ final class MenuService
 
         return $this->messageRenderer->render('menus.messages.support_overview', [
             'support_id' => $username !== '' ? $username : $this->catalog->get('messages.generic.dash'),
-            'support_link_line' => $link !== '' ? ("\n🌐 لینک پشتیبانی: " . $link) : '',
-            'support_link_desc_line' => $linkDesc !== '' ? ("\n📝 توضیح لینک: " . $linkDesc) : '',
+            'support_link_line' => $link !== '' ? $this->messageRenderer->render('menus.messages.support_link_line', ['link' => $link]) : '',
+            'support_link_desc_line' => $linkDesc !== '' ? $this->messageRenderer->render('menus.messages.support_link_desc_line', ['description' => $linkDesc]) : '',
         ]);
     }
 
