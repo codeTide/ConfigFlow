@@ -101,7 +101,7 @@ final class UiTextCatalog implements UiTextCatalogInterface
 
     private function normalizeTip(string $tip): string
     {
-        $tip = trim(preg_replace('/\s+/u', ' ', $tip) ?? '');
+        $tip = trim((string) preg_replace('/[^\S\n]+/u', ' ', $tip));
         if ($tip === '') {
             throw new \InvalidArgumentException('Tip cannot be empty.');
         }
