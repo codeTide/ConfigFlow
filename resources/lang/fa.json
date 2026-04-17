@@ -534,6 +534,7 @@
         "panel_pkg_add": "✏️ ویرایش سرویس",
         "panel_conn_add": "➕ تنظیم پنل",
         "panel_conn_edit": "✏️ ویرایش اطلاعات پنل",
+        "panel_conn_status": "📋 وضعیت اتصال پنل",
         "panel_conn_delete": "🗑 حذف پنل",
         "panel_conn_delete_confirm": "✅ تایید حذف",
         "panel_conn_delete_cancel": "❌ انصراف",
@@ -664,7 +665,8 @@
       },
       "messages": {
         "wizard_preview": "🧾 <b>پیش‌نمایش اتصال پنل</b>\n\n📋 خلاصه اتصال:\n🔹 🌐 آدرس پنل: {base_url}\n🔹 👤 نام کاربری: {username}\n🔹 🔐 رمز عبور: {password_masked}\n\n<blockquote>💡 اگر اطلاعات بالا کاملاً صحیح است، از دکمه ثبت استفاده کنید تا اطلاعات اتصال به پنل ذخیره و فعال شود.</blockquote>",
-        "menu_overview": "⚙️ <b>تنظیمات اتصال پنل</b>\n\n🌐 آدرس پنل: {base_url}\n👤 نام کاربری پنل: {username}\n🔐 رمز عبور پنل: {password_masked}\n📋 وضعیت اتصال: {status_text}\n\n<blockquote>{guide_text}</blockquote>",
+        "menu_overview": "⚙️ <b>تنظیمات اتصال پنل</b>\n\n🌐 آدرس پنل: {base_url}\n👤 نام کاربری پنل: {username}\n🔐 رمز عبور پنل: {password_masked}\n{status_line}\n<blockquote>{guide_text}</blockquote>",
+        "status_line": "📋 وضعیت اتصال: {status_text}\n",
         "delete_confirm": "🗑 <b>تایید حذف اتصال پنل</b>\n\n⚠️ پیام: {delete_text}\n\n<blockquote>{delete_tip}</blockquote>",
         "panels_list": "🖥 <b>مدیریت سرویس‌های پنلی</b>\n\n📋 وضعیت اتصال پنل: {connection_status}\n\n<blockquote>💡 این بخش فقط برای مدیریت اطلاعات اتصال پنل است. تعریف سرویس فروش از بخش نوع/پکیج انجام می‌شود.</blockquote>",
         "wizard_step_base_url": "🌐 لطفاً آدرس پنل را دقیق وارد کنید:\n\n🧩 آدرس باید کامل باشد (ترجیحاً با https://) و بدون فاصله اضافی ارسال شود.\n🧪 مثال: <code>https://panel.example.com</code>\n\n<blockquote>💡 ارسال آدرس صحیح و دارای SSL باعث می‌شود اتصال ربات به پنل پاسارگارد شما، ایمن‌تر و کم‌خطاتر باقی بماند.</blockquote>",
