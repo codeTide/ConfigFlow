@@ -679,7 +679,6 @@
         "connection_missing": "هیچ اطلاعات اتصالی برای پنل ثبت نشده است."
       },
       "summary": {
-        "title_label": "📋 خلاصه اتصال",
         "base_url_label": "🌐 آدرس پنل",
         "username_label": "👤 نام کاربری",
         "password_label": "🔐 رمز عبور",

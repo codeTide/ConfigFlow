@@ -3965,11 +3965,12 @@ final class MessageHandler
                 ]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->uiText->multi(new UiTextBlock(
-                        title: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_title'),
-                        lines: [new UiTextLine('', $this->catalog->get('admin.panel_settings.summary.title_label'), htmlspecialchars($summary))],
-                        tipText: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_tip')
-                    )),
+                    $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_title')
+                    . "\n\n"
+                    . htmlspecialchars($summary)
+                    . "\n\n<blockquote>"
+                    . htmlspecialchars($this->catalog->get('admin.ui.open.panel_settings.wizard_summary_tip'))
+                    . '</blockquote>',
                     $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.panel_settings.confirm_words.submit')], [UiLabels::back($this->catalog)]])
                 );
                 return;
