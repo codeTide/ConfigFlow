@@ -3963,7 +3963,15 @@ final class MessageHandler
                     'password_label' => $this->catalog->get('admin.panel_settings.summary.password_label'),
                     'password_masked' => str_repeat('*', min(strlen((string) ($data['password'] ?? '')), 10)),
                 ]);
-                $this->telegram->sendMessage($chatId, $this->uiText->multi(new UiTextBlock(title: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_title'), lines: [new UiTextLine('', $this->catalog->get('admin.panel_settings.summary.title_label'), htmlspecialchars($summary))], tipText: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_tip'))), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $this->uiText->multi(new UiTextBlock(
+                        title: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_title'),
+                        lines: [new UiTextLine('', $this->catalog->get('admin.panel_settings.summary.title_label'), htmlspecialchars($summary))],
+                        tipText: $this->catalog->get('admin.ui.open.panel_settings.wizard_summary_tip')
+                    )),
+                    $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.panel_settings.confirm_words.submit')], [UiLabels::back($this->catalog)]])
+                );
                 return;
             }
             if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {
