@@ -639,7 +639,7 @@
       },
       "success": {
         "connection_deleted": "اطلاعات اتصال پنل حذف شد.",
-        "connection_saved": "تنظیمات تحویل/پاسارگارد ذخیره شد."
+        "connection_saved": "تنظیمات پنل پاسارگارد ذخیره شد."
       },
       "info": {
         "connection_exists": "اتصال پنل ثبت شده است.",
