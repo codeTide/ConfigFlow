@@ -4611,13 +4611,9 @@ final class MessageHandler
         $this->database->setUserState($userId, 'buy.await_package', ['options' => $optionMap, 'type_id' => $typeId, 'stack' => ['buy.await_type'], 'package_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('messages.user.buy.package_selection.title'),
-                lines: [
-                    new UiTextLine('', $this->catalog->get('messages.user.buy.package_selection.label'), implode("\n", $lines)),
-                ],
-                tipText: $this->catalog->get('messages.user.buy.package_selection.tip'),
-            )),
+            $this->messageRenderer->render('messages.user.buy.package_selection.overview', [
+                'options' => implode("\n", $lines),
+            ], ['options']),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
@@ -4660,11 +4656,9 @@ final class MessageHandler
         $this->database->setUserState($userId, 'buy.panel.await_service', ['options' => $options]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('messages.user.buy.panel.service_selection.title'),
-                lines: [new UiTextLine('', $this->catalog->get('messages.user.buy.panel.service_selection.label'), implode("\n", $lines))],
-                tipText: $this->catalog->get('messages.user.buy.panel.service_selection.tip'),
-            )),
+            $this->messageRenderer->render('messages.user.buy.panel.service_selection.overview', [
+                'services' => implode("\n", $lines),
+            ], ['services']),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
@@ -4694,20 +4688,13 @@ final class MessageHandler
         $this->database->setUserState($userId, 'buy.panel.await_volume', ['service_id' => $serviceId]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('messages.user.buy.panel.volume_selection.title', ['title' => htmlspecialchars((string) ($service['title'] ?? 'Service'))]),
-                lines: [
-                    new UiTextLine('', $this->catalog->get('messages.user.buy.panel.volume_selection.range_label'), $this->catalog->get('messages.user.buy.panel.volume_selection.range_value', [
-                        'min_gb' => (string) ($service['min_gb'] ?? '0'),
-                        'max_gb' => (string) ($service['max_gb'] ?? '0'),
-                        'step_gb' => (string) ($service['step_gb'] ?? '1'),
-                    ])),
-                    new UiTextLine('', $this->catalog->get('messages.user.buy.panel.volume_selection.price_label'), $this->catalog->get('messages.user.buy.panel.volume_selection.price_value', [
-                        'price_per_gb' => (int) ($service['price_per_gb'] ?? 0),
-                    ])),
-                ],
-                tipText: $this->catalog->get('messages.user.buy.panel.volume_selection.tip'),
-            )),
+            $this->messageRenderer->render('messages.user.buy.panel.volume_selection.overview', [
+                'title' => (string) ($service['title'] ?? 'Service'),
+                'min_gb' => (string) ($service['min_gb'] ?? '0'),
+                'max_gb' => (string) ($service['max_gb'] ?? '0'),
+                'step_gb' => (string) ($service['step_gb'] ?? '1'),
+                'price_per_gb' => (int) ($service['price_per_gb'] ?? 0),
+            ]),
             $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
         );
     }
@@ -4750,11 +4737,9 @@ final class MessageHandler
             ]);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->uiText->multi(new UiTextBlock(
-                    title: $this->catalog->get('messages.user.buy.rules.title'),
-                    lines: [new UiTextLine('', $this->catalog->get('messages.user.buy.rules.label'), htmlspecialchars($rulesText))],
-                    tipText: $this->catalog->get('messages.user.buy.rules.tip'),
-                )),
+                $this->messageRenderer->render('messages.user.buy.rules.overview', [
+                    'rules_text' => $rulesText,
+                ]),
                 $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.accept_rules')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
             );
             return;
@@ -4789,13 +4774,9 @@ final class MessageHandler
             $this->database->setUserState($userId, 'buy.await_rules_accept', ['package_id' => $packageId, 'type_id' => (int) ($state['payload']['type_id'] ?? 0), 'stack' => ['buy.await_type', 'buy.await_package'], 'payment_method' => null]);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->uiText->multi(new UiTextBlock(
-                    title: $this->catalog->get('messages.user.buy.rules.title'),
-                    lines: [
-                        new UiTextLine('', $this->catalog->get('messages.user.buy.rules.label'), htmlspecialchars($rulesText)),
-                    ],
-                    tipText: $this->catalog->get('messages.user.buy.rules.tip'),
-                )),
+                $this->messageRenderer->render('messages.user.buy.rules.overview', [
+                    'rules_text' => $rulesText,
+                ]),
                 $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.accept_rules')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
             );
             return;
@@ -4807,14 +4788,10 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->uiText->error($this->catalog->get('messages.user.buy.package_not_found')));
             return;
         }
-        $textOut = $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('messages.user.buy.payment.title'),
-            lines: [
-                new UiTextLine('', $this->catalog->get('messages.user.buy.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
-                new UiTextLine('', $this->catalog->get('messages.user.buy.payment.price_label'), $this->catalog->get('messages.user.buy.payment.price_value', ['amount' => (int) $this->database->effectivePackagePrice($userId, $package)])),
-            ],
-            tipText: $this->catalog->get('messages.user.buy.payment.tip'),
-        ));
+        $textOut = $this->messageRenderer->render('messages.user.buy.payment.overview', [
+            'package_name' => (string) $package['name'],
+            'amount' => (int) $this->database->effectivePackagePrice($userId, $package),
+        ]);
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
             $buttons[] = [$this->catalog->get('buttons.pay.card')];
@@ -4868,13 +4845,9 @@ final class MessageHandler
         $this->database->setUserState($userId, 'renew.await_purchase', ['options' => $optionMap, 'stack' => [], 'purchase_id' => null, 'package_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('messages.user.renew.select_order.title'),
-                lines: [
-                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_order.label'), implode("\n", $lines)),
-                ],
-                tipText: $this->catalog->get('messages.user.renew.select_order.tip'),
-            )),
+            $this->messageRenderer->render('messages.user.renew.select_order.overview', [
+                'orders' => implode("\n", $lines),
+            ], ['orders']),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
@@ -4936,16 +4909,12 @@ final class MessageHandler
         $this->database->setUserState($userId, 'renew.await_package', ['options' => $optionMap, 'purchase_id' => $purchaseId, 'stack' => ['renew.await_purchase'], 'package_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->multi(new UiTextBlock(
-                title: $this->catalog->get('messages.user.renew.select_package.title'),
-                lines: [
-                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.order_label'), "<code>#{$purchaseId}</code>"),
-                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.current_service_label'), '<b>' . htmlspecialchars((string) ($purchase['service_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
-                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.current_package_label'), '<b>' . htmlspecialchars((string) ($purchase['package_name'] ?? $this->catalog->get('messages.generic.dash'))) . '</b>'),
-                    new UiTextLine('', $this->catalog->get('messages.user.renew.select_package.options_label'), implode("\n", $lines)),
-                ],
-                tipText: $this->catalog->get('messages.user.renew.select_package.tip'),
-            )),
+            $this->messageRenderer->render('messages.user.renew.select_package.overview', [
+                'purchase_id' => $purchaseId,
+                'service_name' => (string) ($purchase['service_name'] ?? $this->catalog->get('messages.generic.dash')),
+                'package_name' => (string) ($purchase['package_name'] ?? $this->catalog->get('messages.generic.dash')),
+                'options' => implode("\n", $lines),
+            ], ['options']),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
@@ -4979,15 +4948,11 @@ final class MessageHandler
             return;
         }
 
-        $textOut = $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('messages.user.renew.payment.title'),
-            lines: [
-                new UiTextLine('', $this->catalog->get('messages.user.renew.payment.order_label'), "<code>#{$purchaseId}</code>"),
-                new UiTextLine('', $this->catalog->get('messages.user.renew.payment.package_label'), '<b>' . htmlspecialchars((string) $package['name']) . '</b>'),
-                new UiTextLine('', $this->catalog->get('messages.user.renew.payment.amount_label'), $this->catalog->get('messages.user.renew.payment.amount_value', ['amount' => (int) $package['price']])),
-            ],
-            tipText: $this->catalog->get('messages.user.renew.payment.tip'),
-        ));
+        $textOut = $this->messageRenderer->render('messages.user.renew.payment.overview', [
+            'purchase_id' => $purchaseId,
+            'package_name' => (string) $package['name'],
+            'amount' => (int) $package['price'],
+        ]);
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
             $buttons[] = [$this->catalog->get('buttons.pay.card')];

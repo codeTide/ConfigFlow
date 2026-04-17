@@ -12,8 +12,10 @@ final class StartHandler
         private SettingsRepository $settings,
         private MenuService $menus,
         private ?UiJsonCatalog $catalog = null,
+        private ?UiMessageRenderer $messageRenderer = null,
     ) {
         $this->catalog ??= new UiJsonCatalog();
+        $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
     }
 
     public function handle(array $update): void
@@ -54,7 +56,7 @@ final class StartHandler
         if ($botStatus === 'update') {
             $this->telegram->sendMessage(
                 $chatId,
-                $this->catalog->get('messages.start.bot_updating')
+                $this->messageRenderer->render('messages.start.bot_updating')
             );
 
             return;
@@ -63,7 +65,7 @@ final class StartHandler
         if ($this->database->userStatus($userId) === 'restricted') {
             $this->telegram->sendMessage(
                 $chatId,
-                $this->catalog->get('messages.start.access_restricted')
+                $this->messageRenderer->render('messages.start.access_restricted')
             );
 
             return;
@@ -71,7 +73,7 @@ final class StartHandler
 
         if (!$this->checkChannelMembership($userId)) {
             $this->telegram->sendMessage($chatId, $this->channelLockText(), $this->channelLockKeyboard());
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
             return;
         }
 
@@ -101,7 +103,7 @@ final class StartHandler
 
     private function channelLockText(): string
     {
-        return $this->catalog->get('messages.channel.lock_simple');
+        return $this->messageRenderer->render('messages.channel.lock_simple');
     }
 
     private function channelLockKeyboard(): array
