@@ -4318,10 +4318,7 @@ final class MessageHandler
         };
         if ($text !== '') {
             $title = $isEdit ? $this->catalog->get('admin.ui.open.panel_settings.wizard_edit_title') : $this->catalog->get('admin.ui.open.panel_settings.wizard_add_title');
-            $message = $this->uiText->multi(new UiTextBlock(
-                title: $title,
-                lines: [new UiTextLine('', $this->catalog->get('admin.panel_settings.wizard.step_label'), $text)],
-            ));
+            $message = $title . "\n\n" . $text;
             $this->telegram->sendMessage($chatId, $message, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
         }
     }
