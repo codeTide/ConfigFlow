@@ -128,8 +128,8 @@ final class MenuService
 
         return $this->messageRenderer->render('menus.messages.support_overview', [
             'support_id' => $username !== '' ? $username : $this->catalog->get('messages.generic.dash'),
-            'support_link_line' => $link !== '' ? ("\n" . $this->catalog->get('menus.support.support_link_label') . ': ' . $link) : '',
-            'support_link_desc_line' => $linkDesc !== '' ? ("\n" . $this->catalog->get('menus.support.support_link_desc_label') . ': ' . $linkDesc) : '',
+            'support_link_line' => $link !== '' ? $this->messageRenderer->render('menus.messages.support_link_line', ['link' => $link]) : '',
+            'support_link_desc_line' => $linkDesc !== '' ? $this->messageRenderer->render('menus.messages.support_link_desc_line', ['description' => $linkDesc]) : '',
         ]);
     }
 
@@ -137,7 +137,7 @@ final class MenuService
     {
         $count = $this->database->countUserPurchases($userId);
         if ($count === 0) {
-            return $this->catalog->get('emojis.package') . ' ' . $this->catalog->get('errors.no_configs');
+            return $this->messageRenderer->render('menus.messages.my_configs_empty');
         }
 
         $items = $this->database->listUserPurchasesSummary($userId, 8);
@@ -158,13 +158,11 @@ final class MenuService
             ]);
         }
 
-        return $this->uiText->multi(new UiTextBlock(
-            title: $this->catalog->get('menus.my_configs.title', ['count' => $count]),
-            lines: [
-                new UiTextLine('', $this->catalog->get('menus.my_configs.latest_orders_label'), implode("\n", $lines)),
-            ],
-            tipText: $this->catalog->get('menus.my_configs.tip'),
-        ));
+        // Guardrail: row-template + implode is intentionally allowed only for data-driven lists.
+        return $this->messageRenderer->render('menus.messages.my_configs_overview', [
+            'count' => $count,
+            'orders' => implode("\n", $lines),
+        ], ['orders']);
     }
 
     public function referralText(int $userId): string
@@ -185,16 +183,13 @@ final class MenuService
         $intro = $banner !== '' ? $banner . "\n\n" : $defaultIntro . "\n\n";
 
         $title = preg_replace('/\s+/u', ' ', trim($intro)) ?: $defaultIntro;
-        return $this->uiText->multi(new UiTextBlock(
-            title: $title,
-            lines: [
-                new UiTextLine('', $this->catalog->get('menus.referral.total_referrals_label'), "<b>{$totalReferralsFa}</b>"),
-                new UiTextLine('', $this->catalog->get('menus.referral.purchase_count_label'), "<b>{$purchaseCountFa}</b>"),
-                new UiTextLine('', $this->catalog->get('menus.referral.total_purchase_amount_label'), $this->catalog->get('menus.referral.total_purchase_amount_value', ['amount' => $totalPurchaseAmountFa])),
-                new UiTextLine('', $this->catalog->get('menus.referral.invite_link_label'), "\n\n<code>{$refLink}</code>"),
-            ],
-            tipText: $this->catalog->get('menus.referral.tip'),
-        ));
+        return $this->messageRenderer->render('menus.messages.referral_overview', [
+            'title' => $title,
+            'total_referrals' => $totalReferralsFa,
+            'purchase_count' => $purchaseCountFa,
+            'total_purchase_amount' => $totalPurchaseAmountFa,
+            'ref_link' => $refLink,
+        ], ['title', 'ref_link']);
     }
 
     public function referralKeyboard(int $userId): array

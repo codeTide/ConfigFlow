@@ -39,6 +39,13 @@ ConfigFlow/
 └── env.example
 ```
 
+## Message Rendering Guardrails (Canonical Baseline)
+
+- Final user-visible/admin-visible messages should be rendered through `UiMessageRenderer` templates.
+- **Intentional exception:** data-driven list screens may keep `row-template + implode("\n", $lines)` assembly before injecting into a single `overview` template.
+- Rationale: list rows are runtime-generated collections and this pattern minimizes regression risk while preserving exact UI parity.
+- This exception is limited to list rendering only, and must not be used for general (non-list) messages.
+
 ## Environment Files
 
 - `env.example` is a **template** only.

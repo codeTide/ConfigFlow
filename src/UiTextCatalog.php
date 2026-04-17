@@ -11,8 +11,10 @@ final class UiTextCatalog implements UiTextCatalogInterface
 
     public function __construct(
         private ?UiJsonCatalog $catalog = null,
+        private ?UiMessageRenderer $messageRenderer = null,
     ) {
         $this->catalog ??= new UiJsonCatalog();
+        $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
         $this->genericTips = $this->catalog->getList('validation.generic_tips');
     }
 
@@ -36,51 +38,15 @@ final class UiTextCatalog implements UiTextCatalogInterface
         return $this->singleLine($this->catalog->get('emojis.info'), $message);
     }
 
-    public function multi(UiTextBlock $block): string
-    {
-        $title = trim($block->title);
-        if ($title === '') {
-            throw new \InvalidArgumentException('UiTextBlock title cannot be empty.');
-        }
-
-        $parts = [$title];
-        if ($block->lines !== []) {
-            $parts[] = '';
-            foreach ($block->lines as $line) {
-                if (!$line instanceof UiTextLine) {
-                    throw new \InvalidArgumentException('UiTextBlock lines must be UiTextLine instances.');
-                }
-                $emoji = trim($line->emoji);
-                $label = trim($line->label);
-                $value = trim($line->valueHtml);
-                $prefix = $emoji !== '' ? ($emoji . ' ' . $label) : $label;
-                $parts[] = sprintf('%s: %s', $prefix, $value);
-            }
-        }
-
-        if ($block->tipText !== null && trim($block->tipText) !== '') {
-            $tip = $this->normalizeTip($block->tipText);
-            $parts[] = '';
-            $parts[] = '<blockquote>' . htmlspecialchars($tip) . '</blockquote>';
-        }
-
-        return implode("\n", $parts);
-    }
-
     public function paymentCreated(int $paymentId, int $amount, string $title, ?string $tip = null): string
     {
-        $escapedTitle = htmlspecialchars(trim($title));
-
-        $block = new UiTextBlock(
-            title: $this->catalog->get('payments.created.title', ['title' => $escapedTitle]),
-            lines: [
-                new UiTextLine('', $this->catalog->get('payments.created.id_label'), '<code>' . $paymentId . '</code>'),
-                new UiTextLine('', $this->catalog->get('payments.created.amount_label'), $this->catalog->get('payments.created.amount_value', ['amount' => $amount])),
-            ],
-            tipText: $tip,
-        );
-
-        return $this->multi($block);
+        $key = $tip !== null && trim($tip) !== '' ? 'payments.created.overview_with_tip' : 'payments.created.overview';
+        return $this->messageRenderer->render($key, [
+            'title' => trim($title),
+            'payment_id' => $paymentId,
+            'amount' => $amount,
+            'tip' => $tip !== null ? $this->normalizeTip($tip) : '',
+        ]);
     }
 
     private function singleLine(string $emoji, string $message): string
