@@ -4316,7 +4316,17 @@ final class MessageHandler
             default => '',
         };
         if ($text !== '') {
-            $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
+            $message = $text;
+            $tip = null;
+            $parts = preg_split('/\n\n💡/u', $text, 2);
+            if (is_array($parts) && count($parts) === 2) {
+                $message = trim((string) $parts[0]);
+                $tip = '💡' . trim((string) $parts[1]);
+            }
+            if ($tip !== null && $tip !== '') {
+                $message = $this->uiText->multi(new UiTextBlock(title: $message, tipText: $tip));
+            }
+            $this->telegram->sendMessage($chatId, $message, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
         }
     }
 
