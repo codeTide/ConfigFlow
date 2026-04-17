@@ -3820,7 +3820,7 @@ final class MessageHandler
                     return;
                 }
                 if ($text === $this->catalog->get('admin.final_modules.actions.panel_conn_status')) {
-                    $this->sendAdminPanelStatusSnapshot($chatId);
+                    $this->sendAdminPanelStatusOverview($chatId);
                     return;
                 }
                 $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.panel_settings.errors.invalid_menu_option')));
@@ -4217,6 +4217,11 @@ final class MessageHandler
             'base_url' => $baseUrl !== '' ? $baseUrl : '-',
             'username' => $username !== '' ? $username : '-',
             'password_masked' => $passwordMasked,
+            'status_line' => $hasConnection
+                ? ''
+                : $this->catalog->get('admin.panel_settings.messages.status_line', [
+                    'status_text' => $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
+                ]),
             'status_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
             'guide_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty'),
         ]);
@@ -4248,7 +4253,8 @@ final class MessageHandler
             $this->catalog->get('admin.final_modules.actions.panel_conn_status'),
         ]];
         if ($hasConnection) {
-            $rows[] = [$this->catalog->get('admin.final_modules.actions.panel_conn_delete'), UiLabels::back($this->catalog)];
+            $rows[] = [$this->catalog->get('admin.final_modules.actions.panel_conn_delete')];
+            $rows[] = [UiLabels::back($this->catalog)];
             return $rows;
         }
         $rows[] = [UiLabels::back($this->catalog)];
@@ -4256,13 +4262,18 @@ final class MessageHandler
         return $rows;
     }
 
-    private function sendAdminPanelStatusSnapshot(int $chatId): void
+    private function sendAdminPanelStatusOverview(int $chatId): void
     {
         [$baseUrl, $username, $passwordMasked, $hasConnection] = $this->getPanelConnectionSummary();
-        $snapshotText = $this->messageRenderer->render('admin.panel_settings.messages.menu_status_snapshot', [
+        $snapshotText = $this->messageRenderer->render('admin.panel_settings.messages.menu_overview', [
             'base_url' => $baseUrl !== '' ? $baseUrl : '-',
             'username' => $username !== '' ? $username : '-',
             'password_masked' => $passwordMasked,
+            'status_line' => $hasConnection
+                ? ''
+                : $this->catalog->get('admin.panel_settings.messages.status_line', [
+                    'status_text' => $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
+                ]),
             'status_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
             'guide_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty'),
         ]);
