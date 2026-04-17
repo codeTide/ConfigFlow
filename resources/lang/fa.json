@@ -765,7 +765,12 @@
         "service_tariffs": "💳 تعرفه‌ها",
         "service_inventory": "📚 موجودی",
         "service_panel_bind": "🔌 اتصال پنل",
-        "service_toggle": "🔁 فعال/غیرفعال سرویس"
+        "service_toggle": "🔁 فعال/غیرفعال سرویس",
+        "service_tariff_add": "➕ افزودن تعرفه",
+        "service_stock_add": "➕ افزودن موجودی",
+        "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس",
+        "service_tariff_edit": "✏️ ویرایش تعرفه",
+        "service_tariff_delete": "🗑 حذف تعرفه"
       },
       "create_type": {
         "overview": "🆕 <b>افزودن نوع سرویس</b>\n\n✍️ راهنما: نام نوع سرویس جدید را ارسال کنید.\n\n<blockquote>💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید.</blockquote>"
@@ -790,6 +795,24 @@
           "confirm": "برای ثبت سرویس، «تایید» را ارسال کنید.",
           "summary_template": "نام: {name}\nحالت: {mode}\nپنل: {panel}\nمرجع پنل: {panel_ref}"
         },
+        "tariff_wizard": {
+          "title": "عنوان تعرفه را وارد کنید.",
+          "pricing_mode": "نوع قیمت‌گذاری را انتخاب کنید.",
+          "volume_gb": "حجم (GB) را وارد کنید.",
+          "duration_days": "مدت (روز) را وارد کنید.",
+          "price": "قیمت (تومان) را وارد کنید.",
+          "min_volume_gb": "حداقل حجم (GB) را وارد کنید.",
+          "max_volume_gb": "حداکثر حجم (GB) را وارد کنید.",
+          "step_volume_gb": "گام حجم (GB) را وارد کنید.",
+          "price_per_gb": "قیمت هر گیگ (تومان) را وارد کنید.",
+          "duration_policy": "duration_policy را وارد کنید: fixed_days یا unlimited.",
+          "summary_template": "عنوان: {title}\nحالت: {pricing_mode}\nحجم: {volume_gb}\nمدت: {duration_days}\nقیمت: {price}\nحداقل/حداکثر: {min_volume_gb} / {max_volume_gb}\nگام: {step_volume_gb}\nقیمت هر گیگ: {price_per_gb}\nduration_policy: {duration_policy}"
+        },
+        "tariff_delete_confirm": "برای حذف تعرفه #{tariff_id} عبارت «{confirm_word}» را ارسال کنید.",
+        "service_inventory": {
+          "tariff": "تعرفه این آیتم را انتخاب کنید (اختیاری).",
+          "payload": "فرمت ورودی:\nخط اول: نام سرویس\n---\nخط دوم: متن کانفیگ\n---\n(اختیاری) لینک استعلام"
+        },
         "wizard": {
           "name": "عنوان پکیج را وارد کنید.",
           "volume": "حجم پکیج (GB) را وارد کنید.",
@@ -807,7 +830,31 @@
         "inventory_bridge_notice": "این بخش در فاز ۱ به موجودی فعلی متصل است و بازطراحی کامل نشده است.",
         "inventory_bridge_not_stock": "مدیریت موجودی فقط برای سرویس‌های انباری فعال است.",
         "tariffs_placeholder": "بخش تعرفه‌ها در این فاز به‌صورت placeholder فعال است.",
-        "panel_bind_not_panel_auto": "مدیریت اتصال پنل فقط برای سرویس‌های panel_auto فعال است."
+        "panel_bind_not_panel_auto": "مدیریت اتصال پنل فقط برای سرویس‌های panel_auto فعال است.",
+        "tariffs_empty": "تعرفه‌ای برای این سرویس ثبت نشده است.",
+        "tariffs_overview": "💳 <b>تعرفه‌های سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 لیست تعرفه‌ها: {list}",
+        "tariff_detail_overview": "💳 <b>جزئیات تعرفه</b>\n\n🔢 شناسه: <code>{tariff_id}</code>\n📝 عنوان: <b>{title}</b>\n⚙️ حالت: {mode_text}\n📋 جزئیات: {summary}",
+        "tariff_wizard_summary": "🧾 <b>پیش‌نمایش تعرفه</b>\n\n📌 خلاصه: {summary}\n\n<blockquote>برای ثبت نهایی، «تایید» را ارسال کنید.</blockquote>",
+        "service_inventory_empty": "موجودی‌ای برای این سرویس ثبت نشده است.",
+        "service_inventory_overview": "📚 <b>موجودی سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 آیتم‌ها: {list}"
+      },
+      "labels": {
+        "panel_fallback_name": "اتصال پنل فعلی",
+        "panel_fallback_ref": "legacy_settings",
+        "mode_stock": "stock",
+        "mode_panel_auto": "panel_auto",
+        "pricing_mode_fixed": "fixed",
+        "pricing_mode_per_gb": "per_gb",
+        "tariff_fixed_row": "{volume_gb}GB/{duration_days}روز/{price}ت",
+        "tariff_per_gb_row": "{min_volume_gb}-{max_volume_gb}GB step:{step_volume_gb} price/GB:{price_per_gb}",
+        "tariff_list_row": "{num}) {title} | T:{tariff_id} | {summary}",
+        "tariff_option_button": "{num} - {title}",
+        "tariff_fixed_detail": "حجم: {volume_gb}GB | مدت: {duration_days} روز | قیمت: {price} تومان",
+        "tariff_per_gb_detail": "حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} GB | گام: {step_volume_gb} GB | قیمت هر گیگ: {price_per_gb} تومان | policy: {duration_policy} | روز: {duration_days}",
+        "service_inventory_row": "{num}) {status} {service_name} | C:{config_id}",
+        "service_inventory_option_button": "{num} - آیتم",
+        "service_inventory_no_tariff": "بدون تعرفه",
+        "service_inventory_tariff_button": "تعرفه #{tariff_id} | {title}"
       },
       "errors": {
         "invalid_type_option": "گزینه نامعتبر است. لطفاً یکی از دکمه‌های لیست نوع‌ها را انتخاب کنید.",
@@ -829,7 +876,21 @@
         "panel_required_for_panel_auto": "برای سرویس panel_auto باید یک پنل معتبر انتخاب شود.",
         "panel_not_found": "پنل انتخاب‌شده معتبر نیست.",
         "service_not_found": "سرویس پیدا نشد.",
-        "invalid_service_action": "گزینه نامعتبر است. از دکمه‌های مدیریت سرویس استفاده کنید."
+        "invalid_service_action": "گزینه نامعتبر است. از دکمه‌های مدیریت سرویس استفاده کنید.",
+        "invalid_tariff_option": "گزینه تعرفه معتبر نیست.",
+        "tariff_not_found": "تعرفه پیدا نشد.",
+        "tariff_invalid_input": "ورودی تعرفه معتبر نیست.",
+        "tariff_invalid_pricing_mode": "نوع قیمت‌گذاری معتبر نیست.",
+        "tariff_fixed_required": "برای حالت fixed باید volume/duration/price معتبر وارد شود.",
+        "tariff_per_gb_required": "برای حالت per_gb باید min/max/step/price_per_gb معتبر باشد.",
+        "tariff_invalid_duration_policy": "duration_policy باید fixed_days یا unlimited باشد.",
+        "tariff_duration_days_required": "وقتی duration_policy=fixed_days است، duration_days الزامی است.",
+        "tariff_validation_failed": "مقادیر تعرفه ناقص یا مبهم است.",
+        "tariff_delete_confirm_required": "برای حذف تعرفه باید عبارت تایید حذف را ارسال کنید.",
+        "invalid_service_inventory_option": "گزینه موجودی سرویس معتبر نیست.",
+        "service_inventory_invalid_input": "ورودی موجودی سرویس معتبر نیست.",
+        "service_inventory_tariff_invalid": "تعرفه انتخابی معتبر نیست.",
+        "service_inventory_payload_format": "فرمت ورودی موجودی نامعتبر است. جداکننده --- را رعایت کنید."
       },
       "success": {
         "type_created": "نوع سرویس با شناسه <code>{type_id}</code> ثبت شد.",
@@ -840,7 +901,11 @@
         "package_deleted": "پکیج حذف شد.",
         "service_created": "سرویس با شناسه <code>{service_id}</code> ثبت شد.",
         "service_updated": "تنظیمات سرویس بروزرسانی شد.",
-        "service_status_updated": "وضعیت سرویس بروزرسانی شد."
+        "service_status_updated": "وضعیت سرویس بروزرسانی شد.",
+        "tariff_created": "تعرفه ثبت شد.",
+        "tariff_updated": "تعرفه بروزرسانی شد.",
+        "tariff_deleted": "تعرفه حذف شد.",
+        "service_stock_added": "موجودی سرویس با شناسه <code>{config_id}</code> ثبت شد."
       }
     },
     "ui": {

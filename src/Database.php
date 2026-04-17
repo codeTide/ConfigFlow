@@ -86,6 +86,33 @@ final class Database implements WorkerApiStore
                 INDEX idx_service_active (is_active)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS service_tariff (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                service_id BIGINT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                pricing_mode VARCHAR(32) NOT NULL DEFAULT 'fixed',
+                volume_gb DECIMAL(10,2) NULL,
+                duration_days INT NULL,
+                price INT NULL,
+                min_volume_gb DECIMAL(10,2) NULL,
+                max_volume_gb DECIMAL(10,2) NULL,
+                step_volume_gb DECIMAL(10,2) NULL,
+                price_per_gb INT NULL,
+                duration_policy VARCHAR(32) NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                INDEX idx_service_tariff_service (service_id),
+                INDEX idx_service_tariff_mode (pricing_mode),
+                INDEX idx_service_tariff_active (is_active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $this->pdo->exec("ALTER TABLE configs MODIFY package_id BIGINT NULL");
+        $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id");
+        $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
+        $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_service (service_id)");
+        $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_tariff (tariff_id)");
     }
 
     public function pdo(): PDO
@@ -740,6 +767,168 @@ final class Database implements WorkerApiStore
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
             'created_at' => $now,
             'updated_at' => $now,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function listTariffsByService(int $serviceId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, service_id, title, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, step_volume_gb, price_per_gb, duration_policy, is_active
+             FROM service_tariff
+             WHERE service_id = :service_id
+             ORDER BY id DESC'
+        );
+        $stmt->execute(['service_id' => $serviceId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getServiceTariff(int $tariffId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, service_id, title, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, step_volume_gb, price_per_gb, duration_policy, is_active
+             FROM service_tariff
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => $tariffId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
+    /** @param array<string,mixed> $data */
+    public function createServiceTariff(array $data): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO service_tariff (
+                service_id, title, pricing_mode, volume_gb, duration_days, price,
+                min_volume_gb, max_volume_gb, step_volume_gb, price_per_gb, duration_policy, is_active, created_at, updated_at
+             ) VALUES (
+                :service_id, :title, :pricing_mode, :volume_gb, :duration_days, :price,
+                :min_volume_gb, :max_volume_gb, :step_volume_gb, :price_per_gb, :duration_policy, :is_active, :created_at, :updated_at
+             )'
+        );
+        $now = gmdate('Y-m-d H:i:s');
+        $stmt->execute([
+            'service_id' => (int) ($data['service_id'] ?? 0),
+            'title' => trim((string) ($data['title'] ?? '')),
+            'pricing_mode' => (string) ($data['pricing_mode'] ?? 'fixed'),
+            'volume_gb' => isset($data['volume_gb']) ? (float) $data['volume_gb'] : null,
+            'duration_days' => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
+            'price' => isset($data['price']) ? (int) $data['price'] : null,
+            'min_volume_gb' => isset($data['min_volume_gb']) ? (float) $data['min_volume_gb'] : null,
+            'max_volume_gb' => isset($data['max_volume_gb']) ? (float) $data['max_volume_gb'] : null,
+            'step_volume_gb' => isset($data['step_volume_gb']) ? (float) $data['step_volume_gb'] : null,
+            'price_per_gb' => isset($data['price_per_gb']) ? (int) $data['price_per_gb'] : null,
+            'duration_policy' => isset($data['duration_policy']) ? (string) $data['duration_policy'] : null,
+            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    /** @param array<string,mixed> $data */
+    public function updateServiceTariff(int $tariffId, array $data): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE service_tariff
+             SET title = :title, pricing_mode = :pricing_mode, volume_gb = :volume_gb, duration_days = :duration_days, price = :price,
+                 min_volume_gb = :min_volume_gb, max_volume_gb = :max_volume_gb, step_volume_gb = :step_volume_gb,
+                 price_per_gb = :price_per_gb, duration_policy = :duration_policy, is_active = :is_active, updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $stmt->execute([
+            'title' => trim((string) ($data['title'] ?? '')),
+            'pricing_mode' => (string) ($data['pricing_mode'] ?? 'fixed'),
+            'volume_gb' => isset($data['volume_gb']) ? (float) $data['volume_gb'] : null,
+            'duration_days' => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
+            'price' => isset($data['price']) ? (int) $data['price'] : null,
+            'min_volume_gb' => isset($data['min_volume_gb']) ? (float) $data['min_volume_gb'] : null,
+            'max_volume_gb' => isset($data['max_volume_gb']) ? (float) $data['max_volume_gb'] : null,
+            'step_volume_gb' => isset($data['step_volume_gb']) ? (float) $data['step_volume_gb'] : null,
+            'price_per_gb' => isset($data['price_per_gb']) ? (int) $data['price_per_gb'] : null,
+            'duration_policy' => isset($data['duration_policy']) ? (string) $data['duration_policy'] : null,
+            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+            'id' => $tariffId,
+        ]);
+    }
+
+    public function deleteServiceTariff(int $tariffId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM service_tariff WHERE id = :id');
+        $stmt->execute(['id' => $tariffId]);
+    }
+
+    public function countTariffsByService(int $serviceId): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM service_tariff WHERE service_id = :service_id');
+        $stmt->execute(['service_id' => $serviceId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function countAvailableConfigsByService(int $serviceId): int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+             FROM configs
+             WHERE service_id = :service_id
+               AND sold_to IS NULL
+               AND reserved_payment_id IS NULL
+               AND is_expired = 0'
+        );
+        $stmt->execute(['service_id' => $serviceId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function listConfigsByService(int $serviceId, ?int $tariffId = null, int $limit = 20, int $offset = 0): array
+    {
+        $limit = max(1, min($limit, 100));
+        $offset = max(0, $offset);
+        $sql = 'SELECT id, service_id, tariff_id, service_name, sold_to, is_expired, inquiry_link, created_at
+                FROM configs
+                WHERE service_id = :service_id';
+        $params = ['service_id' => $serviceId];
+        if ($tariffId !== null && $tariffId > 0) {
+            $sql .= ' AND tariff_id = :tariff_id';
+            $params['tariff_id'] = $tariffId;
+        }
+        $sql .= ' ORDER BY id DESC LIMIT ' . $limit . ' OFFSET ' . $offset;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function countConfigsByService(int $serviceId, ?int $tariffId = null): int
+    {
+        $sql = 'SELECT COUNT(*) FROM configs WHERE service_id = :service_id';
+        $params = ['service_id' => $serviceId];
+        if ($tariffId !== null && $tariffId > 0) {
+            $sql .= ' AND tariff_id = :tariff_id';
+            $params['tariff_id'] = $tariffId;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function addConfigForService(int $serviceId, ?int $tariffId, string $serviceName, string $configText, ?string $inquiryLink = null): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO configs (
+                type_id, package_id, service_id, tariff_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
+             ) VALUES (
+                0, NULL, :service_id, :tariff_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
+             )'
+        );
+        $stmt->execute([
+            'service_id' => $serviceId,
+            'tariff_id' => $tariffId !== null && $tariffId > 0 ? $tariffId : null,
+            'service_name' => trim($serviceName),
+            'config_text' => trim($configText),
+            'inquiry_link' => $inquiryLink !== null && trim($inquiryLink) !== '' ? trim($inquiryLink) : null,
+            'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
         return (int) $this->pdo->lastInsertId();
     }
