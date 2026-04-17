@@ -11,8 +11,10 @@ final class UiTextCatalog implements UiTextCatalogInterface
 
     public function __construct(
         private ?UiJsonCatalog $catalog = null,
+        private ?UiMessageRenderer $messageRenderer = null,
     ) {
         $this->catalog ??= new UiJsonCatalog();
+        $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
         $this->genericTips = $this->catalog->getList('validation.generic_tips');
     }
 
@@ -69,18 +71,13 @@ final class UiTextCatalog implements UiTextCatalogInterface
 
     public function paymentCreated(int $paymentId, int $amount, string $title, ?string $tip = null): string
     {
-        $escapedTitle = htmlspecialchars(trim($title));
-
-        $block = new UiTextBlock(
-            title: $this->catalog->get('payments.created.title', ['title' => $escapedTitle]),
-            lines: [
-                new UiTextLine('', $this->catalog->get('payments.created.id_label'), '<code>' . $paymentId . '</code>'),
-                new UiTextLine('', $this->catalog->get('payments.created.amount_label'), $this->catalog->get('payments.created.amount_value', ['amount' => $amount])),
-            ],
-            tipText: $tip,
-        );
-
-        return $this->multi($block);
+        $key = $tip !== null && trim($tip) !== '' ? 'payments.created.overview_with_tip' : 'payments.created.overview';
+        return $this->messageRenderer->render($key, [
+            'title' => trim($title),
+            'payment_id' => $paymentId,
+            'amount' => $amount,
+            'tip' => $tip !== null ? $this->normalizeTip($tip) : '',
+        ]);
     }
 
     private function singleLine(string $emoji, string $message): string

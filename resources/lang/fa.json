@@ -57,55 +57,23 @@
     "package": "📦"
   },
   "menus": {
-    "main": {
-      "title": "✨ <b>به فروشگاه ConfigFlow خوش آمدید!</b>",
-      "guide_label": "🧭 راهنما",
-      "guide_value": "از منوی زیر بخش مورد نظر خود را انتخاب کنید.",
-      "tip": "💡 اگر اولین بار است وارد ربات می‌شوید، ابتدا بخش حساب را باز کنید تا وضعیت موجودی و امکانات فعال خود را ببینید."
-    },
-    "admin": {
-      "title": "⚙️ <b>پنل مدیریت</b>",
-      "guide_label": "🧭 راهنما",
-      "guide_value": "از دکمه‌های زیر بخش مدیریتی موردنظر را انتخاب کنید.",
-      "tip": "💡 هر زمان نیاز داشتید می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را کنترل کنید تا عملیات مدیریتی اشتباه ثبت نشود."
-    },
-    "profile": {
-      "title": "👤 <b>پروفایل کاربری</b>",
-      "name_label": "📱 نام",
-      "username_label": "🌀 نام کاربری",
-      "user_id_label": "🔢 آیدی",
-      "balance_label": "💰 موجودی",
-      "balance_value": "<b>{amount}</b> تومان",
-      "tip": "🔐 اطلاعات حساب شما امن است؛ برای شارژ، دعوت دوستان یا ثبت نمایندگی فقط از دکمه‌های همین بخش استفاده کنید."
-    },
-    "support": {
-      "title": "🎧 <b>ارتباط با پشتیبانی</b>",
-      "support_id_label": "🌀 آیدی پشتیبانی",
-      "support_link_label": "🌐 لینک پشتیبانی",
-      "support_link_desc_label": "📝 توضیح لینک",
-      "tip": "💡 برای بررسی سریع‌تر، مشکل را همراه با جزئیات مرحله، خطا یا شناسه سفارش ارسال کنید تا تیم پشتیبانی دقیق‌تر راهنمایی کند."
-    },
     "messages": {
       "main_overview": "✨ <b>به فروشگاه ConfigFlow خوش آمدید!</b>\n\n🧭 راهنما: از منوی زیر بخش مورد نظر خود را انتخاب کنید.\n\n<blockquote>💡 اگر اولین بار است وارد ربات می‌شوید، ابتدا بخش حساب را باز کنید تا وضعیت موجودی و امکانات فعال خود را ببینید.</blockquote>",
       "admin_overview": "⚙️ <b>پنل مدیریت</b>\n\n🧭 راهنما: از دکمه‌های زیر بخش مدیریتی موردنظر را انتخاب کنید.\n\n<blockquote>💡 هر زمان نیاز داشتید می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را کنترل کنید تا عملیات مدیریتی اشتباه ثبت نشود.</blockquote>",
       "profile_overview": "👤 <b>پروفایل کاربری</b>\n\n📱 نام: {full_name}\n🌀 نام کاربری: {username}\n🔢 آیدی: <code>{user_id}</code>\n💰 موجودی: <b>{balance}</b> تومان\n\n<blockquote>🔐 اطلاعات حساب شما امن است؛ برای شارژ، دعوت دوستان یا ثبت نمایندگی فقط از دکمه‌های همین بخش استفاده کنید.</blockquote>",
-      "support_overview": "🎧 <b>ارتباط با پشتیبانی</b>\n\n🌀 آیدی پشتیبانی: {support_id}{support_link_line}{support_link_desc_line}\n\n<blockquote>💡 برای بررسی سریع‌تر، مشکل را همراه با جزئیات مرحله، خطا یا شناسه سفارش ارسال کنید تا تیم پشتیبانی دقیق‌تر راهنمایی کند.</blockquote>"
+      "support_overview": "🎧 <b>ارتباط با پشتیبانی</b>\n\n🌀 آیدی پشتیبانی: {support_id}{support_link_line}{support_link_desc_line}\n\n<blockquote>💡 برای بررسی سریع‌تر، مشکل را همراه با جزئیات مرحله، خطا یا شناسه سفارش ارسال کنید تا تیم پشتیبانی دقیق‌تر راهنمایی کند.</blockquote>",
+      "support_link_line": "\n🌐 لینک پشتیبانی: {link}",
+      "support_link_desc_line": "\n📝 توضیح لینک: {description}",
+      "my_configs_empty": "📦 هنوز کانفیگی برای حساب شما ثبت نشده است.",
+      "my_configs_overview": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>\n\n🗂 آخرین سفارش‌ها: {orders}\n\n<blockquote>💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند.</blockquote>",
+      "referral_overview": "{title}\n\n📊 زیرمجموعه‌ها: <b>{total_referrals}</b>\n🛒 خریدهای زیرمجموعه: <b>{purchase_count}</b>\n💵 مجموع خرید زیرمجموعه: <b>{total_purchase_amount}</b> تومان\n🔗 لینک دعوت: \n\n<code>{ref_link}</code>\n\n<blockquote>💡 لینک دعوت را فقط برای مخاطب واقعی بفرستید؛ ثبت‌نام و خرید زیرمجموعه‌ها خودکار در آمار شما ثبت می‌شود.</blockquote>"
     },
     "my_configs": {
-      "title": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>",
-      "latest_orders_label": "🗂 آخرین سفارش‌ها",
       "order_row": "• #{id} | {package} | {service} | {amount} تومان{test_suffix}\n  ⏱ {created_at}",
-      "test_suffix": " (تست)",
-      "tip": "💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند."
+      "test_suffix": " (تست)"
     },
     "referral": {
       "default_intro": "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>",
-      "total_referrals_label": "📊 زیرمجموعه‌ها",
-      "purchase_count_label": "🛒 خریدهای زیرمجموعه",
-      "total_purchase_amount_label": "💵 مجموع خرید زیرمجموعه",
-      "total_purchase_amount_value": "<b>{amount}</b> تومان",
-      "invite_link_label": "🔗 لینک دعوت",
-      "tip": "💡 لینک دعوت را فقط برای مخاطب واقعی بفرستید؛ ثبت‌نام و خرید زیرمجموعه‌ها خودکار در آمار شما ثبت می‌شود.",
       "share_text": "از لینک من وارد شو:\n{ref_link}"
     }
   },
@@ -135,6 +103,7 @@
       "admin_access_denied": "شما دسترسی ادمین ندارید.",
       "admin_legacy": "⚠️ مسیر ادمین قدیمی شده است. از پنل مدیریت جدید ادامه دهید.",
       "admin_legacy_note": "💡 این callback منقضی شده و flow جدید جایگزین آن است.",
+      "admin_legacy_overview": "{admin_overview}\n\n{legacy_note}",
       "expired_operation": "عملیات منقضی شده است. از منوی اصلی ادامه دهید."
     },
     "user": {
@@ -147,7 +116,7 @@
         "not_available": "⚠️ فعلاً تست آماده نداریم یا سهمیه‌تان پر شده است.",
         "default_service": "سرویس تست",
         "ready": "🎁 <b>تست رایگان شما آماده است</b>\n\n📦 سرویس: <b>{service_name}</b>\n🧪 نوع سفارش: <b>تست رایگان</b>\n\n🔗 کانفیگ شما:\n<code>{config_text}</code>",
-        "inquiry": "🌐 لینک استعلام:\n{inquiry_link}",
+        "ready_with_inquiry": "🎁 <b>تست رایگان شما آماده است</b>\n\n📦 سرویس: <b>{service_name}</b>\n🧪 نوع سفارش: <b>تست رایگان</b>\n\n🔗 کانفیگ شما:\n<code>{config_text}</code>\n\n🌐 لینک استعلام:\n{inquiry_link}",
         "note_as_text": "⚠️ لطفاً متن توضیح ارسال کنید، نه دکمه‌های منو.",
         "note_required": "⚠️ لطفاً توضیح کوتاه تست را ارسال کنید.",
         "request_submitted": "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید.\nشناسه درخواست: <code>{request_id}</code>"
@@ -170,20 +139,20 @@
         "out_of_stock": "این پکیج در حال حاضر موجودی ندارد.",
         "package_not_found": "پکیج پیدا نشد.",
         "type_selection": {
-          "title": "🛒 <b>خرید کانفیگ</b>",
-          "label": "🧩 انتخاب نوع سرویس",
-          "tip": "💡 ابتدا نوع سرویس را انتخاب کنید؛ در مرحله بعد لیست پکیج‌های همان نوع نمایش داده می‌شود و می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را مدیریت کنید."
+          "overview": "🛒 <b>خرید کانفیگ</b>\n\n🧩 انتخاب نوع سرویس: {options}\n\n<blockquote>💡 ابتدا نوع سرویس را انتخاب کنید؛ در مرحله بعد لیست پکیج‌های همان نوع نمایش داده می‌شود و می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را مدیریت کنید.</blockquote>"
         },
         "package_selection": {
           "title": "📦 <b>انتخاب پکیج</b>",
           "label": "📋 لیست پکیج‌ها",
-          "tip": "💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید نوع سرویس را دوباره تغییر دهید."
+          "tip": "💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید نوع سرویس را دوباره تغییر دهید.",
+          "overview": "📦 <b>انتخاب پکیج</b>\n\n📋 لیست پکیج‌ها: {options}\n\n<blockquote>💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید نوع سرویس را دوباره تغییر دهید.</blockquote>"
         },
         "rules": {
           "default_text": "لطفاً قوانین خرید را بپذیرید.",
           "title": "📜 <b>قوانین خرید</b>",
           "label": "📝 متن قوانین",
           "tip": "⚠️ با تایید قوانین، خرید شما وارد مرحله انتخاب روش پرداخت می‌شود؛ اگر نیاز به تغییر پکیج دارید از دکمه بازگشت استفاده کنید تا انتخاب قبلی را اصلاح کنید.",
+          "overview": "📜 <b>قوانین خرید</b>\n\n📝 متن قوانین: {rules_text}\n\n<blockquote>⚠️ با تایید قوانین، خرید شما وارد مرحله انتخاب روش پرداخت می‌شود؛ اگر نیاز به تغییر پکیج دارید از دکمه بازگشت استفاده کنید تا انتخاب قبلی را اصلاح کنید.</blockquote>",
           "must_accept": "لطفاً گزینه تایید قوانین را انتخاب کنید.",
           "need_accept_first": "ابتدا قوانین خرید را بپذیرید."
         },
@@ -192,7 +161,8 @@
           "package_label": "📦 پکیج",
           "price_label": "💵 قیمت",
           "price_value": "<b>{amount}</b> تومان",
-          "tip": "💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود."
+          "tip": "💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود.",
+          "overview": "💰 <b>پرداخت سفارش</b>\n\n📦 پکیج: <b>{package_name}</b>\n💵 قیمت: <b>{amount}</b> تومان\n\n<blockquote>💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود.</blockquote>"
         },
         "panel": {
           "service_row": "{num}) {title} | {min_gb}-{max_gb}GB | step:{step_gb} | {price_per_gb} تومان/GB",
@@ -200,7 +170,8 @@
           "service_selection": {
             "title": "🛒 <b>خرید سرویس مستقیم</b>",
             "label": "🧩 انتخاب سرویس",
-            "tip": "💡 یک سرویس را انتخاب کنید؛ سپس حجم دلخواه را در بازه مجاز همان سرویس وارد کنید."
+            "tip": "💡 یک سرویس را انتخاب کنید؛ سپس حجم دلخواه را در بازه مجاز همان سرویس وارد کنید.",
+            "overview": "🛒 <b>خرید سرویس مستقیم</b>\n\n🧩 انتخاب سرویس: {services}\n\n<blockquote>💡 یک سرویس را انتخاب کنید؛ سپس حجم دلخواه را در بازه مجاز همان سرویس وارد کنید.</blockquote>"
           },
           "volume_selection": {
             "title": "📏 <b>انتخاب حجم برای {title}</b>",
@@ -208,12 +179,11 @@
             "range_value": "حداقل: {min_gb} GB | حداکثر: {max_gb} GB | گام: {step_gb} GB",
             "price_label": "💵 تعرفه",
             "price_value": "{price_per_gb} تومان به‌ازای هر GB",
-            "tip": "💡 حجم را به‌صورت عددی وارد کنید (مثلاً 10 یا 12.5) تا مبلغ نهایی محاسبه شود."
+            "tip": "💡 حجم را به‌صورت عددی وارد کنید (مثلاً 10 یا 12.5) تا مبلغ نهایی محاسبه شود.",
+            "overview": "📏 <b>انتخاب حجم برای {title}</b>\n\n📦 بازه مجاز: حداقل: {min_gb} GB | حداکثر: {max_gb} GB | گام: {step_gb} GB\n💵 تعرفه: {price_per_gb} تومان به‌ازای هر GB\n\n<blockquote>💡 حجم را به‌صورت عددی وارد کنید (مثلاً 10 یا 12.5) تا مبلغ نهایی محاسبه شود.</blockquote>"
           },
           "payment": {
-            "service_label": "🧩 سرویس",
-            "volume_label": "💾 حجم",
-            "volume_value": "{volume} GB"
+            "overview": "💰 <b>پرداخت سفارش</b>\n\n🧩 سرویس: <b>{service_title}</b>\n💾 حجم: {volume} GB\n💵 قیمت: <b>{amount}</b> تومان\n\n<blockquote>💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود.</blockquote>"
           },
           "errors": {
             "invalid_volume": "حجم واردشده معتبر نیست یا با بازه/گام سرویس سازگار نیست."
@@ -227,7 +197,8 @@
         "select_order": {
           "title": "♻️ <b>تمدید سرویس</b>",
           "label": "📋 لیست سفارش‌ها",
-          "tip": "💡 برای تمدید، شماره سفارش موردنظر را از دکمه‌ها انتخاب کنید؛ در ادامه پکیج‌های تمدید همان سرویس نمایش داده می‌شود و می‌توانید مسیر را با بازگشت مدیریت کنید."
+          "tip": "💡 برای تمدید، شماره سفارش موردنظر را از دکمه‌ها انتخاب کنید؛ در ادامه پکیج‌های تمدید همان سرویس نمایش داده می‌شود و می‌توانید مسیر را با بازگشت مدیریت کنید.",
+          "overview": "♻️ <b>تمدید سرویس</b>\n\n📋 لیست سفارش‌ها: {orders}\n\n<blockquote>💡 برای تمدید، شماره سفارش موردنظر را از دکمه‌ها انتخاب کنید؛ در ادامه پکیج‌های تمدید همان سرویس نمایش داده می‌شود و می‌توانید مسیر را با بازگشت مدیریت کنید.</blockquote>"
         },
         "order_not_found": "سفارش پیدا نشد.",
         "test_not_renewable": "تمدید برای سرویس تست ممکن نیست.",
@@ -240,7 +211,8 @@
           "current_service_label": "📡 سرویس فعلی",
           "current_package_label": "📦 پکیج فعلی",
           "options_label": "📋 گزینه‌های تمدید",
-          "tip": "💡 پکیج تمدید باید با سرویس فعلی شما سازگار باشد؛ اگر انتخاب را اشتباه انجام دادید با بازگشت به لیست سفارش‌ها برگردید و گزینه درست را انتخاب کنید."
+          "tip": "💡 پکیج تمدید باید با سرویس فعلی شما سازگار باشد؛ اگر انتخاب را اشتباه انجام دادید با بازگشت به لیست سفارش‌ها برگردید و گزینه درست را انتخاب کنید.",
+          "overview": "♻️ <b>انتخاب پکیج تمدید</b>\n\n🧾 سفارش: <code>#{purchase_id}</code>\n📡 سرویس فعلی: <b>{service_name}</b>\n📦 پکیج فعلی: <b>{package_name}</b>\n📋 گزینه‌های تمدید: {options}\n\n<blockquote>💡 پکیج تمدید باید با سرویس فعلی شما سازگار باشد؛ اگر انتخاب را اشتباه انجام دادید با بازگشت به لیست سفارش‌ها برگردید و گزینه درست را انتخاب کنید.</blockquote>"
         },
         "payment": {
           "title": "💳 <b>پرداخت تمدید</b>",
@@ -248,7 +220,8 @@
           "package_label": "📦 پکیج تمدید",
           "amount_label": "💵 مبلغ",
           "amount_value": "<b>{amount}</b> تومان",
-          "tip": "💡 روش پرداخت مناسب را انتخاب کنید؛ بعد از تکمیل پرداخت، وضعیت تراکنش را بررسی کنید تا درخواست تمدید در صف تحویل قرار بگیرد."
+          "tip": "💡 روش پرداخت مناسب را انتخاب کنید؛ بعد از تکمیل پرداخت، وضعیت تراکنش را بررسی کنید تا درخواست تمدید در صف تحویل قرار بگیرد.",
+          "overview": "💳 <b>پرداخت تمدید</b>\n\n🧾 سفارش: <code>#{purchase_id}</code>\n📦 پکیج تمدید: <b>{package_name}</b>\n💵 مبلغ: <b>{amount}</b> تومان\n\n<blockquote>💡 روش پرداخت مناسب را انتخاب کنید؛ بعد از تکمیل پرداخت، وضعیت تراکنش را بررسی کنید تا درخواست تمدید در صف تحویل قرار بگیرد.</blockquote>"
         },
         "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان"
       },
@@ -318,10 +291,8 @@
   },
   "payments": {
     "created": {
-      "title": "💳 <b>{title}</b>",
-      "id_label": "🧾 شناسه سفارش",
-      "amount_label": "💰 مبلغ",
-      "amount_value": "<b>{amount}</b> تومان"
+      "overview": "💳 <b>{title}</b>\n\n🧾 شناسه سفارش: <code>{payment_id}</code>\n💰 مبلغ: <b>{amount}</b> تومان",
+      "overview_with_tip": "💳 <b>{title}</b>\n\n🧾 شناسه سفارش: <code>{payment_id}</code>\n💰 مبلغ: <b>{amount}</b> تومان\n\n<blockquote>{tip}</blockquote>"
     }
   },
   "validation": {
@@ -347,7 +318,8 @@
       "legacy_button_request": "دکمه قدیمی است؛ مسیر canonical برای بررسی درخواست باز شد.",
       "legacy_free_request_prefix": "👀 درخواست تست",
       "legacy_agency_request_prefix": "👀 درخواست نمایندگی",
-      "note_line": "توضیح: {note}\n"
+      "note_line": "توضیح: {note}\n",
+      "notice_with_optional_note": "{notice}{note_line}"
     },
     "legacy": {
       "labels": {
@@ -460,11 +432,7 @@
         "status_rejected": "❌ رد شد"
       },
       "prompts": {
-        "request_review_note_title": "📝 <b>ثبت یادداشت {action_text}</b>",
-        "request_id_label": "👤 شناسه درخواست",
-        "note_label": "✍️ یادداشت",
-        "note_value": "یادداشت ادمین را ارسال کنید. اگر یادداشت ندارید، «-» بفرستید.",
-        "note_tip": "💡 یادداشت به کاربر ارسال می‌شود؛ کوتاه و واضح بنویسید."
+        "request_review_note_overview": "📝 <b>ثبت یادداشت {action_text}</b>\n\n👤 شناسه درخواست: <code>{request_id}</code>\n✍️ یادداشت: یادداشت ادمین را ارسال کنید. اگر یادداشت ندارید، «-» بفرستید.\n\n<blockquote>💡 یادداشت به کاربر ارسال می‌شود؛ کوتاه و واضح بنویسید.</blockquote>"
       },
       "errors": {
         "invalid_payment_option": "گزینه نامعتبر است. یکی از پرداخت‌ها را انتخاب کنید.",
@@ -514,24 +482,15 @@
         "send_confirm": "ارسال"
       },
       "prompts": {
-        "set_channel_title": "📣 <b>تنظیم کانال قفل</b>",
-        "input_label": "🧾 ورودی",
-        "set_channel_input_value": "آیدی کانال را بفرستید (@channel یا -100...). برای غیرفعال‌سازی «-» ارسال کنید.",
-        "set_channel_tip": "💡 کانال قفل روی شروع کاربرها اثر مستقیم دارد؛ مقدار را دقیق ثبت کنید.",
-        "edit_setting_title": "✍️ <b>ویرایش دستی تنظیم</b>",
-        "format_label": "🧾 فرمت",
-        "edit_setting_format_value": "<code>key|value</code>",
-        "edit_setting_tip": "💡 برای کلیدهای حساس مقدار معتبر وارد کنید.",
-        "add_admin_title": "✅ <b>افزودن ادمین</b>",
-        "guide_label": "👤 راهنما",
-        "add_admin_guide_value": "آیدی عددی ادمین جدید را ارسال کنید.",
-        "add_admin_tip": "💡 سطح دسترسی اولیه با سطح‌های پایه ایجاد می‌شود و قابل ویرایش است.",
         "admin_delete_confirm": "برای حذف ادمین <code>{target_uid}</code>، عبارت «{confirm_word}» را ارسال کنید.",
         "pin_text_send": "متن پیام پین را ارسال کنید.",
         "pin_new_text_send": "متن جدید پیام پین را ارسال کنید.",
         "pin_delete_confirm": "برای حذف پیام پین #{pin_id} عبارت «{confirm_word}» را ارسال کنید.",
         "pin_send_all_confirm": "برای ارسال و پین همگانی #{pin_id} عبارت «{confirm_word}» را ارسال کنید.",
-        "delivery_mode_input": "حالت تحویل را انتخاب کنید: stock_only یا panel_only"
+        "delivery_mode_input": "حالت تحویل را انتخاب کنید: stock_only یا panel_only",
+        "set_channel_overview": "📣 <b>تنظیم کانال قفل</b>\n\n🧾 ورودی: آیدی کانال را بفرستید (@channel یا -100...). برای غیرفعال‌سازی «-» ارسال کنید.\n\n<blockquote>💡 کانال قفل روی شروع کاربرها اثر مستقیم دارد؛ مقدار را دقیق ثبت کنید.</blockquote>",
+        "edit_setting_overview": "✍️ <b>ویرایش دستی تنظیم</b>\n\n🧾 فرمت: <code>key|value</code>\n\n<blockquote>💡 برای کلیدهای حساس مقدار معتبر وارد کنید.</blockquote>",
+        "add_admin_overview": "✅ <b>افزودن ادمین</b>\n\n👤 راهنما: آیدی عددی ادمین جدید را ارسال کنید.\n\n<blockquote>💡 سطح دسترسی اولیه با سطح‌های پایه ایجاد می‌شود و قابل ویرایش است.</blockquote>"
       },
       "errors": {
         "invalid_input": "ورودی معتبر ارسال کنید.",
@@ -601,9 +560,6 @@
         "panel_create_format": "ثبت سرویس پنلی به‌صورت مرحله‌ای انجام می‌شود.",
         "panel_delete_confirm": "برای حذف سرویس #{panel_id} عبارت «{confirm_word}» را ارسال کنید.",
         "panel_pkg_create_format": "ویرایش سرویس پنلی به‌صورت مرحله‌ای انجام می‌شود.",
-        "broadcast_confirm_title": "📣 <b>تایید ارسال همگانی</b>",
-        "broadcast_preview_label": "📝 پیش‌نمایش",
-        "broadcast_confirm_tip": "💡 scope را انتخاب کنید و سپس دکمه ارسال را بزنید.",
         "delivery_confirm": "برای تحویل سفارش #{order_id} عبارت «{confirm_word}» را ارسال کنید.",
         "group_id_input": "Group ID را ارسال کنید (یا - برای غیرفعال‌سازی).",
         "restore_json_input": "JSON تنظیمات را ارسال کنید.",
@@ -626,7 +582,8 @@
           "summary_label": "خلاصه",
           "summary_tip": "برای ثبت نهایی، عبارت «تایید» را ارسال کنید.",
           "summary_template": "نام: {title}\nحداقل/حداکثر: {min_gb} / {max_gb} GB\nگام: {step_gb} GB\nقیمت هر گیگ: {price_per_gb} تومان\nمدت: {duration_value}\nارائه‌دهنده: {provider}\nگروه‌ها: {group_ids}\nتوضیحات: {description}"
-        }
+        },
+        "broadcast_confirm_overview": "📣 <b>تایید ارسال همگانی</b>\n\n📝 پیش‌نمایش: {message_preview}\n\n<blockquote>💡 scope را انتخاب کنید و سپس دکمه ارسال را بزنید.</blockquote>"
       },
       "messages": {
         "panel_wizard_summary": "🧾 <b>پیش‌نمایش اطلاعات</b>\n\n📌 خلاصه: {summary}\n\n<blockquote>برای ثبت نهایی، عبارت «تایید» را ارسال کنید.</blockquote>"
@@ -720,7 +677,8 @@
     },
     "panels": {
       "messages": {
-        "panel_view": "🖥 <b>سرویس پنلی #{panel_id}</b>\n\n📛 عنوان سرویس: {panel_title}\n📦 مشخصات سرویس: {summary}\n\n<blockquote>{tip_text}</blockquote>"
+        "panel_view": "🖥 <b>سرویس پنلی #{panel_id}</b>\n\n📛 عنوان سرویس: {panel_title}\n📦 مشخصات سرویس: {summary}\n\n<blockquote>💡 از دکمه‌های همین صفحه برای ویرایش، فعال/غیرفعال‌سازی و حذف سرویس استفاده کنید.</blockquote>",
+        "panel_summary": "min={min_gb} | max={max_gb} | step={step_gb} | price/GB={price_per_gb}\nprovider={provider} | groups={provider_group_ids} | duration={duration}"
       }
     },
     "requests": {
@@ -737,19 +695,9 @@
         "balance_mode_add": "افزایش"
       },
       "prompts": {
-        "balance_action_title": "💵 <b>{mode_text} موجودی کاربر</b>",
-        "balance_action_user_label": "👤 کاربر",
-        "balance_action_input_label": "🔢 ورودی",
-        "balance_action_input_value": "مبلغ را به تومان ارسال کنید (فقط عدد).",
-        "balance_action_tip": "💡 با دکمه بازگشت می‌توانید به پروفایل کاربر برگردید.",
-        "add_config_title": "➕ <b>افزودن کانفیگ</b>",
-        "add_config_format_label": "🧾 فرمت",
-        "add_config_format_value": "خط اول: نام سرویس\n---\nخط دوم: متن کانفیگ\n---\n(اختیاری) لینک استعلام",
-        "add_config_tip": "💡 جداکننده بین بخش‌ها باید دقیقاً --- باشد.",
-        "search_config_title": "🔎 <b>جستجو در کانفیگ‌ها</b>",
-        "search_config_input_label": "📝 ورودی",
-        "search_config_input_value": "عبارت جستجو را ارسال کنید. برای پاک‌کردن از \"-\" استفاده کنید.",
-        "search_config_tip": "💡 جستجو روی نام سرویس، متن کانفیگ و لینک استعلام انجام می‌شود."
+        "balance_action_overview": "💵 <b>{mode_text} موجودی کاربر</b>\n\n👤 کاربر: <code>{target_uid}</code>\n🔢 ورودی: مبلغ را به تومان ارسال کنید (فقط عدد).\n\n<blockquote>💡 با دکمه بازگشت می‌توانید به پروفایل کاربر برگردید.</blockquote>",
+        "add_config_overview": "➕ <b>افزودن کانفیگ</b>\n\n🧾 فرمت: خط اول: نام سرویس\n---\nخط دوم: متن کانفیگ\n---\n(اختیاری) لینک استعلام\n\n<blockquote>💡 جداکننده بین بخش‌ها باید دقیقاً --- باشد.</blockquote>",
+        "search_config_overview": "🔎 <b>جستجو در کانفیگ‌ها</b>\n\n📝 ورودی: عبارت جستجو را ارسال کنید. برای پاک‌کردن از \"-\" استفاده کنید.\n\n<blockquote>💡 جستجو روی نام سرویس، متن کانفیگ و لینک استعلام انجام می‌شود.</blockquote>"
       },
       "errors": {
         "invalid_user_list_option": "گزینه نامعتبر است. لطفاً از لیست کاربران انتخاب کنید.",
@@ -801,10 +749,7 @@
         "delete_package": "🗑 حذف پکیج"
       },
       "create_type": {
-        "title": "🆕 <b>افزودن نوع سرویس</b>",
-        "guide_label": "✍️ راهنما",
-        "guide_value": "نام نوع سرویس جدید را ارسال کنید.",
-        "tip": "💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید."
+        "overview": "🆕 <b>افزودن نوع سرویس</b>\n\n✍️ راهنما: نام نوع سرویس جدید را ارسال کنید.\n\n<blockquote>💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید.</blockquote>"
       },
       "create_package": {
         "title": "📦 <b>افزودن پکیج</b>",
@@ -867,44 +812,31 @@
         "caption": "🗄 بکاپ دیتابیس\n{datetime} UTC"
       },
       "nav": {
-        "title": "⚙️ <b>ناوبری پنل مدیریت</b>",
-        "line_label": "📍 ماژول انتخاب‌شده",
-        "tip": "💡 این ماژول در chunkهای بعدی به‌صورت کامل به reply/state مهاجرت می‌شود. برای ادامه از بازگشت یا منوی اصلی استفاده کنید."
+        "overview": "⚙️ <b>ناوبری پنل مدیریت</b>\n\n📍 ماژول انتخاب‌شده: <code>{route}</code>\n\n<blockquote>💡 این ماژول در chunkهای بعدی به‌صورت کامل به reply/state مهاجرت می‌شود. برای ادامه از بازگشت یا منوی اصلی استفاده کنید.</blockquote>"
       },
       "agents": {
-        "title": "🤝 <b>مدیریت نماینده‌ها</b>",
-        "list_label": "📋 لیست",
         "empty": "نماینده‌ای ثبت نشده است.",
-        "tip": "💡 نماینده را انتخاب کنید تا قیمت اختصاصی پکیج‌ها را مدیریت کنید.",
+        "overview": "🤝 <b>مدیریت نماینده‌ها</b>\n\n📋 لیست: {list}\n\n<blockquote>💡 نماینده را انتخاب کنید تا قیمت اختصاصی پکیج‌ها را مدیریت کنید.</blockquote>",
         "button": "{num} - نماینده {id}"
       },
       "agent_view": {
-        "title": "🤝 <b>قیمت‌گذاری نماینده {agent_id}</b>",
-        "packages_label": "📦 پکیج‌ها",
-        "tip": "💡 پکیج را انتخاب کنید و قیمت اختصاصی را ثبت یا حذف کنید.",
+        "overview": "🤝 <b>قیمت‌گذاری نماینده {agent_id}</b>\n\n📦 پکیج‌ها: {packages}\n\n<blockquote>💡 پکیج را انتخاب کنید و قیمت اختصاصی را ثبت یا حذف کنید.</blockquote>",
         "package_button": "{num} - پکیج {id}"
       },
       "panels": {
         "not_found": "سرویس پنلی پیدا نشد."
       },
       "broadcast": {
-        "title": "📣 <b>ارسال همگانی</b>",
-        "step_label": "📝 مرحله ۱",
-        "step_value": "متن پیام همگانی را ارسال کنید.",
-        "tip": "💡 بعد از متن، scope انتخاب می‌شود و سپس ارسال نهایی تایید می‌گردد."
+        "overview": "📣 <b>ارسال همگانی</b>\n\n📝 مرحله ۱: متن پیام همگانی را ارسال کنید.\n\n<blockquote>💡 بعد از متن، scope انتخاب می‌شود و سپس ارسال نهایی تایید می‌گردد.</blockquote>"
       },
       "freetest": {
-        "title": "🧪 <b>مدیریت تست رایگان</b>",
-        "rules_label": "📋 قوانین",
         "rules_empty": "قانونی ثبت نشده است.",
-        "tip": "💡 اگر کاربری به‌اشتباه سهمیه‌اش مصرف شده یا نیاز به بررسی دوباره دارد، از همین بخش می‌توانید سهمیه او را ریست کنید."
+        "overview": "🧪 <b>مدیریت تست رایگان</b>\n\n📋 قوانین: {rules}\n\n<blockquote>💡 اگر کاربری به‌اشتباه سهمیه‌اش مصرف شده یا نیاز به بررسی دوباره دارد، از همین بخش می‌توانید سهمیه او را ریست کنید.</blockquote>"
       },
       "open": {
         "types_list": {
-          "title": "🧩 <b>مدیریت نوع/پکیج</b>",
-          "list_label": "📋 لیست نوع‌ها",
           "empty": "هنوز نوع سرویسی ثبت نشده است.",
-          "tip": "💡 یک نوع را انتخاب کنید تا پکیج‌ها و عملیات همان نوع باز شود."
+          "overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\n📋 لیست نوع‌ها: {list}\n\n<blockquote>💡 یک نوع را انتخاب کنید تا پکیج‌ها و عملیات همان نوع باز شود.</blockquote>"
         },
         "common": {
           "status_emoji": "📶",
@@ -913,24 +845,12 @@
           "status_inactive": "🔴 غیرفعال"
         },
         "type_view": {
-          "title": "🧩 <b>جزئیات نوع سرویس</b>",
-          "type_label": "👤 نوع",
-          "packages_label": "📦 پکیج‌ها",
           "packages_empty": "برای این نوع هنوز پکیجی ثبت نشده است.",
-          "tip": "💡 برای مدیریت هر پکیج، شماره همان پکیج را انتخاب کنید.",
+          "overview": "🧩 <b>جزئیات نوع سرویس</b>\n\n👤 نوع: {type_name} | <code>{type_id}</code>\n📶 وضعیت: {status_text}\n📦 پکیج‌ها: {packages}\n\n<blockquote>💡 برای مدیریت هر پکیج، شماره همان پکیج را انتخاب کنید.</blockquote>",
           "not_found": "نوع سرویس پیدا نشد."
         },
         "package_view": {
-          "title": "📦 <b>جزئیات پکیج</b>",
-          "name_label": "👤 نام",
-          "type_label": "🧩 نوع",
-          "volume_label": "💾 حجم",
-          "volume_value": "{volume} GB",
-          "duration_label": "⏳ مدت",
-          "duration_value": "{days} روز",
-          "price_label": "💵 قیمت",
-          "price_value": "{amount} تومان",
-          "tip": "💡 در این صفحه می‌توانید وضعیت پکیج را تغییر دهید یا آن را حذف کنید.",
+          "overview": "📦 <b>جزئیات پکیج</b>\n\n👤 نام: <b>{package_name}</b> | <code>{package_id}</code>\n🧩 نوع: {type_name} | <code>{type_id}</code>\n💾 حجم: {volume} GB\n⏳ مدت: {days} روز\n💵 قیمت: {amount} تومان\n📶 وضعیت: {status_text}\n\n<blockquote>💡 در این صفحه می‌توانید وضعیت پکیج را تغییر دهید یا آن را حذف کنید.</blockquote>",
           "not_found_in_type": "پکیج پیدا نشد یا با نوع انتخابی سازگار نیست."
         },
         "panels_list": {
@@ -939,13 +859,6 @@
           "empty": "سرویس پنلی ثبت نشده است.",
           "tip": "💡 این بخش فقط برای مدیریت اطلاعات اتصال پنل است. تعریف سرویس فروش از بخش نوع/پکیج انجام می‌شود.",
           "button": "{num} - سرویس {id}"
-        },
-        "panel_view": {
-          "title": "🖥 <b>سرویس پنلی #{panel_id}</b>",
-          "name_label": "📛 عنوان سرویس",
-          "packages_label": "📦 مشخصات سرویس",
-          "packages_empty": "اطلاعاتی ثبت نشده است.",
-          "tip": "💡 از دکمه‌های همین صفحه برای ویرایش، فعال/غیرفعال‌سازی و حذف سرویس استفاده کنید."
         },
         "panel_settings": {
           "title": "⚙️ <b>تنظیمات اتصال پنل</b>",
@@ -966,10 +879,8 @@
           "wizard_summary_tip": "💡 اگر اطلاعات بالا کاملاً صحیح است، از دکمه ثبت استفاده کنید تا اطلاعات اتصال به پنل ذخیره و فعال شود."
         },
         "users_list": {
-          "title": "👤 <b>مدیریت کاربران</b>",
-          "list_label": "📋 آخرین کاربران",
           "empty": "کاربری یافت نشد.",
-          "tip": "💡 یکی از کاربران را انتخاب کنید تا جزئیات و عملیات مدیریتی نمایش داده شود.",
+          "overview": "👤 <b>مدیریت کاربران</b>\n\n📋 آخرین کاربران: {list}\n\n<blockquote>💡 یکی از کاربران را انتخاب کنید تا جزئیات و عملیات مدیریتی نمایش داده شود.</blockquote>",
           "status_restricted_emoji": "⛔️",
           "status_active_emoji": "✅",
           "row": "{num}) {status_emoji} {name} | U:{uid} | Bal:{balance}",
@@ -982,72 +893,50 @@
             "status_symbol_ready": "🟢"
           },
           "types": {
-            "title": "📋 <b>موجودی کانفیگ‌ها</b>",
-            "label": "🧩 انتخاب نوع سرویس",
             "empty": "نوع سرویسی برای موجودی یافت نشد.",
-            "tip": "💡 ابتدا نوع سرویس را انتخاب کنید تا لیست پکیج‌ها نمایش داده شود.",
+            "overview": "📋 <b>موجودی کانفیگ‌ها</b>\n\n🧩 انتخاب نوع سرویس: {list}\n\n<blockquote>💡 ابتدا نوع سرویس را انتخاب کنید تا لیست پکیج‌ها نمایش داده شود.</blockquote>",
             "row": "{num}) {name} | ID: {type_id}",
             "button": "{num} - {name}"
           },
           "packages": {
             "invalid_type": "نوع سرویس معتبر نبود.",
-            "title": "📦 <b>پکیج‌های موجودی</b>",
-            "label": "🧾 لیست پکیج‌ها",
             "empty": "برای این نوع پکیجی ثبت نشده است.",
-            "tip": "💡 با انتخاب پکیج، لیست کانفیگ‌های موجودی همان پکیج باز می‌شود.",
+            "overview": "📦 <b>پکیج‌های موجودی</b>\n\n🧾 لیست پکیج‌ها: {list}\n\n<blockquote>💡 با انتخاب پکیج، لیست کانفیگ‌های موجودی همان پکیج باز می‌شود.</blockquote>",
             "default_name": "پکیج",
             "row": "{num}) {name} | P:{package_id} | موجود: {available}",
             "button": "{num} - {name}"
           },
           "configs": {
             "invalid_type_package": "نوع/پکیج معتبر نبود.",
-            "title": "🗂 <b>لیست کانفیگ‌های پکیج</b>",
-            "package_label": "📦 پکیج",
-            "search_label": "🔎 فیلتر جستجو",
-            "list_label": "📋 کانفیگ‌ها",
             "empty": "کانفیگی مطابق فیلتر پیدا نشد.",
-            "tip": "💡 برای جزئیات هر کانفیگ، شماره همان مورد را انتخاب کنید.",
             "query_none": "ندارد",
             "row": "{num}) {status} {service} | C:{config_id}",
-            "option_button": "{num} - کانفیگ"
+            "option_button": "{num} - کانفیگ",
+            "overview": "🗂 <b>لیست کانفیگ‌های پکیج</b>\n\n📦 پکیج: <code>{package_id}</code>\n🔎 فیلتر جستجو: {query_view}\n📋 کانفیگ‌ها: {list}\n\n<blockquote>💡 برای جزئیات هر کانفیگ، شماره همان مورد را انتخاب کنید.</blockquote>"
           },
           "config_detail": {
             "not_found": "کانفیگ پیدا نشد.",
-            "title": "🔎 <b>جزئیات کانفیگ</b>",
-            "id_label": "🔢 شناسه",
-            "service_label": "👤 سرویس",
+            "overview": "🔎 <b>جزئیات کانفیگ</b>\n\n🔢 شناسه: <code>{config_id}</code>\n👤 سرویس: {service_name}\n📶 وضعیت: {status}\n\n<blockquote>💡 حذف کانفیگ غیرقابل بازگشت است.</blockquote>",
             "status_expired": "⏳ منقضی",
             "status_sold": "🔴 فروخته‌شده",
-            "status_ready": "🟢 آماده",
-            "tip": "💡 حذف کانفیگ غیرقابل بازگشت است."
+            "status_ready": "🟢 آماده"
           }
         },
         "payments": {
           "list": {
-            "title": "💰 <b>مدیریت پرداخت‌ها</b>",
-            "label": "📋 پرداخت‌های در انتظار",
             "empty": "پرداختی در انتظار بررسی نیست.",
-            "tip": "💡 یک پرداخت را انتخاب کنید تا عملیات بررسی/تایید/رد انجام شود.",
+            "overview": "💰 <b>مدیریت پرداخت‌ها</b>\n\n📋 پرداخت‌های در انتظار: {list}\n\n<blockquote>💡 یک پرداخت را انتخاب کنید تا عملیات بررسی/تایید/رد انجام شود.</blockquote>",
             "row": "{num}) #{payment_id} | {kind} | U:{uid} | {amount} | {method}",
             "button": "{num} - پرداخت #{payment_id}"
           },
           "view": {
             "not_found": "پرداخت پیدا نشد.",
-            "title": "💰 <b>جزئیات پرداخت</b>",
-            "id_label": "🔢 شناسه",
-            "user_label": "👤 کاربر",
-            "amount_label": "💵 مبلغ",
-            "amount_value": "{amount} تومان",
-            "method_label": "🧾 روش",
-            "tip": "💡 ابتدا وضعیت و روش پرداخت را بررسی کنید، سپس تایید یا رد انجام دهید."
+            "overview": "💰 <b>جزئیات پرداخت</b>\n\n🔢 شناسه: <code>{payment_id}</code>\n👤 کاربر: <code>{user_id}</code>\n💵 مبلغ: {amount} تومان\n🧾 روش: {method}\n📶 وضعیت: {status}\n\n<blockquote>💡 ابتدا وضعیت و روش پرداخت را بررسی کنید، سپس تایید یا رد انجام دهید.</blockquote>"
           }
         },
         "requests": {
           "root": {
-            "title": "🗂 <b>مدیریت درخواست‌ها</b>",
-            "step_label": "📌 مرحله اول",
-            "step_value": "نوع درخواست را انتخاب کنید.",
-            "tip": "💡 بعد از انتخاب نوع، می‌توانید وضعیت pending/approved/rejected را فیلتر کنید."
+            "overview": "🗂 <b>مدیریت درخواست‌ها</b>\n\n📌 مرحله اول: نوع درخواست را انتخاب کنید.\n\n<blockquote>💡 بعد از انتخاب نوع، می‌توانید وضعیت pending/approved/rejected را فیلتر کنید.</blockquote>"
           },
           "list": {
             "filter_pending": "⏳ pending",
@@ -1058,10 +947,8 @@
             "kind_free": "تست رایگان",
             "kind_agency": "نمایندگی",
             "title": "🗂 <b>درخواست‌های {kind_title}</b>",
-            "status_filter_label": "فیلتر وضعیت",
-            "list_label": "📋 لیست درخواست‌ها",
             "empty": "درخواستی برای این فیلتر یافت نشد.",
-            "tip": "💡 با تغییر فیلتر وضعیت می‌توانید سوابق تایید/رد را هم بررسی کنید."
+            "overview": "🗂 <b>درخواست‌های {kind_title}</b>\n\n📶 فیلتر وضعیت: {status}\n📋 لیست درخواست‌ها: {list}\n\n<blockquote>💡 با تغییر فیلتر وضعیت می‌توانید سوابق تایید/رد را هم بررسی کنید.</blockquote>"
           },
           "view": {
             "not_found": "درخواست پیدا نشد.",
@@ -1070,39 +957,17 @@
             "status_pending": "⏳ pending",
             "kind_free": "درخواست تست رایگان",
             "kind_agency": "درخواست نمایندگی",
-            "title": "📝 <b>{kind_title}</b>",
-            "id_label": "🔢 شناسه",
-            "user_label": "👤 کاربر",
-            "created_label": "🕒 زمان ثبت",
-            "note_label": "🧾 متن درخواست",
-            "tip": "💡 قبل از تایید یا رد، متن درخواست را کامل بررسی کنید."
+            "overview": "📝 <b>{kind_title}</b>\n\n🔢 شناسه: <code>{request_id}</code>\n👤 کاربر: <code>{user_id}</code>\n📶 وضعیت: {status_text}\n🕒 زمان ثبت: {created_at}\n🧾 متن درخواست: {note}\n\n<blockquote>💡 قبل از تایید یا رد، متن درخواست را کامل بررسی کنید.</blockquote>"
           }
         },
         "settings_admins_pins": {
           "settings": {
-            "title": "⚙️ <b>تنظیمات سریع</b>",
-            "bot_status_emoji": "🤖",
-            "bot_status_label": "bot_status",
-            "free_test_emoji": "🎁",
-            "free_test_label": "free_test_enabled",
-            "agency_emoji": "🤝",
-            "agency_label": "agency_request_enabled",
-            "gw_card_emoji": "💳",
-            "gw_card_label": "gw_card_enabled",
-            "gw_crypto_emoji": "💎",
-            "gw_crypto_label": "gw_crypto_enabled",
-            "gw_tetrapay_emoji": "🏦",
-            "gw_tetrapay_label": "gw_tetrapay_enabled",
-            "channel_emoji": "📢",
-            "channel_label": "channel_id",
             "channel_unset": "❌ تنظیم نشده",
-            "tip": "💡 تغییرات این صفحه فوری اعمال می‌شوند."
+            "overview": "⚙️ <b>تنظیمات سریع</b>\n\n🤖 bot_status: {bot_status}\n🎁 free_test_enabled: {free_test_enabled}\n🤝 agency_request_enabled: {agency_request_enabled}\n💳 gw_card_enabled: {gw_card_enabled}\n💎 gw_crypto_enabled: {gw_crypto_enabled}\n🏦 gw_tetrapay_enabled: {gw_tetrapay_enabled}\n📢 channel_id: {channel_id}\n🚚 {delivery_mode_label}: {delivery_mode}\n\n<blockquote>💡 تغییرات این صفحه فوری اعمال می‌شوند.</blockquote>"
           },
           "admins": {
-            "title": "🔐 <b>مدیریت ادمین‌ها</b>",
-            "list_label": "📋 لیست ادمین‌ها",
             "empty": "ادمینی ثبت نشده است.",
-            "tip": "💡 OWNERها فقط نمایش داده می‌شوند و قابل حذف نیستند.",
+            "overview": "🔐 <b>مدیریت ادمین‌ها</b>\n\n📋 لیست ادمین‌ها: {list}\n\n<blockquote>💡 OWNERها فقط نمایش داده می‌شوند و قابل حذف نیستند.</blockquote>",
             "row": "{num}) U:{uid}",
             "button": "{num} - ادمین {uid}",
             "owner_emoji": "👑",
@@ -1111,62 +976,41 @@
           "admin_view": {
             "owner_locked": "این کاربر owner است و قابل ویرایش نیست.",
             "perm_row": "{status} {perm}",
-            "title": "🔐 <b>دسترسی‌های ادمین</b>",
-            "admin_label": "🔢 ادمین",
-            "permissions_label": "🔒 دسترسی‌ها",
-            "tip": "💡 با لمس هر دسترسی، وضعیت آن روشن/خاموش می‌شود."
+            "overview": "🔐 <b>دسترسی‌های ادمین</b>\n\n🔢 ادمین: <code>{target_uid}</code>\n🔒 دسترسی‌ها: {permissions}\n\n<blockquote>💡 با لمس هر دسترسی، وضعیت آن روشن/خاموش می‌شود.</blockquote>"
           },
           "pins": {
-            "title": "📝 <b>مدیریت پیام‌های پین</b>",
-            "list_label": "📋 پیام‌ها",
             "empty": "پیامی ثبت نشده است.",
-            "tip": "💡 قبل از ارسال همگانی، متن پین را مرور کنید.",
+            "overview": "📝 <b>مدیریت پیام‌های پین</b>\n\n📋 پیام‌ها: {list}\n\n<blockquote>💡 قبل از ارسال همگانی، متن پین را مرور کنید.</blockquote>",
             "row": "{num}) #{pin_id} | {preview}",
             "button": "{num} - پین #{pin_id}"
           },
           "pin_view": {
             "not_found": "پیام پین پیدا نشد.",
-            "title": "📝 <b>پیام پین #{pin_id}</b>",
-            "text_label": "🧾 متن",
-            "sent_label": "📤 ارسال‌شده",
-            "tip": "💡 ارسال همگانی ممکن است زمان‌بر باشد."
+            "overview": "📝 <b>پیام پین #{pin_id}</b>\n\n🧾 متن: {text}\n📤 ارسال‌شده: {sent_count}\n\n<blockquote>💡 ارسال همگانی ممکن است زمان‌بر باشد.</blockquote>"
           }
         },
         "user_view": {
           "not_found": "کاربر پیدا نشد.",
-          "title": "👤 <b>جزئیات کاربر</b>",
-          "user_label": "🔢 کاربر",
-          "name_label": "👤 نام",
-          "balance_label": "💰 موجودی",
-          "balance_value": "{amount} تومان",
-          "agent_label": "💼 نماینده",
+          "overview": "👤 <b>جزئیات کاربر</b>\n\n🔢 کاربر: <code>{user_id}</code>\n👤 نام: {name}\n💰 موجودی: {balance} تومان\n📶 وضعیت: {status_text}\n💼 نماینده: {agent_text}\n\n<blockquote>💡 تغییرات وضعیت/موجودی فوری اعمال می‌شود.</blockquote>",
           "status_restricted": "⛔️ محدود",
           "status_active": "✅ فعال",
           "agent_yes": "✅ بله",
-          "agent_no": "❌ خیر",
-          "tip": "💡 تغییرات وضعیت/موجودی فوری اعمال می‌شود."
+          "agent_no": "❌ خیر"
         },
         "deliveries": {
           "list": {
-            "title": "📦 <b>تحویل سفارش‌ها</b>",
-            "label": "📋 سفارش‌های معلق",
             "empty": "سفارشی برای تحویل وجود ندارد.",
-            "tip": "💡 سفارش را انتخاب کنید و سپس تحویل را تایید کنید.",
+            "overview": "📦 <b>تحویل سفارش‌ها</b>\n\n📋 سفارش‌های معلق: {list}\n\n<blockquote>💡 سفارش را انتخاب کنید و سپس تحویل را تایید کنید.</blockquote>",
             "row": "{num}) #{order_id} | U:{user_id} | P:{package_id}",
             "button": "{num} - سفارش {order_id}"
           },
           "view": {
-            "title": "📦 <b>سفارش #{order_id}</b>",
-            "action_label": "⚙️ عملیات",
-            "action_value": "برای تحویل نهایی از دکمه زیر استفاده کنید.",
-            "tip": "⚠️ تحویل، عملیات حساس و غیرقابل بازگشت است."
+            "overview": "📦 <b>سفارش #{order_id}</b>\n\n⚙️ عملیات: برای تحویل نهایی از دکمه زیر استفاده کنید.\n\n<blockquote>⚠️ تحویل، عملیات حساس و غیرقابل بازگشت است.</blockquote>"
           }
         },
         "groupops": {
-          "title": "🗂 <b>گروه/بکاپ</b>",
-          "group_id_label": "🧩 Group ID فعلی",
           "group_id_unset": "❌ تنظیم نشده",
-          "tip": "💡 بازیابی تنظیمات فقط با JSON معتبر انجام می‌شود."
+          "overview": "🗂 <b>گروه/بکاپ</b>\n\n🧩 Group ID فعلی: {group_id}\n\n<blockquote>💡 بازیابی تنظیمات فقط با JSON معتبر انجام می‌شود.</blockquote>"
         }
       },
       "audit": {
