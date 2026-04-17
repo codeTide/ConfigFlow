@@ -184,6 +184,16 @@ Apply pending migrations (CLI):
 php migrate.php
 ```
 
+Phase 3 service-centric data migration (with rollback support):
+
+```bash
+# apply
+php scripts/Phase3CleanupMigration.php
+
+# rollback
+php scripts/Phase3CleanupMigration.php --rollback
+```
+
 Apply pending migrations (Web):
 
 ```text
