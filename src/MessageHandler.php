@@ -1900,7 +1900,7 @@ final class MessageHandler
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_TARIFFS)) {
-                $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId);
+                $this->openAdminServiceTariffBridgeView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_INVENTORY)) {
@@ -2004,7 +2004,7 @@ final class MessageHandler
             $serviceId = (int) ($payload['service_id'] ?? 0);
             $selectedTariffId = (int) ($payload['selected_tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId);
+                $this->openAdminServiceTariffBridgeView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
             if ($selectedTariffId > 0 && $text === $this->catalog->get('admin.types_packages.actions.service_tariff_edit')) {
@@ -2048,11 +2048,35 @@ final class MessageHandler
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, 'admin.service.tariff.create', 'pricing_mode', [], 0);
                 return;
             }
+            if ($text === $this->catalog->get('admin.types_packages.actions.service_tariffs_list')) {
+                $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId);
+                return;
+            }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
             $selected = $this->extractOptionKey($text);
             $tariffId = isset($options[$selected]) ? (int) $options[$selected] : 0;
             if ($tariffId > 0) {
                 $this->openAdminServiceTariffDetailView($chatId, $userId, $typeId, $serviceId, $tariffId);
+                return;
+            }
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_tariff_option'));
+            return;
+        }
+
+        if ($stateName === 'admin.service.tariffs.bridge') {
+            $typeId = (int) ($payload['type_id'] ?? 0);
+            $serviceId = (int) ($payload['service_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId);
+                return;
+            }
+            if ($text === $this->catalog->get('admin.types_packages.actions.service_tariffs_list')) {
+                $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId);
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD)) {
+                $this->database->setUserState($userId, 'admin.service.tariff.create', ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'pricing_mode', 'data' => []]);
+                $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, 'admin.service.tariff.create', 'pricing_mode', [], 0);
                 return;
             }
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_tariff_option'));
@@ -2592,7 +2616,10 @@ final class MessageHandler
         $tariffs = $this->database->listTariffsByService($serviceId);
         $options = [];
         $lines = [];
-        $buttons = [[$this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD)]];
+        $buttons = [[
+            $this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD),
+            $this->catalog->get('admin.types_packages.actions.service_tariffs_list'),
+        ]];
         foreach (array_values($tariffs) as $idx => $tariff) {
             $num = (string) ($idx + 1);
             $tariffId = (int) ($tariff['id'] ?? 0);
@@ -2635,6 +2662,32 @@ final class MessageHandler
                 'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.types_packages.messages.tariffs_empty'),
             ], ['list']),
             $this->uiKeyboard->replyMenu($buttons)
+        );
+    }
+
+    private function openAdminServiceTariffBridgeView(int $chatId, int $userId, int $typeId, int $serviceId, ?string $notice = null): void
+    {
+        $service = $this->database->getService($serviceId);
+        if (!is_array($service) || (int) ($service['type_id'] ?? 0) !== $typeId) {
+            $this->openAdminTypeView($chatId, $userId, $typeId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+            return;
+        }
+        $this->database->setUserState($userId, 'admin.service.tariffs.bridge', [
+            'type_id' => $typeId,
+            'service_id' => $serviceId,
+        ]);
+        if ($notice !== null && $notice !== '') {
+            $this->telegram->sendMessage($chatId, $notice);
+        }
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->messageRenderer->render('admin.types_packages.messages.tariffs_bridge_overview', [
+                'service_name' => (string) ($service['name'] ?? $this->catalog->get('messages.generic.dash')),
+            ]),
+            $this->uiKeyboard->replyMenu([
+                [$this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD), $this->catalog->get('admin.types_packages.actions.service_tariffs_list')],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+            ])
         );
     }
 
