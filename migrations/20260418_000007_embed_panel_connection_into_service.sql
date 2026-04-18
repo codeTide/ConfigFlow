@@ -1,0 +1,9 @@
+ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_provider VARCHAR(64) NULL AFTER mode;
+ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_base_url VARCHAR(255) NULL AFTER panel_provider;
+ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_username VARCHAR(191) NULL AFTER panel_base_url;
+ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_password TEXT NULL AFTER panel_username;
+ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_ref VARCHAR(255) NULL AFTER panel_password;
+ALTER TABLE service DROP COLUMN IF EXISTS panel_id;
+ALTER TABLE service DROP INDEX IF EXISTS idx_service_panel;
+
+DROP TABLE IF EXISTS panel;
