@@ -663,6 +663,66 @@ final class Database implements WorkerApiStore
         )->fetchAll();
     }
 
+    public function getTypeById(int $typeId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, name, description, is_active
+             FROM config_types
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $stmt->execute(['id' => $typeId]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? $row : null;
+    }
+
+    public function createType(string $name, string $description = ''): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO config_types (name, description, is_active)
+             VALUES (:name, :description, 1)'
+        );
+        $stmt->execute([
+            'name' => trim($name),
+            'description' => trim($description),
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function updateTypeName(int $typeId, string $name): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE config_types SET name = :name WHERE id = :id');
+        $stmt->execute([
+            'id' => $typeId,
+            'name' => trim($name),
+        ]);
+    }
+
+    public function updateTypeActive(int $typeId, bool $active): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE config_types SET is_active = :active WHERE id = :id');
+        $stmt->execute([
+            'id' => $typeId,
+            'active' => $active ? 1 : 0,
+        ]);
+    }
+
+    public function deleteType(int $typeId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM config_types WHERE id = :id');
+        $stmt->execute(['id' => $typeId]);
+    }
+
+    public function countServicesByType(int $typeId): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM service WHERE type_id = :type_id');
+        $stmt->execute(['type_id' => $typeId]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
     public function listServicesByType(int $typeId): array
     {
         $stmt = $this->pdo->prepare(
@@ -735,6 +795,12 @@ final class Database implements WorkerApiStore
             'updated_at' => gmdate('Y-m-d H:i:s'),
             'id' => $serviceId,
         ]);
+    }
+
+    public function deleteService(int $serviceId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM service WHERE id = :id');
+        $stmt->execute(['id' => $serviceId]);
     }
 
     /** @param array<string,mixed> $data */
