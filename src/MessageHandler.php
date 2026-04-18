@@ -1700,8 +1700,8 @@ final class MessageHandler
                 $this->openAdminTypeView($chatId, $userId, $typeId);
                 return;
             }
-            if (trim($text) !== $this->catalog->get('admin.final_modules.keywords.delete_confirm')) {
-                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.confirm_required')));
+            if ($text !== $this->catalog->get('admin.types_packages.actions.delete_confirm')) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.ui.invalid_admin_option')));
                 return;
             }
             $this->database->deleteType($typeId);
@@ -1777,11 +1777,11 @@ final class MessageHandler
                 $this->database->setUserState($userId, 'admin.type.delete', ['type_id' => $typeId, 'stack' => ['admin.service.list', 'admin.service.landing', 'admin.root']]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->uiText->warning($this->catalog->get('admin.types_packages.prompts.type_delete_confirm', [
-                        'type_id' => $typeId,
-                        'confirm_word' => $this->catalog->get('admin.final_modules.keywords.delete_confirm'),
-                    ])),
-                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+                    $this->uiText->warning($this->catalog->get('admin.types_packages.prompts.type_delete_confirm', ['type_id' => $typeId])),
+                    $this->uiKeyboard->replyMenu([
+                        [$this->catalog->get('admin.types_packages.actions.delete_confirm')],
+                        [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                    ])
                 );
                 return;
             }

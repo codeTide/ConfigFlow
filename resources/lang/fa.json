@@ -776,7 +776,8 @@
         "add_stock_package": "📦 پکیج انباری",
         "add_panel_package": "⚙️ تنظیمات اتصال پنل",
         "toggle_type": "🔁 تغییر وضعیت نوع",
-        "delete_type": "🗑 حذف نوع سرویس",
+        "delete_type": "🗑 حذف سرویس",
+        "delete_confirm": "✅ تایید حذف",
         "toggle_package": "🔁 تغییر وضعیت پکیج",
         "delete_package": "🗑 حذف پکیج",
         "service_edit": "✏️ ویرایش سرویس",
@@ -803,7 +804,7 @@
       "prompts": {
         "package_mode_select": "نوع سرویس جدید را انتخاب کنید.",
         "type_edit_name": "نام جدید نوع سرویس را وارد کنید.",
-        "type_delete_confirm": "برای حذف نوع #{type_id} عبارت «{confirm_word}» را ارسال کنید.",
+        "type_delete_confirm": "برای حذف سرویس #{type_id}، دکمه «✅ تایید حذف» را بزنید.",
         "stock_package_name": "عنوان پکیج را وارد کنید.",
         "service_wizard": {
           "name": "نام سرویس را وارد کنید.",
