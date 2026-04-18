@@ -22,7 +22,25 @@ if ($schema === false) {
     throw new RuntimeException('Could not read schema.sql');
 }
 
-$pdo->exec($schema);
+/**
+ * Execute SQL scripts safely across hosts where multi-statement exec is disabled.
+ */
+$executeSqlBatch = static function (PDO $pdo, string $sql): void {
+    $normalized = str_replace("\r\n", "\n", $sql);
+    $chunks = preg_split('/;\n+/', $normalized) ?: [];
+    foreach ($chunks as $chunk) {
+        $stmt = trim($chunk);
+        if ($stmt === '') {
+            continue;
+        }
+        if (str_starts_with($stmt, '--') || str_starts_with($stmt, '#')) {
+            continue;
+        }
+        $pdo->exec($stmt);
+    }
+};
+
+$executeSqlBatch($pdo, $schema);
 
 // Lightweight forward-compatible column migrations for existing installations
 $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_ref VARCHAR(191) NULL");
