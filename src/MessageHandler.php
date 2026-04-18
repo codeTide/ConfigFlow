@@ -2157,12 +2157,42 @@ final class MessageHandler
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
+        $landingText = $hasServices
+            ? $this->messageRenderer->render('admin.ui.open.services_landing.overview', ['list' => implode("\n", $rows)], ['list'])
+            : $this->messageRenderer->render('admin.ui.open.services_landing.empty_overview');
+
+        $this->telegram->sendMessage($chatId, $landingText, $this->uiKeyboard->replyMenu($buttons));
+    }
+
+    private function openAdminServiceTypeSelector(int $chatId, int $userId): void
+    {
+        $types = $this->database->listTypes();
+        $options = [];
+        $rows = [];
+        foreach (array_values($types) as $idx => $type) {
+            $typeId = (int) ($type['id'] ?? 0);
+            if ($typeId <= 0) {
+                continue;
+            }
+            $num = (string) ($idx + 1);
+            $name = trim((string) ($type['name'] ?? $this->catalog->get('messages.generic.dash')));
+            $options[$num] = $typeId;
+            $rows[] = $this->catalog->get('admin.ui.open.types_list.button', ['num' => $num, 'name' => $name]);
+        }
+        if ($options === []) {
+            $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.ui.open.types_list.empty')));
+            return;
+        }
+        $this->database->setUserState($userId, 'admin.service.type_select', ['options' => $options, 'stack' => ['admin.service.landing', 'admin.root']]);
+        $keyboardRows = [];
+        foreach ($rows as $label) {
+            $keyboardRows[] = [$label];
+        }
+        $keyboardRows[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->telegram->sendMessage(
             $chatId,
-            $hasServices
-                ? $this->messageRenderer->render('admin.ui.open.services_landing.overview', ['list' => implode("\n", $rows)], ['list'])
-                : $this->messageRenderer->render('admin.ui.open.services_landing.empty_overview'),
-            $this->uiKeyboard->replyMenu($buttons)
+            $this->uiText->info($this->catalog->get('admin.types_packages.prompts.package_mode_select')),
+            $this->uiKeyboard->replyMenu($keyboardRows)
         );
     }
 
