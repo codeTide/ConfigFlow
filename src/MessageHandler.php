@@ -2003,6 +2003,7 @@ final class MessageHandler
             $typeId = (int) ($payload['type_id'] ?? 0);
             $serviceId = (int) ($payload['service_id'] ?? 0);
             $selectedTariffId = (int) ($payload['selected_tariff_id'] ?? 0);
+            $serviceTariffsListAction = (string) $this->catalog->get('admin.types_packages.actions.service_tariffs_list');
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminServiceTariffBridgeView($chatId, $userId, $typeId, $serviceId);
                 return;
@@ -2048,7 +2049,7 @@ final class MessageHandler
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, 'admin.service.tariff.create', 'pricing_mode', [], 0);
                 return;
             }
-            if ($text === $this->catalog->get('admin.types_packages.actions.service_tariffs_list')) {
+            if ($text === $serviceTariffsListAction || $this->removeEmoji($text) === $this->removeEmoji($serviceTariffsListAction)) {
                 $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
@@ -2066,11 +2067,12 @@ final class MessageHandler
         if ($stateName === 'admin.service.tariffs.bridge') {
             $typeId = (int) ($payload['type_id'] ?? 0);
             $serviceId = (int) ($payload['service_id'] ?? 0);
+            $serviceTariffsListAction = (string) $this->catalog->get('admin.types_packages.actions.service_tariffs_list');
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
-            if ($text === $this->catalog->get('admin.types_packages.actions.service_tariffs_list')) {
+            if ($text === $serviceTariffsListAction || $this->removeEmoji($text) === $this->removeEmoji($serviceTariffsListAction)) {
                 $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
