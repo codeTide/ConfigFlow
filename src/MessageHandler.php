@@ -1876,7 +1876,7 @@ final class MessageHandler
             $created = $this->database->getService($serviceId);
             $serviceCode = is_array($created) ? (string) ($created['service_code'] ?? (string) $serviceId) : (string) $serviceId;
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.success.service_created', ['service_id' => $serviceCode]));
-            $this->openAdminTypeView($chatId, $userId, $typeId);
+            $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId);
             return;
         }
 
@@ -2339,8 +2339,8 @@ final class MessageHandler
             $panelName = $this->catalog->get('admin.ui.open.service_view.panel_none');
         }
         $statusText = ((int) ($service['is_active'] ?? 0)) === 1
-            ? $this->catalog->get('admin.ui.open.common.status_active')
-            : $this->catalog->get('admin.ui.open.common.status_inactive');
+            ? $this->catalog->get('admin.ui.open.service_view.status_active')
+            : $this->catalog->get('admin.ui.open.service_view.status_inactive');
         $tariffCount = $this->database->countTariffsByService($serviceId);
         $stockCount = $this->database->countAvailableConfigsByService($serviceId);
 
@@ -2348,9 +2348,11 @@ final class MessageHandler
             [$this->uiConst(self::ADMIN_SERVICE_EDIT), $this->uiConst(self::ADMIN_SERVICE_TOGGLE)],
             [$this->uiConst(self::ADMIN_SERVICE_STATUS)],
             [$this->uiConst(self::ADMIN_SERVICE_DELETE)],
-            [$this->uiConst(self::ADMIN_SERVICE_TARIFFS), $this->uiConst(self::ADMIN_SERVICE_INVENTORY)],
-            [$this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD), $this->uiConst(self::ADMIN_SERVICE_STOCK_ADD)],
+            [$this->uiConst(self::ADMIN_SERVICE_TARIFFS)],
         ];
+        if ($mode === 'stock') {
+            $buttons[] = [$this->uiConst(self::ADMIN_SERVICE_INVENTORY), $this->uiConst(self::ADMIN_SERVICE_STOCK_ADD)];
+        }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
 
         $this->database->setUserState($userId, 'admin.service.view', [

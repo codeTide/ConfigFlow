@@ -1004,7 +1004,9 @@
         "service_view": {
           "mode_stock": "انباری",
           "mode_panel_auto": "پنلی خودکار",
-          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b> | <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت کامل همین سرویس طراحی شده است. از دکمه‌های پایین می‌توانید وضعیت فعال/غیرفعال، ویرایش اطلاعات، تعرفه‌ها و موجودی را با دقت کنترل کنید. اگر تغییری اعمال کردید، برای اطمینان دوباره وضعیت سرویس را بررسی کنید.</blockquote>",
+          "status_active": "فعال",
+          "status_inactive": "غیرفعال",
+          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🆔 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
           "panel_none": "تنظیم نشده"
         },
         "panels_list": {
