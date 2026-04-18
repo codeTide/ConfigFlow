@@ -2895,25 +2895,46 @@ final class MessageHandler
     /** @param array<string,mixed> $data */
     private function promptTariffConfirm(int $chatId, int $userId, int $typeId, int $serviceId, string $stateName, array $data, int $tariffId = 0): void
     {
-        $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_template', [
-            'pricing_mode' => (string) (($data['pricing_mode'] ?? '') === 'fixed'
-                ? $this->catalog->get('admin.types_packages.labels.pricing_mode_fixed')
-                : (($data['pricing_mode'] ?? '') === 'per_gb'
-                    ? $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb')
-                    : $this->catalog->get('messages.generic.dash'))),
-            'volume_gb' => (string) (($data['volume_gb'] ?? null) !== null ? $data['volume_gb'] : $this->catalog->get('messages.generic.dash')),
-            'duration_days' => (string) (($data['duration_days'] ?? null) !== null ? $data['duration_days'] : $this->catalog->get('messages.generic.dash')),
-            'price' => (string) (($data['price'] ?? null) !== null ? $data['price'] : $this->catalog->get('messages.generic.dash')),
-            'min_volume_gb' => (string) (($data['min_volume_gb'] ?? null) !== null ? $data['min_volume_gb'] : $this->catalog->get('messages.generic.dash')),
-            'max_volume_gb' => (string) (($data['max_volume_gb'] ?? null) !== null ? $data['max_volume_gb'] : $this->catalog->get('messages.generic.dash')),
-            'step_volume_gb' => (string) (($data['step_volume_gb'] ?? null) !== null ? $data['step_volume_gb'] : $this->catalog->get('messages.generic.dash')),
-            'price_per_gb' => (string) (($data['price_per_gb'] ?? null) !== null ? $data['price_per_gb'] : $this->catalog->get('messages.generic.dash')),
-            'duration_policy' => (string) (($data['duration_policy'] ?? null) !== null
-                ? (($data['duration_policy'] ?? '') === 'fixed_days'
-                    ? $this->catalog->get('admin.types_packages.labels.duration_policy_fixed')
-                    : $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited'))
-                : $this->catalog->get('messages.generic.dash')),
-        ]);
+        $mode = (string) ($data['pricing_mode'] ?? '');
+        $modeText = $mode === 'fixed'
+            ? 'ثابت'
+            : ($mode === 'per_gb' ? 'پلکانی بر اساس حجم' : $this->catalog->get('messages.generic.dash'));
+        $durationPolicy = (string) ($data['duration_policy'] ?? '');
+        $durationPolicyText = $durationPolicy === 'fixed_days'
+            ? 'مدت ثابت'
+            : ($durationPolicy === 'unlimited' ? 'نامحدود' : $this->catalog->get('messages.generic.dash'));
+
+        $lines = ['🧩 حالت: ' . $modeText];
+        if ($mode === 'fixed') {
+            if (isset($data['volume_gb'])) {
+                $lines[] = '📦 حجم: ' . $this->toPersianDigits((string) $data['volume_gb']) . ' گیگ';
+            }
+            if (isset($data['duration_days'])) {
+                $lines[] = '⏳ مدت: ' . $this->toPersianDigits((string) $data['duration_days']) . ' روز';
+            }
+            if (isset($data['price'])) {
+                $lines[] = '💵 قیمت: ' . $this->toPersianDigits((string) $data['price']) . ' تومان';
+            }
+        } elseif ($mode === 'per_gb') {
+            if (isset($data['min_volume_gb']) && isset($data['max_volume_gb'])) {
+                $lines[] = '📉 حداقل/حداکثر حجم: '
+                    . $this->toPersianDigits((string) $data['min_volume_gb'])
+                    . ' / '
+                    . $this->toPersianDigits((string) $data['max_volume_gb'])
+                    . ' گیگ';
+            }
+            if (isset($data['step_volume_gb'])) {
+                $lines[] = '🪜 گام: ' . $this->toPersianDigits((string) $data['step_volume_gb']) . ' گیگ';
+            }
+            if (isset($data['price_per_gb'])) {
+                $lines[] = '💰 قیمت هر گیگ: ' . $this->toPersianDigits((string) $data['price_per_gb']) . ' واحد';
+            }
+            $lines[] = '🧭 سیاست مدت: ' . $durationPolicyText;
+            if ($durationPolicy === 'fixed_days' && isset($data['duration_days'])) {
+                $lines[] = '📅 مدت ثابت: ' . $this->toPersianDigits((string) $data['duration_days']) . ' روز';
+            }
+        }
+        $summary = implode("\n", $lines);
         $payload = ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'confirm', 'data' => $data];
         if ($stateName === 'admin.service.tariff.edit' && $tariffId > 0) {
             $payload['tariff_id'] = $tariffId;
@@ -2927,6 +2948,23 @@ final class MessageHandler
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
+    }
+
+    private function toPersianDigits(string $value): string
+    {
+        return strtr($value, [
+            '0' => '۰',
+            '1' => '۱',
+            '2' => '۲',
+            '3' => '۳',
+            '4' => '۴',
+            '5' => '۵',
+            '6' => '۶',
+            '7' => '۷',
+            '8' => '۸',
+            '9' => '۹',
+            '.' => '٫',
+        ]);
     }
 
     /** @param array<string,mixed> $data */
