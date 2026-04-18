@@ -2265,6 +2265,10 @@ final class MessageHandler
         if ($types !== []) {
             $defaultTypeId = (int) (($types[0]['id'] ?? 0));
         }
+        $defaultTypeId = 0;
+        if ($types !== []) {
+            $defaultTypeId = (int) (($types[0]['id'] ?? 0));
+        }
         $buttons[] = [$this->catalog->get('admin.types_packages.actions.add_type')];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.service.landing', ['options' => $options, 'stack' => ['admin.root'], 'default_type_id' => $defaultTypeId]);
@@ -2559,7 +2563,7 @@ final class MessageHandler
                         'mode' => $this->catalog->get('admin.types_packages.labels.mode_stock_fa'),
                     ]),
                     $this->uiKeyboard->replyMenu([
-                        [$this->catalog->get('admin.types_packages.actions.confirm_service')],
+                        [$this->catalog->get('buttons.confirm_yes')],
                         [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
                     ])
                 );
@@ -2615,14 +2619,14 @@ final class MessageHandler
                     'panel_ref' => (string) (($data['panel_ref'] ?? null) !== null ? $data['panel_ref'] : $this->catalog->get('messages.generic.dash')),
                 ]),
                 $this->uiKeyboard->replyMenu([
-                    [$this->catalog->get('admin.types_packages.actions.confirm_service')],
+                    [$this->catalog->get('buttons.confirm_yes')],
                     [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
                 ])
             );
             return false;
         }
         if ($step === 'confirm') {
-            if ($raw !== $this->catalog->get('admin.types_packages.actions.confirm_service')) {
+            if ($raw !== $this->catalog->get('buttons.confirm_yes')) {
                 $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.confirm_required')));
                 return false;
             }
@@ -3016,7 +3020,7 @@ final class MessageHandler
             return false;
         }
         if ($step === 'confirm') {
-            if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {
+            if ($raw !== $this->catalog->get('buttons.confirm_yes')) {
                 $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.confirm_required')));
                 return false;
             }
@@ -3049,7 +3053,14 @@ final class MessageHandler
             $payload['tariff_id'] = $tariffId;
         }
         $this->database->setUserState($userId, $stateName, $payload);
-        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]),
+            $this->uiKeyboard->replyMenu([
+                [$this->catalog->get('buttons.confirm_yes')],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+            ])
+        );
     }
 
     /** @param array<string,mixed> $data */
@@ -5116,11 +5127,11 @@ final class MessageHandler
                 $this->telegram->sendMessage(
                     $chatId,
                     $preview,
-                    $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.panel_settings.confirm_words.submit')], [UiLabels::back($this->catalog)]])
+                    $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.confirm_yes')], [UiLabels::back($this->catalog)]])
                 );
                 return;
             }
-            if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {
+            if ($raw !== $this->catalog->get('buttons.confirm_yes')) {
                 $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.panel_settings.errors.confirm_required')));
                 return;
             }
@@ -5680,10 +5691,17 @@ final class MessageHandler
                 $summaryText = $this->messageRenderer->render('admin.final_modules.messages.panel_wizard_summary', [
                     'summary' => $summary,
                 ]);
-                $this->telegram->sendMessage($chatId, $summaryText, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $summaryText,
+                    $this->uiKeyboard->replyMenu([
+                        [$this->catalog->get('buttons.confirm_yes')],
+                        [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                    ])
+                );
                 return false;
             case 'confirm':
-                if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {
+                if ($raw !== $this->catalog->get('buttons.confirm_yes')) {
                     $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.final_modules.errors.panel_wizard_confirm_required')));
                     return false;
                 }

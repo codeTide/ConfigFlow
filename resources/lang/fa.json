@@ -636,7 +636,7 @@
         "invalid_duration_policy": "سیاست مدت باید fixed_days یا unlimited باشد.",
         "invalid_duration_days": "تعداد روز معتبر نیست.",
         "group_ids_required": "شناسه گروه‌ها الزامی است.",
-        "panel_wizard_confirm_required": "برای ثبت، «تایید» را ارسال کنید.",
+        "panel_wizard_confirm_required": "برای ثبت روی دکمه «✅ تایید» بزنید.",
         "invalid_state": "وضعیت نامعتبر است. دوباره تلاش کنید."
       },
       "success": {
@@ -659,7 +659,7 @@
         "invalid_menu_option": "یکی از گزینه‌های مدیریت اتصال پنل را انتخاب کنید.",
         "delete_choice_required": "برای ادامه حذف، یکی از گزینه‌های تایید یا انصراف را انتخاب کنید.",
         "invalid_input": "ورودی معتبر نیست.",
-        "confirm_required": "برای ثبت، «تایید» را ارسال کنید."
+        "confirm_required": "برای ثبت روی دکمه «✅ تایید» بزنید."
       },
       "success": {
         "connection_deleted": "اطلاعات اتصال پنل حذف شد.",
@@ -674,10 +674,6 @@
         "username_label": "👤 نام کاربری",
         "password_label": "🔐 رمز عبور",
         "template": "🔹 {base_url_label}: {base_url}\n🔹 {username_label}: {username}\n🔹 {password_label}: {password_masked}"
-      },
-      "confirm_words": {
-        "confirm": "تایید",
-        "submit": "✅ ثبت"
       },
       "wizard": {
         "preview_message": "🧾 <b>پیش‌نمایش اتصال پنل</b>\n\n📋 خلاصه اتصال:\n🔹 🌐 آدرس پنل: {base_url}\n🔹 👤 نام کاربری: {username}\n🔹 🔐 رمز عبور: {password_masked}\n\n<blockquote>💡 اگر اطلاعات بالا کاملاً صحیح است، از دکمه ثبت استفاده کنید تا اطلاعات اتصال به پنل ذخیره و فعال شود.</blockquote>",
@@ -787,7 +783,6 @@
         "service_panel_bind": "🔌 اتصال پنل",
         "service_toggle": "🔁 فعال/غیرفعال سرویس",
         "service_delete": "🗑 حذف سرویس",
-        "confirm_service": "✅ تایید",
         "service_tariff_add": "➕ افزودن تعرفه",
         "service_stock_add": "➕ افزودن موجودی",
         "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس",
