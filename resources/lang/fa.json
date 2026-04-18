@@ -127,19 +127,15 @@
       "buy": {
         "shop_closed": "فروشگاه در حال حاضر بسته است.",
         "no_active_service": "🛒 فعلاً سرویسی برای خرید فعال نیست.",
-        "no_package_for_type": "پکیجی برای این نوع سرویس یافت نشد.",
         "default_package_name": "پکیج",
         "stock_suffix": " | موجودی: {stock}",
         "out_of_stock": "این پکیج در حال حاضر موجودی ندارد.",
         "package_not_found": "پکیج پیدا نشد.",
-        "type_selection": {
-          "overview": "🛒 <b>خرید کانفیگ</b>\n\n🧩 انتخاب نوع سرویس: {options}\n\n<blockquote>💡 ابتدا نوع سرویس را انتخاب کنید؛ در مرحله بعد لیست پکیج‌های همان نوع نمایش داده می‌شود و می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را مدیریت کنید.</blockquote>"
-        },
         "package_selection": {
           "title": "📦 <b>انتخاب پکیج</b>",
           "label": "📋 لیست پکیج‌ها",
-          "tip": "💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید نوع سرویس را دوباره تغییر دهید.",
-          "overview": "📦 <b>انتخاب پکیج</b>\n\n📋 لیست پکیج‌ها: {options}\n\n<blockquote>💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید نوع سرویس را دوباره تغییر دهید.</blockquote>"
+          "tip": "💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید سرویس را دوباره تغییر دهید.",
+          "overview": "📦 <b>انتخاب پکیج</b>\n\n📋 لیست پکیج‌ها: {options}\n\n<blockquote>💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید سرویس را دوباره تغییر دهید.</blockquote>"
         },
         "rules": {
           "default_text": "لطفاً قوانین خرید را بپذیرید.",
@@ -188,7 +184,7 @@
           "service_row": "{num}) {name} | mode:{mode}",
           "service_button": "{num} - {name}",
           "service_selection": {
-            "overview": "🛒 <b>خرید بر اساس سرویس</b>\n\n🧩 سرویس‌های فعال: {services}\n\n<blockquote>💡 سرویس را انتخاب کنید تا تعرفه‌های همان سرویس نمایش داده شود.</blockquote>"
+            "overview": "🛒 <b>خرید کانفیگ</b>\n\n🧩 سرویس‌های فعال: {services}\n\n<blockquote>💡 سرویس موردنظرت را انتخاب کن تا مستقیم وارد مرحله انتخاب تعرفه همون سرویس بشی.</blockquote>"
           },
           "tariff_row": "{num}) {title} | {summary}",
           "tariff_button": "{num} - {title}",
@@ -199,10 +195,17 @@
             "overview": "💳 <b>انتخاب تعرفه</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 تعرفه‌ها: {tariffs}\n\n<blockquote>💡 تعرفه را انتخاب کنید تا به پرداخت بروید. در تعرفه‌های per_gb ابتدا حجم پرسیده می‌شود.</blockquote>"
           },
           "volume_selection": {
-            "overview": "📏 <b>انتخاب حجم تعرفه</b>\n\n📦 بازه: {min_volume_gb} تا {max_volume_gb} گیگ\n💵 قیمت هر گیگ: {price_per_gb} تومان"
+            "overview": "📏 <b>انتخاب حجم تعرفه</b>\n\n📦 بازه: {min_volume_gb} تا {max_volume_gb} گیگ\n💵 قیمت هر گیگ: {price_per_gb} تومان\n\n<blockquote>✨ حجم موردنظرت رو به‌صورت عددی وارد کن تا مبلغ نهایی دقیق محاسبه و ادامه خرید انجام بشه.</blockquote>"
+          },
+          "payment": {
+            "overview": "💰 <b>پرداخت سفارش</b>\n\n📡 سرویس: <b>{service_name}</b>\n🏷 تعرفه: <b>{tariff_title}</b>\n💾 حجم: <b>{volume}</b>\n⏳ زمان سرویس: <b>{duration}</b>\n💵 مبلغ نهایی: <b>{amount}</b> تومان\n\n<blockquote>💡 روش پرداخت را از روی دکمه‌ها انتخاب کنید؛ بعد از پرداخت، وضعیت تراکنش را بررسی کنید تا سفارش به صف تحویل وارد شود.</blockquote>"
           }
         },
-        "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان{stock_suffix}"
+        "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان{stock_suffix}",
+        "no_package_for_service": "پکیجی برای سرویس انتخابی یافت نشد.",
+        "service_selection": {
+          "overview": "🛒 <b>خرید کانفیگ</b>\n\n🧩 انتخاب سرویس: {options}\n\n<blockquote>💡 ابتدا سرویس را انتخاب کنید؛ در مرحله بعد لیست پکیج‌ها نمایش داده می‌شود و می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را مدیریت کنید.</blockquote>"
+        }
       },
       "renew": {
         "order_option": "{num}) سفارش #{purchase_id} - {service_name}",
@@ -246,7 +249,7 @@
           "select_method": "❌ لطفاً یکی از روش‌های پرداخت را انتخاب کنید.",
           "purchase_not_found": "❌ سرویس قابل تمدید پیدا نشد.",
           "test_not_renewable": "❌ تمدید برای سرویس تست مجاز نیست.",
-          "type_mismatch": "❌ پکیج انتخابی برای این سرویس معتبر نیست.",
+          "service_mismatch": "❌ پکیج انتخابی برای این سرویس معتبر نیست.",
           "renewal_failed": "❌ پرداخت تمدید انجام نشد."
         },
         "wallet_purchase_success": "✅ خرید با کیف پول ثبت شد.\n\nشناسه پرداخت: <code>{payment_id}</code>\nمبلغ: <b>{amount}</b> تومان\nموجودی جدید: <b>{new_balance}</b> تومان\n\nسفارش شما در صف تحویل قرار گرفت.",
@@ -344,7 +347,7 @@
       "info": {
         "request_note_legacy_redirect": "💡 این مسیر legacy است؛ ادامه بررسی از مسیر canonical انجام می‌شود.",
         "legacy_path_not_canonical": "💡 مسیر قبلی برای سازگاری نگه داشته شده اما canonical نیست.",
-        "type_name_legacy_redirect": "💡 این مسیر legacy است؛ از این به بعد مسیر canonical در منوی reply انجام می‌شود.",
+        "service_name_legacy_redirect": "💡 این مسیر legacy است؛ از این به بعد مسیر canonical در منوی reply انجام می‌شود.",
         "legacy_use_canonical": "💡 این مسیر legacy است؛ برای ادامه از مسیر canonical استفاده کنید.",
         "user_balance_legacy_redirect": "💡 این مسیر legacy است؛ ادامه کار از flow canonical انجام می‌شود.",
         "stock_add_config_legacy_redirect": "💡 این مسیر legacy است؛ برای ادامه از flow canonical استفاده کنید.",
@@ -352,7 +355,7 @@
         "search_legacy_redirect": "💡 مسیر جستجوی قبلی canonical نیست و به flow جدید منتقل شد.",
         "add_admin_legacy_redirect": "💡 مسیر قبلی canonical نیست و به flow جدید منتقل شد.",
         "settings_legacy_redirect": "💡 این مسیر legacy است؛ ادامه از مسیر canonical انجام می‌شود.",
-        "type_create_legacy_disabled": "💡 ایجاد Type از مسیر legacy غیرفعال شده است.",
+        "service_create_legacy_disabled": "💡 ایجاد گروه سرویس از مسیر legacy غیرفعال شده است.",
         "package_create_legacy_disabled": "💡 ایجاد Package از مسیر legacy غیرفعال شده است.",
         "noncanonical_prefix": "💡 مسیر قبلی canonical نیست. {msg}",
         "config_created_noncanonical": "💡 مسیر قبلی canonical نیست؛ کانفیگ با شناسه <code>{config_id}</code> ثبت شد.",
@@ -390,7 +393,7 @@
       "success": {
         "freetest_rule_saved": "✅ قانون تست رایگان ذخیره شد.",
         "freetest_user_quota_reset": "✅ سهمیه تست کاربر <code>{target_user_id}</code> ریست شد.",
-        "type_created": "✅ نوع سرویس ثبت شد. شناسه: <code>{type_id}</code>",
+        "type_created": "✅ نوع سرویس ثبت شد. شناسه: <code>{service_id}</code>",
         "package_created": "✅ پکیج ثبت شد. شناسه: <code>{package_id}</code>",
         "agent_price_saved": "✅ قیمت اختصاصی ثبت شد.\nU:<code>{agent_id}</code> | P:<code>{package_id}</code> | <b>{price}</b>",
         "panel_created": "✅ پنل ثبت شد. ID: <code>{panel_id}</code>",
@@ -801,9 +804,9 @@
         "tip": "💡 اطلاعات پکیج را به‌صورت مرحله‌ای و گام‌به‌گام وارد کنید."
       },
       "prompts": {
-        "package_mode_select": "💡 نوع سرویس جدید را انتخاب کنید.",
+        "package_mode_select": "💡 سرویس موردنظر را انتخاب کنید.",
         "type_edit_name": "💡 نام جدید نوع سرویس را وارد کنید.",
-        "type_delete_confirm": "💡 برای حذف سرویس #{type_id}، دکمه «✅ تایید حذف» را بزنید.",
+        "type_delete_confirm": "💡 برای حذف سرویس #{service_id}، دکمه «✅ تایید حذف» را بزنید.",
         "stock_package_name": "💡 عنوان پکیج را وارد کنید.",
         "service_wizard": {
           "name": "📝 <b>نام سرویس:</b>\n\n📌 نامی انتخاب کنید که برای کاربر نهایی واضح، کوتاه و قابل تشخیص باشد (مثلاً اقتصادی، پرسرعت، نامحدود).\n\n<blockquote>✍️ لطفاً نام سرویس را به‌صورت دقیق و بدون ابهام ارسال کنید تا در لیست فروش به‌خوبی دیده شود.</blockquote>",
@@ -892,20 +895,20 @@
         "service_inventory_tariff_button": "تعرفه #{tariff_id}"
       },
       "errors": {
-        "invalid_type_option": "❌ گزینه نامعتبر است. لطفاً یکی از دکمه‌های لیست نوع‌ها را انتخاب کنید.",
-        "type_name_required": "❌ لطفاً نام نوع سرویس را به‌صورت متن معمولی ارسال کنید.",
-        "invalid_type": "❌ نوع سرویس نامعتبر بود. دوباره از لیست انتخاب کنید.",
-        "type_not_found": "❌ نوع سرویس پیدا نشد.",
-        "type_delete_blocked": "❌ ابتدا سرویس‌های این گروه را حذف کنید، سپس حذف سرویس را انجام دهید.",
+        "invalid_type_option": "❌ گزینه نامعتبر است. لطفاً یکی از دکمه‌های لیست سرویس‌ها را انتخاب کنید.",
+        "type_name_required": "❌ لطفاً نام سرویس را به‌صورت متن معمولی ارسال کنید.",
+        "invalid_type": "❌ سرویس نامعتبر بود. دوباره از لیست انتخاب کنید.",
+        "type_not_found": "❌ سرویس پیدا نشد.",
+        "type_delete_blocked": "❌ ابتدا آیتم‌های وابسته به این سرویس را حذف کنید، سپس حذف سرویس را انجام دهید.",
         "invalid_package_or_action": "❌ گزینه نامعتبر است. یکی از پکیج‌ها یا عملیات مدیریتی همین صفحه را انتخاب کنید.",
-        "invalid_type_again": "❌ نوع سرویس معتبر نبود. لطفاً دوباره انتخاب کنید.",
+        "invalid_type_again": "❌ سرویس معتبر نبود. لطفاً دوباره انتخاب کنید.",
         "invalid_create_input": "❌ فرمت ورودی معتبر نیست. لطفاً مطابق راهنما ارسال کنید.",
         "create_format": "❌ ورودی‌ها باید مرحله‌به‌مرحله وارد شوند.",
         "invalid_values": "❌ مقادیر واردشده معتبر نیستند. لطفاً مقدار درست وارد کنید.",
         "invalid_package_info": "❌ اطلاعات پکیج معتبر نبود. لطفاً دوباره انتخاب کنید.",
         "package_not_found": "❌ پکیج پیدا نشد.",
         "invalid_package_action": "❌ گزینه نامعتبر است. لطفاً از دکمه‌های مدیریت پکیج استفاده کنید.",
-        "package_mode_invalid_option": "❌ یکی از گزینه‌های نوع سرویس را انتخاب کنید.",
+        "package_mode_invalid_option": "❌ یکی از گزینه‌های سرویس را انتخاب کنید.",
         "confirm_required": "❌ برای ثبت نهایی روی دکمه «✅ تایید» بزنید.",
         "service_name_required": "❌ نام سرویس را ارسال کنید.",
         "service_name_duplicate": "❌ این نام سرویس قبلاً ثبت شده است. لطفاً یک نام متفاوت وارد کنید.",
@@ -931,8 +934,8 @@
         "service_inventory_payload_format": "❌ فرمت ورودی موجودی نامعتبر است. جداکننده --- را رعایت کنید."
       },
       "success": {
-        "type_created": "✅ نوع سرویس با شناسه <code>{type_id}</code> ثبت شد.",
-        "type_status_updated": "✅ وضعیت نوع سرویس بروزرسانی شد.",
+        "type_created": "✅ سرویس با شناسه <code>{service_id}</code> ثبت شد.",
+        "type_status_updated": "✅ وضعیت سرویس بروزرسانی شد.",
         "type_deleted": "✅ سرویس حذف شد.",
         "package_created": "✅ پکیج با شناسه <code>{package_id}</code> ثبت شد.",
         "package_status_updated": "✅ وضعیت پکیج بروزرسانی شد.",
@@ -984,14 +987,14 @@
       "open": {
         "services_landing": {
           "empty_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\nهنوز سرویسی ثبت نشده است.\n\n<blockquote>💡 برای شروع، از دکمه «🧩 افزودن سرویس (جدید)» استفاده کنید.</blockquote>",
-          "overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📋 گروه‌بندی بر اساس نوع: {list}\n\n<blockquote>💡 نوع فقط برای گروه‌بندی است؛ عملیات اصلی روی سرویس انجام می‌شود.</blockquote>",
+          "overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📋 لیست سرویس‌ها: {list}\n\n<blockquote>💡 عملیات این بخش مستقیماً روی سرویس انجام می‌شود.</blockquote>",
           "row": "{num}) {status} {name} | سرویس‌ها: <code>{service_count}</code>",
           "button": "{num} - {name} ({service_count})"
         },
-        "types_list": {
-          "empty": "هنوز نوع سرویسی ثبت نشده است.",
+        "services_list": {
+          "empty": "هنوز سرویسی ثبت نشده است.",
           "empty_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\nهنوز سرویسی ثبت نشده است. برای شروع یک سرویس جدید بسازید تا بعد بتوانید تعرفه، موجودی و اتصال پنل را مدیریت کنید.\n\n<blockquote>💡 از دکمه «➕ افزودن سرویس» استفاده کنید و مراحل را کامل جلو ببرید.</blockquote>",
-          "overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📋 لیست گروه‌های سرویس: {list}\n\n<blockquote>💡 یک مورد را انتخاب کنید تا سرویس‌ها و عملیات مدیریتی همان بخش باز شود.</blockquote>",
+          "overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📋 لیست سرویس‌ها: {list}\n\n<blockquote>💡 عملیات این بخش مستقیماً روی سرویس انجام می‌شود.</blockquote>",
           "row": "{num}) {status} {name} | سرویس‌ها: <code>{service_count}</code>",
           "button": "{num} - {name} ({service_count})"
         },
@@ -1001,15 +1004,15 @@
           "status_active": "🟢 فعال",
           "status_inactive": "🔴 غیرفعال"
         },
-        "type_view": {
-          "packages_empty": "برای این نوع هنوز سرویسی ثبت نشده است.",
-          "overview": "🧩 <b>جزئیات گروه سرویس</b>\n\n👤 گروه: {type_name} | <code>{type_id}</code>\n📶 وضعیت: {status_text}\n📦 سرویس‌ها: {packages}\n\n<blockquote>💡 برای مدیریت هر سرویس، شماره همان سرویس را انتخاب کنید.</blockquote>",
-          "not_found": "نوع سرویس پیدا نشد.",
+        "service_view": {
+          "packages_empty": "برای این سرویس هنوز آیتمی ثبت نشده است.",
+          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 سرویس: {service_name} | <code>{service_id}</code>\n📶 وضعیت: {status_text}\n📦 آیتم‌ها: {packages}\n\n<blockquote>💡 برای مدیریت هر آیتم، شماره همان آیتم را انتخاب کنید.</blockquote>",
+          "not_found": "سرویس پیدا نشد.",
           "service_button": "🧩 سرویس #{service_id} | {name}"
         },
         "package_view": {
-          "overview": "📦 <b>جزئیات پکیج</b>\n\n👤 نام: <b>{package_name}</b> | <code>{package_id}</code>\n🧩 نوع: {type_name} | <code>{type_id}</code>\n💾 حجم: {volume} GB\n⏳ مدت: {days} روز\n💵 قیمت: {amount} تومان\n📶 وضعیت: {status_text}\n\n<blockquote>💡 در این صفحه می‌توانید وضعیت پکیج را تغییر دهید یا آن را حذف کنید.</blockquote>",
-          "not_found_in_type": "پکیج پیدا نشد یا با نوع انتخابی سازگار نیست."
+          "overview": "📦 <b>جزئیات پکیج</b>\n\n👤 نام: <b>{package_name}</b> | <code>{package_id}</code>\n🧩 سرویس: {service_name} | <code>{service_id}</code>\n💾 حجم: {volume} GB\n⏳ مدت: {days} روز\n💵 قیمت: {amount} تومان\n📶 وضعیت: {status_text}\n\n<blockquote>💡 در این صفحه می‌توانید وضعیت پکیج را تغییر دهید یا آن را حذف کنید.</blockquote>",
+          "not_found_in_type": "پکیج پیدا نشد یا با سرویس انتخابی سازگار نیست."
         },
         "service_view": {
           "mode_stock": "انباری",
@@ -1059,21 +1062,21 @@
             "status_symbol_ready": "🟢"
           },
           "types": {
-            "empty": "نوع سرویسی برای موجودی یافت نشد.",
-            "overview": "📋 <b>موجودی کانفیگ‌ها</b>\n\n🧩 انتخاب نوع سرویس: {list}\n\n<blockquote>💡 ابتدا نوع سرویس را انتخاب کنید تا لیست پکیج‌ها نمایش داده شود.</blockquote>",
-            "row": "{num}) {name} | ID: {type_id}",
+            "empty": "سرویسی برای موجودی یافت نشد.",
+            "overview": "📋 <b>موجودی کانفیگ‌ها</b>\n\n🧩 انتخاب سرویس: {list}\n\n<blockquote>💡 ابتدا سرویس را انتخاب کنید تا لیست پکیج‌ها نمایش داده شود.</blockquote>",
+            "row": "{num}) {name} | ID: {service_id}",
             "button": "{num} - {name}"
           },
           "packages": {
-            "invalid_type": "نوع سرویس معتبر نبود.",
-            "empty": "برای این نوع پکیجی ثبت نشده است.",
+            "invalid_type": "سرویس معتبر نبود.",
+            "empty": "برای این سرویس پکیجی ثبت نشده است.",
             "overview": "📦 <b>پکیج‌های موجودی</b>\n\n🧾 لیست پکیج‌ها: {list}\n\n<blockquote>💡 با انتخاب پکیج، لیست کانفیگ‌های موجودی همان پکیج باز می‌شود.</blockquote>",
             "default_name": "پکیج",
             "row": "{num}) {name} | P:{package_id} | موجود: {available}",
             "button": "{num} - {name}"
           },
           "configs": {
-            "invalid_type_package": "نوع/پکیج معتبر نبود.",
+            "invalid_service_package": "سرویس/پکیج معتبر نبود.",
             "empty": "کانفیگی مطابق فیلتر پیدا نشد.",
             "query_none": "ندارد",
             "row": "{num}) {status} {service} | C:{config_id}",
@@ -1182,7 +1185,7 @@
       "audit": {
         "error_prefix": "❌ {msg}",
         "package_default_name": "پکیج",
-        "type_view": {
+        "service_view": {
           "package_row": "{num}) {status} {name} | ID: {package_id} | {volume}GB | {days} روز | {price} تومان"
         },
         "payment_review": {
