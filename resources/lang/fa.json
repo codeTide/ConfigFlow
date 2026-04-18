@@ -770,6 +770,7 @@
     "types_packages": {
       "actions": {
         "add_type": "➕ افزودن نوع سرویس",
+        "edit_type": "✏️ ویرایش نوع سرویس",
         "add_package": "➕ افزودن پکیج",
         "add_service": "🧩 افزودن سرویس (جدید)",
         "add_stock_package": "📦 پکیج انباری",
@@ -783,6 +784,7 @@
         "service_inventory": "📚 موجودی",
         "service_panel_bind": "🔌 اتصال پنل",
         "service_toggle": "🔁 فعال/غیرفعال سرویس",
+        "service_delete": "🗑 حذف سرویس",
         "service_tariff_add": "➕ افزودن تعرفه",
         "service_stock_add": "➕ افزودن موجودی",
         "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس",
@@ -800,6 +802,8 @@
       },
       "prompts": {
         "package_mode_select": "نوع سرویس جدید را انتخاب کنید.",
+        "type_edit_name": "نام جدید نوع سرویس را وارد کنید.",
+        "type_delete_confirm": "برای حذف نوع #{type_id} عبارت «{confirm_word}» را ارسال کنید.",
         "stock_package_name": "عنوان پکیج را وارد کنید.",
         "service_wizard": {
           "name": "نام سرویس را وارد کنید.",
@@ -878,6 +882,7 @@
         "type_name_required": "لطفاً نام نوع سرویس را به‌صورت متن معمولی ارسال کنید.",
         "invalid_type": "نوع سرویس نامعتبر بود. دوباره از لیست انتخاب کنید.",
         "type_not_found": "نوع سرویس پیدا نشد.",
+        "type_delete_blocked": "ابتدا سرویس‌های این نوع را حذف کنید، سپس نوع را حذف کنید.",
         "invalid_package_or_action": "گزینه نامعتبر است. یکی از پکیج‌ها یا عملیات مدیریتی همین صفحه را انتخاب کنید.",
         "invalid_type_again": "نوع سرویس معتبر نبود. لطفاً دوباره انتخاب کنید.",
         "invalid_create_input": "فرمت ورودی معتبر نیست. لطفاً مطابق راهنما ارسال کنید.",
@@ -893,6 +898,7 @@
         "panel_required_for_panel_auto": "برای سرویس panel_auto باید یک پنل معتبر انتخاب شود.",
         "panel_not_found": "پنل انتخاب‌شده معتبر نیست.",
         "service_not_found": "سرویس پیدا نشد.",
+        "service_delete_blocked": "برای حذف سرویس، ابتدا تعرفه‌ها و موجودی‌های آن را حذف کنید.",
         "invalid_service_action": "گزینه نامعتبر است. از دکمه‌های مدیریت سرویس استفاده کنید.",
         "invalid_tariff_option": "گزینه تعرفه معتبر نیست.",
         "tariff_not_found": "تعرفه پیدا نشد.",
@@ -919,6 +925,7 @@
         "service_created": "سرویس با شناسه <code>{service_id}</code> ثبت شد.",
         "service_updated": "تنظیمات سرویس بروزرسانی شد.",
         "service_status_updated": "وضعیت سرویس بروزرسانی شد.",
+        "service_deleted": "سرویس حذف شد.",
         "tariff_created": "تعرفه ثبت شد.",
         "tariff_updated": "تعرفه بروزرسانی شد.",
         "tariff_deleted": "تعرفه حذف شد.",
