@@ -53,7 +53,6 @@ CREATE TABLE IF NOT EXISTS service (
 CREATE TABLE IF NOT EXISTS service_tariff (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     service_id BIGINT NOT NULL,
-    title VARCHAR(255) NOT NULL,
     pricing_mode VARCHAR(32) NOT NULL DEFAULT 'fixed',
     volume_gb DECIMAL(10,2) NULL,
     duration_days INT NULL,
