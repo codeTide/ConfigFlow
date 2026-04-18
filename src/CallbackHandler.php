@@ -59,7 +59,7 @@ final class CallbackHandler
         $this->database->ensureUser($fromUser);
 
         if ($this->database->userStatus($userId) === 'restricted') {
-            $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.restricted'));
+            $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.callback.restricted'));
             return;
         }
 
@@ -70,13 +70,13 @@ final class CallbackHandler
 
         if ($data === 'check_channel') {
             if ($this->checkChannelMembership($userId)) {
-                $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.channel.membership_confirmed'));
+                $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.channel.membership_confirmed'));
                 $this->telegram->editMessageText($chatId, $messageId, $this->menus->mainMenuText());
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.generic.main_menu'), $this->menus->mainMenuReplyKeyboard($userId));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.generic.main_menu'), $this->menus->mainMenuReplyKeyboard($userId));
             } else {
-                $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.channel.membership_missing'));
+                $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.channel.membership_missing'));
                 $this->telegram->editMessageText($chatId, $messageId, $this->channelLockText(), $this->channelLockKeyboard());
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
             }
             return;
         }
@@ -84,30 +84,30 @@ final class CallbackHandler
         if (!$this->checkChannelMembership($userId)) {
             $this->telegram->answerCallbackQuery($callbackId);
             $this->telegram->editMessageText($chatId, $messageId, $this->channelLockText(), $this->channelLockKeyboard());
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.channel.after_join_prompt'), $this->channelLockReplyKeyboard());
             return;
         }
 
         if ($this->isDeprecatedUserInlineAction($data)) {
             error_log('Deprecated user callback route used. uid=' . $userId . ' data=' . $data);
             $this->database->clearUserState($userId);
-            $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.deprecated_route'));
+            $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.callback.deprecated_route'));
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
 
         if (str_starts_with($data, 'admin:') || str_starts_with($data, 'pay:')) {
             if (!$this->database->isAdminUser($userId)) {
-                $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.admin_access_denied'));
+                $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.callback.admin_access_denied'));
                 return;
             }
             $this->database->clearUserState($userId);
-            $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.admin_legacy'));
+            $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.callback.admin_legacy'));
             $this->telegram->sendMessage(
                 $chatId,
                 $this->messageRenderer->render('messages.callback.admin_legacy_overview', [
                     'admin_overview' => $this->menus->adminRootText(),
-                    'legacy_note' => $this->catalog->get('messages.callback.admin_legacy_note'),
+                    'legacy_note' => $this->messageRenderer->render('messages.callback.admin_legacy_note'),
                 ], ['admin_overview']),
                 $this->menus->adminRootReplyKeyboard()
             );
@@ -116,12 +116,12 @@ final class CallbackHandler
 
         if ($data === 'nav:main') {
             $this->telegram->editMessageText($chatId, $messageId, $this->menus->mainMenuText());
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.generic.main_menu'), $this->menus->mainMenuReplyKeyboard($userId));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.generic.main_menu'), $this->menus->mainMenuReplyKeyboard($userId));
             $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
 
-        $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.callback.expired_operation'));
+        $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.callback.expired_operation'));
     }
 
     private function isDeprecatedUserInlineAction(string $data): bool
@@ -156,7 +156,7 @@ final class CallbackHandler
         $channelId = trim($this->settings->get('channel_id', ''));
         $title = trim($this->settings->get('channel_title', ''));
         if ($title === '') {
-            $title = $this->catalog->get('messages.channel.lock_title_default');
+            $title = $this->messageRenderer->render('messages.channel.lock_title_default');
         }
 
         $mention = $channelId;
@@ -165,13 +165,13 @@ final class CallbackHandler
         }
 
         $line2 = $mention !== ''
-            ? $this->catalog->get('messages.channel.mention_line', ['mention' => $mention])
-            : $this->catalog->get('messages.channel.private_line', ['label' => $this->catalog->get('messages.channel.private')]);
+            ? $this->messageRenderer->render('messages.channel.mention_line', ['mention' => $mention])
+            : $this->messageRenderer->render('messages.channel.private_line', ['label' => $this->messageRenderer->render('messages.channel.private')]);
 
-        return $this->catalog->get('messages.channel.lock_detailed', [
+        return $this->messageRenderer->render('messages.channel.lock_detailed', [
             'title' => htmlspecialchars($title),
             'line2' => $line2,
-        ]);
+        ], ['line2']);
     }
 
     private function channelLockKeyboard(): array
