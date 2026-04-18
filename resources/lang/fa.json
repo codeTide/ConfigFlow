@@ -960,6 +960,12 @@
         "overview": "🧪 <b>مدیریت تست رایگان</b>\n\n📋 قوانین: {rules}\n\n<blockquote>💡 اگر کاربری به‌اشتباه سهمیه‌اش مصرف شده یا نیاز به بررسی دوباره دارد، از همین بخش می‌توانید سهمیه او را ریست کنید.</blockquote>"
       },
       "open": {
+        "services_landing": {
+          "empty_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\nهنوز سرویسی ثبت نشده است.\n\n<blockquote>💡 برای شروع، از دکمه «🧩 افزودن سرویس (جدید)» استفاده کنید.</blockquote>",
+          "overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📋 گروه‌بندی بر اساس نوع: {list}\n\n<blockquote>💡 نوع فقط برای گروه‌بندی است؛ عملیات اصلی روی سرویس انجام می‌شود.</blockquote>",
+          "row": "{num}) {status} {name} | سرویس‌ها: <code>{service_count}</code>",
+          "button": "{num} - {name} ({service_count})"
+        },
         "types_list": {
           "empty": "هنوز نوع سرویسی ثبت نشده است.",
           "overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\n📋 لیست نوع‌ها: {list}\n\n<blockquote>💡 یک نوع را انتخاب کنید تا پکیج‌ها و عملیات همان نوع باز شود.</blockquote>"
