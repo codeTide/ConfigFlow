@@ -1639,10 +1639,6 @@ final class MessageHandler
                 );
                 return;
             }
-            if ($text === $this->catalog->get('admin.types_packages.actions.add_service') || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)) {
-                $this->openAdminServiceTypeSelector($chatId, $userId);
-                return;
-            }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
             $selected = $this->extractOptionKey($text);
             $typeId = isset($options[$selected]) ? (int) $options[$selected] : 0;
@@ -2254,20 +2250,19 @@ final class MessageHandler
                 ? $this->catalog->get('admin.ui.open.common.status_active')
                 : $this->catalog->get('admin.ui.open.common.status_inactive');
             $name = trim((string) ($type['name'] ?? $this->catalog->get('messages.generic.dash')));
-            $rows[] = $this->catalog->get('admin.ui.open.services_landing.row', ['num' => $key, 'status' => $status, 'name' => $name, 'type_id' => $typeId, 'service_count' => $serviceCount]);
+            $rows[] = $this->catalog->get('admin.ui.open.types_list.row', ['num' => $key, 'status' => $status, 'name' => $name, 'type_id' => $typeId, 'service_count' => $serviceCount]);
             $options[$key] = $typeId;
-            $buttons[] = [$this->catalog->get('admin.ui.open.services_landing.button', ['num' => $key, 'name' => $name, 'service_count' => $serviceCount])];
+            $buttons[] = [$this->catalog->get('admin.ui.open.types_list.button', ['num' => $key, 'name' => $name, 'service_count' => $serviceCount])];
         }
         $buttons[] = [$this->catalog->get('admin.types_packages.actions.add_type')];
-        $buttons[] = [$this->catalog->get('admin.types_packages.actions.add_service')];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.service.landing', ['options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
         $landingText = $rows !== []
-            ? $this->messageRenderer->render('admin.ui.open.services_landing.overview', ['list' => implode("\n", $rows)], ['list'])
-            : $this->messageRenderer->render('admin.ui.open.services_landing.empty_overview');
+            ? $this->messageRenderer->render('admin.ui.open.types_list.overview', ['list' => implode("\n", $rows)], ['list'])
+            : $this->messageRenderer->render('admin.ui.open.types_list.empty_overview');
 
         $this->telegram->sendMessage($chatId, $landingText, $this->uiKeyboard->replyMenu($buttons));
     }
@@ -2329,8 +2324,8 @@ final class MessageHandler
             }
             $isActive = ((int) ($service['is_active'] ?? 0)) === 1;
             $status = $isActive
-                ? $this->catalog->get('admin.ui.open.type_view.status_active_symbol')
-                : $this->catalog->get('admin.ui.open.type_view.status_inactive_symbol');
+                ? $this->catalog->get('admin.ui.open.common.status_active')
+                : $this->catalog->get('admin.ui.open.common.status_inactive');
             $mode = (string) ($service['mode'] ?? 'stock');
             $modeLabel = $mode === 'panel_auto'
                 ? $this->catalog->get('admin.ui.open.service_view.mode_panel_auto')
