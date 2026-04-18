@@ -1633,6 +1633,7 @@ final class MessageHandler
             if (
                 $text === $this->catalog->get('admin.types_packages.actions.add_service')
                 || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)
+                || $text === $this->catalog->get('admin.types_packages.actions.add_type')
             ) {
                 $defaultTypeId = (int) ($payload['default_type_id'] ?? 0);
                 if ($defaultTypeId <= 0) {
@@ -1769,7 +1770,7 @@ final class MessageHandler
                 );
                 return;
             }
-            if ($text === $this->catalog->get('admin.types_packages.actions.delete_type')) {
+            if ($text === $this->catalog->get('admin.types_packages.actions.delete_service')) {
                 if ($this->database->countServicesByType($typeId) > 0) {
                     $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_delete_blocked')));
                     return;
@@ -2337,7 +2338,7 @@ final class MessageHandler
                 $this->catalog->get('admin.types_packages.actions.edit_type'),
                 $this->catalog->get('admin.types_packages.actions.toggle_type'),
             ],
-            [$this->catalog->get('admin.types_packages.actions.delete_type')],
+            [$this->catalog->get('admin.types_packages.actions.delete_service')],
         ];
         foreach (array_values($services) as $service) {
             $serviceId = (int) ($service['id'] ?? 0);
