@@ -114,7 +114,22 @@ function cf_write_env(array $values, string $path): void
     $content = implode(PHP_EOL, $lines) . PHP_EOL;
     $dir = dirname($path);
     if (!is_dir($dir) || !is_writable($dir)) {
-        throw new RuntimeException('Could not write .env file. Project directory is not writable.');
+        $runtimeUser = cf_runtime_user() ?? 'unknown';
+        $ownerId = @fileowner($dir);
+        $ownerUser = 'unknown';
+        if ($ownerId !== false && function_exists('posix_getpwuid')) {
+            $ownerInfo = @posix_getpwuid((int) $ownerId);
+            if (is_array($ownerInfo)) {
+                $ownerUser = (string) ($ownerInfo['name'] ?? 'unknown');
+            }
+        }
+        $perms = @fileperms($dir);
+        $permStr = $perms === false ? 'unknown' : substr(sprintf('%o', $perms), -4);
+        throw new RuntimeException(
+            'Could not write .env file. Project directory is not writable. '
+            . "path={$dir}, runtime_user={$runtimeUser}, owner={$ownerUser}, perms={$permStr}. "
+            . "Fix ownership/permissions (for example: chown -R <web-user>:<web-user> {$dir} && chmod 755 {$dir})."
+        );
     }
 
     set_error_handler(static function (): bool {
@@ -354,11 +369,11 @@ function cf_install(array $input): array
     }
 
     try {
-        cf_write_env($env, __DIR__ . '/.env');
-        $messages[] = '✓ .env file written.';
         foreach (cf_auto_fix_permissions(__DIR__) as $permMsg) {
             $messages[] = $permMsg;
         }
+        cf_write_env($env, __DIR__ . '/.env');
+        $messages[] = '✓ .env file written.';
 
         if ($isLocked && $reinstallMode === 'reset_db') {
             cf_reset_database($env);
