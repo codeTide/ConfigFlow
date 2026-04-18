@@ -2224,8 +2224,10 @@ final class MessageHandler
     {
         $defaultTypeId = $this->ensureServiceRootTypeId();
         $buttons = [
-            [$this->catalog->get('admin.types_packages.actions.my_services')],
-            [$this->catalog->get('admin.types_packages.actions.add_service')],
+            [
+                $this->catalog->get('admin.types_packages.actions.my_services'),
+                $this->catalog->get('admin.types_packages.actions.add_service'),
+            ],
         ];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.service.landing', ['stack' => ['admin.root'], 'default_type_id' => $defaultTypeId]);
@@ -2292,14 +2294,9 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         if ($services === []) {
-            $this->database->setUserState($userId, 'admin.service.list', ['service_options' => [], 'stack' => ['admin.service.landing', 'admin.root']]);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.types_packages.messages.service_list_empty'),
-                $this->uiKeyboard->replyMenu([
-                    [$this->catalog->get('admin.types_packages.actions.add_service')],
-                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-                ])
+                $this->messageRenderer->render('admin.types_packages.messages.service_list_empty')
             );
             return;
         }
