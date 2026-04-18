@@ -2039,6 +2039,10 @@ final class MessageHandler
                 );
                 return;
             }
+            if ($selectedTariffId > 0 && $text === $this->catalog->get('admin.types_packages.actions.service_tariff_status')) {
+                $this->openAdminServiceTariffDetailView($chatId, $userId, $typeId, $serviceId, $selectedTariffId);
+                return;
+            }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD)) {
                 $this->database->setUserState($userId, 'admin.service.tariff.create', ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'pricing_mode', 'data' => []]);
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, 'admin.service.tariff.create', 'pricing_mode', [], 0);
@@ -2108,7 +2112,11 @@ final class MessageHandler
             }
             if ($stateName === 'admin.service.tariff.create') {
                 $newId = $this->database->createServiceTariff(array_merge($data, ['service_id' => $serviceId, 'is_active' => 1]));
-                $this->openAdminServiceTariffDetailView($chatId, $userId, $typeId, $serviceId, $newId, $this->messageRenderer->render('admin.types_packages.success.tariff_created'));
+                if ($newId > 0) {
+                    $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.tariff_created'));
+                    return;
+                }
+                $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
             $this->database->updateServiceTariff($tariffId, array_merge($data, ['is_active' => 1]));
@@ -2641,19 +2649,35 @@ final class MessageHandler
         $modeText = $mode === 'fixed'
             ? $this->catalog->get('admin.types_packages.labels.pricing_mode_fixed')
             : $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb');
-        $summary = $mode === 'fixed'
-            ? $this->catalog->get('admin.types_packages.labels.tariff_fixed_detail', [
-                'volume_gb' => (string) ($tariff['volume_gb'] ?? '0'),
-                'duration_days' => (string) ($tariff['duration_days'] ?? '0'),
-                'price' => (string) ($tariff['price'] ?? '0'),
-            ])
-            : $this->catalog->get('admin.types_packages.labels.tariff_per_gb_detail', [
-                'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
-                'max_volume_gb' => (string) ($tariff['max_volume_gb'] ?? '0'),
-                'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
-                'duration_policy' => (string) (($tariff['duration_policy'] ?? '') !== '' ? $tariff['duration_policy'] : $this->catalog->get('messages.generic.dash')),
-                'duration_days' => (string) (($tariff['duration_days'] ?? null) !== null ? $tariff['duration_days'] : $this->catalog->get('messages.generic.dash')),
+        $modeText = $this->removeEmoji((string) $modeText);
+        if ($mode === 'fixed') {
+            $summary = $this->catalog->get('admin.types_packages.labels.tariff_fixed_detail', [
+                'volume_gb' => $this->toPersianNumber((string) ($tariff['volume_gb'] ?? '0')),
+                'duration_days' => $this->toPersianNumber((string) ($tariff['duration_days'] ?? '0')),
+                'price' => $this->toPersianNumber((string) ($tariff['price'] ?? '0')),
             ]);
+        } else {
+            $durationPolicy = (string) ($tariff['duration_policy'] ?? '');
+            $durationPolicyText = $durationPolicy === 'unlimited'
+                ? $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited'))
+                : ($durationPolicy === 'fixed_days'
+                    ? $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_fixed'))
+                    : $this->catalog->get('messages.generic.dash'));
+            $summary = $this->catalog->get(
+                $durationPolicy === 'fixed_days'
+                    ? 'admin.types_packages.labels.tariff_per_gb_detail_fixed_days'
+                    : 'admin.types_packages.labels.tariff_per_gb_detail_unlimited',
+                [
+                    'min_volume_gb' => $this->toPersianNumber((string) ($tariff['min_volume_gb'] ?? '0')),
+                    'max_volume_gb' => (($tariff['max_volume_gb'] ?? null) !== null)
+                        ? $this->toPersianNumber((string) $tariff['max_volume_gb'])
+                        : $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited')),
+                    'price_per_gb' => $this->toPersianNumber((string) ($tariff['price_per_gb'] ?? '0')),
+                    'duration_policy' => $durationPolicyText,
+                    'duration_days' => $this->toPersianNumber((string) (($tariff['duration_days'] ?? null) !== null ? $tariff['duration_days'] : $this->catalog->get('messages.generic.dash'))),
+                ]
+            );
+        }
         $this->database->setUserState($userId, 'admin.service.tariffs', [
             'type_id' => $typeId,
             'service_id' => $serviceId,
@@ -2665,12 +2689,16 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->messageRenderer->render('admin.types_packages.messages.tariff_detail_overview', [
-                'tariff_id' => $tariffId,
+                'tariff_id' => $this->toPersianNumber((string) $tariffId),
                 'mode_text' => $modeText,
                 'summary' => $summary,
             ]),
             $this->uiKeyboard->replyMenu([
-                [$this->catalog->get('admin.types_packages.actions.service_tariff_edit'), $this->catalog->get('admin.types_packages.actions.service_tariff_delete')],
+                [
+                    $this->catalog->get('admin.types_packages.actions.service_tariff_status'),
+                    $this->catalog->get('admin.types_packages.actions.service_tariff_edit'),
+                    $this->catalog->get('admin.types_packages.actions.service_tariff_delete'),
+                ],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
@@ -2948,6 +2976,11 @@ final class MessageHandler
     {
         $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}]/u', '', $text) ?? $text;
         return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+    }
+
+    private function toPersianNumber(string $value): string
+    {
+        return strtr($value, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹', '.' => '٫']);
     }
 
     /** @param array<string,mixed> $data */
