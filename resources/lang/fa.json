@@ -975,7 +975,7 @@
         },
         "types_list": {
           "empty": "هنوز نوع سرویسی ثبت نشده است.",
-          "empty_overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\nهنوز نوع سرویسی ثبت نشده است.\n\n<blockquote>💡 برای شروع از دکمه «➕ افزودن سرویس» استفاده کنید.</blockquote>",
+          "empty_overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\nهنوز نوع سرویسی ثبت نشده است.\n\n<blockquote>💡 برای شروع از دکمه «➕ افزودن سرویس» استفاده کنید و مرحله‌به‌مرحله تنظیمات را کامل انجام دهید.</blockquote>",
           "overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\n📋 لیست نوع‌ها: {list}\n\n<blockquote>💡 یک نوع را انتخاب کنید تا سرویس‌ها و عملیات همان نوع باز شود.</blockquote>",
           "row": "{num}) {status} {name} | سرویس‌ها: <code>{service_count}</code>",
           "button": "{num} - {name} ({service_count})"

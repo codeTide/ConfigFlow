@@ -1630,16 +1630,11 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === $this->catalog->get('admin.types_packages.actions.add_type')) {
-                $this->database->setUserState($userId, 'admin.type.create', ['stack' => ['admin.service.landing', 'admin.root']]);
-                $this->telegram->sendMessage(
-                    $chatId,
-                    $this->uiText->info($this->catalog->get('admin.types_packages.create_type.overview')),
-                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
-                );
-                return;
-            }
-            if ($text === $this->catalog->get('admin.types_packages.actions.add_service') || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)) {
+            if (
+                $text === $this->catalog->get('admin.types_packages.actions.add_service')
+                || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)
+                || $text === $this->catalog->get('admin.types_packages.actions.add_type')
+            ) {
                 $defaultTypeId = (int) ($payload['default_type_id'] ?? 0);
                 if ($defaultTypeId <= 0) {
                     $defaultTypeId = $this->ensureDefaultTypeForServiceWizard();
