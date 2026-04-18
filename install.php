@@ -113,9 +113,11 @@ function cf_write_env(array $values, string $path): void
 
     $content = implode(PHP_EOL, $lines) . PHP_EOL;
     $dir = dirname($path);
-    if (!is_dir($dir) || !is_writable($dir)) {
+    $targetExists = is_file($path);
+    $writeTarget = $targetExists ? $path : $dir;
+    if (!is_dir($dir) || !is_writable($writeTarget)) {
         $runtimeUser = cf_runtime_user() ?? 'unknown';
-        $ownerId = @fileowner($dir);
+        $ownerId = @fileowner($writeTarget);
         $ownerUser = 'unknown';
         if ($ownerId !== false && function_exists('posix_getpwuid')) {
             $ownerInfo = @posix_getpwuid((int) $ownerId);
@@ -123,12 +125,16 @@ function cf_write_env(array $values, string $path): void
                 $ownerUser = (string) ($ownerInfo['name'] ?? 'unknown');
             }
         }
-        $perms = @fileperms($dir);
+        $perms = @fileperms($writeTarget);
         $permStr = $perms === false ? 'unknown' : substr(sprintf('%o', $perms), -4);
+        $scope = $targetExists ? '.env file is not writable' : 'project directory is not writable';
+        $fixHint = $targetExists
+            ? "Fix file ownership/permissions (for example: chown <web-user>:<web-user> {$path} && chmod 600 {$path})."
+            : "Fix ownership/permissions (for example: chown -R <web-user>:<web-user> {$dir} && chmod 755 {$dir}).";
         throw new RuntimeException(
-            'Could not write .env file. Project directory is not writable. '
-            . "path={$dir}, runtime_user={$runtimeUser}, owner={$ownerUser}, perms={$permStr}. "
-            . "Fix ownership/permissions (for example: chown -R <web-user>:<web-user> {$dir} && chmod 755 {$dir})."
+            "Could not write .env file: {$scope}. "
+            . "path={$writeTarget}, runtime_user={$runtimeUser}, owner={$ownerUser}, perms={$permStr}. "
+            . $fixHint
         );
     }
 
