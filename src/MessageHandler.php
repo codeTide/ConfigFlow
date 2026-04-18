@@ -1538,7 +1538,7 @@ final class MessageHandler
             $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {
                 if ($route === 'admin:types') {
-                    $this->openAdminTypesList($chatId, $userId);
+                    $this->openAdminTypesList($chatId, $userId, $this->uiText->info('ورود مستقیم به مدیریت سرویس فعال شد.'));
                     return;
                 }
                 if ($route === 'admin:users') {
@@ -1669,7 +1669,7 @@ final class MessageHandler
             }
             $typeId = (int) ($payload['type_id'] ?? 0);
             if ($typeId <= 0) {
-                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type')));
+                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type_again')));
                 return;
             }
             if ($text === $this->catalog->get('admin.types_packages.actions.add_service') || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)) {
@@ -2120,7 +2120,6 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_config_detail_option')));
             return;
         }
-    }
 
     private function openAdminTypesList(int $chatId, int $userId, ?string $notice = null): void
     {
@@ -2226,7 +2225,6 @@ final class MessageHandler
             $serviceOptions[$serviceButton] = $serviceId;
             $buttons[] = [$serviceButton];
         }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
 
         $this->database->setUserState($userId, 'admin.service.list', ['type_id' => $typeId, 'service_options' => $serviceOptions, 'stack' => ['admin.service.landing', 'admin.root']]);
         if ($notice !== null && $notice !== '') {
