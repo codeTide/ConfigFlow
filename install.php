@@ -294,7 +294,18 @@ function cf_detect_base_url(): string
     }
 
     $scheme = $isHttps ? 'https' : 'http';
-    return $scheme . '://' . $host;
+
+    $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+    $requestPath = parse_url($requestUri, PHP_URL_PATH);
+    if (!is_string($requestPath) || $requestPath === '') {
+        $requestPath = '/';
+    }
+    $basePath = str_replace('\\', '/', dirname($requestPath));
+    if ($basePath === '/' || $basePath === '.') {
+        $basePath = '';
+    }
+
+    return $scheme . '://' . $host . rtrim($basePath, '/');
 }
 
 function cf_has_existing_installation(string $root): bool
