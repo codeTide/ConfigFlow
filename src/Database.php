@@ -663,19 +663,6 @@ final class Database implements WorkerApiStore
         )->fetchAll();
     }
 
-    public function addType(string $name, string $description = ''): int
-    {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO config_types (name, description, is_active)
-             VALUES (:name, :description, 1)'
-        );
-        $stmt->execute([
-            'name' => trim($name),
-            'description' => trim($description),
-        ]);
-        return (int) $this->pdo->lastInsertId();
-    }
-
     public function listServicesByType(int $typeId): array
     {
         $stmt = $this->pdo->prepare(
@@ -1020,21 +1007,6 @@ final class Database implements WorkerApiStore
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function setTypeActive(int $typeId, bool $active): void
-    {
-        $stmt = $this->pdo->prepare('UPDATE config_types SET is_active = :active WHERE id = :id');
-        $stmt->execute([
-            'active' => $active ? 1 : 0,
-            'id' => $typeId,
-        ]);
-    }
-
-    public function deleteType(int $typeId): void
-    {
-        $stmt = $this->pdo->prepare('DELETE FROM config_types WHERE id = :id');
-        $stmt->execute(['id' => $typeId]);
-    }
-
     public function getActivePackagesByType(int $typeId): array
     {
         $stmt = $this->pdo->prepare('SELECT id, name, price, volume_gb, duration_days FROM packages WHERE type_id = :type_id AND active = 1 ORDER BY id ASC');
@@ -1052,37 +1024,6 @@ final class Database implements WorkerApiStore
         );
         $stmt->execute(['type_id' => $typeId]);
         return $stmt->fetchAll();
-    }
-
-    public function addPackage(int $typeId, string $name, float $volumeGb, int $durationDays, int $price): int
-    {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO packages (type_id, name, volume_gb, duration_days, price, active)
-             VALUES (:type_id, :name, :volume_gb, :duration_days, :price, 1)'
-        );
-        $stmt->execute([
-            'type_id' => $typeId,
-            'name' => trim($name),
-            'volume_gb' => $volumeGb,
-            'duration_days' => $durationDays,
-            'price' => $price,
-        ]);
-        return (int) $this->pdo->lastInsertId();
-    }
-
-    public function setPackageActive(int $packageId, bool $active): void
-    {
-        $stmt = $this->pdo->prepare('UPDATE packages SET active = :active WHERE id = :id');
-        $stmt->execute([
-            'active' => $active ? 1 : 0,
-            'id' => $packageId,
-        ]);
-    }
-
-    public function deletePackage(int $packageId): void
-    {
-        $stmt = $this->pdo->prepare('DELETE FROM packages WHERE id = :id');
-        $stmt->execute(['id' => $packageId]);
     }
 
     public function countAvailableConfigsForPackage(int $packageId): int
