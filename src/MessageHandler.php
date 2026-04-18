@@ -267,6 +267,7 @@ final class MessageHandler
             || $state['state_name'] === 'admin.service.view'
             || $state['state_name'] === 'admin.service.edit'
             || $state['state_name'] === 'admin.service.tariffs'
+            || $state['state_name'] === 'admin.service.tariffs.bridge'
             || $state['state_name'] === 'admin.service.inventory_bridge'
             || $state['state_name'] === 'admin.service.tariff.create'
             || $state['state_name'] === 'admin.service.tariff.edit'
