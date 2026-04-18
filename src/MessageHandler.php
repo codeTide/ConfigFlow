@@ -2619,10 +2619,7 @@ final class MessageHandler
         $tariffs = $this->database->listTariffsByService($serviceId);
         $options = [];
         $lines = [];
-        $buttons = [[
-            $this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD),
-            $this->catalog->get('admin.types_packages.actions.service_tariffs_list'),
-        ]];
+        $buttons = [[$this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD)]];
         foreach (array_values($tariffs) as $idx => $tariff) {
             $num = (string) ($idx + 1);
             $tariffId = (int) ($tariff['id'] ?? 0);
@@ -2646,8 +2643,10 @@ final class MessageHandler
                 'tariff_id' => $tariffId,
                 'summary' => $summary,
             ]);
+            $buttonLabel = $this->catalog->get('admin.types_packages.labels.tariff_option_button', ['num' => $num, 'tariff_id' => $tariffId]);
             $options[$num] = $tariffId;
-            $buttons[] = [$this->catalog->get('admin.types_packages.labels.tariff_option_button', ['num' => $num, 'tariff_id' => $tariffId])];
+            $options[$buttonLabel] = $tariffId;
+            $buttons[] = [$buttonLabel];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.service.tariffs', [
