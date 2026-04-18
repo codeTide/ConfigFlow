@@ -25,16 +25,8 @@ CREATE TABLE IF NOT EXISTS referrals (
     INDEX idx_referrer_id (referrer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS config_types (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT NOT NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS service (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    type_id BIGINT NULL,
     service_code VARCHAR(32) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
     mode VARCHAR(32) NOT NULL DEFAULT 'stock',
@@ -45,7 +37,6 @@ CREATE TABLE IF NOT EXISTS service (
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
-    INDEX idx_service_type (type_id),
     INDEX idx_service_mode (mode),
     INDEX idx_service_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -71,19 +62,15 @@ CREATE TABLE IF NOT EXISTS service_tariff (
 
 CREATE TABLE IF NOT EXISTS packages (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    type_id BIGINT NOT NULL,
     name VARCHAR(255) NOT NULL,
     volume_gb DECIMAL(10,2) NOT NULL,
     duration_days INT NOT NULL,
     price INT NOT NULL,
-    active TINYINT(1) NOT NULL DEFAULT 1,
-    CONSTRAINT fk_packages_type FOREIGN KEY (type_id) REFERENCES config_types(id) ON DELETE CASCADE,
-    INDEX idx_packages_type (type_id)
+    active TINYINT(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS configs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    type_id BIGINT NOT NULL,
     package_id BIGINT NULL,
     service_id BIGINT NULL,
     tariff_id BIGINT NULL,
@@ -243,13 +230,13 @@ CREATE TABLE IF NOT EXISTS agency_price_config (
     global_val INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS agency_type_discount (
+CREATE TABLE IF NOT EXISTS agency_service_discount (
     user_id BIGINT NOT NULL,
-    type_id BIGINT NOT NULL,
+    service_id BIGINT NOT NULL,
     discount_type VARCHAR(16) NOT NULL DEFAULT 'pct',
     discount_value INT NOT NULL DEFAULT 0,
-    PRIMARY KEY (user_id, type_id),
-    INDEX idx_agency_type_discount_type (type_id)
+    PRIMARY KEY (user_id, service_id),
+    INDEX idx_agency_service_discount_service (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pinned_messages (

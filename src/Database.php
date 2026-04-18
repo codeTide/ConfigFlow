@@ -57,7 +57,6 @@ final class Database implements WorkerApiStore
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS service (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                type_id BIGINT NULL,
                 service_code VARCHAR(32) NOT NULL UNIQUE,
                 name VARCHAR(255) NOT NULL,
                 mode VARCHAR(32) NOT NULL DEFAULT 'stock',
@@ -68,18 +67,17 @@ final class Database implements WorkerApiStore
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
-                INDEX idx_service_type (type_id),
                 INDEX idx_service_mode (mode),
                 INDEX idx_service_active (is_active)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         if ($this->tableExists('service')) {
-            $this->pdo->exec("ALTER TABLE service MODIFY type_id BIGINT NULL");
-            $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS service_code VARCHAR(32) NULL AFTER type_id");
+            $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS service_code VARCHAR(32) NULL AFTER id");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_provider VARCHAR(64) NULL AFTER mode");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_base_url VARCHAR(255) NULL AFTER panel_provider");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_username VARCHAR(191) NULL AFTER panel_base_url");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_password TEXT NULL AFTER panel_username");
+            $this->pdo->exec("ALTER TABLE service DROP INDEX IF EXISTS idx_service_type");
             $this->pdo->exec("ALTER TABLE service DROP COLUMN IF EXISTS panel_ref");
             $this->pdo->exec("ALTER TABLE service DROP COLUMN IF EXISTS panel_id");
             $this->pdo->exec("ALTER TABLE service DROP INDEX IF EXISTS idx_service_panel");
@@ -322,7 +320,7 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             'SELECT p.id AS purchase_id, p.is_test, p.package_id, p.config_id,
-                    pkg.type_id, pkg.name AS package_name,
+                    pkg.name AS package_name,
                     cfg.service_name
              FROM purchases p
              JOIN packages pkg ON pkg.id = p.package_id
@@ -654,112 +652,109 @@ final class Database implements WorkerApiStore
 
     public function getActiveTypes(): array
     {
-        return $this->pdo->query('SELECT id, name FROM config_types WHERE is_active = 1 ORDER BY id ASC')->fetchAll();
+        return [
+            ['id' => 1, 'name' => 'Services'],
+        ];
     }
 
     public function listTypes(): array
     {
-        return $this->pdo->query(
-            'SELECT id, name, description, is_active
-             FROM config_types
-             ORDER BY id DESC'
-        )->fetchAll();
+        return [
+            [
+                'id' => 1,
+                'name' => 'Services',
+                'description' => 'Service-scoped virtual group',
+                'is_active' => 1,
+            ],
+        ];
     }
 
     public function getTypeById(int $typeId): ?array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT id, name, description, is_active
-             FROM config_types
-             WHERE id = :id
-             LIMIT 1'
-        );
-        $stmt->execute(['id' => $typeId]);
-        $row = $stmt->fetch();
+        if ($typeId <= 0) {
+            return null;
+        }
 
-        return is_array($row) ? $row : null;
+        return [
+            'id' => $typeId,
+            'name' => 'Services',
+            'description' => 'Service-scoped virtual group',
+            'is_active' => 1,
+        ];
     }
 
     public function createType(string $name, string $description = ''): int
     {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO config_types (name, description, is_active)
-             VALUES (:name, :description, 1)'
-        );
-        $stmt->execute([
-            'name' => trim($name),
-            'description' => trim($description),
-        ]);
-
-        return (int) $this->pdo->lastInsertId();
+        return 1;
     }
 
     public function updateTypeName(int $typeId, string $name): void
     {
-        $stmt = $this->pdo->prepare('UPDATE config_types SET name = :name WHERE id = :id');
-        $stmt->execute([
-            'id' => $typeId,
-            'name' => trim($name),
-        ]);
+        // no-op: type groups are removed in service-centric model.
     }
 
     public function updateTypeActive(int $typeId, bool $active): void
     {
-        $stmt = $this->pdo->prepare('UPDATE config_types SET is_active = :active WHERE id = :id');
-        $stmt->execute([
-            'id' => $typeId,
-            'active' => $active ? 1 : 0,
-        ]);
+        // no-op: type groups are removed in service-centric model.
     }
 
     public function deleteType(int $typeId): void
     {
-        $stmt = $this->pdo->prepare('DELETE FROM config_types WHERE id = :id');
-        $stmt->execute(['id' => $typeId]);
+        // no-op: type groups are removed in service-centric model.
     }
 
     public function countServicesByType(int $typeId): int
     {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM service WHERE type_id = :type_id');
-        $stmt->execute(['type_id' => $typeId]);
+        $stmt = $this->pdo->query('SELECT COUNT(*) FROM service');
 
         return (int) $stmt->fetchColumn();
     }
 
+    public function countServices(): int
+    {
+        return $this->countServicesByType(0);
+    }
+
     public function listServicesByType(int $typeId): array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.type_id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+        $stmt = $this->pdo->query(
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
              FROM service s
-             WHERE s.type_id = :type_id
              ORDER BY s.id DESC'
         );
-        $stmt->execute(['type_id' => $typeId]);
         return $stmt->fetchAll();
+    }
+
+    public function listServices(): array
+    {
+        return $this->listServicesByType(0);
     }
 
     public function listActiveServicesByType(int $typeId): array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.type_id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+        $stmt = $this->pdo->query(
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
              FROM service s
-             WHERE s.type_id = :type_id AND s.is_active = 1
+             WHERE s.is_active = 1
              ORDER BY s.id DESC'
         );
-        $stmt->execute(['type_id' => $typeId]);
         return $stmt->fetchAll();
+    }
+
+    public function listActiveServices(): array
+    {
+        return $this->listActiveServicesByType(0);
     }
 
     /** @param array<string,mixed> $data */
     public function createService(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO service (type_id, service_code, name, mode, panel_provider, panel_base_url, panel_username, panel_password, is_active, created_at, updated_at)
-             VALUES (:type_id, :service_code, :name, :mode, :panel_provider, :panel_base_url, :panel_username, :panel_password, :is_active, :created_at, :updated_at)'
+            'INSERT INTO service (service_code, name, mode, panel_provider, panel_base_url, panel_username, panel_password, is_active, created_at, updated_at)
+             VALUES (:service_code, :name, :mode, :panel_provider, :panel_base_url, :panel_username, :panel_password, :is_active, :created_at, :updated_at)'
         );
         $now = gmdate('Y-m-d H:i:s');
         $stmt->execute([
-            'type_id' => isset($data['type_id']) ? (int) $data['type_id'] : null,
             'service_code' => isset($data['service_code']) ? trim((string) $data['service_code']) : $this->generateServiceCode(),
             'name' => trim((string) ($data['name'] ?? '')),
             'mode' => (string) ($data['mode'] ?? 'stock'),
@@ -777,7 +772,7 @@ final class Database implements WorkerApiStore
     public function getService(int $serviceId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.type_id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
              FROM service s
              WHERE s.id = :id
              LIMIT 1'
@@ -965,9 +960,9 @@ final class Database implements WorkerApiStore
             'SELECT COUNT(DISTINCT s.id)
              FROM service s
              JOIN service_tariff t ON t.service_id = s.id AND t.is_active = 1
-             WHERE s.type_id = :type_id AND s.is_active = 1'
+             WHERE s.is_active = 1'
         );
-        $stmt->execute(['type_id' => $typeId]);
+        $stmt->execute();
         return (int) $stmt->fetchColumn();
     }
 
@@ -1024,9 +1019,9 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO configs (
-                type_id, package_id, service_id, tariff_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
+                package_id, service_id, tariff_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
              ) VALUES (
-                0, NULL, :service_id, :tariff_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
+                NULL, :service_id, :tariff_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
              )'
         );
         $stmt->execute([
@@ -1042,20 +1037,17 @@ final class Database implements WorkerApiStore
 
     public function getActivePackagesByType(int $typeId): array
     {
-        $stmt = $this->pdo->prepare('SELECT id, name, price, volume_gb, duration_days FROM packages WHERE type_id = :type_id AND active = 1 ORDER BY id ASC');
-        $stmt->execute(['type_id' => $typeId]);
+        $stmt = $this->pdo->query('SELECT id, name, price, volume_gb, duration_days FROM packages WHERE active = 1 ORDER BY id ASC');
         return $stmt->fetchAll();
     }
 
     public function listPackagesByType(int $typeId): array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT id, type_id, name, price, volume_gb, duration_days, active
+        $stmt = $this->pdo->query(
+            'SELECT id, name, price, volume_gb, duration_days, active
              FROM packages
-             WHERE type_id = :type_id
              ORDER BY id DESC'
         );
-        $stmt->execute(['type_id' => $typeId]);
         return $stmt->fetchAll();
     }
 
@@ -1124,17 +1116,16 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function addConfig(int $typeId, int $packageId, string $serviceName, string $configText, ?string $inquiryLink = null): int
+    public function addConfig(int $packageId, string $serviceName, string $configText, ?string $inquiryLink = null): int
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO configs (
-                type_id, package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
+                package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
              ) VALUES (
-                :type_id, :package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
+                :package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
              )'
         );
         $stmt->execute([
-            'type_id' => $typeId,
             'package_id' => $packageId,
             'service_name' => trim($serviceName),
             'config_text' => trim($configText),
@@ -1170,7 +1161,7 @@ final class Database implements WorkerApiStore
 
     public function getPackage(int $packageId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, type_id, name, price, volume_gb, duration_days FROM packages WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, name, price, volume_gb, duration_days FROM packages WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $packageId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
@@ -1193,7 +1184,7 @@ final class Database implements WorkerApiStore
     public function listAllPackages(): array
     {
         return $this->pdo->query(
-            'SELECT id, type_id, name, price, volume_gb, duration_days, active
+            'SELECT id, name, price, volume_gb, duration_days, active
              FROM packages
              ORDER BY id DESC'
         )->fetchAll();
@@ -1542,10 +1533,6 @@ final class Database implements WorkerApiStore
         if ($package === null) {
             return ['ok' => false, 'error' => 'package_not_found'];
         }
-        if ((int) ($purchase['type_id'] ?? 0) !== (int) ($package['type_id'] ?? -1)) {
-            return ['ok' => false, 'error' => 'type_mismatch'];
-        }
-
         $price = $this->effectivePackagePrice($userId, $package);
         $this->pdo->beginTransaction();
         try {
@@ -2007,11 +1994,10 @@ final class Database implements WorkerApiStore
         }
 
         $configInsert = $this->pdo->prepare(
-            'INSERT INTO configs (type_id, package_id, service_id, tariff_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
-             VALUES (:type_id, NULL, :service_id, :tariff_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
+            'INSERT INTO configs (package_id, service_id, tariff_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
+             VALUES (NULL, :service_id, :tariff_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
         );
         $configInsert->execute([
-            'type_id' => (int) ($service['type_id'] ?? 0),
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'service_name' => (string) ($service['name'] ?? ''),
@@ -2095,11 +2081,10 @@ final class Database implements WorkerApiStore
         }
 
         $configInsert = $this->pdo->prepare(
-            'INSERT INTO configs (type_id, package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
-             VALUES (:type_id, :package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
+            'INSERT INTO configs (package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
+             VALUES (:package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
         );
         $configInsert->execute([
-            'type_id' => 0,
             'package_id' => 0,
             'service_name' => (string) ($service['title'] ?? ''),
             'config_text' => $subscriptionUrl,
@@ -2613,17 +2598,16 @@ final class Database implements WorkerApiStore
 
     public function getActivePackagesByTypeWithStock(int $typeId, bool $stockOnly = false): array
     {
-        $sql = 'SELECT p.id, p.type_id, p.name, p.price, p.volume_gb, p.duration_days,
+        $sql = 'SELECT p.id, p.name, p.price, p.volume_gb, p.duration_days,
 '
             . '       (SELECT COUNT(*) FROM configs c WHERE c.package_id = p.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0) AS stock
 '
-            . 'FROM packages p WHERE p.type_id = :type_id AND p.active = 1';
+            . 'FROM packages p WHERE p.active = 1';
         if ($stockOnly) {
             $sql .= ' HAVING stock > 0';
         }
         $sql .= ' ORDER BY p.id ASC';
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute(['type_id' => $typeId]);
+        $stmt = $this->pdo->query($sql);
         return $stmt->fetchAll();
     }
 
@@ -2642,22 +2626,6 @@ final class Database implements WorkerApiStore
         ];
     }
 
-    public function getAgencyTypeDiscount(int $userId, int $typeId): ?array
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT discount_type, discount_value FROM agency_type_discount WHERE user_id = :user_id AND type_id = :type_id LIMIT 1'
-        );
-        $stmt->execute(['user_id' => $userId, 'type_id' => $typeId]);
-        $row = $stmt->fetch();
-        if (!is_array($row)) {
-            return null;
-        }
-        return [
-            'discount_type' => (string) ($row['discount_type'] ?? 'pct'),
-            'discount_value' => (int) ($row['discount_value'] ?? 0),
-        ];
-    }
-
     public function effectivePackagePrice(int $userId, array $package): int
     {
         $base = (int) ($package['price'] ?? 0);
@@ -2667,21 +2635,11 @@ final class Database implements WorkerApiStore
         }
 
         $packageId = (int) ($package['id'] ?? 0);
-        $typeId = (int) ($package['type_id'] ?? 0);
 
-        // Python-parity precedence: package > type > global
+        // Service-centric precedence: package > global
         $pkgCustom = $this->getAgencyPrice($userId, $packageId);
         if ($pkgCustom !== null) {
             return max(0, $pkgCustom);
-        }
-
-        $typeDiscount = $this->getAgencyTypeDiscount($userId, $typeId);
-        if ($typeDiscount !== null) {
-            $dType = (string) ($typeDiscount['discount_type'] ?? 'pct');
-            $dValue = (int) ($typeDiscount['discount_value'] ?? 0);
-            return $dType === 'pct'
-                ? max(0, $base - (int) round($base * $dValue / 100))
-                : max(0, $base - $dValue);
         }
 
         $config = $this->getAgencyPriceConfig($userId);
@@ -2975,7 +2933,7 @@ final class Database implements WorkerApiStore
     public function getServiceByCode(string $serviceCode): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.type_id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
              FROM service s
              WHERE s.service_code = :code
              LIMIT 1'
@@ -2988,7 +2946,7 @@ final class Database implements WorkerApiStore
     public function listAllServices(): array
     {
         $stmt = $this->pdo->query(
-            'SELECT s.id, s.type_id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
              FROM service s
              ORDER BY s.id DESC'
         );
