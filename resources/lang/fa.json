@@ -192,13 +192,14 @@
           },
           "tariff_row": "{num}) {title} | {summary}",
           "tariff_button": "{num} - {title}",
+          "default_tariff_title": "تعرفه #{tariff_id}",
           "tariff_fixed_summary": "{volume_gb}GB / {duration_days} روز / {price} تومان",
-          "tariff_per_gb_summary": "{min_volume_gb}-{max_volume_gb}GB step:{step_volume_gb} / {price_per_gb} تومان هر GB",
+          "tariff_per_gb_summary": "{min_volume_gb}-{max_volume_gb}گیگ / {price_per_gb} تومان هر گیگ",
           "tariff_selection": {
             "overview": "💳 <b>انتخاب تعرفه</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 تعرفه‌ها: {tariffs}\n\n<blockquote>💡 تعرفه را انتخاب کنید تا به پرداخت بروید. در تعرفه‌های per_gb ابتدا حجم پرسیده می‌شود.</blockquote>"
           },
           "volume_selection": {
-            "overview": "📏 <b>انتخاب حجم تعرفه</b>\n\n📦 بازه: {min_volume_gb} تا {max_volume_gb} GB\n🪜 گام: {step_volume_gb} GB\n💵 قیمت هر GB: {price_per_gb} تومان"
+            "overview": "📏 <b>انتخاب حجم تعرفه</b>\n\n📦 بازه: {min_volume_gb} تا {max_volume_gb} گیگ\n💵 قیمت هر گیگ: {price_per_gb} تومان"
           }
         },
         "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان{stock_suffix}"
@@ -774,18 +775,21 @@
         "delete_confirm": "✅ تایید حذف",
         "toggle_package": "🔁 تغییر وضعیت پکیج",
         "delete_package": "🗑 حذف پکیج",
-        "service_edit": "✏️ ویرایش سرویس",
-        "service_status": "📊 وضعیت سرویس",
+        "service_edit": "✏️ ویرایش",
+        "service_status": "📊 وضعیت",
         "service_tariffs": "💳 تعرفه‌ها",
         "service_inventory": "📚 موجودی",
         "service_panel_bind": "🔌 اتصال پنل",
-        "service_toggle": "🔁 فعال/غیرفعال سرویس",
-        "service_delete": "🗑 حذف سرویس",
-        "service_tariff_add": "➕ افزودن تعرفه",
+        "service_toggle": "🔁 فعال/غیرفعال",
+        "service_delete": "🗑 حذف",
+        "service_tariff_add": "➕ افزودن",
         "service_stock_add": "➕ افزودن موجودی",
         "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس",
-        "service_tariff_edit": "✏️ ویرایش تعرفه",
-        "service_tariff_delete": "🗑 حذف تعرفه"
+        "service_tariff_edit": "✏️ ویرایش",
+        "service_tariff_status": "📊 وضعیت",
+        "service_tariffs_list": "🧾 تعرفه‌های سرویس",
+        "service_tariff_delete": "🗑 حذف",
+        "skip": "⏭ رد شدن"
       },
       "create_type": {
         "overview": "🆕 <b>افزودن نوع سرویس</b>\n\n✍️ راهنما: نام نوع سرویس جدید را ارسال کنید.\n\n<blockquote>💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید.</blockquote>"
@@ -812,17 +816,17 @@
           "summary_template": "💡 نام: {name}\nحالت: {mode}\nپنل: {panel}"
         },
         "tariff_wizard": {
-          "title": "💡 عنوان تعرفه را وارد کنید.",
-          "pricing_mode": "💡 نوع قیمت‌گذاری را انتخاب کنید.",
-          "volume_gb": "💡 حجم (GB) را وارد کنید.",
-          "duration_days": "💡 مدت (روز) را وارد کنید.",
-          "price": "💡 قیمت (تومان) را وارد کنید.",
-          "min_volume_gb": "💡 حداقل حجم (GB) را وارد کنید.",
-          "max_volume_gb": "💡 حداکثر حجم (GB) را وارد کنید.",
-          "step_volume_gb": "💡 گام حجم (GB) را وارد کنید.",
-          "price_per_gb": "💡 قیمت هر گیگ (تومان) را وارد کنید.",
-          "duration_policy": "💡 duration_policy را وارد کنید: fixed_days یا unlimited.",
-          "summary_template": "💡 عنوان: {title}\nحالت: {pricing_mode}\nحجم: {volume_gb}\nمدت: {duration_days}\nقیمت: {price}\nحداقل/حداکثر: {min_volume_gb} / {max_volume_gb}\nگام: {step_volume_gb}\nقیمت هر گیگ: {price_per_gb}\nduration_policy: {duration_policy}"
+          "pricing_mode": "💳 نوع قیمت‌گذاری را انتخاب کنید:\n\n📌 یکی از حالت‌های زیر را انتخاب کنید تا ساختار تعرفه دقیق مشخص شود.\n🧮 «📦 ثابت» برای حجم/مدت/قیمت مشخص است و «📐 پلکانی بر اساس حجم» برای قیمت‌گذاری به‌ازای هر گیگ استفاده می‌شود.\n\n<blockquote>🎯 با انتخاب درست نوع قیمت‌گذاری، ادامه مراحل سریع‌تر و بدون ابهام پیش می‌رود.</blockquote>",
+          "volume_gb": "📦 حجم بسته را وارد کنید:\n\n🔢 مقدار حجم را به گیگ وارد کنید (مثلاً ۵۰).\n\n<blockquote>✅ این مقدار پایه محاسبه تعرفه ثابت است، پس آن را دقیق وارد کنید.</blockquote>",
+          "duration_days": "⏳ مدت اعتبار را وارد کنید:\n\n📅 تعداد روزهای اعتبار این تعرفه را وارد کنید.\n\n<blockquote>🧭 مدت اعتبار باید با سیاست فروش این سرویس هماهنگ باشد تا تجربه کاربر نهایی شفاف بماند.</blockquote>",
+          "price": "💵 قیمت نهایی را وارد کنید:\n\n🔢 مبلغ را به تومان و بدون جداکننده اضافی وارد کنید.\n\n<blockquote>📌 قیمت نهایی همین عددی است که کاربر برای این تعرفه پرداخت می‌کند، پس دقیق ثبتش کنید.</blockquote>",
+          "min_volume_gb": "📉 حداقل حجم را وارد کنید:\n\n🔢 کمترین حجم مجاز گیگ برای این تعرفه پلکانی را مشخص کنید.\n\n<blockquote>🧩 این مقدار نقطه شروع بازه فروش است و باید با نیاز واقعی سرویس هم‌خوان باشد تا انتخاب حجم برای کاربر دقیق‌تر و منطقی‌تر پیش برود.</blockquote>",
+          "max_volume_gb": "📈 حداکثر حجم را وارد کنید:\n\n🔢 اگر محدودیت سقف دارید، مقدار بیشترین حجم مجاز گیگ را وارد کنید.\n⏭ اگر محدودیت سقف ندارید، از دکمه «⏭ رد شدن» استفاده کنید.\n\n<blockquote>📌 وقتی سقف تعیین نشود، هر حجمی بالاتر از حداقل برای این تعرفه معتبر در نظر گرفته می‌شود.</blockquote>",
+          "price_per_gb": "💰 قیمت هر گیگ را وارد کنید:\n\n🔢 مبلغ هر ۱ گیگ را به تومان وارد کنید.\n\n<blockquote>📊 این مقدار مستقیماً در محاسبه مبلغ نهایی حالت پلکانی اثر دارد، پس با دقت ثبت شود.</blockquote>",
+          "duration_policy": "🧭 سیاست مدت را انتخاب کنید:\n\n📌 «📅 مدت ثابت» یعنی سرویس بعد از تعداد روز مشخص منقضی می‌شود و «♾️ نامحدود» یعنی بدون تاریخ پایان فعال می‌ماند.\n\n<blockquote>🔐 این انتخاب تعیین می‌کند اعتبار سرویس تاریخ پایان داشته باشد یا بدون محدودیت زمانی فعال بماند.</blockquote>",
+          "summary_fixed": "🧩 حالت: {pricing_mode}\n📦 حجم: {volume_gb} گیگ\n⏳ مدت: {duration_days} روز\n💵 قیمت: {price} تومان",
+          "summary_per_gb_unlimited": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}",
+          "summary_per_gb_fixed_days": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}\n📅 مدت ثابت: {duration_days} روز"
         },
         "tariff_delete_confirm": "💡 برای حذف تعرفه #{tariff_id} عبارت «{confirm_word}» را ارسال کنید.",
         "service_inventory": {
@@ -843,7 +847,7 @@
       "messages": {
         "wizard_summary": "🧾 <b>پیش‌نمایش پکیج</b>\n\n📌 خلاصه: {summary}\n\n<blockquote>برای ثبت نهایی، «تایید» را ارسال کنید.</blockquote>",
         "service_wizard_summary": "🧾 <b>پیش‌نمایش سرویس</b>",
-        "service_management_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\nبرای شروع یکی از گزینه‌های زیر را انتخاب کنید.",
+        "service_management_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📌 یکی از گزینه‌های زیر را انتخاب کنید.\n✨ از همین بخش می‌توانید سرویس جدید بسازید یا سرویس‌های فعلی را مدیریت کنید.\n\n<blockquote>🚀 برای مدیریت سریع‌تر، اول «📋 سرویس‌های من» را بررسی کنید و در صورت نیاز با «➕ افزودن سرویس» یک سرویس تازه با تنظیمات کامل ثبت کنید.</blockquote>",
         "service_wizard_preview_stock": "🧾 <b>پیش‌نمایش سرویس</b>\n\n📝 نام: <b>{name}</b>\n⚙️ حالت تحویل: <b>{mode}</b>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا سرویس با همین تنظیمات ثبت نهایی شود.</blockquote>",
         "service_wizard_preview_panel": "🧾 <b>پیش‌نمایش سرویس</b>\n\n📝 نام: <b>{name}</b>\n⚙️ حالت تحویل: <b>{mode}</b>\n🖥 پنل: <b>{panel}</b>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا سرویس با همین تنظیمات ثبت نهایی شود.</blockquote>",
         "inventory_bridge_notice": "این بخش در فاز ۱ به موجودی فعلی متصل است و بازطراحی کامل نشده است.",
@@ -851,13 +855,14 @@
         "tariffs_placeholder": "بخش تعرفه‌ها در این فاز به‌صورت placeholder فعال است.",
         "panel_bind_not_panel_auto": "مدیریت اتصال پنل فقط برای سرویس‌های panel_auto فعال است.",
         "tariffs_empty": "تعرفه‌ای برای این سرویس ثبت نشده است.",
-        "tariffs_overview": "💳 <b>تعرفه‌های سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 لیست تعرفه‌ها: {list}",
-        "tariff_detail_overview": "💳 <b>جزئیات تعرفه</b>\n\n🔢 شناسه: <code>{tariff_id}</code>\n📝 عنوان: <b>{title}</b>\n⚙️ حالت: {mode_text}\n📋 جزئیات: {summary}",
-        "tariff_wizard_summary": "🧾 <b>پیش‌نمایش تعرفه</b>\n\n📌 خلاصه: {summary}\n\n<blockquote>برای ثبت نهایی، «تایید» را ارسال کنید.</blockquote>",
+        "tariffs_bridge_overview": "💳 <b>مدیریت تعرفه‌ها</b>\n\n🧩 سرویس: <b>{service_name}</b>\n\n<blockquote>🧭 از دکمه‌های پایین می‌توانید تعرفه جدید بسازید یا لیست تعرفه‌های همین سرویس را ببینید.</blockquote>",
+        "tariffs_overview": "💳 <b>تعرفه‌های سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 لیست تعرفه‌ها: {list}\n\n<blockquote>🧠 از این بخش می‌توانید تعرفه‌ها را ایجاد یا بازبینی کنید تا ساختار قیمت‌گذاری سرویس دقیق، قابل‌مدیریت و هماهنگ با سناریوی فروش شما باقی بماند.</blockquote>",
+        "tariff_detail_overview": "💳 <b>جزئیات تعرفه</b>\n\n🔢 شناسه: <code>{tariff_id}</code>\n⚙️ حالت: {mode_text}\n{summary}\n\n<blockquote>💡 برای مدیریت سریع، از دکمه‌های پایین وضعیت/ویرایش/حذف را مستقیم انجام دهید.</blockquote>",
+        "tariff_wizard_summary": "🧾 <b>پیش‌نمایش تعرفه</b>\n\n{summary}\n\n<blockquote>✅ اگر اطلاعات این پیش‌نمایش کامل و دقیق است، برای ثبت نهایی تعرفه «تایید» را ارسال کنید تا همین تنظیمات بدون خطا ذخیره شود.</blockquote>",
         "service_inventory_empty": "موجودی‌ای برای این سرویس ثبت نشده است.",
         "service_inventory_overview": "📚 <b>موجودی سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 آیتم‌ها: {list}",
-        "service_list_empty": "هنوز سرویسی ثبت نشده است. برای شروع، روی «➕ افزودن سرویس» بزنید.",
-        "service_list_overview": "📋 <b>سرویس‌های من</b>\n\nروی یکی از سرویس‌ها بزنید تا منوی اختصاصی مدیریت همان سرویس باز شود."
+        "service_list_empty": "📭 هنوز سرویسی ثبت نشده؛ از «➕ افزودن سرویس» شروع کنید.",
+        "service_list_overview": "📋 <b>سرویس‌های من</b>\n\n🧩 روی یکی از سرویس‌ها بزنید تا مدیریت همان سرویس باز شود.\n⚙️ از دکمه‌های هر سرویس می‌توانید وضعیت، تعرفه‌ها و تنظیمات مرتبط را کنترل کنید.\n\n<blockquote>🚀 برای مدیریت سریع‌تر، ابتدا سرویس هدف را انتخاب کنید؛ سپس تغییرات لازم را مرحله‌به‌مرحله اعمال کنید تا تنظیمات همان سرویس دقیق و بدون خطا ثبت شود.</blockquote>"
       },
       "labels": {
         "panel_fallback_name": "اتصال پنل فعلی",
@@ -867,19 +872,24 @@
         "mode_panel_auto": "panel_auto",
         "mode_stock_fa": "انباری",
         "mode_panel_auto_fa": "ساخت خودکار از پنل",
-        "pricing_mode_fixed": "fixed",
-        "pricing_mode_per_gb": "per_gb",
+        "pricing_mode_fixed": "📦 ثابت",
+        "pricing_mode_per_gb": "📐 پلکانی بر اساس حجم",
+        "pricing_mode_fixed_plain": "ثابت",
+        "pricing_mode_per_gb_plain": "پلکانی بر اساس حجم",
+        "duration_policy_fixed": "📅 مدت ثابت",
+        "duration_policy_unlimited": "♾️ نامحدود",
         "service_list_button": "🧩 سرویس #{code} | {name}",
-        "tariff_fixed_row": "{volume_gb}GB/{duration_days}روز/{price}ت",
-        "tariff_per_gb_row": "{min_volume_gb}-{max_volume_gb}GB step:{step_volume_gb} price/GB:{price_per_gb}",
-        "tariff_list_row": "{num}) {title} | T:{tariff_id} | {summary}",
-        "tariff_option_button": "{num} - {title}",
-        "tariff_fixed_detail": "حجم: {volume_gb}GB | مدت: {duration_days} روز | قیمت: {price} تومان",
-        "tariff_per_gb_detail": "حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} GB | گام: {step_volume_gb} GB | قیمت هر گیگ: {price_per_gb} تومان | policy: {duration_policy} | روز: {duration_days}",
+        "tariff_fixed_row": "{volume_gb}گیگ/{duration_days}روز/{price}ت",
+        "tariff_per_gb_row": "{min_volume_gb}-{max_volume_gb}گیگ قیمت/گیگ:{price_per_gb}",
+        "tariff_list_row": "{num}) تعرفه #{tariff_id} | {summary}",
+        "tariff_option_button": "{num} - #{tariff_id}",
+        "tariff_fixed_detail": "📦 حجم: {volume_gb} گیگ\n📅 مدت: {duration_days} روز\n💰 قیمت: {price} تومان",
+        "tariff_per_gb_detail_unlimited": "📏 حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} تومان\n🧭 سیاست: {duration_policy}",
+        "tariff_per_gb_detail_fixed_days": "📏 حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} تومان\n🧭 سیاست: {duration_policy}\n📅 روز: {duration_days}",
         "service_inventory_row": "{num}) {status} {service_name} | C:{config_id}",
         "service_inventory_option_button": "{num} - آیتم",
         "service_inventory_no_tariff": "بدون تعرفه",
-        "service_inventory_tariff_button": "تعرفه #{tariff_id} | {title}"
+        "service_inventory_tariff_button": "تعرفه #{tariff_id}"
       },
       "errors": {
         "invalid_type_option": "❌ گزینه نامعتبر است. لطفاً یکی از دکمه‌های لیست نوع‌ها را انتخاب کنید.",
@@ -910,9 +920,9 @@
         "tariff_invalid_input": "❌ ورودی تعرفه معتبر نیست.",
         "tariff_invalid_pricing_mode": "❌ نوع قیمت‌گذاری معتبر نیست.",
         "tariff_fixed_required": "❌ برای حالت fixed باید volume/duration/price معتبر وارد شود.",
-        "tariff_per_gb_required": "❌ برای حالت per_gb باید min/max/step/price_per_gb معتبر باشد.",
-        "tariff_invalid_duration_policy": "❌ duration_policy باید fixed_days یا unlimited باشد.",
-        "tariff_duration_days_required": "❌ وقتی duration_policy=fixed_days است، duration_days الزامی است.",
+        "tariff_per_gb_required": "❌ برای حالت per_gb باید حداقل/حداکثر (اختیاری) و قیمت هر گیگ معتبر باشد.",
+        "tariff_invalid_duration_policy": "❌ لطفاً یکی از گزینه‌های معتبر سیاست مدت را انتخاب کنید.",
+        "tariff_duration_days_required": "❌ وقتی سیاست مدت «ثابت» است، واردکردن تعداد روز الزامی است.",
         "tariff_validation_failed": "❌ مقادیر تعرفه ناقص یا مبهم است.",
         "tariff_delete_confirm_required": "❌ برای حذف تعرفه باید عبارت تایید حذف را ارسال کنید.",
         "invalid_service_inventory_option": "❌ گزینه موجودی سرویس معتبر نیست.",
@@ -1004,7 +1014,9 @@
         "service_view": {
           "mode_stock": "انباری",
           "mode_panel_auto": "پنلی خودکار",
-          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b> | <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت کامل همین سرویس طراحی شده است. از دکمه‌های پایین می‌توانید وضعیت فعال/غیرفعال، ویرایش اطلاعات، تعرفه‌ها و موجودی را با دقت کنترل کنید. اگر تغییری اعمال کردید، برای اطمینان دوباره وضعیت سرویس را بررسی کنید.</blockquote>",
+          "status_active": "فعال",
+          "status_inactive": "غیرفعال",
+          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
           "panel_none": "تنظیم نشده"
         },
         "panels_list": {
