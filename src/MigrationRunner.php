@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ConfigFlow\Bot;
 
 use PDO;
+use PDOException;
 use RuntimeException;
 
 final class MigrationRunner
@@ -31,7 +32,7 @@ final class MigrationRunner
                 throw new RuntimeException("Migration file is empty or unreadable: {$name}");
             }
 
-            $this->pdo->exec($sql);
+            $this->executeSqlBatch($sql);
             $insert = $this->pdo->prepare(
                 'INSERT INTO schema_migrations (migration_name, applied_at) VALUES (:migration_name, :applied_at)'
             );
@@ -55,6 +56,33 @@ final class MigrationRunner
                 INDEX idx_schema_migrations_applied_at (applied_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+    }
+
+    private function executeSqlBatch(string $sql): void
+    {
+        $normalized = str_replace("\r\n", "\n", $sql);
+        $chunks = preg_split('/;\n+/', $normalized) ?: [];
+        foreach ($chunks as $chunk) {
+            $stmt = trim($chunk);
+            if ($stmt === '') {
+                continue;
+            }
+            if (str_starts_with($stmt, '--') || str_starts_with($stmt, '#')) {
+                continue;
+            }
+            try {
+                $this->pdo->exec($stmt);
+            } catch (PDOException $e) {
+                $sqlState = (string) ($e->errorInfo[0] ?? $e->getCode());
+                $driverCode = (int) ($e->errorInfo[1] ?? 0);
+                $ignorable = $sqlState === '42S21' // duplicate column
+                    || $driverCode === 1060     // duplicate column name
+                    || $driverCode === 1061;    // duplicate key name
+                if (!$ignorable) {
+                    throw $e;
+                }
+            }
+        }
     }
 
     /** @return array<string,bool> */
