@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS config_types (
 
 CREATE TABLE IF NOT EXISTS service (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    type_id BIGINT NOT NULL,
+    type_id BIGINT NULL,
+    service_code VARCHAR(32) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
     mode VARCHAR(32) NOT NULL DEFAULT 'stock',
     panel_provider VARCHAR(64) NULL,

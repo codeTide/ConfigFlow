@@ -769,6 +769,7 @@
         "edit_type": "✏️ ویرایش نوع سرویس",
         "add_package": "➕ افزودن پکیج",
         "add_service": "➕ افزودن سرویس",
+        "my_services": "📋 سرویس‌های من",
         "add_stock_package": "📦 پکیج انباری",
         "add_panel_package": "⚙️ تنظیمات اتصال پنل",
         "toggle_type": "🔁 تغییر وضعیت نوع",
@@ -778,6 +779,7 @@
         "toggle_package": "🔁 تغییر وضعیت پکیج",
         "delete_package": "🗑 حذف پکیج",
         "service_edit": "✏️ ویرایش سرویس",
+        "service_status": "📊 وضعیت سرویس",
         "service_tariffs": "💳 تعرفه‌ها",
         "service_inventory": "📚 موجودی",
         "service_panel_bind": "🔌 اتصال پنل",
@@ -1001,7 +1003,7 @@
         "service_view": {
           "mode_stock": "انباری",
           "mode_panel_auto": "پنلی خودکار",
-          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b> | <code>{service_id}</code>\n🧩 نوع: {type_name} | <code>{type_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 در این صفحه عملیات پایه سرویس در فاز ۱ فعال است.</blockquote>",
+          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b> | <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت کامل همین سرویس طراحی شده است. از دکمه‌های پایین می‌توانید وضعیت فعال/غیرفعال، ویرایش اطلاعات، تعرفه‌ها و موجودی را با دقت کنترل کنید. اگر تغییری اعمال کردید، برای اطمینان دوباره وضعیت سرویس را بررسی کنید.</blockquote>",
           "panel_none": "تنظیم نشده"
         },
         "panels_list": {
