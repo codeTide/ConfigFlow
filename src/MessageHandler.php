@@ -1635,9 +1635,6 @@ final class MessageHandler
                 || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)
             ) {
                 $defaultTypeId = (int) ($payload['default_type_id'] ?? 0);
-                if ($defaultTypeId <= 0) {
-                    $defaultTypeId = $this->ensureServiceRootTypeId();
-                }
                 $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $defaultTypeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.service.landing']]);
                 $this->telegram->sendMessage(
                     $chatId,
@@ -1797,10 +1794,6 @@ final class MessageHandler
 
         if ($stateName === 'admin.service.create') {
             $typeId = (int) ($payload['type_id'] ?? 0);
-            if ($typeId <= 0) {
-                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type_again')));
-                return;
-            }
             $step = (string) ($payload['step'] ?? 'name');
             $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
             if ($text === UiLabels::back($this->catalog)) {
@@ -1818,6 +1811,9 @@ final class MessageHandler
                 ['panel_options' => is_array($payload['panel_options'] ?? null) ? $payload['panel_options'] : []]
             )) {
                 return;
+            }
+            if ($typeId <= 0) {
+                $typeId = $this->ensureServiceRootTypeId();
             }
             $serviceId = $this->database->createService([
                 'type_id' => $typeId,
@@ -2260,10 +2256,6 @@ final class MessageHandler
             $rows[] = $this->catalog->get('admin.ui.open.types_list.row', ['num' => $key, 'status' => $status, 'name' => $name, 'type_id' => $typeId, 'service_count' => $serviceCount]);
             $options[$key] = $typeId;
             $buttons[] = [$this->catalog->get('admin.ui.open.types_list.button', ['num' => $key, 'name' => $name, 'service_count' => $serviceCount])];
-        }
-        $defaultTypeId = 0;
-        if ($types !== []) {
-            $defaultTypeId = (int) (($types[0]['id'] ?? 0));
         }
         $defaultTypeId = 0;
         if ($types !== []) {
