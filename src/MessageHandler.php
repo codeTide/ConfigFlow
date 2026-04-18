@@ -2271,7 +2271,7 @@ final class MessageHandler
         if ($types !== []) {
             $defaultTypeId = (int) (($types[0]['id'] ?? 0));
         }
-        $buttons[] = [$this->catalog->get('admin.types_packages.actions.add_service')];
+        $buttons[] = [$this->catalog->get('admin.types_packages.actions.add_type')];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.service.landing', ['options' => $options, 'stack' => ['admin.root'], 'default_type_id' => $defaultTypeId]);
         if ($notice !== null && $notice !== '') {
