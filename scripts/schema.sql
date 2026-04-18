@@ -59,7 +59,6 @@ CREATE TABLE IF NOT EXISTS service_tariff (
     price INT NULL,
     min_volume_gb DECIMAL(10,2) NULL,
     max_volume_gb DECIMAL(10,2) NULL,
-    step_volume_gb DECIMAL(10,2) NULL,
     price_per_gb INT NULL,
     duration_policy VARCHAR(32) NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,

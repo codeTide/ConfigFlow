@@ -194,12 +194,12 @@
           "tariff_button": "{num} - {title}",
           "default_tariff_title": "تعرفه #{tariff_id}",
           "tariff_fixed_summary": "{volume_gb}GB / {duration_days} روز / {price} تومان",
-          "tariff_per_gb_summary": "{min_volume_gb}-{max_volume_gb}GB step:{step_volume_gb} / {price_per_gb} تومان هر GB",
+          "tariff_per_gb_summary": "{min_volume_gb}-{max_volume_gb}گیگ / {price_per_gb} تومان هر گیگ",
           "tariff_selection": {
             "overview": "💳 <b>انتخاب تعرفه</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 تعرفه‌ها: {tariffs}\n\n<blockquote>💡 تعرفه را انتخاب کنید تا به پرداخت بروید. در تعرفه‌های per_gb ابتدا حجم پرسیده می‌شود.</blockquote>"
           },
           "volume_selection": {
-            "overview": "📏 <b>انتخاب حجم تعرفه</b>\n\n📦 بازه: {min_volume_gb} تا {max_volume_gb} GB\n🪜 گام: {step_volume_gb} GB\n💵 قیمت هر GB: {price_per_gb} تومان"
+            "overview": "📏 <b>انتخاب حجم تعرفه</b>\n\n📦 بازه: {min_volume_gb} تا {max_volume_gb} گیگ\n💵 قیمت هر گیگ: {price_per_gb} تومان"
           }
         },
         "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان{stock_suffix}"
@@ -786,7 +786,8 @@
         "service_stock_add": "➕ افزودن موجودی",
         "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس",
         "service_tariff_edit": "✏️ ویرایش تعرفه",
-        "service_tariff_delete": "🗑 حذف تعرفه"
+        "service_tariff_delete": "🗑 حذف تعرفه",
+        "skip": "⏭ رد شدن"
       },
       "create_type": {
         "overview": "🆕 <b>افزودن نوع سرویس</b>\n\n✍️ راهنما: نام نوع سرویس جدید را ارسال کنید.\n\n<blockquote>💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید.</blockquote>"
@@ -818,13 +819,12 @@
           "duration_days": "⏳ مدت اعتبار را وارد کنید:\n\n📅 تعداد روزهای اعتبار این تعرفه را وارد کنید.\n\n<blockquote>🧭 مدت اعتبار باید با سیاست فروش این سرویس هماهنگ باشد تا تجربه کاربر نهایی شفاف بماند.</blockquote>",
           "price": "💵 قیمت نهایی را وارد کنید:\n\n🔢 مبلغ را به تومان و بدون جداکننده اضافی وارد کنید.\n\n<blockquote>📌 قیمت نهایی همین عددی است که کاربر برای این تعرفه پرداخت می‌کند، پس دقیق ثبتش کنید.</blockquote>",
           "min_volume_gb": "📉 حداقل حجم را وارد کنید:\n\n🔢 کمترین حجم مجاز گیگ برای این تعرفه پلکانی را مشخص کنید.\n\n<blockquote>🧩 این مقدار نقطه شروع بازه فروش است و باید با نیاز واقعی سرویس هم‌خوان باشد تا انتخاب حجم برای کاربر دقیق‌تر و منطقی‌تر پیش برود.</blockquote>",
-          "max_volume_gb": "📈 حداکثر حجم را وارد کنید:\n\n🔢 بیشترین حجم مجاز گیگ را وارد کنید.\n\n<blockquote>📌 حداکثر حجم باید از حداقل بیشتر یا مساوی باشد تا بازه تعرفه معتبر بماند و کاربر در سفارش‌گذاری با محدودیت نادرست روبه‌رو نشود.</blockquote>",
-          "step_volume_gb": "🪜 گام افزایش حجم را وارد کنید:\n\n🔢 مشخص کنید کاربر با چه گام حجمی بتواند مقدار را تغییر دهد (مثلاً ۵).\n\n<blockquote>⚙️ انتخاب گام مناسب باعث می‌شود سفارش‌گذاری دقیق‌تر و مدیریت تعرفه ساده‌تر انجام شود.</blockquote>",
+          "max_volume_gb": "📈 حداکثر حجم را وارد کنید:\n\n🔢 اگر محدودیت سقف دارید، مقدار بیشترین حجم مجاز گیگ را وارد کنید.\n⏭ اگر محدودیت سقف ندارید، از دکمه «⏭ رد شدن» استفاده کنید.\n\n<blockquote>📌 وقتی سقف تعیین نشود، هر حجمی بالاتر از حداقل برای این تعرفه معتبر در نظر گرفته می‌شود.</blockquote>",
           "price_per_gb": "💰 قیمت هر گیگ را وارد کنید:\n\n🔢 مبلغ هر ۱ گیگ را به تومان وارد کنید.\n\n<blockquote>📊 این مقدار مستقیماً در محاسبه مبلغ نهایی حالت پلکانی اثر دارد، پس با دقت ثبت شود.</blockquote>",
-          "duration_policy": "🧭 سیاست مدت را انتخاب کنید:\n\n📌 یکی از گزینه‌های زیر را انتخاب کنید: «📅 مدت ثابت» یا «♾️ نامحدود».\n\n<blockquote>🔐 این انتخاب تعیین می‌کند اعتبار سرویس تاریخ پایان داشته باشد یا بدون محدودیت زمانی فعال بماند.</blockquote>",
+          "duration_policy": "🧭 سیاست مدت را انتخاب کنید:\n\n📌 «📅 مدت ثابت» یعنی سرویس بعد از تعداد روز مشخص منقضی می‌شود و «♾️ نامحدود» یعنی بدون تاریخ پایان فعال می‌ماند.\n\n<blockquote>🔐 این انتخاب تعیین می‌کند اعتبار سرویس تاریخ پایان داشته باشد یا بدون محدودیت زمانی فعال بماند.</blockquote>",
           "summary_fixed": "🧩 حالت: {pricing_mode}\n📦 حجم: {volume_gb} گیگ\n⏳ مدت: {duration_days} روز\n💵 قیمت: {price} تومان",
-          "summary_per_gb_unlimited": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n🪜 گام: {step_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}",
-          "summary_per_gb_fixed_days": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n🪜 گام: {step_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}\n📅 مدت ثابت: {duration_days} روز"
+          "summary_per_gb_unlimited": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}",
+          "summary_per_gb_fixed_days": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}\n📅 مدت ثابت: {duration_days} روز"
         },
         "tariff_delete_confirm": "💡 برای حذف تعرفه #{tariff_id} عبارت «{confirm_word}» را ارسال کنید.",
         "service_inventory": {
@@ -877,11 +877,11 @@
         "duration_policy_unlimited": "♾️ نامحدود",
         "service_list_button": "🧩 سرویس #{code} | {name}",
         "tariff_fixed_row": "{volume_gb}گیگ/{duration_days}روز/{price}ت",
-        "tariff_per_gb_row": "{min_volume_gb}-{max_volume_gb}گیگ گام:{step_volume_gb} قیمت/گیگ:{price_per_gb}",
+        "tariff_per_gb_row": "{min_volume_gb}-{max_volume_gb}گیگ قیمت/گیگ:{price_per_gb}",
         "tariff_list_row": "{num}) تعرفه #{tariff_id} | {summary}",
         "tariff_option_button": "{num} - تعرفه #{tariff_id}",
         "tariff_fixed_detail": "حجم: {volume_gb} گیگ | مدت: {duration_days} روز | قیمت: {price} تومان",
-        "tariff_per_gb_detail": "حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} گیگ | گام: {step_volume_gb} گیگ | قیمت هر گیگ: {price_per_gb} تومان | سیاست: {duration_policy} | روز: {duration_days}",
+        "tariff_per_gb_detail": "حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} گیگ | قیمت هر گیگ: {price_per_gb} تومان | سیاست: {duration_policy} | روز: {duration_days}",
         "service_inventory_row": "{num}) {status} {service_name} | C:{config_id}",
         "service_inventory_option_button": "{num} - آیتم",
         "service_inventory_no_tariff": "بدون تعرفه",
@@ -916,7 +916,7 @@
         "tariff_invalid_input": "❌ ورودی تعرفه معتبر نیست.",
         "tariff_invalid_pricing_mode": "❌ نوع قیمت‌گذاری معتبر نیست.",
         "tariff_fixed_required": "❌ برای حالت fixed باید volume/duration/price معتبر وارد شود.",
-        "tariff_per_gb_required": "❌ برای حالت per_gb باید min/max/step/price_per_gb معتبر باشد.",
+        "tariff_per_gb_required": "❌ برای حالت per_gb باید حداقل/حداکثر (اختیاری) و قیمت هر گیگ معتبر باشد.",
         "tariff_invalid_duration_policy": "❌ لطفاً یکی از گزینه‌های معتبر سیاست مدت را انتخاب کنید.",
         "tariff_duration_days_required": "❌ وقتی سیاست مدت «ثابت» است، واردکردن تعداد روز الزامی است.",
         "tariff_validation_failed": "❌ مقادیر تعرفه ناقص یا مبهم است.",

@@ -167,7 +167,7 @@ try {
 
     $pkgRows = $pdo->query('SELECT id, type_id, name, volume_gb, duration_days, price FROM packages')->fetchAll(PDO::FETCH_ASSOC);
     $insSvc = $pdo->prepare('INSERT INTO service (type_id, name, mode, panel_provider, panel_base_url, panel_username, panel_password, is_active, created_at, updated_at) VALUES (:type_id,:name,:mode,:panel_provider,:panel_base_url,:panel_username,:panel_password,1,:created_at,:updated_at)');
-    $insTariff = $pdo->prepare('INSERT INTO service_tariff (service_id,pricing_mode,volume_gb,duration_days,price,min_volume_gb,max_volume_gb,step_volume_gb,price_per_gb,duration_policy,is_active,created_at,updated_at) VALUES (:service_id,:pricing_mode,:volume_gb,:duration_days,:price,NULL,NULL,NULL,NULL,NULL,1,:created_at,:updated_at)');
+    $insTariff = $pdo->prepare('INSERT INTO service_tariff (service_id,pricing_mode,volume_gb,duration_days,price,min_volume_gb,max_volume_gb,price_per_gb,duration_policy,is_active,created_at,updated_at) VALUES (:service_id,:pricing_mode,:volume_gb,:duration_days,:price,NULL,NULL,NULL,NULL,1,:created_at,:updated_at)');
     $insMap = $pdo->prepare('INSERT INTO phase3_package_map (package_id,service_id,tariff_id) VALUES (:package_id,:service_id,:tariff_id)');
     foreach ($pkgRows as $pkg) {
         $now = gmdate('Y-m-d H:i:s');
@@ -220,7 +220,7 @@ try {
 
         $provRows = $pdo->query('SELECT id,title,min_gb,max_gb,step_gb,price_per_gb,duration_policy,duration_days,provider_group_ids,is_active FROM provisioning_services')->fetchAll(PDO::FETCH_ASSOC);
         $insProvMap = $pdo->prepare('INSERT INTO phase3_provisioning_service_map (provisioning_service_id,service_id,tariff_id) VALUES (:legacy_id,:service_id,:tariff_id)');
-        $insProvTariff = $pdo->prepare('INSERT INTO service_tariff (service_id,pricing_mode,volume_gb,duration_days,price,min_volume_gb,max_volume_gb,step_volume_gb,price_per_gb,duration_policy,is_active,created_at,updated_at) VALUES (:service_id,:pricing_mode,NULL,:duration_days,NULL,:min_volume_gb,:max_volume_gb,:step_volume_gb,:price_per_gb,:duration_policy,1,:created_at,:updated_at)');
+        $insProvTariff = $pdo->prepare('INSERT INTO service_tariff (service_id,pricing_mode,volume_gb,duration_days,price,min_volume_gb,max_volume_gb,price_per_gb,duration_policy,is_active,created_at,updated_at) VALUES (:service_id,:pricing_mode,NULL,:duration_days,NULL,:min_volume_gb,:max_volume_gb,:price_per_gb,:duration_policy,1,:created_at,:updated_at)');
         foreach ($provRows as $legacy) {
             $now = gmdate('Y-m-d H:i:s');
             $insSvc->execute([
@@ -244,7 +244,6 @@ try {
                 'duration_days' => (int) ($legacy['duration_days'] ?? 0),
                 'min_volume_gb' => (float) ($legacy['min_gb'] ?? 0),
                 'max_volume_gb' => (float) ($legacy['max_gb'] ?? 0),
-                'step_volume_gb' => (float) ($legacy['step_gb'] ?? 1),
                 'price_per_gb' => (int) ($legacy['price_per_gb'] ?? 0),
                 'duration_policy' => (string) (($legacy['duration_policy'] ?? 'fixed_days') !== '' ? $legacy['duration_policy'] : 'fixed_days'),
                 'created_at' => $now,

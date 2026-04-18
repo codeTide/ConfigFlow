@@ -2020,7 +2020,6 @@ final class MessageHandler
                     'price' => isset($tariff['price']) ? (int) $tariff['price'] : null,
                     'min_volume_gb' => isset($tariff['min_volume_gb']) ? (float) $tariff['min_volume_gb'] : null,
                     'max_volume_gb' => isset($tariff['max_volume_gb']) ? (float) $tariff['max_volume_gb'] : null,
-                    'step_volume_gb' => isset($tariff['step_volume_gb']) ? (float) $tariff['step_volume_gb'] : null,
                     'price_per_gb' => isset($tariff['price_per_gb']) ? (int) $tariff['price_per_gb'] : null,
                     'duration_policy' => (string) ($tariff['duration_policy'] ?? ''),
                 ];
@@ -2602,7 +2601,6 @@ final class MessageHandler
                 : $this->catalog->get('admin.types_packages.labels.tariff_per_gb_row', [
                     'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
                     'max_volume_gb' => (string) ($tariff['max_volume_gb'] ?? '0'),
-                    'step_volume_gb' => (string) ($tariff['step_volume_gb'] ?? '1'),
                     'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
                 ]);
             $lines[] = $this->catalog->get('admin.types_packages.labels.tariff_list_row', [
@@ -2652,7 +2650,6 @@ final class MessageHandler
             : $this->catalog->get('admin.types_packages.labels.tariff_per_gb_detail', [
                 'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
                 'max_volume_gb' => (string) ($tariff['max_volume_gb'] ?? '0'),
-                'step_volume_gb' => (string) ($tariff['step_volume_gb'] ?? '1'),
                 'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
                 'duration_policy' => (string) (($tariff['duration_policy'] ?? '') !== '' ? $tariff['duration_policy'] : $this->catalog->get('messages.generic.dash')),
                 'duration_days' => (string) (($tariff['duration_days'] ?? null) !== null ? $tariff['duration_days'] : $this->catalog->get('messages.generic.dash')),
@@ -2698,8 +2695,7 @@ final class MessageHandler
             'price' => 'duration_days',
             'min_volume_gb' => 'pricing_mode',
             'max_volume_gb' => 'min_volume_gb',
-            'step_volume_gb' => 'max_volume_gb',
-            'price_per_gb' => 'step_volume_gb',
+            'price_per_gb' => 'max_volume_gb',
             'duration_policy' => 'price_per_gb',
             'confirm' => 'duration_policy',
         ];
@@ -2753,7 +2749,11 @@ final class MessageHandler
             $payload['tariff_id'] = $tariffId;
         }
         $this->database->setUserState($userId, $stateName, $payload);
-        $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+        $rows = [[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]];
+        if ($step === 'max_volume_gb') {
+            array_unshift($rows, [$this->catalog->get('admin.types_packages.actions.skip')]);
+        }
+        $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->replyMenu($rows));
     }
 
     /** @param array<string,mixed> $data */
@@ -2838,22 +2838,17 @@ final class MessageHandler
             return false;
         }
         if ($step === 'max_volume_gb') {
+            if ($raw === $this->catalog->get('admin.types_packages.actions.skip')) {
+                $data['max_volume_gb'] = null;
+                $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, $stateName, 'price_per_gb', $data, $tariffId);
+                return false;
+            }
             $val = (float) str_replace(',', '.', $raw);
             if ($val < (float) ($data['min_volume_gb'] ?? 0)) {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_per_gb_required'));
                 return false;
             }
             $data['max_volume_gb'] = $val;
-            $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, $stateName, 'step_volume_gb', $data, $tariffId);
-            return false;
-        }
-        if ($step === 'step_volume_gb') {
-            $val = (float) str_replace(',', '.', $raw);
-            if ($val <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_per_gb_required'));
-                return false;
-            }
-            $data['step_volume_gb'] = $val;
             $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, $stateName, 'price_per_gb', $data, $tariffId);
             return false;
         }
@@ -2886,8 +2881,7 @@ final class MessageHandler
             $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_per_gb_unlimited', [
                 'pricing_mode' => $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb_plain'),
                 'min_volume_gb' => strtr((string) ($data['min_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
-                'max_volume_gb' => strtr((string) ($data['max_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
-                'step_volume_gb' => strtr((string) ($data['step_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'max_volume_gb' => strtr((string) (($data['max_volume_gb'] ?? null) !== null ? $data['max_volume_gb'] : 'نامحدود'), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'price_per_gb' => strtr((string) ($data['price_per_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'duration_policy' => $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited')),
             ]);
@@ -2916,8 +2910,7 @@ final class MessageHandler
             $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_per_gb_fixed_days', [
                 'pricing_mode' => $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb_plain'),
                 'min_volume_gb' => strtr((string) ($data['min_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
-                'max_volume_gb' => strtr((string) ($data['max_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
-                'step_volume_gb' => strtr((string) ($data['step_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'max_volume_gb' => strtr((string) (($data['max_volume_gb'] ?? null) !== null ? $data['max_volume_gb'] : 'نامحدود'), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'price_per_gb' => strtr((string) ($data['price_per_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'duration_policy' => $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_fixed')),
                 'duration_days' => strtr((string) ($data['duration_days'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
@@ -2957,23 +2950,6 @@ final class MessageHandler
         return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
     }
 
-    private function toPersianDigits(string $value): string
-    {
-        return strtr($value, [
-            '0' => '۰',
-            '1' => '۱',
-            '2' => '۲',
-            '3' => '۳',
-            '4' => '۴',
-            '5' => '۵',
-            '6' => '۶',
-            '7' => '۷',
-            '8' => '۸',
-            '9' => '۹',
-            '.' => '٫',
-        ]);
-    }
-
     /** @param array<string,mixed> $data */
     private function validateTariffData(array $data): bool
     {
@@ -2984,9 +2960,9 @@ final class MessageHandler
                 && (int) ($data['price'] ?? 0) > 0;
         }
         if ($mode === 'per_gb') {
+            $maxVolume = $data['max_volume_gb'] ?? null;
             $required = (float) ($data['min_volume_gb'] ?? 0) > 0
-                && (float) ($data['max_volume_gb'] ?? 0) >= (float) ($data['min_volume_gb'] ?? 0)
-                && (float) ($data['step_volume_gb'] ?? 0) > 0
+                && ($maxVolume === null || (float) $maxVolume >= (float) ($data['min_volume_gb'] ?? 0))
                 && (int) ($data['price_per_gb'] ?? 0) > 0;
             if (!$required) {
                 return false;
@@ -6003,8 +5979,7 @@ final class MessageHandler
                 ])
                 : $this->catalog->get('messages.user.buy.service.tariff_per_gb_summary', [
                     'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
-                    'max_volume_gb' => (string) ($tariff['max_volume_gb'] ?? '0'),
-                    'step_volume_gb' => (string) ($tariff['step_volume_gb'] ?? '0'),
+                    'max_volume_gb' => (string) (($tariff['max_volume_gb'] ?? null) !== null ? $tariff['max_volume_gb'] : $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited'))),
                     'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
                 ]);
             $lines[] = $this->catalog->get('messages.user.buy.service.tariff_row', [
@@ -6070,8 +6045,7 @@ final class MessageHandler
                 $chatId,
                 $this->messageRenderer->render('messages.user.buy.service.volume_selection.overview', [
                     'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
-                    'max_volume_gb' => (string) ($tariff['max_volume_gb'] ?? '0'),
-                    'step_volume_gb' => (string) ($tariff['step_volume_gb'] ?? '0'),
+                    'max_volume_gb' => (string) (($tariff['max_volume_gb'] ?? null) !== null ? $tariff['max_volume_gb'] : $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited'))),
                     'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
                 ]),
                 $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
