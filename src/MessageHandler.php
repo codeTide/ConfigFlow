@@ -1633,12 +1633,10 @@ final class MessageHandler
             if (
                 $text === $this->catalog->get('admin.types_packages.actions.add_service')
                 || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)
-                || $text === $this->catalog->get('admin.types_packages.actions.add_type')
             ) {
                 $defaultTypeId = (int) ($payload['default_type_id'] ?? 0);
                 if ($defaultTypeId <= 0) {
-                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.ui.open.types_list.empty')));
-                    return;
+                    $defaultTypeId = $this->ensureServiceRootTypeId();
                 }
                 $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $defaultTypeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.service.landing']]);
                 $this->telegram->sendMessage(
@@ -2280,14 +2278,14 @@ final class MessageHandler
         $this->telegram->sendMessage($chatId, $landingText, $this->uiKeyboard->replyMenu($buttons));
     }
 
-    private function ensureDefaultTypeForServiceWizard(): int
+    private function ensureServiceRootTypeId(): int
     {
         $types = $this->database->listTypes();
         if ($types !== []) {
             return (int) ($types[0]['id'] ?? 0);
         }
 
-        return $this->database->createType('عمومی');
+        return $this->database->createType('سرویس‌ها');
     }
 
     private function openAdminServiceTypeSelector(int $chatId, int $userId): void
@@ -2527,6 +2525,11 @@ final class MessageHandler
         }
 
         if ($step === 'name') {
+            $excludeServiceId = isset($extraPayload['service_id']) ? (int) $extraPayload['service_id'] : null;
+            if ($this->database->serviceNameExists($raw, $excludeServiceId)) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.service_name_duplicate')));
+                return false;
+            }
             $data['name'] = $raw;
             $this->promptServiceModeSelection($chatId, $userId, $typeId, $stateName, $data, $extraPayload);
             return false;

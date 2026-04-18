@@ -803,6 +803,20 @@ final class Database implements WorkerApiStore
         $stmt->execute(['id' => $serviceId]);
     }
 
+    public function serviceNameExists(string $name, ?int $excludeServiceId = null): bool
+    {
+        $sql = 'SELECT COUNT(*) FROM service WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name))';
+        $params = ['name' => trim($name)];
+        if ($excludeServiceId !== null && $excludeServiceId > 0) {
+            $sql .= ' AND id <> :exclude_id';
+            $params['exclude_id'] = $excludeServiceId;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return ((int) $stmt->fetchColumn()) > 0;
+    }
+
     /** @param array<string,mixed> $data */
     public function updateServiceBasic(int $serviceId, array $data): void
     {

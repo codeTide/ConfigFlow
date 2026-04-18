@@ -896,6 +896,7 @@
         "package_mode_invalid_option": "یکی از گزینه‌های نوع سرویس را انتخاب کنید.",
         "confirm_required": "برای ثبت نهایی «تایید» را ارسال کنید.",
         "service_name_required": "نام سرویس را ارسال کنید.",
+        "service_name_duplicate": "این نام سرویس قبلاً ثبت شده است. لطفاً یک نام متفاوت وارد کنید.",
         "service_mode_invalid": "یکی از حالت‌های سرویس را انتخاب کنید.",
         "panel_required_for_panel_auto": "برای سرویس panel_auto باید یک پنل معتبر انتخاب شود.",
         "panel_not_found": "پنل انتخاب‌شده معتبر نیست.",
