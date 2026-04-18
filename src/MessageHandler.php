@@ -2619,7 +2619,7 @@ final class MessageHandler
         $tariffs = $this->database->listTariffsByService($serviceId);
         $options = [];
         $lines = [];
-        $buttons = [[$this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD)]];
+        $buttons = [];
         foreach (array_values($tariffs) as $idx => $tariff) {
             $num = (string) ($idx + 1);
             $tariffId = (int) ($tariff['id'] ?? 0);
