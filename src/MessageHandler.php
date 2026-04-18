@@ -20,6 +20,7 @@ final class MessageHandler
     private const ADMIN_SERVICE_INVENTORY = '[legacy] admin.types_packages.actions.service_inventory';
     private const ADMIN_SERVICE_PANEL_BIND = '[legacy] admin.types_packages.actions.service_panel_bind';
     private const ADMIN_SERVICE_TOGGLE = '[legacy] admin.types_packages.actions.service_toggle';
+    private const ADMIN_SERVICE_DELETE = '[legacy] admin.types_packages.actions.service_delete';
     private const ADMIN_SERVICE_TARIFF_ADD = '[legacy] admin.types_packages.actions.service_tariff_add';
     private const ADMIN_SERVICE_STOCK_ADD = '[legacy] admin.types_packages.actions.service_stock_add';
     private const ADMIN_SERVICE_INVENTORY_REFRESH = '[legacy] admin.types_packages.actions.service_inventory_refresh';
@@ -260,6 +261,9 @@ final class MessageHandler
             $state['state_name'] === 'admin.service.landing'
             || $state['state_name'] === 'admin.service.type_select'
             || $state['state_name'] === 'admin.service.list'
+            || $state['state_name'] === 'admin.type.create'
+            || $state['state_name'] === 'admin.type.edit'
+            || $state['state_name'] === 'admin.type.delete'
             || $state['state_name'] === 'admin.service.create'
             || $state['state_name'] === 'admin.service.view'
             || $state['state_name'] === 'admin.service.edit'
@@ -1535,10 +1539,10 @@ final class MessageHandler
                 $this->catalog->get('buttons.admin.requests') => 'admin:requests',
                 $this->catalog->get('buttons.admin.backup_topics') => 'admin:groupops',
             ];
-            $route = $adminRouteMap[$text] ?? '';
+                $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {
                 if ($route === 'admin:types') {
-                    $this->openAdminTypesList($chatId, $userId, $this->uiText->info('ورود مستقیم به مدیریت سرویس فعال شد.'));
+                    $this->openAdminTypesList($chatId, $userId);
                     return;
                 }
                 if ($route === 'admin:users') {
@@ -1626,8 +1630,20 @@ final class MessageHandler
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
-            if ($text === $this->catalog->get('admin.types_packages.actions.add_service') || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)) {
-                $this->openAdminServiceTypeSelector($chatId, $userId);
+            if (
+                $text === $this->catalog->get('admin.types_packages.actions.add_service')
+                || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)
+            ) {
+                $defaultTypeId = (int) ($payload['default_type_id'] ?? 0);
+                if ($defaultTypeId <= 0) {
+                    $defaultTypeId = $this->ensureServiceRootTypeId();
+                }
+                $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $defaultTypeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.service.landing']]);
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')),
+                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+                );
                 return;
             }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
@@ -1638,6 +1654,57 @@ final class MessageHandler
                 return;
             }
             $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type_option')));
+            return;
+        }
+
+        if ($stateName === 'admin.type.create') {
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminTypesList($chatId, $userId);
+                return;
+            }
+            $name = trim($text);
+            if ($name === '') {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_name_required')));
+                return;
+            }
+            $typeId = $this->database->createType($name);
+            $this->openAdminTypeView(
+                $chatId,
+                $userId,
+                $typeId,
+                $this->uiText->success($this->catalog->get('admin.types_packages.success.type_created', ['type_id' => $typeId]))
+            );
+            return;
+        }
+
+        if ($stateName === 'admin.type.edit') {
+            $typeId = (int) ($payload['type_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminTypeView($chatId, $userId, $typeId);
+                return;
+            }
+            $name = trim($text);
+            if ($name === '') {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_name_required')));
+                return;
+            }
+            $this->database->updateTypeName($typeId, $name);
+            $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->success($this->catalog->get('admin.types_packages.success.type_status_updated')));
+            return;
+        }
+
+        if ($stateName === 'admin.type.delete') {
+            $typeId = (int) ($payload['type_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminTypeView($chatId, $userId, $typeId);
+                return;
+            }
+            if ($text !== $this->catalog->get('admin.types_packages.actions.delete_confirm')) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.ui.invalid_admin_option')));
+                return;
+            }
+            $this->database->deleteType($typeId);
+            $this->openAdminTypesList($chatId, $userId, $this->uiText->success($this->catalog->get('admin.types_packages.success.type_deleted')));
             return;
         }
 
@@ -1678,6 +1745,42 @@ final class MessageHandler
                     $chatId,
                     $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+                );
+                return;
+            }
+            if ($text === $this->catalog->get('admin.types_packages.actions.toggle_type')) {
+                $type = $this->database->getTypeById($typeId);
+                if (!is_array($type)) {
+                    $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_not_found')));
+                    return;
+                }
+                $active = ((int) ($type['is_active'] ?? 0)) === 1;
+                $this->database->updateTypeActive($typeId, !$active);
+                $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->success($this->catalog->get('admin.types_packages.success.type_status_updated')));
+                return;
+            }
+            if ($text === $this->catalog->get('admin.types_packages.actions.edit_type')) {
+                $this->database->setUserState($userId, 'admin.type.edit', ['type_id' => $typeId, 'stack' => ['admin.service.list', 'admin.service.landing', 'admin.root']]);
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $this->uiText->info($this->catalog->get('admin.types_packages.prompts.type_edit_name')),
+                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+                );
+                return;
+            }
+            if ($text === $this->catalog->get('admin.types_packages.actions.delete_service')) {
+                if ($this->database->countServicesByType($typeId) > 0) {
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_delete_blocked')));
+                    return;
+                }
+                $this->database->setUserState($userId, 'admin.type.delete', ['type_id' => $typeId, 'stack' => ['admin.service.list', 'admin.service.landing', 'admin.root']]);
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $this->uiText->warning($this->catalog->get('admin.types_packages.prompts.type_delete_confirm', ['type_id' => $typeId])),
+                    $this->uiKeyboard->replyMenu([
+                        [$this->catalog->get('admin.types_packages.actions.delete_confirm')],
+                        [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                    ])
                 );
                 return;
             }
@@ -1830,6 +1933,15 @@ final class MessageHandler
                 $active = ((int) ($service['is_active'] ?? 0)) === 1;
                 $this->database->updateServiceActive($serviceId, !$active);
                 $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId, $this->uiText->success($this->catalog->get('admin.types_packages.success.service_status_updated')));
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_DELETE)) {
+                if ($this->database->countTariffsByService($serviceId) > 0 || $this->database->countConfigsByService($serviceId) > 0) {
+                    $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.service_delete_blocked')));
+                    return;
+                }
+                $this->database->deleteService($serviceId);
+                $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->success($this->catalog->get('admin.types_packages.success.service_deleted')));
                 return;
             }
             $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_service_action')));
@@ -2130,7 +2242,6 @@ final class MessageHandler
         $rows = [];
         $options = [];
         $buttons = [];
-        $hasServices = false;
         $num = 1;
         foreach (array_values($types) as $type) {
             $typeId = (int) ($type['id'] ?? 0);
@@ -2139,32 +2250,42 @@ final class MessageHandler
             }
             $services = $this->database->listServicesByType($typeId);
             $serviceCount = count($services);
-            if ($serviceCount <= 0) {
-                continue;
-            }
-            $hasServices = true;
             $key = (string) $num;
             $num++;
             $isActive = ((int) ($type['is_active'] ?? 0)) === 1;
             $status = $isActive
-                ? $this->catalog->get('admin.ui.open.types_list.status_active_symbol')
-                : $this->catalog->get('admin.ui.open.types_list.status_inactive_symbol');
+                ? $this->catalog->get('admin.ui.open.common.status_active')
+                : $this->catalog->get('admin.ui.open.common.status_inactive');
             $name = trim((string) ($type['name'] ?? $this->catalog->get('messages.generic.dash')));
-            $rows[] = $this->catalog->get('admin.ui.open.services_landing.row', ['num' => $key, 'status' => $status, 'name' => $name, 'type_id' => $typeId, 'service_count' => $serviceCount]);
+            $rows[] = $this->catalog->get('admin.ui.open.types_list.row', ['num' => $key, 'status' => $status, 'name' => $name, 'type_id' => $typeId, 'service_count' => $serviceCount]);
             $options[$key] = $typeId;
-            $buttons[] = [$this->catalog->get('admin.ui.open.services_landing.button', ['num' => $key, 'name' => $name, 'service_count' => $serviceCount])];
+            $buttons[] = [$this->catalog->get('admin.ui.open.types_list.button', ['num' => $key, 'name' => $name, 'service_count' => $serviceCount])];
+        }
+        $defaultTypeId = 0;
+        if ($types !== []) {
+            $defaultTypeId = (int) (($types[0]['id'] ?? 0));
         }
         $buttons[] = [$this->catalog->get('admin.types_packages.actions.add_service')];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.service.landing', ['options' => $options, 'stack' => ['admin.root']]);
+        $this->database->setUserState($userId, 'admin.service.landing', ['options' => $options, 'stack' => ['admin.root'], 'default_type_id' => $defaultTypeId]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $landingText = $hasServices
-            ? $this->messageRenderer->render('admin.ui.open.services_landing.overview', ['list' => implode("\n", $rows)], ['list'])
-            : $this->messageRenderer->render('admin.ui.open.services_landing.empty_overview');
+        $landingText = $rows !== []
+            ? $this->messageRenderer->render('admin.ui.open.types_list.overview', ['list' => implode("\n", $rows)], ['list'])
+            : $this->messageRenderer->render('admin.ui.open.types_list.empty_overview');
 
         $this->telegram->sendMessage($chatId, $landingText, $this->uiKeyboard->replyMenu($buttons));
+    }
+
+    private function ensureServiceRootTypeId(): int
+    {
+        $types = $this->database->listTypes();
+        if ($types !== []) {
+            return (int) ($types[0]['id'] ?? 0);
+        }
+
+        return $this->database->createType('سرویس‌ها');
     }
 
     private function openAdminServiceTypeSelector(int $chatId, int $userId): void
@@ -2172,15 +2293,17 @@ final class MessageHandler
         $types = $this->database->listTypes();
         $options = [];
         $rows = [];
-        foreach (array_values($types) as $idx => $type) {
+        $num = 1;
+        foreach (array_values($types) as $type) {
             $typeId = (int) ($type['id'] ?? 0);
             if ($typeId <= 0) {
                 continue;
             }
-            $num = (string) ($idx + 1);
+            $numKey = (string) $num;
+            $num++;
             $name = trim((string) ($type['name'] ?? $this->catalog->get('messages.generic.dash')));
-            $options[$num] = $typeId;
-            $rows[] = $this->catalog->get('admin.ui.open.types_list.button', ['num' => $num, 'name' => $name]);
+            $options[$numKey] = $typeId;
+            $rows[] = $numKey . ' - ' . $name;
         }
         if ($options === []) {
             $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.ui.open.types_list.empty')));
@@ -2207,7 +2330,14 @@ final class MessageHandler
         $services = $this->database->listServicesByType($typeId);
         $serviceOptions = [];
         $serviceRows = [];
-        $buttons = [[$this->uiConst(self::ADMIN_SERVICE_ADD)]];
+        $buttons = [
+            [$this->uiConst(self::ADMIN_SERVICE_ADD)],
+            [
+                $this->catalog->get('admin.types_packages.actions.edit_type'),
+                $this->catalog->get('admin.types_packages.actions.toggle_type'),
+            ],
+            [$this->catalog->get('admin.types_packages.actions.delete_service')],
+        ];
         foreach (array_values($services) as $service) {
             $serviceId = (int) ($service['id'] ?? 0);
             if ($serviceId <= 0) {
@@ -2215,8 +2345,8 @@ final class MessageHandler
             }
             $isActive = ((int) ($service['is_active'] ?? 0)) === 1;
             $status = $isActive
-                ? $this->catalog->get('admin.ui.open.type_view.status_active_symbol')
-                : $this->catalog->get('admin.ui.open.type_view.status_inactive_symbol');
+                ? $this->catalog->get('admin.ui.open.common.status_active')
+                : $this->catalog->get('admin.ui.open.common.status_inactive');
             $mode = (string) ($service['mode'] ?? 'stock');
             $modeLabel = $mode === 'panel_auto'
                 ? $this->catalog->get('admin.ui.open.service_view.mode_panel_auto')
@@ -2226,6 +2356,8 @@ final class MessageHandler
             $serviceOptions[$serviceButton] = $serviceId;
             $buttons[] = [$serviceButton];
         }
+
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
 
         $this->database->setUserState($userId, 'admin.service.list', ['type_id' => $typeId, 'service_options' => $serviceOptions, 'stack' => ['admin.service.landing', 'admin.root']]);
         if ($notice !== null && $notice !== '') {
@@ -2275,6 +2407,7 @@ final class MessageHandler
 
         $buttons = [
             [$this->uiConst(self::ADMIN_SERVICE_EDIT), $this->uiConst(self::ADMIN_SERVICE_TOGGLE)],
+            [$this->uiConst(self::ADMIN_SERVICE_DELETE)],
             [$this->uiConst(self::ADMIN_SERVICE_TARIFFS), $this->uiConst(self::ADMIN_SERVICE_INVENTORY)],
             [$this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD), $this->uiConst(self::ADMIN_SERVICE_STOCK_ADD)],
         ];
@@ -2392,6 +2525,11 @@ final class MessageHandler
         }
 
         if ($step === 'name') {
+            $excludeServiceId = isset($extraPayload['service_id']) ? (int) $extraPayload['service_id'] : null;
+            if ($this->database->serviceNameExists($raw, $excludeServiceId)) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.service_name_duplicate')));
+                return false;
+            }
             $data['name'] = $raw;
             $this->promptServiceModeSelection($chatId, $userId, $typeId, $stateName, $data, $extraPayload);
             return false;
@@ -3089,13 +3227,7 @@ final class MessageHandler
 
     private function findTypeById(int $typeId): ?array
     {
-        foreach ($this->database->listTypes() as $type) {
-            if ((int) ($type['id'] ?? 0) === $typeId) {
-                return $type;
-            }
-        }
-
-        return null;
+        return $this->database->getTypeById($typeId);
     }
 
     private function handleAdminUsersStockState(int $chatId, int $userId, string $text, array $state, array $message): void

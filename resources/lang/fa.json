@@ -20,7 +20,7 @@
     "join_channel": "📢 عضویت در کانال",
     "enter_channel": "📢 ورود به کانال",
     "admin": {
-      "types_packages": "🧩 نوع/پکیج",
+      "types_packages": "🧩 سرویس‌ها",
       "inventory": "📚 موجودی",
       "users": "👥 کاربران",
       "settings": "⚙️ تنظیمات",
@@ -692,7 +692,7 @@
         "menu_overview": "⚙️ <b>تنظیمات اتصال پنل</b>\n\n🌐 آدرس پنل: {base_url}\n👤 نام کاربری پنل: {username}\n🔐 رمز عبور پنل: {password_masked}\n{status_line}\n<blockquote>{guide_text}</blockquote>",
         "status_line": "📋 وضعیت اتصال: {status_text}\n",
         "delete_confirm": "🗑 <b>تایید حذف اتصال پنل</b>\n\n⚠️ پیام: {delete_text}\n\n<blockquote>{delete_tip}</blockquote>",
-        "panels_list": "🖥 <b>مدیریت سرویس‌های پنلی</b>\n\n📋 وضعیت اتصال پنل: {connection_status}\n\n<blockquote>💡 این بخش فقط برای مدیریت اطلاعات اتصال پنل است. تعریف سرویس فروش از بخش نوع/پکیج انجام می‌شود.</blockquote>",
+        "panels_list": "🖥 <b>مدیریت سرویس‌های پنلی</b>\n\n📋 وضعیت اتصال پنل: {connection_status}\n\n<blockquote>💡 این بخش فقط برای مدیریت اطلاعات اتصال پنل است. تعریف سرویس فروش از بخش سرویس‌ها انجام می‌شود.</blockquote>",
         "wizard_step_base_url": "🌐 لطفاً آدرس پنل را دقیق وارد کنید:\n\n🧩 آدرس باید کامل باشد (ترجیحاً با https://) و بدون فاصله اضافی ارسال شود.\n🧪 مثال: <code>https://panel.example.com</code>\n\n<blockquote>💡 ارسال آدرس صحیح و دارای SSL باعث می‌شود اتصال ربات به پنل پاسارگارد شما، ایمن‌تر و کم‌خطاتر باقی بماند.</blockquote>",
         "wizard_step_username": "👤 نام کاربری پنل را ارسال کنید:\n\n🧩 از همان نام کاربری مدیریتی استفاده کنید که با آن وارد پنل می‌شوید.\n🧪 مثال: <code>admin_user</code>\n\n<blockquote>💡 در صورت ثبت نام کاربری نادرست، فرآیند اتصال به پنل با خطا مواجه شده و انجام نخواهد شد.</blockquote>",
         "wizard_step_password": "🔐 رمز عبور پنل را وارد کنید:\n\n🧩 رمز عبور باید همان رمز فعلی ورود به پنل باشد و بدون فاصله ارسال شود.\n\n🛡 در پیام‌های بعدی رمز به‌صورت مخفی نمایش داده می‌شود.\n\n<blockquote>💡 ثبت رمز صحیح و دقیق باعث می‌شود ارتباط ربات با پنل بدون خطای احراز هویت ادامه پیدا کند.</blockquote>"
@@ -769,13 +769,16 @@
     },
     "types_packages": {
       "actions": {
-        "add_type": "➕ افزودن نوع سرویس",
+        "add_type": "➕ افزودن سرویس",
+        "edit_type": "✏️ ویرایش نوع سرویس",
         "add_package": "➕ افزودن پکیج",
-        "add_service": "🧩 افزودن سرویس (جدید)",
+        "add_service": "➕ افزودن سرویس",
         "add_stock_package": "📦 پکیج انباری",
         "add_panel_package": "⚙️ تنظیمات اتصال پنل",
         "toggle_type": "🔁 تغییر وضعیت نوع",
-        "delete_type": "🗑 حذف نوع سرویس",
+        "delete_type": "🗑 حذف سرویس",
+        "delete_service": "🗑 حذف سرویس",
+        "delete_confirm": "✅ تایید حذف",
         "toggle_package": "🔁 تغییر وضعیت پکیج",
         "delete_package": "🗑 حذف پکیج",
         "service_edit": "✏️ ویرایش سرویس",
@@ -783,6 +786,7 @@
         "service_inventory": "📚 موجودی",
         "service_panel_bind": "🔌 اتصال پنل",
         "service_toggle": "🔁 فعال/غیرفعال سرویس",
+        "service_delete": "🗑 حذف سرویس",
         "service_tariff_add": "➕ افزودن تعرفه",
         "service_stock_add": "➕ افزودن موجودی",
         "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس",
@@ -800,6 +804,8 @@
       },
       "prompts": {
         "package_mode_select": "نوع سرویس جدید را انتخاب کنید.",
+        "type_edit_name": "نام جدید نوع سرویس را وارد کنید.",
+        "type_delete_confirm": "برای حذف سرویس #{type_id}، دکمه «✅ تایید حذف» را بزنید.",
         "stock_package_name": "عنوان پکیج را وارد کنید.",
         "service_wizard": {
           "name": "نام سرویس را وارد کنید.",
@@ -878,6 +884,7 @@
         "type_name_required": "لطفاً نام نوع سرویس را به‌صورت متن معمولی ارسال کنید.",
         "invalid_type": "نوع سرویس نامعتبر بود. دوباره از لیست انتخاب کنید.",
         "type_not_found": "نوع سرویس پیدا نشد.",
+        "type_delete_blocked": "ابتدا سرویس‌های این گروه را حذف کنید، سپس حذف سرویس را انجام دهید.",
         "invalid_package_or_action": "گزینه نامعتبر است. یکی از پکیج‌ها یا عملیات مدیریتی همین صفحه را انتخاب کنید.",
         "invalid_type_again": "نوع سرویس معتبر نبود. لطفاً دوباره انتخاب کنید.",
         "invalid_create_input": "فرمت ورودی معتبر نیست. لطفاً مطابق راهنما ارسال کنید.",
@@ -889,10 +896,12 @@
         "package_mode_invalid_option": "یکی از گزینه‌های نوع سرویس را انتخاب کنید.",
         "confirm_required": "برای ثبت نهایی «تایید» را ارسال کنید.",
         "service_name_required": "نام سرویس را ارسال کنید.",
+        "service_name_duplicate": "این نام سرویس قبلاً ثبت شده است. لطفاً یک نام متفاوت وارد کنید.",
         "service_mode_invalid": "یکی از حالت‌های سرویس را انتخاب کنید.",
         "panel_required_for_panel_auto": "برای سرویس panel_auto باید یک پنل معتبر انتخاب شود.",
         "panel_not_found": "پنل انتخاب‌شده معتبر نیست.",
         "service_not_found": "سرویس پیدا نشد.",
+        "service_delete_blocked": "برای حذف سرویس، ابتدا تعرفه‌ها و موجودی‌های آن را حذف کنید.",
         "invalid_service_action": "گزینه نامعتبر است. از دکمه‌های مدیریت سرویس استفاده کنید.",
         "invalid_tariff_option": "گزینه تعرفه معتبر نیست.",
         "tariff_not_found": "تعرفه پیدا نشد.",
@@ -912,13 +921,14 @@
       "success": {
         "type_created": "نوع سرویس با شناسه <code>{type_id}</code> ثبت شد.",
         "type_status_updated": "وضعیت نوع سرویس بروزرسانی شد.",
-        "type_deleted": "نوع سرویس حذف شد.",
+        "type_deleted": "سرویس حذف شد.",
         "package_created": "پکیج با شناسه <code>{package_id}</code> ثبت شد.",
         "package_status_updated": "وضعیت پکیج بروزرسانی شد.",
         "package_deleted": "پکیج حذف شد.",
         "service_created": "سرویس با شناسه <code>{service_id}</code> ثبت شد.",
         "service_updated": "تنظیمات سرویس بروزرسانی شد.",
         "service_status_updated": "وضعیت سرویس بروزرسانی شد.",
+        "service_deleted": "سرویس حذف شد.",
         "tariff_created": "تعرفه ثبت شد.",
         "tariff_updated": "تعرفه بروزرسانی شد.",
         "tariff_deleted": "تعرفه حذف شد.",
@@ -968,7 +978,10 @@
         },
         "types_list": {
           "empty": "هنوز نوع سرویسی ثبت نشده است.",
-          "overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\n📋 لیست نوع‌ها: {list}\n\n<blockquote>💡 یک نوع را انتخاب کنید تا پکیج‌ها و عملیات همان نوع باز شود.</blockquote>"
+          "empty_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\nهنوز سرویسی ثبت نشده است. برای شروع یک سرویس جدید بسازید تا بعد بتوانید تعرفه، موجودی و اتصال پنل را مدیریت کنید.\n\n<blockquote>💡 از دکمه «➕ افزودن سرویس» استفاده کنید و مراحل را کامل جلو ببرید.</blockquote>",
+          "overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📋 لیست گروه‌های سرویس: {list}\n\n<blockquote>💡 یک مورد را انتخاب کنید تا سرویس‌ها و عملیات مدیریتی همان بخش باز شود.</blockquote>",
+          "row": "{num}) {status} {name} | سرویس‌ها: <code>{service_count}</code>",
+          "button": "{num} - {name} ({service_count})"
         },
         "common": {
           "status_emoji": "📶",
@@ -977,8 +990,8 @@
           "status_inactive": "🔴 غیرفعال"
         },
         "type_view": {
-          "packages_empty": "برای این نوع هنوز پکیجی ثبت نشده است.",
-          "overview": "🧩 <b>جزئیات نوع سرویس</b>\n\n👤 نوع: {type_name} | <code>{type_id}</code>\n📶 وضعیت: {status_text}\n📦 پکیج‌ها: {packages}\n\n<blockquote>💡 برای مدیریت هر پکیج، شماره همان پکیج را انتخاب کنید.</blockquote>",
+          "packages_empty": "برای این نوع هنوز سرویسی ثبت نشده است.",
+          "overview": "🧩 <b>جزئیات گروه سرویس</b>\n\n👤 گروه: {type_name} | <code>{type_id}</code>\n📶 وضعیت: {status_text}\n📦 سرویس‌ها: {packages}\n\n<blockquote>💡 برای مدیریت هر سرویس، شماره همان سرویس را انتخاب کنید.</blockquote>",
           "not_found": "نوع سرویس پیدا نشد.",
           "service_button": "🧩 سرویس #{service_id} | {name}"
         },
@@ -996,7 +1009,7 @@
           "title": "🖥 <b>مدیریت سرویس‌های پنلی</b>",
           "list_label": "📋 وضعیت اتصال پنل",
           "empty": "سرویس پنلی ثبت نشده است.",
-          "tip": "💡 این بخش فقط برای مدیریت اطلاعات اتصال پنل است. تعریف سرویس فروش از بخش نوع/پکیج انجام می‌شود.",
+          "tip": "💡 این بخش فقط برای مدیریت اطلاعات اتصال پنل است. تعریف سرویس فروش از بخش سرویس‌ها انجام می‌شود.",
           "button": "{num} - سرویس {id}"
         },
         "panel_settings": {
