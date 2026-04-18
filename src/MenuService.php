@@ -9,12 +9,10 @@ final class MenuService
     public function __construct(
         private SettingsRepository $settings,
         private Database $database,
-        private ?UiTextCatalogInterface $uiText = null,
         private ?UiKeyboardFactoryInterface $uiKeyboard = null,
         private ?UiJsonCatalog $catalog = null,
         private ?UiMessageRenderer $messageRenderer = null,
     ) {
-        $this->uiText ??= new UiTextCatalog();
         $this->uiKeyboard ??= new UiKeyboardFactory();
         $this->catalog ??= new UiJsonCatalog();
         $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
@@ -82,7 +80,7 @@ final class MenuService
     {
         $user = $this->database->getUser($userId);
         if ($user === null) {
-            return $this->uiText->warning($this->catalog->get('errors.profile_not_found'));
+            return $this->messageRenderer->render('errors.profile_not_found');
         }
 
         $username = trim((string) ($user['username'] ?? ''));
@@ -168,7 +166,7 @@ final class MenuService
     public function referralText(int $userId): string
     {
         if ($this->settings->get('referral_enabled', '1') !== '1') {
-            return $this->uiText->warning($this->catalog->get('errors.referral_disabled'));
+            return $this->messageRenderer->render('errors.referral_disabled');
         }
 
         $stats = $this->database->referralStats($userId);
