@@ -91,14 +91,12 @@ final class Database implements WorkerApiStore
             "CREATE TABLE IF NOT EXISTS service_tariff (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 service_id BIGINT NOT NULL,
-                title VARCHAR(255) NOT NULL,
                 pricing_mode VARCHAR(32) NOT NULL DEFAULT 'fixed',
                 volume_gb DECIMAL(10,2) NULL,
                 duration_days INT NULL,
                 price INT NULL,
                 min_volume_gb DECIMAL(10,2) NULL,
                 max_volume_gb DECIMAL(10,2) NULL,
-                step_volume_gb DECIMAL(10,2) NULL,
                 price_per_gb INT NULL,
                 duration_policy VARCHAR(32) NULL,
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -109,6 +107,10 @@ final class Database implements WorkerApiStore
                 INDEX idx_service_tariff_active (is_active)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+        if ($this->tableExists('service_tariff')) {
+            $this->pdo->exec("ALTER TABLE service_tariff DROP COLUMN IF EXISTS title");
+            $this->pdo->exec("ALTER TABLE service_tariff DROP COLUMN IF EXISTS step_volume_gb");
+        }
         if ($this->tableExists('configs')) {
             $this->pdo->exec("ALTER TABLE configs MODIFY package_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id");
@@ -839,7 +841,7 @@ final class Database implements WorkerApiStore
     public function listTariffsByService(int $serviceId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, service_id, title, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, step_volume_gb, price_per_gb, duration_policy, is_active
+            'SELECT id, service_id, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, price_per_gb, duration_policy, is_active
              FROM service_tariff
              WHERE service_id = :service_id
              ORDER BY id DESC'
@@ -851,7 +853,7 @@ final class Database implements WorkerApiStore
     public function getServiceTariff(int $tariffId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, service_id, title, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, step_volume_gb, price_per_gb, duration_policy, is_active
+            'SELECT id, service_id, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, price_per_gb, duration_policy, is_active
              FROM service_tariff
              WHERE id = :id
              LIMIT 1'
@@ -864,7 +866,7 @@ final class Database implements WorkerApiStore
     public function getServiceTariffForService(int $serviceId, int $tariffId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, service_id, title, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, step_volume_gb, price_per_gb, duration_policy, is_active
+            'SELECT id, service_id, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, price_per_gb, duration_policy, is_active
              FROM service_tariff
              WHERE id = :id AND service_id = :service_id AND is_active = 1
              LIMIT 1'
@@ -880,7 +882,7 @@ final class Database implements WorkerApiStore
     public function listActiveTariffsByService(int $serviceId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, service_id, title, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, step_volume_gb, price_per_gb, duration_policy, is_active
+            'SELECT id, service_id, pricing_mode, volume_gb, duration_days, price, min_volume_gb, max_volume_gb, price_per_gb, duration_policy, is_active
              FROM service_tariff
              WHERE service_id = :service_id AND is_active = 1
              ORDER BY id DESC'
@@ -894,24 +896,22 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO service_tariff (
-                service_id, title, pricing_mode, volume_gb, duration_days, price,
-                min_volume_gb, max_volume_gb, step_volume_gb, price_per_gb, duration_policy, is_active, created_at, updated_at
+                service_id, pricing_mode, volume_gb, duration_days, price,
+                min_volume_gb, max_volume_gb, price_per_gb, duration_policy, is_active, created_at, updated_at
              ) VALUES (
-                :service_id, :title, :pricing_mode, :volume_gb, :duration_days, :price,
-                :min_volume_gb, :max_volume_gb, :step_volume_gb, :price_per_gb, :duration_policy, :is_active, :created_at, :updated_at
+                :service_id, :pricing_mode, :volume_gb, :duration_days, :price,
+                :min_volume_gb, :max_volume_gb, :price_per_gb, :duration_policy, :is_active, :created_at, :updated_at
              )'
         );
         $now = gmdate('Y-m-d H:i:s');
         $stmt->execute([
             'service_id' => (int) ($data['service_id'] ?? 0),
-            'title' => trim((string) ($data['title'] ?? '')),
             'pricing_mode' => (string) ($data['pricing_mode'] ?? 'fixed'),
             'volume_gb' => isset($data['volume_gb']) ? (float) $data['volume_gb'] : null,
             'duration_days' => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
             'price' => isset($data['price']) ? (int) $data['price'] : null,
             'min_volume_gb' => isset($data['min_volume_gb']) ? (float) $data['min_volume_gb'] : null,
             'max_volume_gb' => isset($data['max_volume_gb']) ? (float) $data['max_volume_gb'] : null,
-            'step_volume_gb' => isset($data['step_volume_gb']) ? (float) $data['step_volume_gb'] : null,
             'price_per_gb' => isset($data['price_per_gb']) ? (int) $data['price_per_gb'] : null,
             'duration_policy' => isset($data['duration_policy']) ? (string) $data['duration_policy'] : null,
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
@@ -926,20 +926,18 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             'UPDATE service_tariff
-             SET title = :title, pricing_mode = :pricing_mode, volume_gb = :volume_gb, duration_days = :duration_days, price = :price,
-                 min_volume_gb = :min_volume_gb, max_volume_gb = :max_volume_gb, step_volume_gb = :step_volume_gb,
+             SET pricing_mode = :pricing_mode, volume_gb = :volume_gb, duration_days = :duration_days, price = :price,
+                 min_volume_gb = :min_volume_gb, max_volume_gb = :max_volume_gb,
                  price_per_gb = :price_per_gb, duration_policy = :duration_policy, is_active = :is_active, updated_at = :updated_at
              WHERE id = :id'
         );
         $stmt->execute([
-            'title' => trim((string) ($data['title'] ?? '')),
             'pricing_mode' => (string) ($data['pricing_mode'] ?? 'fixed'),
             'volume_gb' => isset($data['volume_gb']) ? (float) $data['volume_gb'] : null,
             'duration_days' => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
             'price' => isset($data['price']) ? (int) $data['price'] : null,
             'min_volume_gb' => isset($data['min_volume_gb']) ? (float) $data['min_volume_gb'] : null,
             'max_volume_gb' => isset($data['max_volume_gb']) ? (float) $data['max_volume_gb'] : null,
-            'step_volume_gb' => isset($data['step_volume_gb']) ? (float) $data['step_volume_gb'] : null,
             'price_per_gb' => isset($data['price_per_gb']) ? (int) $data['price_per_gb'] : null,
             'duration_policy' => isset($data['duration_policy']) ? (string) $data['duration_policy'] : null,
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
@@ -1899,15 +1897,16 @@ final class Database implements WorkerApiStore
     {
         $min = (float) ($tariff['min_volume_gb'] ?? 0);
         $max = (float) ($tariff['max_volume_gb'] ?? 0);
-        $step = (float) ($tariff['step_volume_gb'] ?? 0);
-        if ($volumeGb <= 0 || $min <= 0 || $max < $min || $step <= 0) {
+        if ($volumeGb <= 0 || $min <= 0) {
             return false;
         }
-        if ($volumeGb < $min || $volumeGb > $max) {
+        if ($volumeGb < $min) {
             return false;
         }
-        $ratio = ($volumeGb - $min) / $step;
-        return abs($ratio - round($ratio)) < 0.00001;
+        if ($max > 0 && $volumeGb > $max) {
+            return false;
+        }
+        return true;
     }
 
     public function calculateServiceTariffAmount(array $tariff, ?float $selectedVolumeGb = null): int
