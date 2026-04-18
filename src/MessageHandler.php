@@ -1641,7 +1641,7 @@ final class MessageHandler
                 $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $defaultTypeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.service.landing']]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')),
+                    $this->catalog->get('admin.types_packages.prompts.service_wizard.name'),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
                 return;
@@ -1720,7 +1720,7 @@ final class MessageHandler
                 $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $typeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.service.type_select']]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')),
+                    $this->catalog->get('admin.types_packages.prompts.service_wizard.name'),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
                 return;
@@ -1743,7 +1743,7 @@ final class MessageHandler
                 $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $typeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.service.list']]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')),
+                    $this->catalog->get('admin.types_packages.prompts.service_wizard.name'),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
                 return;
@@ -1857,7 +1857,7 @@ final class MessageHandler
                 $this->database->setUserState($userId, 'admin.service.edit', ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'name', 'data' => $data]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')),
+                    $this->catalog->get('admin.types_packages.prompts.service_wizard.name'),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
                 return;
@@ -2451,7 +2451,7 @@ final class MessageHandler
         }
         if ($step === 'mode') {
             $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $typeId, 'step' => 'name', 'data' => $data]);
-            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.types_packages.prompts.service_wizard.name'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return;
         }
         if ($step === 'panel_select') {
@@ -2483,7 +2483,7 @@ final class MessageHandler
         }
         if ($step === 'mode') {
             $this->database->setUserState($userId, 'admin.service.edit', ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'name', 'data' => $data]);
-            $this->telegram->sendMessage($chatId, $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.types_packages.prompts.service_wizard.name'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return;
         }
         if ($step === 'panel_select') {
@@ -2551,14 +2551,18 @@ final class MessageHandler
             if ($mode === 'stock' && !$panelBindMode) {
                 $data['panel_id'] = null;
                 $data['panel_ref'] = null;
-                $summary = $this->catalog->get('admin.types_packages.prompts.service_wizard.summary_template', [
-                    'name' => (string) ($data['name'] ?? ''),
-                    'mode' => $this->catalog->get('admin.types_packages.labels.mode_stock'),
-                    'panel' => $this->catalog->get('admin.ui.open.service_view.panel_none'),
-                    'panel_ref' => $this->catalog->get('messages.generic.dash'),
-                ]);
                 $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['type_id' => $typeId, 'step' => 'confirm', 'data' => $data]));
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.messages.service_wizard_summary', ['summary' => $summary]), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $this->messageRenderer->render('admin.types_packages.messages.service_wizard_preview_stock', [
+                        'name' => (string) ($data['name'] ?? ''),
+                        'mode' => $this->catalog->get('admin.types_packages.labels.mode_stock_fa'),
+                    ]),
+                    $this->uiKeyboard->replyMenu([
+                        [$this->catalog->get('admin.types_packages.actions.confirm_service')],
+                        [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                    ])
+                );
                 return false;
             }
             $this->promptServicePanelSelection($chatId, $userId, $typeId, $stateName, $data, $extraPayload);
@@ -2601,18 +2605,24 @@ final class MessageHandler
                     }
                 }
             }
-            $summary = $this->catalog->get('admin.types_packages.prompts.service_wizard.summary_template', [
-                'name' => (string) ($data['name'] ?? ''),
-                'mode' => (string) ($data['mode'] ?? 'stock'),
-                'panel' => $panelName,
-                'panel_ref' => (string) (($data['panel_ref'] ?? null) !== null ? $data['panel_ref'] : $this->catalog->get('messages.generic.dash')),
-            ]);
             $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['type_id' => $typeId, 'step' => 'confirm', 'data' => $data]));
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.messages.service_wizard_summary', ['summary' => $summary]), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->messageRenderer->render('admin.types_packages.messages.service_wizard_preview_panel', [
+                    'name' => (string) ($data['name'] ?? ''),
+                    'mode' => $this->catalog->get('admin.types_packages.labels.mode_panel_auto_fa'),
+                    'panel' => $panelName,
+                    'panel_ref' => (string) (($data['panel_ref'] ?? null) !== null ? $data['panel_ref'] : $this->catalog->get('messages.generic.dash')),
+                ]),
+                $this->uiKeyboard->replyMenu([
+                    [$this->catalog->get('admin.types_packages.actions.confirm_service')],
+                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                ])
+            );
             return false;
         }
         if ($step === 'confirm') {
-            if (!in_array($raw, [$this->catalog->get('admin.panel_settings.confirm_words.confirm'), $this->catalog->get('admin.panel_settings.confirm_words.submit')], true)) {
+            if ($raw !== $this->catalog->get('admin.types_packages.actions.confirm_service')) {
                 $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.confirm_required')));
                 return false;
             }
@@ -2642,7 +2652,7 @@ final class MessageHandler
         $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['type_id' => $typeId, 'step' => 'mode', 'data' => $data]));
         $this->telegram->sendMessage(
             $chatId,
-            $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.mode')),
+            $this->catalog->get('admin.types_packages.prompts.service_wizard.mode'),
             $this->uiKeyboard->replyMenu([
                 [$this->catalog->get('admin.types_packages.prompts.service_wizard.mode_stock'), $this->catalog->get('admin.types_packages.prompts.service_wizard.mode_panel_auto')],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
