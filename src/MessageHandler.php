@@ -1633,11 +1633,11 @@ final class MessageHandler
             if (
                 $text === $this->catalog->get('admin.types_packages.actions.add_service')
                 || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)
-                || $text === $this->catalog->get('admin.types_packages.actions.add_type')
             ) {
                 $defaultTypeId = (int) ($payload['default_type_id'] ?? 0);
                 if ($defaultTypeId <= 0) {
-                    $defaultTypeId = $this->ensureDefaultTypeForServiceWizard();
+                    $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.ui.open.types_list.empty')));
+                    return;
                 }
                 $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $defaultTypeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.service.landing']]);
                 $this->telegram->sendMessage(
