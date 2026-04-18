@@ -1538,7 +1538,7 @@ final class MessageHandler
             $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {
                 if ($route === 'admin:types') {
-                    $this->openAdminTypesList($chatId, $userId);
+                    $this->openAdminTypesList($chatId, $userId, $this->uiText->info('ورود مستقیم به مدیریت سرویس فعال شد.'));
                     return;
                 }
                 if ($route === 'admin:users') {
@@ -1669,7 +1669,7 @@ final class MessageHandler
             }
             $typeId = (int) ($payload['type_id'] ?? 0);
             if ($typeId <= 0) {
-                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type')));
+                $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.invalid_type_again')));
                 return;
             }
             if ($text === $this->catalog->get('admin.types_packages.actions.add_service') || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)) {
@@ -2120,7 +2120,6 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.users_stock.errors.invalid_config_detail_option')));
             return;
         }
-    }
 
     private function openAdminTypesList(int $chatId, int $userId, ?string $notice = null): void
     {
@@ -2197,6 +2196,35 @@ final class MessageHandler
         );
     }
 
+    private function openAdminServiceTypeSelector(int $chatId, int $userId): void
+    {
+        $types = $this->database->listTypes();
+        $options = [];
+        $rows = [];
+        foreach (array_values($types) as $idx => $type) {
+            $typeId = (int) ($type['id'] ?? 0);
+            if ($typeId <= 0) {
+                continue;
+            }
+            $num = (string) ($idx + 1);
+            $name = trim((string) ($type['name'] ?? $this->catalog->get('messages.generic.dash')));
+            $options[$num] = $typeId;
+            $rows[] = $this->catalog->get('admin.ui.open.types_list.button', ['num' => $num, 'name' => $name]);
+        }
+        if ($options === []) {
+            $this->openAdminTypesList($chatId, $userId, $this->uiText->warning($this->catalog->get('admin.ui.open.types_list.empty')));
+            return;
+        }
+        $this->database->setUserState($userId, 'admin.service.type_select', ['options' => $options, 'stack' => ['admin.service.landing', 'admin.root']]);
+        $keyboardRows = array_map(static fn (string $label): array => [$label], $rows);
+        $keyboardRows[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->uiText->info($this->catalog->get('admin.types_packages.prompts.package_mode_select')),
+            $this->uiKeyboard->replyMenu($keyboardRows)
+        );
+    }
+
     private function openAdminTypeView(int $chatId, int $userId, int $typeId, ?string $notice = null): void
     {
         $type = $this->findTypeById($typeId);
@@ -2227,7 +2255,6 @@ final class MessageHandler
             $serviceOptions[$serviceButton] = $serviceId;
             $buttons[] = [$serviceButton];
         }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
 
         $this->database->setUserState($userId, 'admin.service.list', ['type_id' => $typeId, 'service_options' => $serviceOptions, 'stack' => ['admin.service.landing', 'admin.root']]);
         if ($notice !== null && $notice !== '') {
