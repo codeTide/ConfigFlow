@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS service (
     panel_base_url VARCHAR(255) NULL,
     panel_username VARCHAR(191) NULL,
     panel_password TEXT NULL,
-    panel_ref VARCHAR(255) NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,

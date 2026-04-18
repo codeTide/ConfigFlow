@@ -64,7 +64,6 @@ final class Database implements WorkerApiStore
                 panel_base_url VARCHAR(255) NULL,
                 panel_username VARCHAR(191) NULL,
                 panel_password TEXT NULL,
-                panel_ref VARCHAR(255) NULL,
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
@@ -78,7 +77,7 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_base_url VARCHAR(255) NULL AFTER panel_provider");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_username VARCHAR(191) NULL AFTER panel_base_url");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_password TEXT NULL AFTER panel_username");
-            $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_ref VARCHAR(255) NULL AFTER panel_password");
+            $this->pdo->exec("ALTER TABLE service DROP COLUMN IF EXISTS panel_ref");
             $this->pdo->exec("ALTER TABLE service DROP COLUMN IF EXISTS panel_id");
             $this->pdo->exec("ALTER TABLE service DROP INDEX IF EXISTS idx_service_panel");
         }
@@ -723,7 +722,7 @@ final class Database implements WorkerApiStore
     public function listServicesByType(int $typeId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.type_id, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.panel_ref, s.is_active
+            'SELECT s.id, s.type_id, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
              FROM service s
              WHERE s.type_id = :type_id
              ORDER BY s.id DESC'
@@ -735,7 +734,7 @@ final class Database implements WorkerApiStore
     public function listActiveServicesByType(int $typeId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.type_id, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.panel_ref, s.is_active
+            'SELECT s.id, s.type_id, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
              FROM service s
              WHERE s.type_id = :type_id AND s.is_active = 1
              ORDER BY s.id DESC'
@@ -748,8 +747,8 @@ final class Database implements WorkerApiStore
     public function createService(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO service (type_id, name, mode, panel_provider, panel_base_url, panel_username, panel_password, panel_ref, is_active, created_at, updated_at)
-             VALUES (:type_id, :name, :mode, :panel_provider, :panel_base_url, :panel_username, :panel_password, :panel_ref, :is_active, :created_at, :updated_at)'
+            'INSERT INTO service (type_id, name, mode, panel_provider, panel_base_url, panel_username, panel_password, is_active, created_at, updated_at)
+             VALUES (:type_id, :name, :mode, :panel_provider, :panel_base_url, :panel_username, :panel_password, :is_active, :created_at, :updated_at)'
         );
         $now = gmdate('Y-m-d H:i:s');
         $stmt->execute([
@@ -760,7 +759,6 @@ final class Database implements WorkerApiStore
             'panel_base_url' => isset($data['panel_base_url']) ? trim((string) $data['panel_base_url']) : null,
             'panel_username' => isset($data['panel_username']) ? trim((string) $data['panel_username']) : null,
             'panel_password' => isset($data['panel_password']) ? trim((string) $data['panel_password']) : null,
-            'panel_ref' => isset($data['panel_ref']) ? trim((string) $data['panel_ref']) : null,
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
             'created_at' => $now,
             'updated_at' => $now,
@@ -771,7 +769,7 @@ final class Database implements WorkerApiStore
     public function getService(int $serviceId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.type_id, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.panel_ref, s.is_active
+            'SELECT s.id, s.type_id, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
              FROM service s
              WHERE s.id = :id
              LIMIT 1'
@@ -816,7 +814,7 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             'UPDATE service
-             SET name = :name, mode = :mode, panel_provider = :panel_provider, panel_base_url = :panel_base_url, panel_username = :panel_username, panel_password = :panel_password, panel_ref = :panel_ref, is_active = :is_active, updated_at = :updated_at
+             SET name = :name, mode = :mode, panel_provider = :panel_provider, panel_base_url = :panel_base_url, panel_username = :panel_username, panel_password = :panel_password, is_active = :is_active, updated_at = :updated_at
              WHERE id = :id'
         );
         $stmt->execute([
@@ -826,7 +824,6 @@ final class Database implements WorkerApiStore
             'panel_base_url' => isset($data['panel_base_url']) ? trim((string) $data['panel_base_url']) : null,
             'panel_username' => isset($data['panel_username']) ? trim((string) $data['panel_username']) : null,
             'panel_password' => isset($data['panel_password']) ? trim((string) $data['panel_password']) : null,
-            'panel_ref' => isset($data['panel_ref']) ? trim((string) $data['panel_ref']) : null,
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
             'updated_at' => gmdate('Y-m-d H:i:s'),
             'id' => $serviceId,
@@ -1957,7 +1954,7 @@ final class Database implements WorkerApiStore
             $this->pdo->rollBack();
             return ['ok' => false, 'error' => 'panel_not_found'];
         }
-        $groupIds = $this->parseGroupIds((string) ($service['panel_ref'] ?? ''));
+        $groupIds = $this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword);
         if ($groupIds === []) {
             $this->pdo->rollBack();
             return ['ok' => false, 'error' => 'panel_ref_invalid'];
@@ -2176,6 +2173,25 @@ final class Database implements WorkerApiStore
             }
         }
         return array_values(array_unique($ids));
+    }
+
+    /** @return array<int> */
+    private function resolveDefaultGroupIds(string $baseUrl, string $username, string $password): array
+    {
+        $client = new PGClient($baseUrl, $username, $password);
+        $response = $client->getGroups(0, 50);
+        if (!(bool) ($response['success'] ?? false)) {
+            return [];
+        }
+        $groups = is_array($response['data'] ?? null) ? $response['data'] : [];
+        foreach ($groups as $group) {
+            $groupId = isset($group['id']) ? (int) $group['id'] : 0;
+            if ($groupId > 0) {
+                return [$groupId];
+            }
+        }
+
+        return [];
     }
 
     private function deliveryMode(): string
