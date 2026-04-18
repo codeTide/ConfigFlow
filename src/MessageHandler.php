@@ -2957,6 +2957,23 @@ final class MessageHandler
         return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
     }
 
+    private function toPersianDigits(string $value): string
+    {
+        return strtr($value, [
+            '0' => '۰',
+            '1' => '۱',
+            '2' => '۲',
+            '3' => '۳',
+            '4' => '۴',
+            '5' => '۵',
+            '6' => '۶',
+            '7' => '۷',
+            '8' => '۸',
+            '9' => '۹',
+            '.' => '٫',
+        ]);
+    }
+
     /** @param array<string,mixed> $data */
     private function validateTariffData(array $data): bool
     {
