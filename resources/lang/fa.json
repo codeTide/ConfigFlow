@@ -774,13 +774,13 @@
         "delete_confirm": "✅ تایید حذف",
         "toggle_package": "🔁 تغییر وضعیت پکیج",
         "delete_package": "🗑 حذف پکیج",
-        "service_edit": "✏️ ویرایش سرویس",
-        "service_status": "📊 وضعیت سرویس",
+        "service_edit": "✏️ ویرایش",
+        "service_status": "📊 وضعیت",
         "service_tariffs": "💳 تعرفه‌ها",
         "service_inventory": "📚 موجودی",
         "service_panel_bind": "🔌 اتصال پنل",
-        "service_toggle": "🔁 فعال/غیرفعال سرویس",
-        "service_delete": "🗑 حذف سرویس",
+        "service_toggle": "🔁 فعال/غیرفعال",
+        "service_delete": "🗑 حذف",
         "service_tariff_add": "➕ افزودن تعرفه",
         "service_stock_add": "➕ افزودن موجودی",
         "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس",
@@ -843,7 +843,7 @@
       "messages": {
         "wizard_summary": "🧾 <b>پیش‌نمایش پکیج</b>\n\n📌 خلاصه: {summary}\n\n<blockquote>برای ثبت نهایی، «تایید» را ارسال کنید.</blockquote>",
         "service_wizard_summary": "🧾 <b>پیش‌نمایش سرویس</b>",
-        "service_management_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\nبرای شروع یکی از گزینه‌های زیر را انتخاب کنید.",
+        "service_management_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📌 یکی از گزینه‌های زیر را انتخاب کنید.\n✨ از همین بخش می‌توانید سرویس جدید بسازید یا سرویس‌های فعلی را مدیریت کنید.\n\n<blockquote>🚀 برای مدیریت سریع‌تر، اول «📋 سرویس‌های من» را بررسی کنید و در صورت نیاز با «➕ افزودن سرویس» یک سرویس تازه با تنظیمات کامل ثبت کنید.</blockquote>",
         "service_wizard_preview_stock": "🧾 <b>پیش‌نمایش سرویس</b>\n\n📝 نام: <b>{name}</b>\n⚙️ حالت تحویل: <b>{mode}</b>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا سرویس با همین تنظیمات ثبت نهایی شود.</blockquote>",
         "service_wizard_preview_panel": "🧾 <b>پیش‌نمایش سرویس</b>\n\n📝 نام: <b>{name}</b>\n⚙️ حالت تحویل: <b>{mode}</b>\n🖥 پنل: <b>{panel}</b>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا سرویس با همین تنظیمات ثبت نهایی شود.</blockquote>",
         "inventory_bridge_notice": "این بخش در فاز ۱ به موجودی فعلی متصل است و بازطراحی کامل نشده است.",
@@ -856,8 +856,8 @@
         "tariff_wizard_summary": "🧾 <b>پیش‌نمایش تعرفه</b>\n\n📌 خلاصه: {summary}\n\n<blockquote>برای ثبت نهایی، «تایید» را ارسال کنید.</blockquote>",
         "service_inventory_empty": "موجودی‌ای برای این سرویس ثبت نشده است.",
         "service_inventory_overview": "📚 <b>موجودی سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 آیتم‌ها: {list}",
-        "service_list_empty": "هنوز سرویسی ثبت نشده است. برای شروع، روی «➕ افزودن سرویس» بزنید.",
-        "service_list_overview": "📋 <b>سرویس‌های من</b>\n\nروی یکی از سرویس‌ها بزنید تا منوی اختصاصی مدیریت همان سرویس باز شود."
+        "service_list_empty": "📭 هنوز سرویسی ثبت نشده؛ از «➕ افزودن سرویس» شروع کنید.",
+        "service_list_overview": "📋 <b>سرویس‌های من</b>\n\n🧩 روی یکی از سرویس‌ها بزنید تا مدیریت همان سرویس باز شود.\n⚙️ از دکمه‌های هر سرویس می‌توانید وضعیت، تعرفه‌ها و تنظیمات مرتبط را کنترل کنید.\n\n<blockquote>🚀 برای مدیریت سریع‌تر، ابتدا سرویس هدف را انتخاب کنید؛ سپس تغییرات لازم را مرحله‌به‌مرحله اعمال کنید تا تنظیمات همان سرویس دقیق و بدون خطا ثبت شود.</blockquote>"
       },
       "labels": {
         "panel_fallback_name": "اتصال پنل فعلی",
@@ -1004,7 +1004,9 @@
         "service_view": {
           "mode_stock": "انباری",
           "mode_panel_auto": "پنلی خودکار",
-          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b> | <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت کامل همین سرویس طراحی شده است. از دکمه‌های پایین می‌توانید وضعیت فعال/غیرفعال، ویرایش اطلاعات، تعرفه‌ها و موجودی را با دقت کنترل کنید. اگر تغییری اعمال کردید، برای اطمینان دوباره وضعیت سرویس را بررسی کنید.</blockquote>",
+          "status_active": "فعال",
+          "status_inactive": "غیرفعال",
+          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
           "panel_none": "تنظیم نشده"
         },
         "panels_list": {
