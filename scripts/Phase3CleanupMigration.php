@@ -88,16 +88,12 @@ if ($rollback) {
 
         $svcIds = $pdo->query("SELECT entity_id FROM phase3_created_entities WHERE entity_type = 'service'")->fetchAll(PDO::FETCH_COLUMN);
         $tariffIds = $pdo->query("SELECT entity_id FROM phase3_created_entities WHERE entity_type = 'tariff'")->fetchAll(PDO::FETCH_COLUMN);
-        $panelIds = $pdo->query("SELECT entity_id FROM phase3_created_entities WHERE entity_type = 'panel'")->fetchAll(PDO::FETCH_COLUMN);
 
         if ($tariffIds !== []) {
             $pdo->exec('DELETE FROM service_tariff WHERE id IN (' . implode(',', array_map('intval', $tariffIds)) . ')');
         }
         if ($svcIds !== []) {
             $pdo->exec('DELETE FROM service WHERE id IN (' . implode(',', array_map('intval', $svcIds)) . ')');
-        }
-        if ($panelIds !== []) {
-            $pdo->exec('DELETE FROM panel WHERE id IN (' . implode(',', array_map('intval', $panelIds)) . ')');
         }
 
         $pdo->exec('TRUNCATE TABLE phase3_package_map');
@@ -151,23 +147,9 @@ try {
     foreach ($settingsStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $settings[(string) $row['key']] = (string) $row['value'];
     }
-    $panelId = null;
-    if (($settings['pg_base_url'] ?? '') !== '' && ($settings['pg_username'] ?? '') !== '' && ($settings['pg_password'] ?? '') !== '') {
-        $insPanel = $pdo->prepare('INSERT INTO panel (name, provider, base_url, username, password, is_active, created_at, updated_at) VALUES (:name, :provider, :base_url, :username, :password, 1, :created_at, :updated_at)');
-        $now = gmdate('Y-m-d H:i:s');
-        $insPanel->execute([
-            'name' => 'Migrated Legacy Panel',
-            'provider' => 'pasarguard',
-            'base_url' => $settings['pg_base_url'],
-            'username' => $settings['pg_username'],
-            'password' => $settings['pg_password'],
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-        $panelId = (int) $pdo->lastInsertId();
-        $logEntity = $pdo->prepare('INSERT INTO phase3_created_entities (entity_type, entity_id, created_at) VALUES (:type,:id,:created_at)');
-        $logEntity->execute(['type' => 'panel', 'id' => $panelId, 'created_at' => $now]);
-    }
+    $panelBaseUrl = (string) ($settings['pg_base_url'] ?? '');
+    $panelUsername = (string) ($settings['pg_username'] ?? '');
+    $panelPassword = (string) ($settings['pg_password'] ?? '');
 
     $logEntity = $pdo->prepare('INSERT INTO phase3_created_entities (entity_type, entity_id, created_at) VALUES (:type,:id,:created_at)');
 
@@ -180,11 +162,11 @@ try {
         'updated_pending_orders' => 0,
         'updated_payments' => 0,
         'updated_purchases' => 0,
-        'panel_created' => $panelId !== null ? 1 : 0,
+        'panel_created' => 0,
     ];
 
     $pkgRows = $pdo->query('SELECT id, type_id, name, volume_gb, duration_days, price FROM packages')->fetchAll(PDO::FETCH_ASSOC);
-    $insSvc = $pdo->prepare('INSERT INTO service (type_id, name, mode, panel_id, panel_ref, is_active, created_at, updated_at) VALUES (:type_id,:name,:mode,:panel_id,:panel_ref,1,:created_at,:updated_at)');
+    $insSvc = $pdo->prepare('INSERT INTO service (type_id, name, mode, panel_provider, panel_base_url, panel_username, panel_password, is_active, created_at, updated_at) VALUES (:type_id,:name,:mode,:panel_provider,:panel_base_url,:panel_username,:panel_password,1,:created_at,:updated_at)');
     $insTariff = $pdo->prepare('INSERT INTO service_tariff (service_id,title,pricing_mode,volume_gb,duration_days,price,min_volume_gb,max_volume_gb,step_volume_gb,price_per_gb,duration_policy,is_active,created_at,updated_at) VALUES (:service_id,:title,:pricing_mode,:volume_gb,:duration_days,:price,NULL,NULL,NULL,NULL,NULL,1,:created_at,:updated_at)');
     $insMap = $pdo->prepare('INSERT INTO phase3_package_map (package_id,service_id,tariff_id) VALUES (:package_id,:service_id,:tariff_id)');
     foreach ($pkgRows as $pkg) {
@@ -193,8 +175,10 @@ try {
             'type_id' => (int) $pkg['type_id'],
             'name' => (string) ('[Migrated] ' . ($pkg['name'] ?? 'Package ' . $pkg['id'])),
             'mode' => 'stock',
-            'panel_id' => null,
-            'panel_ref' => null,
+            'panel_provider' => null,
+            'panel_base_url' => null,
+            'panel_username' => null,
+            'panel_password' => null,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -244,8 +228,10 @@ try {
                 'type_id' => $typeId,
                 'name' => (string) ('[Migrated] ' . ($legacy['title'] ?? 'Provisioning ' . $legacy['id'])),
                 'mode' => 'panel_auto',
-                'panel_id' => $panelId,
-                'panel_ref' => (string) ($legacy['provider_group_ids'] ?? ''),
+                'panel_provider' => 'pasarguard',
+                'panel_base_url' => $panelBaseUrl !== '' ? $panelBaseUrl : null,
+                'panel_username' => $panelUsername !== '' ? $panelUsername : null,
+                'panel_password' => $panelPassword !== '' ? $panelPassword : null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);

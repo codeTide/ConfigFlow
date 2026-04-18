@@ -71,7 +71,7 @@ final class MenuService
             [$this->catalog->get('buttons.admin.types_packages'), $this->catalog->get('buttons.admin.inventory'), $this->catalog->get('buttons.admin.users')],
             [$this->catalog->get('buttons.admin.settings'), $this->catalog->get('buttons.admin.free_test')],
             [$this->catalog->get('buttons.admin.admins'), $this->catalog->get('buttons.admin.broadcast'), $this->catalog->get('buttons.admin.pins')],
-            [$this->catalog->get('buttons.admin.agencies'), $this->catalog->get('buttons.admin.panels')],
+            [$this->catalog->get('buttons.admin.agencies')],
             [$this->catalog->get('buttons.admin.charges'), $this->catalog->get('buttons.admin.delivery'), $this->catalog->get('buttons.admin.requests')],
             [$this->catalog->get('buttons.admin.backup_topics')],
             [$this->catalog->get('buttons.admin.exit_panel')],
