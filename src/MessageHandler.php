@@ -2251,16 +2251,6 @@ final class MessageHandler
         return $this->database->createType('سرویس‌ها');
     }
 
-    private function ensureServiceRootTypeId(): int
-    {
-        $types = $this->database->listTypes();
-        if ($types !== []) {
-            return (int) ($types[0]['id'] ?? 0);
-        }
-
-        return $this->database->createType('سرویس‌ها');
-    }
-
     private function openAdminServiceTypeSelector(int $chatId, int $userId): void
     {
         $types = $this->database->listTypes();
