@@ -2346,9 +2346,11 @@ final class MessageHandler
 
         $buttons = [
             [$this->uiConst(self::ADMIN_SERVICE_EDIT), $this->uiConst(self::ADMIN_SERVICE_TOGGLE)],
-            [$this->uiConst(self::ADMIN_SERVICE_STATUS)],
-            [$this->uiConst(self::ADMIN_SERVICE_DELETE)],
-            [$this->uiConst(self::ADMIN_SERVICE_TARIFFS)],
+            [
+                $this->uiConst(self::ADMIN_SERVICE_STATUS),
+                $this->uiConst(self::ADMIN_SERVICE_DELETE),
+                $this->uiConst(self::ADMIN_SERVICE_TARIFFS),
+            ],
         ];
         if ($mode === 'stock') {
             $buttons[] = [$this->uiConst(self::ADMIN_SERVICE_INVENTORY), $this->uiConst(self::ADMIN_SERVICE_STOCK_ADD)];

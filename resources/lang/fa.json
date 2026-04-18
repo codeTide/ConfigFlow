@@ -774,13 +774,13 @@
         "delete_confirm": "✅ تایید حذف",
         "toggle_package": "🔁 تغییر وضعیت پکیج",
         "delete_package": "🗑 حذف پکیج",
-        "service_edit": "✏️ ویرایش سرویس",
-        "service_status": "📊 وضعیت سرویس",
+        "service_edit": "✏️ ویرایش",
+        "service_status": "📊 وضعیت",
         "service_tariffs": "💳 تعرفه‌ها",
         "service_inventory": "📚 موجودی",
         "service_panel_bind": "🔌 اتصال پنل",
-        "service_toggle": "🔁 فعال/غیرفعال سرویس",
-        "service_delete": "🗑 حذف سرویس",
+        "service_toggle": "🔁 فعال/غیرفعال",
+        "service_delete": "🗑 حذف",
         "service_tariff_add": "➕ افزودن تعرفه",
         "service_stock_add": "➕ افزودن موجودی",
         "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس",
@@ -857,7 +857,7 @@
         "service_inventory_empty": "موجودی‌ای برای این سرویس ثبت نشده است.",
         "service_inventory_overview": "📚 <b>موجودی سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 آیتم‌ها: {list}",
         "service_list_empty": "📭 هنوز سرویسی ثبت نشده؛ از «➕ افزودن سرویس» شروع کنید.",
-        "service_list_overview": "📋 <b>سرویس‌های من</b>\n\nروی یکی از سرویس‌ها بزنید تا منوی اختصاصی مدیریت همان سرویس باز شود."
+        "service_list_overview": "📋 <b>سرویس‌های من</b>\n\n🧩 روی یکی از سرویس‌ها بزنید تا مدیریت همان سرویس باز شود.\n⚙️ از دکمه‌های هر سرویس می‌توانید وضعیت، تعرفه‌ها و تنظیمات مرتبط را کنترل کنید.\n\n<blockquote>🚀 برای مدیریت سریع‌تر، ابتدا سرویس هدف را انتخاب کنید؛ سپس تغییرات لازم را مرحله‌به‌مرحله اعمال کنید تا تنظیمات همان سرویس دقیق و بدون خطا ثبت شود.</blockquote>"
       },
       "labels": {
         "panel_fallback_name": "اتصال پنل فعلی",
@@ -1006,7 +1006,7 @@
           "mode_panel_auto": "پنلی خودکار",
           "status_active": "فعال",
           "status_inactive": "غیرفعال",
-          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🆔 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
+          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
           "panel_none": "تنظیم نشده"
         },
         "panels_list": {
