@@ -2806,7 +2806,25 @@ final class MessageHandler
                 return false;
             }
             $data['price'] = $price;
-            $this->promptTariffConfirm($chatId, $userId, $typeId, $serviceId, $stateName, $data, $tariffId);
+            $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_fixed', [
+                'pricing_mode' => $this->catalog->get('admin.types_packages.labels.pricing_mode_fixed_plain'),
+                'volume_gb' => strtr((string) ($data['volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'duration_days' => strtr((string) ($data['duration_days'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'price' => strtr((string) ($data['price'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+            ]);
+            $payload = ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'confirm', 'data' => $data];
+            if ($stateName === 'admin.service.tariff.edit' && $tariffId > 0) {
+                $payload['tariff_id'] = $tariffId;
+            }
+            $this->database->setUserState($userId, $stateName, $payload);
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]),
+                $this->uiKeyboard->replyMenu([
+                    [$this->catalog->get('buttons.confirm_yes')],
+                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                ])
+            );
             return false;
         }
         if ($step === 'min_volume_gb') {
@@ -2865,7 +2883,27 @@ final class MessageHandler
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, $stateName, 'duration_days', $data, $tariffId);
                 return false;
             }
-            $this->promptTariffConfirm($chatId, $userId, $typeId, $serviceId, $stateName, $data, $tariffId);
+            $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_per_gb_unlimited', [
+                'pricing_mode' => $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb_plain'),
+                'min_volume_gb' => strtr((string) ($data['min_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'max_volume_gb' => strtr((string) ($data['max_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'step_volume_gb' => strtr((string) ($data['step_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'price_per_gb' => strtr((string) ($data['price_per_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'duration_policy' => $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited')),
+            ]);
+            $payload = ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'confirm', 'data' => $data];
+            if ($stateName === 'admin.service.tariff.edit' && $tariffId > 0) {
+                $payload['tariff_id'] = $tariffId;
+            }
+            $this->database->setUserState($userId, $stateName, $payload);
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]),
+                $this->uiKeyboard->replyMenu([
+                    [$this->catalog->get('buttons.confirm_yes')],
+                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                ])
+            );
             return false;
         }
         if ($step === 'duration_days' && (string) ($data['pricing_mode'] ?? '') === 'per_gb') {
@@ -2875,7 +2913,28 @@ final class MessageHandler
                 return false;
             }
             $data['duration_days'] = $days;
-            $this->promptTariffConfirm($chatId, $userId, $typeId, $serviceId, $stateName, $data, $tariffId);
+            $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_per_gb_fixed_days', [
+                'pricing_mode' => $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb_plain'),
+                'min_volume_gb' => strtr((string) ($data['min_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'max_volume_gb' => strtr((string) ($data['max_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'step_volume_gb' => strtr((string) ($data['step_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'price_per_gb' => strtr((string) ($data['price_per_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+                'duration_policy' => $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_fixed')),
+                'duration_days' => strtr((string) ($data['duration_days'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
+            ]);
+            $payload = ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'confirm', 'data' => $data];
+            if ($stateName === 'admin.service.tariff.edit' && $tariffId > 0) {
+                $payload['tariff_id'] = $tariffId;
+            }
+            $this->database->setUserState($userId, $stateName, $payload);
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]),
+                $this->uiKeyboard->replyMenu([
+                    [$this->catalog->get('buttons.confirm_yes')],
+                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                ])
+            );
             return false;
         }
         if ($step === 'confirm') {
@@ -2892,62 +2951,10 @@ final class MessageHandler
         return false;
     }
 
-    /** @param array<string,mixed> $data */
-    private function promptTariffConfirm(int $chatId, int $userId, int $typeId, int $serviceId, string $stateName, array $data, int $tariffId = 0): void
+    private function removeEmoji(string $text): string
     {
-        $mode = (string) ($data['pricing_mode'] ?? '');
-        $modeText = $mode === 'fixed'
-            ? 'ثابت'
-            : ($mode === 'per_gb' ? 'پلکانی بر اساس حجم' : $this->catalog->get('messages.generic.dash'));
-        $durationPolicy = (string) ($data['duration_policy'] ?? '');
-        $durationPolicyText = $durationPolicy === 'fixed_days'
-            ? 'مدت ثابت'
-            : ($durationPolicy === 'unlimited' ? 'نامحدود' : $this->catalog->get('messages.generic.dash'));
-
-        $lines = ['🧩 حالت: ' . $modeText];
-        if ($mode === 'fixed') {
-            if (isset($data['volume_gb'])) {
-                $lines[] = '📦 حجم: ' . $this->toPersianDigits((string) $data['volume_gb']) . ' گیگ';
-            }
-            if (isset($data['duration_days'])) {
-                $lines[] = '⏳ مدت: ' . $this->toPersianDigits((string) $data['duration_days']) . ' روز';
-            }
-            if (isset($data['price'])) {
-                $lines[] = '💵 قیمت: ' . $this->toPersianDigits((string) $data['price']) . ' تومان';
-            }
-        } elseif ($mode === 'per_gb') {
-            if (isset($data['min_volume_gb']) && isset($data['max_volume_gb'])) {
-                $lines[] = '📉 حداقل/حداکثر حجم: '
-                    . $this->toPersianDigits((string) $data['min_volume_gb'])
-                    . ' / '
-                    . $this->toPersianDigits((string) $data['max_volume_gb'])
-                    . ' گیگ';
-            }
-            if (isset($data['step_volume_gb'])) {
-                $lines[] = '🪜 گام: ' . $this->toPersianDigits((string) $data['step_volume_gb']) . ' گیگ';
-            }
-            if (isset($data['price_per_gb'])) {
-                $lines[] = '💰 قیمت هر گیگ: ' . $this->toPersianDigits((string) $data['price_per_gb']) . ' واحد';
-            }
-            $lines[] = '🧭 سیاست مدت: ' . $durationPolicyText;
-            if ($durationPolicy === 'fixed_days' && isset($data['duration_days'])) {
-                $lines[] = '📅 مدت ثابت: ' . $this->toPersianDigits((string) $data['duration_days']) . ' روز';
-            }
-        }
-        $summary = implode("\n", $lines);
-        $payload = ['type_id' => $typeId, 'service_id' => $serviceId, 'step' => 'confirm', 'data' => $data];
-        if ($stateName === 'admin.service.tariff.edit' && $tariffId > 0) {
-            $payload['tariff_id'] = $tariffId;
-        }
-        $this->database->setUserState($userId, $stateName, $payload);
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]),
-            $this->uiKeyboard->replyMenu([
-                [$this->catalog->get('buttons.confirm_yes')],
-                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-            ])
-        );
+        $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}]/u', '', $text) ?? $text;
+        return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
     }
 
     private function toPersianDigits(string $value): string

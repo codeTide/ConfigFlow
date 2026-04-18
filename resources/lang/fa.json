@@ -822,7 +822,9 @@
           "step_volume_gb": "🪜 گام افزایش حجم را وارد کنید:\n\n🔢 مشخص کنید کاربر با چه گام حجمی بتواند مقدار را تغییر دهد (مثلاً ۵).\n\n<blockquote>⚙️ انتخاب گام مناسب باعث می‌شود سفارش‌گذاری دقیق‌تر و مدیریت تعرفه ساده‌تر انجام شود.</blockquote>",
           "price_per_gb": "💰 قیمت هر گیگ را وارد کنید:\n\n🔢 مبلغ هر ۱ گیگ را به تومان وارد کنید.\n\n<blockquote>📊 این مقدار مستقیماً در محاسبه مبلغ نهایی حالت پلکانی اثر دارد، پس با دقت ثبت شود.</blockquote>",
           "duration_policy": "🧭 سیاست مدت را انتخاب کنید:\n\n📌 یکی از گزینه‌های زیر را انتخاب کنید: «📅 مدت ثابت» یا «♾️ نامحدود».\n\n<blockquote>🔐 این انتخاب تعیین می‌کند اعتبار سرویس تاریخ پایان داشته باشد یا بدون محدودیت زمانی فعال بماند.</blockquote>",
-          "summary_template": "💡 حالت: {pricing_mode}\nحجم: {volume_gb}\nمدت: {duration_days}\nقیمت: {price}\nحداقل/حداکثر: {min_volume_gb} / {max_volume_gb}\nگام: {step_volume_gb}\nقیمت هر گیگ: {price_per_gb}\nسیاست مدت: {duration_policy}"
+          "summary_fixed": "🧩 حالت: {pricing_mode}\n📦 حجم: {volume_gb} گیگ\n⏳ مدت: {duration_days} روز\n💵 قیمت: {price} تومان",
+          "summary_per_gb_unlimited": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n🪜 گام: {step_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}",
+          "summary_per_gb_fixed_days": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n🪜 گام: {step_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}\n📅 مدت ثابت: {duration_days} روز"
         },
         "tariff_delete_confirm": "💡 برای حذف تعرفه #{tariff_id} عبارت «{confirm_word}» را ارسال کنید.",
         "service_inventory": {
@@ -869,6 +871,8 @@
         "mode_panel_auto_fa": "ساخت خودکار از پنل",
         "pricing_mode_fixed": "📦 ثابت",
         "pricing_mode_per_gb": "📐 پلکانی بر اساس حجم",
+        "pricing_mode_fixed_plain": "ثابت",
+        "pricing_mode_per_gb_plain": "پلکانی بر اساس حجم",
         "duration_policy_fixed": "📅 مدت ثابت",
         "duration_policy_unlimited": "♾️ نامحدود",
         "service_list_button": "🧩 سرویس #{code} | {name}",
