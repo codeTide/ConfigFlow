@@ -1687,6 +1687,57 @@ final class MessageHandler
             return;
         }
 
+        if ($stateName === 'admin.type.create') {
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminTypesList($chatId, $userId);
+                return;
+            }
+            $name = trim($text);
+            if ($name === '') {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_name_required')));
+                return;
+            }
+            $typeId = $this->database->createType($name);
+            $this->openAdminTypeView(
+                $chatId,
+                $userId,
+                $typeId,
+                $this->uiText->success($this->catalog->get('admin.types_packages.success.type_created', ['type_id' => $typeId]))
+            );
+            return;
+        }
+
+        if ($stateName === 'admin.type.edit') {
+            $typeId = (int) ($payload['type_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminTypeView($chatId, $userId, $typeId);
+                return;
+            }
+            $name = trim($text);
+            if ($name === '') {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.types_packages.errors.type_name_required')));
+                return;
+            }
+            $this->database->updateTypeName($typeId, $name);
+            $this->openAdminTypeView($chatId, $userId, $typeId, $this->uiText->success($this->catalog->get('admin.types_packages.success.type_status_updated')));
+            return;
+        }
+
+        if ($stateName === 'admin.type.delete') {
+            $typeId = (int) ($payload['type_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminTypeView($chatId, $userId, $typeId);
+                return;
+            }
+            if ($text !== $this->catalog->get('admin.types_packages.actions.delete_confirm')) {
+                $this->telegram->sendMessage($chatId, $this->uiText->warning($this->catalog->get('admin.ui.invalid_admin_option')));
+                return;
+            }
+            $this->database->deleteType($typeId);
+            $this->openAdminTypesList($chatId, $userId, $this->uiText->success($this->catalog->get('admin.types_packages.success.type_deleted')));
+            return;
+        }
+
         if ($stateName === 'admin.service.type_select') {
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminTypesList($chatId, $userId);
@@ -2188,6 +2239,16 @@ final class MessageHandler
             "🧩 <b>مدیریت سرویس‌ها</b>\n\nبرای شروع یکی از گزینه‌های زیر را انتخاب کنید.",
             $this->uiKeyboard->replyMenu($buttons)
         );
+    }
+
+    private function ensureServiceRootTypeId(): int
+    {
+        $types = $this->database->listTypes();
+        if ($types !== []) {
+            return (int) ($types[0]['id'] ?? 0);
+        }
+
+        return $this->database->createType('سرویس‌ها');
     }
 
     private function ensureServiceRootTypeId(): int
