@@ -1539,10 +1539,10 @@ final class MessageHandler
                 $this->catalog->get('buttons.admin.requests') => 'admin:requests',
                 $this->catalog->get('buttons.admin.backup_topics') => 'admin:groupops',
             ];
-            $route = $adminRouteMap[$text] ?? '';
+                $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {
                 if ($route === 'admin:types') {
-                    $this->openAdminTypesList($chatId, $userId, $this->uiText->info('ورود مستقیم به مدیریت سرویس فعال شد.'));
+                    $this->openAdminTypesList($chatId, $userId);
                     return;
                 }
                 if ($route === 'admin:users') {
@@ -1635,6 +1635,19 @@ final class MessageHandler
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->uiText->info($this->catalog->get('admin.types_packages.create_type.overview')),
+                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+                );
+                return;
+            }
+            if ($text === $this->catalog->get('admin.types_packages.actions.add_service') || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)) {
+                $defaultTypeId = (int) ($payload['default_type_id'] ?? 0);
+                if ($defaultTypeId <= 0) {
+                    $defaultTypeId = $this->ensureDefaultTypeForServiceWizard();
+                }
+                $this->database->setUserState($userId, 'admin.service.create', ['type_id' => $defaultTypeId, 'step' => 'name', 'data' => [], 'stack' => ['admin.service.landing']]);
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $this->uiText->info($this->catalog->get('admin.types_packages.prompts.service_wizard.name')),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
                 return;
@@ -2254,9 +2267,13 @@ final class MessageHandler
             $options[$key] = $typeId;
             $buttons[] = [$this->catalog->get('admin.ui.open.types_list.button', ['num' => $key, 'name' => $name, 'service_count' => $serviceCount])];
         }
+        $defaultTypeId = 0;
+        if ($types !== []) {
+            $defaultTypeId = (int) (($types[0]['id'] ?? 0));
+        }
         $buttons[] = [$this->catalog->get('admin.types_packages.actions.add_type')];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.service.landing', ['options' => $options, 'stack' => ['admin.root']]);
+        $this->database->setUserState($userId, 'admin.service.landing', ['options' => $options, 'stack' => ['admin.root'], 'default_type_id' => $defaultTypeId]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
@@ -2265,6 +2282,16 @@ final class MessageHandler
             : $this->messageRenderer->render('admin.ui.open.types_list.empty_overview');
 
         $this->telegram->sendMessage($chatId, $landingText, $this->uiKeyboard->replyMenu($buttons));
+    }
+
+    private function ensureDefaultTypeForServiceWizard(): int
+    {
+        $types = $this->database->listTypes();
+        if ($types !== []) {
+            return (int) ($types[0]['id'] ?? 0);
+        }
+
+        return $this->database->createType('عمومی');
     }
 
     private function openAdminServiceTypeSelector(int $chatId, int $userId): void

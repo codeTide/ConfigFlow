@@ -772,7 +772,7 @@
         "add_type": "➕ افزودن نوع سرویس",
         "edit_type": "✏️ ویرایش نوع سرویس",
         "add_package": "➕ افزودن پکیج",
-        "add_service": "🧩 افزودن سرویس (جدید)",
+        "add_service": "➕ افزودن سرویس",
         "add_stock_package": "📦 پکیج انباری",
         "add_panel_package": "⚙️ تنظیمات اتصال پنل",
         "toggle_type": "🔁 تغییر وضعیت نوع",
@@ -975,7 +975,7 @@
         },
         "types_list": {
           "empty": "هنوز نوع سرویسی ثبت نشده است.",
-          "empty_overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\nهنوز نوع سرویسی ثبت نشده است.\n\n<blockquote>💡 برای شروع از دکمه «➕ افزودن نوع سرویس» استفاده کنید.</blockquote>",
+          "empty_overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\nهنوز نوع سرویسی ثبت نشده است.\n\n<blockquote>💡 برای شروع از دکمه «➕ افزودن سرویس» استفاده کنید.</blockquote>",
           "overview": "🧩 <b>مدیریت نوع/پکیج</b>\n\n📋 لیست نوع‌ها: {list}\n\n<blockquote>💡 یک نوع را انتخاب کنید تا سرویس‌ها و عملیات همان نوع باز شود.</blockquote>",
           "row": "{num}) {status} {name} | سرویس‌ها: <code>{service_count}</code>",
           "button": "{num} - {name} ({service_count})"
