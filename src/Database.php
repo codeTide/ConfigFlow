@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace StockItemFlow\Bot;
+namespace ConfigFlow\Bot;
 
 use PDO;
 
@@ -17,12 +17,12 @@ final class Database implements WorkerApiStore
     {
         $dsn = sprintf(
             'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
-            StockItem::dbHost(),
-            StockItem::dbPort(),
-            StockItem::dbName()
+            Config::dbHost(),
+            Config::dbPort(),
+            Config::dbName()
         );
 
-        $this->pdo = new PDO($dsn, StockItem::dbUser(), StockItem::dbPass(), [
+        $this->pdo = new PDO($dsn, Config::dbUser(), Config::dbPass(), [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
@@ -273,7 +273,7 @@ final class Database implements WorkerApiStore
 
     public function isAdminUser(int $userId): bool
     {
-        if (in_array($userId, StockItem::adminIds(), true)) {
+        if (in_array($userId, Config::adminIds(), true)) {
             return true;
         }
         $stmt = $this->pdo->prepare('SELECT user_id FROM admin_users WHERE user_id = :user_id LIMIT 1');
@@ -313,7 +313,7 @@ final class Database implements WorkerApiStore
 
     public function getAdminPermissions(int $userId): array
     {
-        if (in_array($userId, StockItem::adminIds(), true)) {
+        if (in_array($userId, Config::adminIds(), true)) {
             return ['full' => true];
         }
         $stmt = $this->pdo->prepare('SELECT permissions FROM admin_users WHERE user_id = :user_id LIMIT 1');
@@ -341,7 +341,7 @@ final class Database implements WorkerApiStore
             return array_map(static fn ($r) => (int) $r['user_id'], $stmt->fetchAll());
         }
         if ($scope === 'admins') {
-            $ids = StockItem::adminIds();
+            $ids = Config::adminIds();
             foreach ($this->listAdminUsers() as $row) {
                 $ids[] = (int) ($row['user_id'] ?? 0);
             }
