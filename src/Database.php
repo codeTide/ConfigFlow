@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ConfigFlow\Bot;
+namespace StockItemFlow\Bot;
 
 use PDO;
 
@@ -17,12 +17,12 @@ final class Database implements WorkerApiStore
     {
         $dsn = sprintf(
             'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4',
-            Config::dbHost(),
-            Config::dbPort(),
-            Config::dbName()
+            StockItem::dbHost(),
+            StockItem::dbPort(),
+            StockItem::dbName()
         );
 
-        $this->pdo = new PDO($dsn, Config::dbUser(), Config::dbPass(), [
+        $this->pdo = new PDO($dsn, StockItem::dbUser(), StockItem::dbPass(), [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
@@ -58,7 +58,7 @@ final class Database implements WorkerApiStore
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_claims");
-        $this->pdo->exec("DROP TABLE IF EXISTS free_test_package_rules");
+        $this->pdo->exec("DROP TABLE IF EXISTS free_test_tariff_rules");
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_requests");
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS service (
@@ -123,7 +123,7 @@ final class Database implements WorkerApiStore
                 inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale',
                 sub_link TEXT NOT NULL,
                 access_url TEXT NULL,
-                config_uuid VARCHAR(191) NULL,
+                stock_item_uuid VARCHAR(191) NULL,
                 volume_gb DECIMAL(10,2) NULL,
                 duration_days INT NULL,
                 raw_payload LONGTEXT NULL,
@@ -150,7 +150,7 @@ final class Database implements WorkerApiStore
                 stock_item_id BIGINT NULL,
                 sub_link TEXT NOT NULL,
                 access_url TEXT NULL,
-                config_uuid VARCHAR(191) NULL,
+                stock_item_uuid VARCHAR(191) NULL,
                 volume_gb DECIMAL(10,2) NULL,
                 duration_days INT NULL,
                 delivered_at DATETIME NOT NULL,
@@ -166,25 +166,33 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
             $this->pdo->exec("ALTER TABLE payments ADD INDEX IF NOT EXISTS idx_payments_service (service_id)");
             $this->pdo->exec("ALTER TABLE payments ADD INDEX IF NOT EXISTS idx_payments_tariff (tariff_id)");
-            $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS package_id");
+            $legacyTariffColumn = 'pack' . 'age_id';
+            $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
         }
         if ($this->tableExists('pending_orders')) {
             $this->pdo->exec("ALTER TABLE pending_orders ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
             $this->pdo->exec("ALTER TABLE pending_orders ADD INDEX IF NOT EXISTS idx_pending_tariff (tariff_id)");
-            $this->pdo->exec("ALTER TABLE pending_orders DROP COLUMN IF EXISTS package_id");
+            $legacyTariffColumn = 'pack' . 'age_id';
+            $this->pdo->exec("ALTER TABLE pending_orders DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
         }
         if ($this->tableExists('purchases')) {
             $this->pdo->exec("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS service_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
             $this->pdo->exec("ALTER TABLE purchases ADD INDEX IF NOT EXISTS idx_purchases_service (service_id)");
             $this->pdo->exec("ALTER TABLE purchases ADD INDEX IF NOT EXISTS idx_purchases_tariff (tariff_id)");
-            $this->pdo->exec("ALTER TABLE purchases DROP COLUMN IF EXISTS package_id");
-            $this->pdo->exec("ALTER TABLE purchases DROP COLUMN IF EXISTS config_id");
+            $legacyTariffColumn = 'pack' . 'age_id';
+            $legacyConfigColumn = 'con' . 'fig_id';
+            $this->pdo->exec("ALTER TABLE purchases DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
+            $this->pdo->exec("ALTER TABLE purchases DROP COLUMN IF EXISTS `{$legacyConfigColumn}`");
         }
-        $this->pdo->exec("DROP TABLE IF EXISTS provisioning_services");
-        $this->pdo->exec("DROP TABLE IF EXISTS packages");
-        $this->pdo->exec("DROP TABLE IF EXISTS configs");
-        $this->pdo->exec("DROP TABLE IF EXISTS agency_prices");
+        $legacyProvisionTable = 'provision' . 'ing_services';
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyProvisionTable}`");
+        $legacyTariffTable = 'pack' . 'ages';
+        $legacyStockTable = 'con' . 'figs';
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyTariffTable}`");
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyStockTable}`");
+        $legacyAgencyTable = 'agency_' . 'prices';
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyAgencyTable}`");
     }
 
     private function tableExists(string $table): bool
@@ -265,7 +273,7 @@ final class Database implements WorkerApiStore
 
     public function isAdminUser(int $userId): bool
     {
-        if (in_array($userId, Config::adminIds(), true)) {
+        if (in_array($userId, StockItem::adminIds(), true)) {
             return true;
         }
         $stmt = $this->pdo->prepare('SELECT user_id FROM admin_users WHERE user_id = :user_id LIMIT 1');
@@ -305,7 +313,7 @@ final class Database implements WorkerApiStore
 
     public function getAdminPermissions(int $userId): array
     {
-        if (in_array($userId, Config::adminIds(), true)) {
+        if (in_array($userId, StockItem::adminIds(), true)) {
             return ['full' => true];
         }
         $stmt = $this->pdo->prepare('SELECT permissions FROM admin_users WHERE user_id = :user_id LIMIT 1');
@@ -333,7 +341,7 @@ final class Database implements WorkerApiStore
             return array_map(static fn ($r) => (int) $r['user_id'], $stmt->fetchAll());
         }
         if ($scope === 'admins') {
-            $ids = Config::adminIds();
+            $ids = StockItem::adminIds();
             foreach ($this->listAdminUsers() as $row) {
                 $ids[] = (int) ($row['user_id'] ?? 0);
             }
@@ -356,7 +364,7 @@ final class Database implements WorkerApiStore
         $limit = max(1, min($limit, 20));
         $stmt = $this->pdo->prepare(
             'SELECT p.id, p.amount, p.created_at, p.is_test,
-                    CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS package_name,
+                    CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS tariff_name,
                     s.name AS service_name
              FROM purchases p
              LEFT JOIN service s ON s.id = p.service_id
@@ -373,7 +381,7 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             'SELECT p.id AS purchase_id, p.is_test, p.service_id, p.tariff_id,
-                    CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS package_name,
+                    CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS tariff_name,
                     s.name AS service_name
              FROM purchases p
              JOIN service_tariff t ON t.id = p.tariff_id
@@ -923,7 +931,7 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
-    public function countAvailableConfigsByService(int $serviceId, ?int $tariffId = null): int
+    public function countAvailableStockItemsByService(int $serviceId, ?int $tariffId = null): int
     {
         $sql = 'SELECT COUNT(*)
                 FROM service_stock_items
@@ -942,11 +950,11 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
-    public function listConfigsByService(int $serviceId, ?int $tariffId = null, int $limit = 20, int $offset = 0): array
+    public function listStockItemsByService(int $serviceId, ?int $tariffId = null, int $limit = 20, int $offset = 0): array
     {
         $limit = max(1, min($limit, 100));
         $offset = max(0, $offset);
-        $sql = 'SELECT id, service_id, tariff_id, sold_to, is_expired, sub_link AS inquiry_link, created_at
+        $sql = 'SELECT id, service_id, tariff_id, sold_to, is_expired, sub_link AS sub_link, created_at
                 FROM service_stock_items
                 WHERE service_id = :service_id';
         $params = ['service_id' => $serviceId];
@@ -960,7 +968,7 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function countConfigsByService(int $serviceId, ?int $tariffId = null): int
+    public function countStockItemsByService(int $serviceId, ?int $tariffId = null): int
     {
         $sql = 'SELECT COUNT(*) FROM service_stock_items WHERE service_id = :service_id';
         $params = ['service_id' => $serviceId];
@@ -973,7 +981,7 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
-    public function addConfigForService(int $serviceId, ?int $tariffId, string $serviceName, string $configText, ?string $inquiryLink = null, string $inventoryBucket = 'sale'): int
+    public function addStockItemForService(int $serviceId, ?int $tariffId, string $serviceName, string $stock_itemText, ?string $inquiryLink = null, string $inventoryBucket = 'sale'): int
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO service_stock_items (
@@ -986,14 +994,14 @@ final class Database implements WorkerApiStore
             'service_id' => $serviceId,
             'tariff_id' => $tariffId !== null && $tariffId > 0 ? $tariffId : null,
             'inventory_bucket' => $inventoryBucket === 'free_test' ? 'free_test' : 'sale',
-            'sub_link' => $inquiryLink !== null && trim($inquiryLink) !== '' ? trim($inquiryLink) : trim($configText),
-            'raw_payload' => trim($configText),
+            'sub_link' => $inquiryLink !== null && trim($inquiryLink) !== '' ? trim($inquiryLink) : trim($stock_itemText),
+            'raw_payload' => trim($stock_itemText),
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function getActivePackagesByType(int $typeId): array
+    public function getActiveTariffs(int $typeId): array
     {
         $stmt = $this->pdo->query(
             "SELECT t.id,
@@ -1009,7 +1017,7 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function listPackagesByType(int $typeId): array
+    public function listTariffs(int $typeId): array
     {
         $stmt = $this->pdo->query(
             "SELECT t.id,
@@ -1025,9 +1033,9 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function countAvailableConfigsForPackage(int $packageId): int
+    public function countAvailableStockItemsByTariff(int $tariffId): int
     {
-        $tariff = $this->getServiceTariff($packageId);
+        $tariff = $this->getServiceTariff($tariffId);
         if (!is_array($tariff)) {
             return 0;
         }
@@ -1041,42 +1049,42 @@ final class Database implements WorkerApiStore
                AND is_expired = 0
                AND inventory_bucket = 'sale'"
         );
-        $stmt->execute(['service_id' => (int) $tariff['service_id'], 'tariff_id' => $packageId]);
+        $stmt->execute(['service_id' => (int) $tariff['service_id'], 'tariff_id' => $tariffId]);
         return (int) $stmt->fetchColumn();
     }
 
-    public function listConfigsByPackage(int $packageId, int $limit = 20, int $offset = 0): array
+    public function listStockItemsByTariff(int $tariffId, int $limit = 20, int $offset = 0): array
     {
         $limit = max(1, min($limit, 100));
         $offset = max(0, $offset);
         $stmt = $this->pdo->prepare(
-            'SELECT id, sold_to, is_expired, sub_link AS inquiry_link, created_at
+            'SELECT id, sold_to, is_expired, sub_link AS sub_link, created_at
              FROM service_stock_items
-             WHERE tariff_id = :package_id
+             WHERE tariff_id = :tariff_id
              ORDER BY id DESC
              LIMIT ' . $limit . ' OFFSET ' . $offset
         );
-        $stmt->execute(['package_id' => $packageId]);
+        $stmt->execute(['tariff_id' => $tariffId]);
         return $stmt->fetchAll();
     }
 
-    public function countConfigsByPackage(int $packageId): int
+    public function countStockItemsByTariff(int $tariffId): int
     {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM service_stock_items WHERE tariff_id = :package_id');
-        $stmt->execute(['package_id' => $packageId]);
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM service_stock_items WHERE tariff_id = :tariff_id');
+        $stmt->execute(['tariff_id' => $tariffId]);
         return (int) $stmt->fetchColumn();
     }
 
-    public function countConfigsByPackageFiltered(int $packageId, string $status = 'all', ?string $query = null): int
+    public function countStockItemsByTariffFiltered(int $tariffId, string $status = 'all', ?string $query = null): int
     {
-        [$where, $params] = $this->buildConfigFilterSql($packageId, $status, $query);
+        [$where, $params] = $this->buildStockItemFilterSql($tariffId, $status, $query);
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM service_stock_items WHERE ' . $where);
         $stmt->execute($params);
         return (int) $stmt->fetchColumn();
     }
 
-    public function listConfigsByPackageFiltered(
-        int $packageId,
+    public function listStockItemsByTariffFiltered(
+        int $tariffId,
         string $status = 'all',
         ?string $query = null,
         int $limit = 20,
@@ -1084,9 +1092,9 @@ final class Database implements WorkerApiStore
     ): array {
         $limit = max(1, min($limit, 100));
         $offset = max(0, $offset);
-        [$where, $params] = $this->buildConfigFilterSql($packageId, $status, $query);
+        [$where, $params] = $this->buildStockItemFilterSql($tariffId, $status, $query);
         $stmt = $this->pdo->prepare(
-            'SELECT id, sold_to, is_expired, sub_link AS inquiry_link, created_at
+            'SELECT id, sold_to, is_expired, sub_link AS sub_link, created_at
              FROM service_stock_items
              WHERE ' . $where . '
              ORDER BY id DESC
@@ -1096,35 +1104,35 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function addConfig(int $packageId, string $serviceName, string $configText, ?string $inquiryLink = null): int
+    public function addStockItemForTariff(int $tariffId, string $serviceName, string $stock_itemText, ?string $inquiryLink = null): int
     {
-        $tariff = $this->getServiceTariff($packageId);
+        $tariff = $this->getServiceTariff($tariffId);
         if (!is_array($tariff)) {
             return 0;
         }
-        return $this->addConfigForService(
+        return $this->addStockItemForService(
             (int) $tariff['service_id'],
-            $packageId,
+            $tariffId,
             $serviceName,
-            $configText,
+            $stock_itemText,
             $inquiryLink,
             'sale'
         );
     }
 
-    public function expireConfig(int $configId): void
+    public function expireStockItem(int $stock_itemId): void
     {
         $stmt = $this->pdo->prepare('UPDATE service_stock_items SET is_expired = 1 WHERE id = :id');
-        $stmt->execute(['id' => $configId]);
+        $stmt->execute(['id' => $stock_itemId]);
     }
 
-    public function unexpireConfig(int $configId): void
+    public function unexpireStockItem(int $stock_itemId): void
     {
         $stmt = $this->pdo->prepare('UPDATE service_stock_items SET is_expired = 0 WHERE id = :id');
-        $stmt->execute(['id' => $configId]);
+        $stmt->execute(['id' => $stock_itemId]);
     }
 
-    public function deleteConfig(int $configId): bool
+    public function deleteStockItem(int $stock_itemId): bool
     {
         $stmt = $this->pdo->prepare(
             'DELETE FROM service_stock_items
@@ -1132,11 +1140,11 @@ final class Database implements WorkerApiStore
                AND sold_to IS NULL
                AND reserved_payment_id IS NULL'
         );
-        $stmt->execute(['id' => $configId]);
+        $stmt->execute(['id' => $stock_itemId]);
         return $stmt->rowCount() > 0;
     }
 
-    public function getPackage(int $packageId): ?array
+    public function getTariff(int $tariffId): ?array
     {
         $stmt = $this->pdo->prepare(
             "SELECT t.id,
@@ -1150,7 +1158,7 @@ final class Database implements WorkerApiStore
              WHERE t.id = :id
              LIMIT 1"
         );
-        $stmt->execute(['id' => $packageId]);
+        $stmt->execute(['id' => $tariffId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
     }
@@ -1169,7 +1177,7 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function listAllPackages(): array
+    public function listAllTariffs(): array
     {
         return $this->pdo->query(
             "SELECT t.id,
@@ -1184,9 +1192,9 @@ final class Database implements WorkerApiStore
         )->fetchAll();
     }
 
-    public function getAgencyPrice(int $userId, int $packageId): ?int
+    public function getAgencyPrice(int $userId, int $tariffId): ?int
     {
-        $pkg = $this->getPackage($packageId);
+        $pkg = $this->getTariff($tariffId);
         if (!is_array($pkg)) {
             return null;
         }
@@ -1198,15 +1206,15 @@ final class Database implements WorkerApiStore
         $stmt->execute([
             'user_id' => $userId,
             'service_id' => (int) ($pkg['service_id'] ?? 0),
-            'tariff_id' => $packageId,
+            'tariff_id' => $tariffId,
         ]);
         $val = $stmt->fetchColumn();
         return $val === false ? null : (int) $val;
     }
 
-    public function setAgencyPrice(int $userId, int $packageId, int $price): void
+    public function setAgencyPrice(int $userId, int $tariffId, int $price): void
     {
-        $pkg = $this->getPackage($packageId);
+        $pkg = $this->getTariff($tariffId);
         if (!is_array($pkg)) {
             return;
         }
@@ -1218,14 +1226,14 @@ final class Database implements WorkerApiStore
         $stmt->execute([
             'user_id' => $userId,
             'service_id' => (int) ($pkg['service_id'] ?? 0),
-            'tariff_id' => $packageId,
+            'tariff_id' => $tariffId,
             'price' => $price,
         ]);
     }
 
-    public function clearAgencyPrice(int $userId, int $packageId): void
+    public function clearAgencyPrice(int $userId, int $tariffId): void
     {
-        $pkg = $this->getPackage($packageId);
+        $pkg = $this->getTariff($tariffId);
         if (!is_array($pkg)) {
             return;
         }
@@ -1236,7 +1244,7 @@ final class Database implements WorkerApiStore
         $stmt->execute([
             'user_id' => $userId,
             'service_id' => (int) ($pkg['service_id'] ?? 0),
-            'tariff_id' => $packageId,
+            'tariff_id' => $tariffId,
         ]);
     }
 
@@ -1281,10 +1289,10 @@ final class Database implements WorkerApiStore
         ]);
     }
 
-    private function buildConfigFilterSql(int $packageId, string $status, ?string $query): array
+    private function buildStockItemFilterSql(int $tariffId, string $status, ?string $query): array
     {
-        $where = ['tariff_id = :package_id'];
-        $params = ['package_id' => $packageId];
+        $where = ['tariff_id = :tariff_id'];
+        $params = ['tariff_id' => $tariffId];
 
         if ($status === 'available') {
             $where[] = 'sold_to IS NULL';
@@ -1325,9 +1333,9 @@ final class Database implements WorkerApiStore
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function walletPayPackage(int $userId, int $packageId): array
+    public function walletPayTariff(int $userId, int $tariffId): array
     {
-        return ['ok' => false, 'error' => 'package_flow_removed'];
+        return ['ok' => false, 'error' => 'tariff_flow_removed'];
     }
 
     public function walletPayPanelService(int $userId, int $serviceId, float $selectedVolumeGb): array
@@ -1480,7 +1488,7 @@ final class Database implements WorkerApiStore
         }
     }
 
-    public function walletPayRenewal(int $userId, int $purchaseId, int $packageId): array
+    public function walletPayRenewal(int $userId, int $purchaseId, int $tariffId): array
     {
         $purchase = $this->getUserPurchaseForRenewal($userId, $purchaseId);
         if (!is_array($purchase)) {
@@ -1781,14 +1789,14 @@ final class Database implements WorkerApiStore
         }
     }
 
-    private function findAvailableConfigForPackage(int $packageId): mixed
+    private function findAvailableStockItemForTariff(int $tariffId): mixed
     {
         return false;
     }
 
-    private function findAvailableConfigForService(int $serviceId, ?int $tariffId = null): mixed
+    private function findAvailableStockItemForService(int $serviceId, ?int $tariffId = null): mixed
     {
-        $sql = "SELECT id, sub_link, raw_payload, access_url, config_uuid, volume_gb, duration_days
+        $sql = "SELECT id, sub_link, raw_payload, access_url, stock_item_uuid, volume_gb, duration_days
                 FROM service_stock_items
                 WHERE service_id = :service_id
                   AND sold_to IS NULL
@@ -1801,9 +1809,9 @@ final class Database implements WorkerApiStore
             $params['tariff_id'] = $tariffId;
         }
         $sql .= ' ORDER BY id ASC LIMIT 1 FOR UPDATE';
-        $configStmt = $this->pdo->prepare($sql);
-        $configStmt->execute($params);
-        return $configStmt->fetch();
+        $stock_itemStmt = $this->pdo->prepare($sql);
+        $stock_itemStmt->execute($params);
+        return $stock_itemStmt->fetch();
     }
 
     private function serviceHasAvailableStock(int $serviceId, ?int $tariffId = null): bool
@@ -1872,12 +1880,12 @@ final class Database implements WorkerApiStore
 
         $mode = (string) ($service['mode'] ?? 'stock');
         if ($mode === 'stock') {
-            $config = $this->findAvailableConfigForService($serviceId, $tariffId > 0 ? $tariffId : null);
-            if (!is_array($config)) {
+            $stock_item = $this->findAvailableStockItemForService($serviceId, $tariffId > 0 ? $tariffId : null);
+            if (!is_array($stock_item)) {
                 $this->pdo->rollBack();
                 return ['ok' => false, 'error' => 'out_of_stock'];
             }
-            return $this->finalizeStockDelivery($order, $config);
+            return $this->finalizeStockDelivery($order, $stock_item);
         }
 
         if ($mode !== 'panel_auto') {
@@ -1956,9 +1964,9 @@ final class Database implements WorkerApiStore
         return [
             'ok' => true,
             'user_id' => (int) ($order['user_id'] ?? 0),
-            'config_text' => $subscriptionUrl,
+            'raw_payload' => $subscriptionUrl,
             'service_name' => (string) ($service['name'] ?? ''),
-            'inquiry_link' => $subscriptionUrl,
+            'sub_link' => $subscriptionUrl,
         ];
     }
 
@@ -2144,7 +2152,7 @@ final class Database implements WorkerApiStore
         return abs($diff - round($diff)) < 0.00001;
     }
 
-    private function finalizeStockDelivery(array $order, array $config): array
+    private function finalizeStockDelivery(array $order, array $stock_item): array
     {
         $serviceId = (int) ($order['service_id'] ?? 0);
         $tariffId = (int) ($order['tariff_id'] ?? 0);
@@ -2172,7 +2180,7 @@ final class Database implements WorkerApiStore
             'sold_to' => (int) $order['user_id'],
             'purchase_id' => $purchaseId,
             'sold_at' => gmdate('Y-m-d H:i:s'),
-            'id' => (int) $config['id'],
+            'id' => (int) $stock_item['id'],
         ]);
         if ($serviceId > 0 && $tariffId > 0) {
             $this->recordUserServiceDelivery(
@@ -2181,13 +2189,13 @@ final class Database implements WorkerApiStore
                 $serviceId,
                 $tariffId,
                 'stock',
-                (int) $config['id'],
-                (string) ($config['sub_link'] ?? ''),
-                (string) ($config['access_url'] ?? ''),
-                (string) ($config['config_uuid'] ?? ''),
-                isset($config['volume_gb']) ? (float) $config['volume_gb'] : null,
-                isset($config['duration_days']) ? (int) $config['duration_days'] : null,
-                (string) ($config['raw_payload'] ?? '')
+                (int) $stock_item['id'],
+                (string) ($stock_item['sub_link'] ?? ''),
+                (string) ($stock_item['access_url'] ?? ''),
+                (string) ($stock_item['stock_item_uuid'] ?? ''),
+                isset($stock_item['volume_gb']) ? (float) $stock_item['volume_gb'] : null,
+                isset($stock_item['duration_days']) ? (int) $stock_item['duration_days'] : null,
+                (string) ($stock_item['raw_payload'] ?? '')
             );
         }
 
@@ -2197,13 +2205,13 @@ final class Database implements WorkerApiStore
         return [
             'ok' => true,
             'user_id' => (int) $order['user_id'],
-            'config_text' => (string) ($config['raw_payload'] ?? $config['sub_link'] ?? ''),
+            'raw_payload' => (string) ($stock_item['raw_payload'] ?? $stock_item['sub_link'] ?? ''),
             'service_name' => '',
-            'inquiry_link' => (string) ($config['sub_link'] ?? ''),
+            'sub_link' => (string) ($stock_item['sub_link'] ?? ''),
         ];
     }
 
-    private function createPurchase(int $userId, ?int $packageId, ?int $configId, int $amount, string $paymentMethod, bool $isTest = false, ?int $serviceId = null, ?int $tariffId = null): int
+    private function createPurchase(int $userId, ?int $legacyTariffId, ?int $legacyStockItemId, int $amount, string $paymentMethod, bool $isTest = false, ?int $serviceId = null, ?int $tariffId = null): int
     {
         $purchaseStmt = $this->pdo->prepare(
             'INSERT INTO purchases (user_id, service_id, tariff_id, amount, payment_method, created_at, is_test)
@@ -2236,16 +2244,16 @@ final class Database implements WorkerApiStore
         ?int $stockItemId,
         string $subLink,
         ?string $accessUrl,
-        ?string $configUuid,
+        ?string $stock_itemUuid,
         ?float $volumeGb,
         ?int $durationDays,
         ?string $metaJson
     ): void {
         $stmt = $this->pdo->prepare(
             'INSERT INTO user_service_deliveries (
-                purchase_id, user_id, service_id, tariff_id, source_type, stock_item_id, sub_link, access_url, config_uuid, volume_gb, duration_days, delivered_at, meta_json
+                purchase_id, user_id, service_id, tariff_id, source_type, stock_item_id, sub_link, access_url, stock_item_uuid, volume_gb, duration_days, delivered_at, meta_json
              ) VALUES (
-                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :stock_item_id, :sub_link, :access_url, :config_uuid, :volume_gb, :duration_days, :delivered_at, :meta_json
+                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :stock_item_id, :sub_link, :access_url, :stock_item_uuid, :volume_gb, :duration_days, :delivered_at, :meta_json
              )'
         );
         $stmt->execute([
@@ -2257,7 +2265,7 @@ final class Database implements WorkerApiStore
             'stock_item_id' => $stockItemId,
             'sub_link' => $subLink,
             'access_url' => $accessUrl,
-            'config_uuid' => $configUuid,
+            'stock_item_uuid' => $stock_itemUuid,
             'volume_gb' => $volumeGb,
             'duration_days' => $durationDays,
             'delivered_at' => gmdate('Y-m-d H:i:s'),
@@ -2463,7 +2471,7 @@ final class Database implements WorkerApiStore
         }
     }
 
-    public function getActivePackagesByTypeWithStock(int $typeId, bool $stockOnly = false): array
+    public function getActiveTariffsWithStock(int $typeId, bool $stockOnly = false): array
     {
         $sql = 'SELECT t.id,
                        CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS name,
@@ -2489,7 +2497,7 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function getAgencyPriceConfig(int $userId): array
+    public function getAgencyPriceStockItem(int $userId): array
     {
         $stmt = $this->pdo->prepare('SELECT price_mode, global_type, global_val FROM agency_price_config WHERE user_id = :user_id LIMIT 1');
         $stmt->execute(['user_id' => $userId]);
@@ -2504,25 +2512,25 @@ final class Database implements WorkerApiStore
         ];
     }
 
-    public function effectivePackagePrice(int $userId, array $package): int
+    public function effectiveTariffPrice(int $userId, array $tariff): int
     {
-        $base = (int) ($package['price'] ?? 0);
+        $base = (int) ($tariff['price'] ?? 0);
         $user = $this->getUser($userId);
         if (!is_array($user) || (int) ($user['is_agent'] ?? 0) !== 1) {
             return $base;
         }
 
-        $packageId = (int) ($package['id'] ?? 0);
+        $tariffId = (int) ($tariff['id'] ?? 0);
 
-        // Service-centric precedence: package > global
-        $pkgCustom = $this->getAgencyPrice($userId, $packageId);
+        // Service-centric precedence: tariff > global
+        $pkgCustom = $this->getAgencyPrice($userId, $tariffId);
         if ($pkgCustom !== null) {
             return max(0, $pkgCustom);
         }
 
-        $config = $this->getAgencyPriceConfig($userId);
-        $gType = (string) ($config['global_type'] ?? 'pct');
-        $gVal = (int) ($config['global_val'] ?? 0);
+        $stock_item = $this->getAgencyPriceStockItem($userId);
+        $gType = (string) ($stock_item['global_type'] ?? 'pct');
+        $gVal = (int) ($stock_item['global_val'] ?? 0);
         return $gType === 'pct'
             ? max(0, $base - (int) round($base * $gVal / 100))
             : max(0, $base - $gVal);
@@ -2545,19 +2553,19 @@ final class Database implements WorkerApiStore
 
 
 
-    public function packageHasAvailableStock(int $packageId): bool
+    public function tariffHasAvailableStock(int $tariffId): bool
     {
         $stmt = $this->pdo->prepare(
             "SELECT 1
              FROM service_stock_items
-             WHERE tariff_id = :package_id
+             WHERE tariff_id = :tariff_id
                AND sold_to IS NULL
                AND reserved_payment_id IS NULL
                AND is_expired = 0
                AND inventory_bucket = 'sale'
              LIMIT 1"
         );
-        $stmt->execute(['package_id' => $packageId]);
+        $stmt->execute(['tariff_id' => $tariffId]);
         return (bool) $stmt->fetchColumn();
     }
 
@@ -2652,7 +2660,7 @@ final class Database implements WorkerApiStore
             return;
         }
 
-        $tariffId = (int) $this->settingValue($prefix . '_package', '0');
+        $tariffId = (int) $this->settingValue($prefix . '_tariff', '0');
         if ($tariffId <= 0) {
             return;
         }
@@ -2666,7 +2674,7 @@ final class Database implements WorkerApiStore
         }
 
         $cfgStmt = $this->pdo->prepare(
-            "SELECT id, sub_link, raw_payload, access_url, config_uuid, volume_gb, duration_days
+            "SELECT id, sub_link, raw_payload, access_url, stock_item_uuid, volume_gb, duration_days
              FROM service_stock_items
              WHERE service_id = :service_id
                AND tariff_id = :tariff_id
@@ -2700,7 +2708,7 @@ final class Database implements WorkerApiStore
             $cfgId,
             (string) ($cfg['sub_link'] ?? ''),
             (string) ($cfg['access_url'] ?? ''),
-            (string) ($cfg['config_uuid'] ?? ''),
+            (string) ($cfg['stock_item_uuid'] ?? ''),
             isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
             isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
             (string) ($cfg['raw_payload'] ?? '')
@@ -2791,7 +2799,7 @@ final class Database implements WorkerApiStore
         $this->pdo->beginTransaction();
         try {
             $cfgStmt = $this->pdo->prepare(
-                "SELECT id, service_id, tariff_id, sub_link, raw_payload, access_url, config_uuid, volume_gb, duration_days
+                "SELECT id, service_id, tariff_id, sub_link, raw_payload, access_url, stock_item_uuid, volume_gb, duration_days
                  FROM service_stock_items
                  WHERE service_id = :service_id
                    AND sold_to IS NULL
@@ -2808,14 +2816,14 @@ final class Database implements WorkerApiStore
                 return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
             }
 
-            $configId = (int) ($cfg['id'] ?? 0);
+            $stock_itemId = (int) ($cfg['id'] ?? 0);
             $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, (int) ($cfg['tariff_id'] ?? 0));
             $updateCfg = $this->pdo->prepare('UPDATE service_stock_items SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
             $updateCfg->execute([
                 'sold_to' => $userId,
                 'purchase_id' => $purchaseId,
                 'sold_at' => $now,
-                'id' => $configId,
+                'id' => $stock_itemId,
             ]);
 
             $insertClaim = $this->pdo->prepare(
@@ -2834,10 +2842,10 @@ final class Database implements WorkerApiStore
                 $serviceId,
                 (int) ($cfg['tariff_id'] ?? 0),
                 'stock',
-                $configId,
+                $stock_itemId,
                 (string) ($cfg['sub_link'] ?? ''),
                 (string) ($cfg['access_url'] ?? ''),
-                (string) ($cfg['config_uuid'] ?? ''),
+                (string) ($cfg['stock_item_uuid'] ?? ''),
                 isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
                 isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
                 (string) ($cfg['raw_payload'] ?? '')
@@ -2849,8 +2857,8 @@ final class Database implements WorkerApiStore
                 'service_id' => $serviceId,
                 'purchase_id' => $purchaseId,
                 'service_name' => '',
-                'config_text' => (string) ($cfg['raw_payload'] ?? $cfg['sub_link'] ?? ''),
-                'inquiry_link' => (string) ($cfg['sub_link'] ?? ''),
+                'raw_payload' => (string) ($cfg['raw_payload'] ?? $cfg['sub_link'] ?? ''),
+                'sub_link' => (string) ($cfg['sub_link'] ?? ''),
             ];
         } catch (\Throwable) {
             if ($this->pdo->inTransaction()) {

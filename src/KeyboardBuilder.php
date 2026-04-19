@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace ConfigFlow\Bot;
+namespace StockItemFlow\Bot;
 
 final class KeyboardBuilder
 {
     public static function buy(): string { return self::label('buttons.buy', 'buy'); }
-    public static function myConfigs(): string { return self::label('buttons.my_configs', 'my_configs'); }
+    public static function myStockItems(): string { return self::label('buttons.my_stock_items', 'my_stock_items'); }
     public static function freeTest(): string { return self::label('buttons.free_test', 'free_test'); }
     public static function profile(): string { return self::label('buttons.profile', 'profile'); }
     public static function wallet(): string { return self::label('buttons.wallet', 'wallet'); }
@@ -28,7 +28,7 @@ final class KeyboardBuilder
         if ($isAdmin) {
             $keyboard[] = [self::admin()];
         }
-        $keyboard[] = [self::myConfigs(), self::buy(), self::profile()];
+        $keyboard[] = [self::myStockItems(), self::buy(), self::profile()];
         $keyboard[] = $freeTestEnabled ? [self::freeTest(), self::support()] : [self::support()];
 
         return [
@@ -82,7 +82,7 @@ final class KeyboardBuilder
     public static function adminPanelReply(): array
     {
         $keyboard = [
-            [self::label('buttons.admin.types_packages', ''), self::label('buttons.admin.inventory', ''), self::label('buttons.admin.users', '')],
+            [self::label('buttons.admin.types_tariffs', ''), self::label('buttons.admin.inventory', ''), self::label('buttons.admin.users', '')],
             [self::label('buttons.admin.settings', '')],
             [self::label('buttons.admin.admins', ''), self::label('buttons.admin.broadcast', ''), self::label('buttons.admin.pins', '')],
             [self::label('buttons.admin.agencies', '')],
