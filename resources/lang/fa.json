@@ -1294,7 +1294,17 @@
         "service_tariff_edit": "✏️ ویرایش",
         "service_tariff_status": "📊 وضعیت",
         "service_tariffs_list": "🧾 تعرفه‌های سرویس",
-        "skip": "⏭ رد شدن"
+        "skip": "⏭ رد شدن",
+        "service_edit": "✏️ ویرایش",
+        "service_status": "📊 وضعیت",
+        "service_tariffs": "💳 تعرفه‌ها",
+        "service_inventory": "📚 موجودی",
+        "service_panel_bind": "🔌 اتصال پنل",
+        "service_toggle": "🔁 فعال/غیرفعال",
+        "service_delete": "🗑 حذف",
+        "service_tariff_add": "➕ افزودن",
+        "service_stock_add": "➕ افزودن موجودی",
+        "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس"
       },
       "errors": {
         "confirm_required": "❌ برای ثبت نهایی روی دکمه «✅ تایید» بزنید.",
@@ -1338,7 +1348,9 @@
         "tariff_fixed_row": "{volume_gb}گیگ/{duration_days}روز/{price}ت",
         "tariff_list_row": "{num}) تعرفه #{tariff_id} | {summary}",
         "tariff_option_button": "🎯 تعرفه #{tariff_id}",
-        "tariff_per_gb_row": "{min_volume_gb}-{max_volume_gb}گیگ قیمت/گیگ:{price_per_gb}"
+        "tariff_per_gb_row": "{min_volume_gb}-{max_volume_gb}گیگ قیمت/گیگ:{price_per_gb}",
+        "tariff_per_gb_detail_fixed_days": "📏 حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} تومان\n🧭 سیاست: {duration_policy}\n📅 روز: {duration_days}",
+        "tariff_per_gb_detail_unlimited": "📏 حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} تومان\n🧭 سیاست: {duration_policy}"
       },
       "messages": {
         "inventory_bridge_not_stock": "مدیریت موجودی فقط برای سرویس‌های انباری فعال است.",
