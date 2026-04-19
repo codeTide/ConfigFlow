@@ -21,14 +21,14 @@ final class MessageHandler
     private const ADMIN_SERVICE_INVENTORY = '[legacy] admin.types_packages.actions.service_inventory';
     private const ADMIN_SERVICE_PANEL_BIND = '[legacy] admin.types_packages.actions.service_panel_bind';
     private const ADMIN_SERVICE_TOGGLE = '[legacy] admin.types_packages.actions.service_toggle';
-    private const ADMIN_SERVICE_FREE_TEST = 'admin.types_packages.actions.service_free_test';
-    private const ADMIN_SERVICE_FREE_TEST_TOGGLE = 'admin.types_packages.actions.service_free_test_toggle';
-    private const ADMIN_SERVICE_FREE_TEST_MODE = 'admin.types_packages.actions.service_free_test_mode';
-    private const ADMIN_SERVICE_FREE_TEST_MAX = 'admin.types_packages.actions.service_free_test_max';
-    private const ADMIN_SERVICE_FREE_TEST_COOLDOWN = 'admin.types_packages.actions.service_free_test_cooldown';
-    private const ADMIN_SERVICE_FREE_TEST_RESET = 'admin.types_packages.actions.service_free_test_reset';
-    private const ADMIN_SERVICE_FREE_TEST_REFRESH = 'admin.types_packages.actions.service_free_test_refresh';
-    private const ADMIN_SERVICE_FREE_TEST_STOCK_ADD = 'admin.types_packages.actions.service_free_test_stock_add';
+    private const ADMIN_SERVICE_FREE_TEST = 'admin.services.actions.free_test';
+    private const ADMIN_SERVICE_FREE_TEST_TOGGLE = 'admin.services.actions.free_test_toggle';
+    private const ADMIN_SERVICE_FREE_TEST_MODE = 'admin.services.actions.free_test_mode';
+    private const ADMIN_SERVICE_FREE_TEST_MAX = 'admin.services.actions.free_test_max_claims';
+    private const ADMIN_SERVICE_FREE_TEST_COOLDOWN = 'admin.services.actions.free_test_cooldown';
+    private const ADMIN_SERVICE_FREE_TEST_RESET = 'admin.services.actions.free_test_reset';
+    private const ADMIN_SERVICE_FREE_TEST_REFRESH = 'admin.services.actions.free_test_status';
+    private const ADMIN_SERVICE_FREE_TEST_STOCK_ADD = 'admin.services.actions.free_test_stock_add';
     private const ADMIN_SERVICE_DELETE = '[legacy] admin.types_packages.actions.service_delete';
     private const ADMIN_SERVICE_TARIFF_ADD = '[legacy] admin.types_packages.actions.service_tariff_add';
     private const ADMIN_SERVICE_STOCK_ADD = '[legacy] admin.types_packages.actions.service_stock_add';
@@ -105,6 +105,10 @@ final class MessageHandler
     {
         if (str_starts_with($value, '[legacy] ')) {
             return $this->catalog->get(substr($value, 9));
+        }
+
+        if (str_contains($value, '.')) {
+            return $this->catalog->get($value);
         }
 
         return $value;
@@ -1678,27 +1682,27 @@ final class MessageHandler
                     (int) ($rule['max_claims'] ?? 1),
                     (int) ($rule['priority'] ?? 0)
                 );
-                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_rule_saved'));
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE)) {
                 $this->database->setUserState($userId, 'admin.service.free_test.mode', ['service_id' => $serviceId]);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.claim_mode'), $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.types_packages.prompts.free_test_wizard.mode_cooldown'), $this->catalog->get('admin.types_packages.prompts.free_test_wizard.mode_once')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.prompts.free_test_mode'), $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.services.prompts.free_test_mode_cooldown'), $this->catalog->get('admin.services.prompts.free_test_mode_once')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX)) {
                 $this->database->setUserState($userId, 'admin.service.free_test.max', ['service_id' => $serviceId]);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.max_claims'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.prompts.free_test_max_claims'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)) {
                 $this->database->setUserState($userId, 'admin.service.free_test.cooldown', ['service_id' => $serviceId]);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.cooldown_days'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.prompts.free_test_cooldown_days'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)) {
                 $this->database->setUserState($userId, 'admin.service.free_test.reset_user', ['service_id' => $serviceId]);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.reset_user'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.prompts.free_test_reset_user'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)) {
@@ -1717,14 +1721,14 @@ final class MessageHandler
                 $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
                 return;
             }
-            $mode = $text === $this->catalog->get('admin.types_packages.prompts.free_test_wizard.mode_cooldown') ? 'cooldown' : ($text === $this->catalog->get('admin.types_packages.prompts.free_test_wizard.mode_once') ? 'once_until_reset' : '');
+            $mode = $text === $this->catalog->get('admin.services.prompts.free_test_mode_cooldown') ? 'cooldown' : ($text === $this->catalog->get('admin.services.prompts.free_test_mode_once') ? 'once_until_reset' : '');
             if ($mode === '') {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_invalid_input'));
                 return;
             }
             $rule = $this->database->getFreeTestRuleForService($serviceId);
             $this->database->saveFreeTestRuleForService($serviceId, ((int) ($rule['is_enabled'] ?? 0)) === 1, $mode, isset($rule['cooldown_days']) ? (int) $rule['cooldown_days'] : null, (int) ($rule['max_claims'] ?? 1), (int) ($rule['priority'] ?? 0));
-            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_rule_saved'));
+            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
             return;
         }
 
@@ -1741,7 +1745,7 @@ final class MessageHandler
                     return;
                 }
                 $this->database->resetFreeTestQuotaForUser($targetUserId, $serviceId);
-                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_quota_reset', ['target_user_id' => $targetUserId]));
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_quota_reset', ['target_user_id' => $targetUserId]));
                 return;
             }
             $value = (int) preg_replace('/\D+/', '', $text);
@@ -1760,7 +1764,7 @@ final class MessageHandler
                 $mode = 'cooldown';
             }
             $this->database->saveFreeTestRuleForService($serviceId, ((int) ($rule['is_enabled'] ?? 0)) === 1, $mode, $cooldownDays, $maxClaims, (int) ($rule['priority'] ?? 0));
-            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_rule_saved'));
+            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
             return;
         }
 
@@ -1806,7 +1810,7 @@ final class MessageHandler
 
             $configPayload = "🔗 لینک ساب:\n{$subLink}\n\n🔐 لینک تکی:\n{$singleConfig}\n\n📦 حجم: {$volume}\n⏳ مدت: {$duration}";
             $configId = $this->database->addConfigForService($serviceId, null, $displayName, $configPayload, $subLink, 'free_test');
-            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_stock_added', ['config_id' => $configId]));
+            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_stock_added', ['config_id' => $configId]));
             return;
         }
 
@@ -2193,7 +2197,7 @@ final class MessageHandler
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.ui.open.service_free_test.overview', [
+            $this->messageRenderer->render('admin.services.messages.free_test_overview', [
                 'service_name' => (string) ($service['name'] ?? ''),
                 'is_enabled' => $isEnabledText,
                 'claim_mode' => $claimModeText,
@@ -3053,7 +3057,7 @@ final class MessageHandler
         ]);
 
         if ($step === 'confirm') {
-            $summary = $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.stock_preview_summary', [
+            $summary = $this->messageRenderer->render('admin.services.prompts.free_test_stock_confirm', [
                 'display_name' => htmlspecialchars((string) ($data['display_name'] ?? $this->catalog->get('messages.generic.dash'))),
                 'volume' => htmlspecialchars((string) ($data['volume'] ?? $this->catalog->get('messages.generic.dash'))),
                 'duration' => htmlspecialchars((string) ($data['duration'] ?? $this->catalog->get('messages.generic.dash'))),
@@ -3073,7 +3077,14 @@ final class MessageHandler
 
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.stock_' . $step),
+            $this->messageRenderer->render(match ($step) {
+                'display_name' => 'admin.services.prompts.free_test_stock_name',
+                'volume' => 'admin.services.prompts.free_test_stock_volume',
+                'duration' => 'admin.services.prompts.free_test_stock_duration',
+                'sub_link' => 'admin.services.prompts.free_test_stock_sub_link',
+                'single_config_link' => 'admin.services.prompts.free_test_stock_config_link',
+                default => 'admin.services.prompts.free_test_stock_name',
+            }),
             $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
         );
     }
