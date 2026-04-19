@@ -33,27 +33,32 @@ final class Database implements WorkerApiStore
     private function ensureRuntimeMigrations(): void
     {
         $this->pdo->exec(
-            "CREATE TABLE IF NOT EXISTS free_test_package_rules (
-                package_id BIGINT PRIMARY KEY,
+            "CREATE TABLE IF NOT EXISTS free_test_service_rules (
+                service_id BIGINT PRIMARY KEY,
+                is_enabled TINYINT(1) NOT NULL DEFAULT 0,
+                claim_mode ENUM('cooldown','once_until_reset') NOT NULL DEFAULT 'once_until_reset',
+                cooldown_days INT NULL,
                 max_claims INT NOT NULL DEFAULT 1,
-                cooldown_days INT NOT NULL DEFAULT 0,
-                is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                priority INT NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
-                INDEX idx_free_test_enabled (is_enabled)
+                INDEX idx_free_test_service_enabled (is_enabled),
+                INDEX idx_free_test_service_priority (priority)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         $this->pdo->exec(
-            "CREATE TABLE IF NOT EXISTS free_test_claims (
+            "CREATE TABLE IF NOT EXISTS free_test_service_claims (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 user_id BIGINT NOT NULL,
-                package_id BIGINT NOT NULL,
+                service_id BIGINT NOT NULL,
                 purchase_id BIGINT NOT NULL,
                 claimed_at DATETIME NOT NULL,
-                INDEX idx_free_test_claims_user_pkg (user_id, package_id),
-                INDEX idx_free_test_claims_pkg (package_id)
+                INDEX idx_free_test_service_claims_user_service (user_id, service_id),
+                INDEX idx_free_test_service_claims_service (service_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+        $this->pdo->exec("DROP TABLE IF EXISTS free_test_claims");
+        $this->pdo->exec("DROP TABLE IF EXISTS free_test_package_rules");
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS service (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -2791,143 +2796,228 @@ final class Database implements WorkerApiStore
         ]);
     }
 
-    public function listFreeTestRules(): array
+    public function getFreeTestRuleForService(int $serviceId): ?array
     {
-        $stmt = $this->pdo->query(
-            "SELECT r.package_id, r.max_claims, r.cooldown_days, r.is_enabled, p.name AS package_name
-             FROM free_test_package_rules r
-             LEFT JOIN packages p ON p.id = r.package_id
-             ORDER BY r.package_id ASC"
+        $stmt = $this->pdo->prepare(
+            'SELECT service_id, is_enabled, claim_mode, cooldown_days, max_claims, priority, created_at, updated_at
+             FROM free_test_service_rules
+             WHERE service_id = :service_id
+             LIMIT 1'
         );
-        return $stmt->fetchAll();
+        $stmt->execute(['service_id' => $serviceId]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
     }
 
-    public function saveFreeTestRule(int $packageId, int $maxClaims, int $cooldownDays, bool $enabled): void
+    public function saveFreeTestRuleForService(int $serviceId, bool $isEnabled, string $claimMode, ?int $cooldownDays, int $maxClaims = 1, int $priority = 0): void
     {
-        $maxClaims = max(0, $maxClaims);
-        $cooldownDays = max(0, $cooldownDays);
+        $claimMode = $claimMode === 'cooldown' ? 'cooldown' : 'once_until_reset';
+        $maxClaims = max(1, $maxClaims);
+        $cooldownDays = $claimMode === 'cooldown' ? max(1, (int) ($cooldownDays ?? 0)) : null;
         $now = gmdate('Y-m-d H:i:s');
+
         $stmt = $this->pdo->prepare(
-            'INSERT INTO free_test_package_rules (package_id, max_claims, cooldown_days, is_enabled, created_at, updated_at)
-             VALUES (:package_id, :max_claims, :cooldown_days, :is_enabled, :created_at, :updated_at)
+            'INSERT INTO free_test_service_rules (service_id, is_enabled, claim_mode, cooldown_days, max_claims, priority, created_at, updated_at)
+             VALUES (:service_id, :is_enabled, :claim_mode, :cooldown_days, :max_claims, :priority, :created_at, :updated_at)
              ON DUPLICATE KEY UPDATE
-                max_claims = VALUES(max_claims),
-                cooldown_days = VALUES(cooldown_days),
                 is_enabled = VALUES(is_enabled),
+                claim_mode = VALUES(claim_mode),
+                cooldown_days = VALUES(cooldown_days),
+                max_claims = VALUES(max_claims),
+                priority = VALUES(priority),
                 updated_at = VALUES(updated_at)'
         );
         $stmt->execute([
-            'package_id' => $packageId,
-            'max_claims' => $maxClaims,
+            'service_id' => $serviceId,
+            'is_enabled' => $isEnabled ? 1 : 0,
+            'claim_mode' => $claimMode,
             'cooldown_days' => $cooldownDays,
-            'is_enabled' => $enabled ? 1 : 0,
+            'max_claims' => $maxClaims,
+            'priority' => $priority,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
     }
 
-    public function resetFreeTestQuota(int $targetUserId): void
+    public function listEnabledFreeTestServices(bool $onlyEligibleForUser = false, ?int $userId = null): array
     {
-        $stmt = $this->pdo->prepare('DELETE FROM free_test_claims WHERE user_id = :user_id');
-        $stmt->execute(['user_id' => $targetUserId]);
+        $stmt = $this->pdo->query(
+            "SELECT s.id AS service_id, s.name AS service_name, s.mode, s.is_active,
+                    r.is_enabled, r.claim_mode, r.cooldown_days, r.max_claims, r.priority,
+                    (SELECT COUNT(*) FROM configs c WHERE c.service_id = s.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0) AS available_stock,
+                    (SELECT COUNT(*) FROM free_test_service_claims fc WHERE fc.service_id = s.id) AS total_claims
+             FROM free_test_service_rules r
+             JOIN service s ON s.id = r.service_id
+             WHERE r.is_enabled = 1
+             ORDER BY r.priority DESC, s.id ASC"
+        );
+        $rows = $stmt->fetchAll();
+        if (!$onlyEligibleForUser || $userId === null || $userId <= 0) {
+            return $rows;
+        }
+
+        $eligible = [];
+        foreach ($rows as $row) {
+            $serviceId = (int) ($row['service_id'] ?? 0);
+            if ($serviceId <= 0) {
+                continue;
+            }
+            if ($this->canUserClaimFreeTestForService($userId, $serviceId, $row)) {
+                $eligible[] = $row;
+            }
+        }
+        return $eligible;
     }
 
-    public function claimFreeTest(int $userId): array
+    public function claimFreeTestForService(int $userId, int $serviceId): array
     {
-        $rules = $this->listFreeTestRules();
-        if ($rules === []) {
-            return ['ok' => false, 'error' => 'no_rule'];
+        $rule = $this->getFreeTestRuleForService($serviceId);
+        if (!$this->canUserClaimFreeTestForService($userId, $serviceId, $rule)) {
+            return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
         }
 
         $now = gmdate('Y-m-d H:i:s');
-        foreach ($rules as $rule) {
-            if ((int) ($rule['is_enabled'] ?? 0) !== 1) {
-                continue;
-            }
-            $packageId = (int) ($rule['package_id'] ?? 0);
-            if ($packageId <= 0) {
-                continue;
-            }
-
-            $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_claims WHERE user_id = :user_id AND package_id = :package_id');
-            $countStmt->execute(['user_id' => $userId, 'package_id' => $packageId]);
-            $claimCount = (int) $countStmt->fetchColumn();
-            $maxClaims = (int) ($rule['max_claims'] ?? 1);
-            if ($maxClaims > 0 && $claimCount >= $maxClaims) {
-                continue;
-            }
-
-            $cooldownDays = (int) ($rule['cooldown_days'] ?? 0);
-            if ($cooldownDays > 0) {
-                $lastStmt = $this->pdo->prepare(
-                    'SELECT claimed_at FROM free_test_claims WHERE user_id = :user_id AND package_id = :package_id ORDER BY id DESC LIMIT 1'
-                );
-                $lastStmt->execute(['user_id' => $userId, 'package_id' => $packageId]);
-                $lastAt = (string) ($lastStmt->fetchColumn() ?: '');
-                if ($lastAt !== '') {
-                    $lastTs = strtotime($lastAt);
-                    if ($lastTs !== false) {
-                        $nextAllowed = strtotime('+' . $cooldownDays . ' days', $lastTs);
-                        if ($nextAllowed !== false && time() < $nextAllowed) {
-                            continue;
-                        }
-                    }
-                }
+        $this->pdo->beginTransaction();
+        try {
+            $cfgStmt = $this->pdo->prepare(
+                'SELECT id, service_id, tariff_id, service_name, config_text, inquiry_link
+                 FROM configs
+                 WHERE service_id = :service_id
+                   AND sold_to IS NULL
+                   AND reserved_payment_id IS NULL
+                   AND is_expired = 0
+                 ORDER BY id ASC
+                 LIMIT 1 FOR UPDATE'
+            );
+            $cfgStmt->execute(['service_id' => $serviceId]);
+            $cfg = $cfgStmt->fetch();
+            if (!is_array($cfg)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
             }
 
-            $this->pdo->beginTransaction();
-            try {
-                $cfgStmt = $this->pdo->prepare(
-                    'SELECT id, service_name, config_text, inquiry_link
-                     FROM configs
-                     WHERE package_id = :package_id AND sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired = 0
-                     ORDER BY id ASC LIMIT 1 FOR UPDATE'
-                );
-                $cfgStmt->execute(['package_id' => $packageId]);
-                $cfg = $cfgStmt->fetch();
-                if (!is_array($cfg)) {
-                    $this->pdo->rollBack();
-                    continue;
-                }
+            $configId = (int) ($cfg['id'] ?? 0);
+            $purchaseId = $this->createPurchase($userId, null, $configId, 0, 'free_test', true, $serviceId, (int) ($cfg['tariff_id'] ?? 0));
+            $updateCfg = $this->pdo->prepare('UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
+            $updateCfg->execute([
+                'sold_to' => $userId,
+                'purchase_id' => $purchaseId,
+                'sold_at' => $now,
+                'id' => $configId,
+            ]);
 
-                $configId = (int) ($cfg['id'] ?? 0);
-                $purchaseId = $this->createPurchase($userId, $packageId, $configId, 0, 'free_test', true);
-                $updateCfg = $this->pdo->prepare('UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
-                $updateCfg->execute([
-                    'sold_to' => $userId,
-                    'purchase_id' => $purchaseId,
-                    'sold_at' => $now,
-                    'id' => $configId,
-                ]);
+            $insertClaim = $this->pdo->prepare(
+                'INSERT INTO free_test_service_claims (user_id, service_id, purchase_id, claimed_at)
+                 VALUES (:user_id, :service_id, :purchase_id, :claimed_at)'
+            );
+            $insertClaim->execute([
+                'user_id' => $userId,
+                'service_id' => $serviceId,
+                'purchase_id' => $purchaseId,
+                'claimed_at' => $now,
+            ]);
 
-                $insertClaim = $this->pdo->prepare(
-                    'INSERT INTO free_test_claims (user_id, package_id, purchase_id, claimed_at)
-                     VALUES (:user_id, :package_id, :purchase_id, :claimed_at)'
-                );
-                $insertClaim->execute([
-                    'user_id' => $userId,
-                    'package_id' => $packageId,
-                    'purchase_id' => $purchaseId,
-                    'claimed_at' => $now,
-                ]);
-
-                $this->pdo->commit();
-                return [
-                    'ok' => true,
-                    'package_id' => $packageId,
-                    'purchase_id' => $purchaseId,
-                    'service_name' => (string) ($cfg['service_name'] ?? ''),
-                    'config_text' => (string) ($cfg['config_text'] ?? ''),
-                    'inquiry_link' => (string) ($cfg['inquiry_link'] ?? ''),
-                ];
-            } catch (\Throwable $e) {
-                if ($this->pdo->inTransaction()) {
-                    $this->pdo->rollBack();
-                }
+            $this->pdo->commit();
+            return [
+                'ok' => true,
+                'service_id' => $serviceId,
+                'purchase_id' => $purchaseId,
+                'service_name' => (string) ($cfg['service_name'] ?? ''),
+                'config_text' => (string) ($cfg['config_text'] ?? ''),
+                'inquiry_link' => (string) ($cfg['inquiry_link'] ?? ''),
+            ];
+        } catch (\Throwable) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
             }
+            return ['ok' => false, 'error' => 'claim_failed'];
+        }
+    }
+
+    public function resetFreeTestQuotaForUser(int $userId, ?int $serviceId = null): void
+    {
+        if ($serviceId !== null && $serviceId > 0) {
+            $stmt = $this->pdo->prepare('DELETE FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
+            $stmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
+            return;
         }
 
-        return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
+        $stmt = $this->pdo->prepare('DELETE FROM free_test_service_claims WHERE user_id = :user_id');
+        $stmt->execute(['user_id' => $userId]);
+    }
+
+    public function resetFreeTestQuotaForService(int $serviceId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM free_test_service_claims WHERE service_id = :service_id');
+        $stmt->execute(['service_id' => $serviceId]);
+    }
+
+    public function countAvailableFreeTestServices(int $userId): int
+    {
+        return count($this->listEnabledFreeTestServices(true, $userId));
+    }
+
+    public function countFreeTestClaimsForService(int $serviceId): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE service_id = :service_id');
+        $stmt->execute(['service_id' => $serviceId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    private function canUserClaimFreeTestForService(int $userId, int $serviceId, ?array $rule = null): bool
+    {
+        if ($userId <= 0 || $serviceId <= 0) {
+            return false;
+        }
+        $rule ??= $this->getFreeTestRuleForService($serviceId);
+        if (!is_array($rule) || (int) ($rule['is_enabled'] ?? 0) !== 1) {
+            return false;
+        }
+
+        $service = $this->getService($serviceId);
+        if (!is_array($service) || (int) ($service['is_active'] ?? 0) !== 1 || (string) ($service['mode'] ?? '') !== 'stock') {
+            return false;
+        }
+
+        if ($this->countAvailableConfigsByService($serviceId) <= 0) {
+            return false;
+        }
+
+        $claimMode = (string) ($rule['claim_mode'] ?? 'once_until_reset');
+        $maxClaims = max(1, (int) ($rule['max_claims'] ?? 1));
+        $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
+        $countStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
+        $claimCount = (int) $countStmt->fetchColumn();
+
+        if ($claimMode === 'once_until_reset') {
+            return $claimCount < 1;
+        }
+
+        if ($claimCount < $maxClaims) {
+            return true;
+        }
+
+        $cooldownDays = max(1, (int) ($rule['cooldown_days'] ?? 0));
+        if ($cooldownDays <= 0) {
+            return false;
+        }
+        $lastStmt = $this->pdo->prepare(
+            'SELECT claimed_at
+             FROM free_test_service_claims
+             WHERE user_id = :user_id AND service_id = :service_id
+             ORDER BY id DESC LIMIT 1'
+        );
+        $lastStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
+        $lastAt = (string) ($lastStmt->fetchColumn() ?: '');
+        if ($lastAt === '') {
+            return true;
+        }
+        $lastTs = strtotime($lastAt);
+        if ($lastTs === false) {
+            return true;
+        }
+        $nextAllowed = strtotime('+' . $cooldownDays . ' days', $lastTs);
+        return $nextAllowed !== false && time() >= $nextAllowed;
     }
 
     public function getServiceByCode(string $serviceCode): ?array
