@@ -158,6 +158,10 @@ final class MessageHandler
         }
 
         $state = $this->database->getUserState($userId);
+        if ($this->handleGlobalReplyKeyboardInput($chatId, $userId, $text, $state)) {
+            return;
+        }
+
         if ($state === null) {
             if ($this->handleMainReplyKeyboardInput($chatId, $messageId, $userId, $fromUser, $text)) {
                 return;
@@ -1193,10 +1197,47 @@ final class MessageHandler
         }
     }
 
+    private function handleGlobalReplyKeyboardInput(int $chatId, int $userId, string $text, ?array $state): bool
+    {
+        if ($text === '' || str_starts_with($text, '/')) {
+            return false;
+        }
+
+        if ($this->isMainMenuInput($text)) {
+            if ($state !== null) {
+                $this->database->clearUserState($userId);
+            }
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return true;
+        }
+
+        if (($text === KeyboardBuilder::admin() || $text === $this->catalog->get('admin.common.back_to_panel'))
+            && $this->database->isAdminUser($userId)) {
+            if ($state !== null) {
+                $this->database->clearUserState($userId);
+            }
+            $this->openAdminRoot($chatId, $userId);
+            return true;
+        }
+
+        return false;
+    }
+
     private function handleMainReplyKeyboardInput(int $chatId, int $messageId, int $userId, array $fromUser, string $text): bool
     {
         if ($text === '' || str_starts_with($text, '/')) {
             return false;
+        }
+
+        if ($text === KeyboardBuilder::admin() && $this->database->isAdminUser($userId)) {
+            $this->openAdminRoot($chatId, $userId);
+            return true;
+        }
+
+        if ($text === KeyboardBuilder::backMain() || $text === UiLabels::main($this->catalog)) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return true;
         }
 
         if ($text === KeyboardBuilder::profile()) {
@@ -1338,7 +1379,8 @@ final class MessageHandler
         }
 
         if ($this->isMainMenuInput($text)) {
-            $this->openAdminRoot($chatId, $userId);
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
         if ($text === UiLabels::back($this->catalog)) {
