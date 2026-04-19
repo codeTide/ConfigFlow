@@ -1643,7 +1643,7 @@ final class MessageHandler
             $created = $this->database->getService($serviceId);
             $serviceCode = is_array($created) ? (string) ($created['service_code'] ?? (string) $serviceId) : (string) $serviceId;
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.success.service_created', ['service_id' => $serviceCode]));
-            $this->openAdminServiceView($chatId, $userId, 0, $serviceId);
+            $this->database->setUserState($userId, 'admin.service.landing', ['stack' => ['admin.root']]);
             return;
         }
 
@@ -2108,7 +2108,7 @@ final class MessageHandler
             ],
         ];
         if ($mode === 'stock') {
-            $buttons[] = [$this->uiConst(self::ADMIN_SERVICE_INVENTORY), $this->uiConst(self::ADMIN_SERVICE_STOCK_ADD)];
+            $buttons[] = [$this->uiConst(self::ADMIN_SERVICE_INVENTORY)];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
 
@@ -2119,9 +2119,12 @@ final class MessageHandler
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
+        $templateKey = $mode === 'stock'
+            ? 'admin.ui.open.service_view.overview_stock'
+            : 'admin.ui.open.service_view.overview';
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.ui.open.service_view.overview', [
+            $this->messageRenderer->render($templateKey, [
                 'service_name' => (string) ($service['name'] ?? $this->catalog->get('messages.generic.dash')),
                 'service_id' => (string) ($service['service_code'] ?? $serviceId),
                 'mode_text' => $modeText,
