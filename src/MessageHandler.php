@@ -1315,13 +1315,13 @@ final class MessageHandler
             $inquiryLink = trim((string) ($claim['sub_link'] ?? ''));
             $msg = $this->catalog->get('messages.user.free_test.ready', [
                 'service_name' => $serviceName,
-                'raw_payload' => $stock_itemText,
+                'config_text' => $stock_itemText,
             ]);
             if ($inquiryLink !== '') {
                 $msg = $this->catalog->get('messages.user.free_test.ready_with_inquiry', [
                     'service_name' => $serviceName,
-                    'raw_payload' => $stock_itemText,
-                    'sub_link' => htmlspecialchars($inquiryLink),
+                    'config_text' => $stock_itemText,
+                    'inquiry_link' => htmlspecialchars($inquiryLink),
                 ]);
             }
         $this->telegram->sendMessage($chatId, $msg);
@@ -1850,9 +1850,25 @@ final class MessageHandler
                 return;
             }
 
-            $stock_itemPayload = "🔗 لینک ساب:\n{$subLink}\n\n🔐 لینک تکی:\n{$singleStockItem}\n\n📦 حجم: {$volume}\n⏳ مدت: {$duration}";
-            $stock_itemId = $this->database->addStockItemForService($serviceId, null, $serviceName, $stock_itemPayload, $subLink, 'free_test');
-            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_stock_added', ['stock_item_id' => $stock_itemId]));
+            $volumeGb = (float) str_replace(',', '.', $volume);
+            $durationDays = $duration === 'نامحدود' ? null : (int) preg_replace('/\D+/', '', $duration);
+            $stock_itemId = $this->database->addStockItemForService(
+                $serviceId,
+                null,
+                $serviceName,
+                '',
+                $subLink,
+                'free_test',
+                $volumeGb > 0 ? $volumeGb : null,
+                $durationDays !== null && $durationDays > 0 ? $durationDays : null,
+                $singleStockItem
+            );
+            $this->database->setUserState($userId, 'admin.service.free_test.view', ['service_id' => $serviceId]);
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->messageRenderer->render('admin.services.success.free_test_stock_added', ['stock_item_id' => $stock_itemId]),
+                $this->adminServiceFreeTestKeyboard()
+            );
             return;
         }
 
@@ -2249,14 +2265,19 @@ final class MessageHandler
                 'stock_count' => $this->toPersianNumber((string) $stockCount),
             ])
             ,
-            $this->uiKeyboard->replyMenu([
-                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)],
-                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)],
-                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)],
-                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)],
-                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-            ])
+            $this->adminServiceFreeTestKeyboard()
         );
+    }
+
+    private function adminServiceFreeTestKeyboard(): array
+    {
+        return $this->uiKeyboard->replyMenu([
+            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)],
+            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)],
+            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)],
+            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)],
+            [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+        ]);
     }
 
     /** @param array<string,mixed> $data */
