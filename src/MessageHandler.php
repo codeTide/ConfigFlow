@@ -787,7 +787,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_tariff') {
-            if (!in_array($userId, StockItem::adminIds(), true)) {
+            if (!in_array($userId, Config::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -833,7 +833,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_add_stock_item') {
-            if (!in_array($userId, StockItem::adminIds(), true)) {
+            if (!in_array($userId, Config::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
