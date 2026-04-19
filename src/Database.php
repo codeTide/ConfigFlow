@@ -2925,6 +2925,25 @@ final class Database implements WorkerApiStore
         if ($claimCount < $maxClaims) {
             return true;
         }
+        $rule ??= $this->getFreeTestRuleForService($serviceId);
+        if (!is_array($rule) || (int) ($rule['is_enabled'] ?? 0) !== 1) {
+            return false;
+        }
+
+        $service = $this->getService($serviceId);
+        if (!is_array($service) || (int) ($service['is_active'] ?? 0) !== 1 || (string) ($service['mode'] ?? '') !== 'stock') {
+            return false;
+        }
+
+        if ($this->countAvailableConfigsByService($serviceId) <= 0) {
+            return false;
+        }
+
+        $claimMode = (string) ($rule['claim_mode'] ?? 'once_until_reset');
+        $maxClaims = max(1, (int) ($rule['max_claims'] ?? 1));
+        $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
+        $countStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
+        $claimCount = (int) $countStmt->fetchColumn();
 
         $cooldownDays = max(1, (int) ($rule['cooldown_days'] ?? 0));
         if ($cooldownDays <= 0) {
