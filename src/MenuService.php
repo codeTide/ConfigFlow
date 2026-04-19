@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ConfigFlow\Bot;
+namespace StockItemFlow\Bot;
 
 final class MenuService
 {
@@ -170,7 +170,7 @@ final class MenuService
         }
 
         $stats = $this->database->referralStats($userId);
-        $botUsername = Config::botUsername();
+        $botUsername = StockItem::botUsername();
         $refLink = $botUsername !== '' ? "https://t.me/{$botUsername}?start=ref_{$userId}" : "ref_{$userId}";
         $totalReferralsFa = $this->toPersianDigits((string) ($stats['total_referrals'] ?? 0));
         $purchaseCountFa = $this->toPersianDigits((string) ($stats['purchase_count'] ?? 0));
@@ -201,7 +201,7 @@ final class MenuService
 
     public function referralShareUrl(int $userId): string
     {
-        $botUsername = Config::botUsername();
+        $botUsername = StockItem::botUsername();
         if ($botUsername === '') {
             return '';
         }
