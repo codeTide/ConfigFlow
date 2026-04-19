@@ -21,6 +21,13 @@ final class MessageHandler
     private const ADMIN_SERVICE_INVENTORY = '[legacy] admin.types_packages.actions.service_inventory';
     private const ADMIN_SERVICE_PANEL_BIND = '[legacy] admin.types_packages.actions.service_panel_bind';
     private const ADMIN_SERVICE_TOGGLE = '[legacy] admin.types_packages.actions.service_toggle';
+    private const ADMIN_SERVICE_FREE_TEST = '[legacy] admin.types_packages.actions.service_free_test';
+    private const ADMIN_SERVICE_FREE_TEST_TOGGLE = '[legacy] admin.types_packages.actions.service_free_test_toggle';
+    private const ADMIN_SERVICE_FREE_TEST_MODE = '[legacy] admin.types_packages.actions.service_free_test_mode';
+    private const ADMIN_SERVICE_FREE_TEST_MAX = '[legacy] admin.types_packages.actions.service_free_test_max';
+    private const ADMIN_SERVICE_FREE_TEST_COOLDOWN = '[legacy] admin.types_packages.actions.service_free_test_cooldown';
+    private const ADMIN_SERVICE_FREE_TEST_RESET = '[legacy] admin.types_packages.actions.service_free_test_reset';
+    private const ADMIN_SERVICE_FREE_TEST_REFRESH = '[legacy] admin.types_packages.actions.service_free_test_refresh';
     private const ADMIN_SERVICE_DELETE = '[legacy] admin.types_packages.actions.service_delete';
     private const ADMIN_SERVICE_TARIFF_ADD = '[legacy] admin.types_packages.actions.service_tariff_add';
     private const ADMIN_SERVICE_STOCK_ADD = '[legacy] admin.types_packages.actions.service_stock_add';
@@ -50,7 +57,6 @@ final class MessageHandler
     private const ADMIN_SETTINGS_REFRESH = '[legacy] admin.settings_admins_pins.actions.settings_refresh';
     private const ADMIN_SETTINGS_EDIT = '[legacy] admin.settings_admins_pins.actions.settings_edit';
     private const ADMIN_SETTINGS_TOGGLE_BOT = '[legacy] admin.settings_admins_pins.actions.settings_toggle_bot';
-    private const ADMIN_SETTINGS_TOGGLE_FREE_TEST = '[legacy] admin.settings_admins_pins.actions.settings_toggle_free_test';
     private const ADMIN_SETTINGS_TOGGLE_AGENCY = '[legacy] admin.settings_admins_pins.actions.settings_toggle_agency';
     private const ADMIN_SETTINGS_TOGGLE_GW_CARD = '[legacy] admin.settings_admins_pins.actions.settings_toggle_gw_card';
     private const ADMIN_SETTINGS_TOGGLE_GW_CRYPTO = '[legacy] admin.settings_admins_pins.actions.settings_toggle_gw_crypto';
@@ -78,8 +84,6 @@ final class MessageHandler
     private const ADMIN_DELIVERY_DO = '[legacy] admin.final_modules.actions.delivery_do';
     private const ADMIN_GROUPOPS_SET_GROUP = '[legacy] admin.final_modules.actions.groupops_set_group';
     private const ADMIN_GROUPOPS_RESTORE = '[legacy] admin.final_modules.actions.groupops_restore';
-    private const ADMIN_FREETEST_RULE = '[legacy] admin.final_modules.actions.freetest_rule';
-    private const ADMIN_FREETEST_RESET = '[legacy] admin.final_modules.actions.freetest_reset';
 
     public function __construct(
         private Database $database,
@@ -266,6 +270,11 @@ final class MessageHandler
             || $state['state_name'] === 'admin.service.inventory'
             || $state['state_name'] === 'admin.service.inventory.add'
             || $state['state_name'] === 'admin.service.inventory.detail'
+            || $state['state_name'] === 'admin.service.free_test.view'
+            || $state['state_name'] === 'admin.service.free_test.mode'
+            || $state['state_name'] === 'admin.service.free_test.max'
+            || $state['state_name'] === 'admin.service.free_test.cooldown'
+            || $state['state_name'] === 'admin.service.free_test.reset_user'
         ) {
             $this->handleAdminServicesState($chatId, $userId, $text, $state);
             return;
@@ -323,9 +332,6 @@ final class MessageHandler
             || $state['state_name'] === 'admin.delivery.review'
             || $state['state_name'] === 'admin.groupops.view'
             || $state['state_name'] === 'admin.groupops.action'
-            || $state['state_name'] === 'admin.freetest.menu'
-            || $state['state_name'] === 'admin.freetest.rule'
-            || $state['state_name'] === 'admin.freetest.reset'
         ) {
             $this->handleAdminFinalModulesState($chatId, $userId, $text, $state, $message);
             return;
@@ -699,38 +705,28 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_admin_free_test_rule') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+        if ($state['state_name'] === 'user.free_test.await_service') {
+            if ($this->isMainMenuInput($text)) {
                 $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
                 return;
             }
-            $parts = array_map('trim', explode('|', $text));
-            $packageId = (int) ($parts[0] ?? 0);
-            $maxClaims = (int) ($parts[1] ?? 1);
-            $cooldownDays = (int) ($parts[2] ?? 0);
-            if ($packageId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_freetest_rule_format'));
-                return;
-            }
-            $this->database->saveFreeTestRule($packageId, $maxClaims, $cooldownDays, true);
-            $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.freetest_rule_saved'));
-            return;
-        }
-
-        if ($state['state_name'] === 'await_admin_free_test_reset_user') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+            if ($text === UiLabels::back($this->catalog)) {
                 $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
                 return;
             }
-            $targetUserId = (int) preg_replace('/\D+/', '', $text);
-            if ($targetUserId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.valid_numeric_user_id_required'));
+            $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
+            $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
+            $selected = $this->extractOptionKey($text);
+            $serviceId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+            if ($serviceId <= 0) {
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.common.invalid_option'));
                 return;
             }
-            $this->database->resetFreeTestQuota($targetUserId);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.freetest_user_quota_reset', ['target_user_id' => $targetUserId]));
+            $claim = $this->database->claimFreeTestForService($userId, $serviceId);
+            $this->sendFreeTestClaimResult($chatId, $claim);
             return;
         }
 
@@ -1280,17 +1276,33 @@ final class MessageHandler
         }
 
         if ($text === KeyboardBuilder::freeTest()) {
-            if ($this->settings->get('free_test_enabled', '1') !== '1') {
-                return false;
-            }
-            $claim = $this->database->claimFreeTest($userId);
-            if (($claim['ok'] ?? false) !== true) {
+            $eligibleServices = $this->database->listEnabledFreeTestServices(true, $userId);
+            if ($eligibleServices === []) {
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->catalog->get('messages.user.free_test.not_available')
                 );
                 return true;
             }
+            if (count($eligibleServices) === 1) {
+                $claim = $this->database->claimFreeTestForService($userId, (int) ($eligibleServices[0]['service_id'] ?? 0));
+                $this->sendFreeTestClaimResult($chatId, $claim);
+                return true;
+            }
+            $this->openUserFreeTestServiceSelection($chatId, $userId, $eligibleServices);
+            return true;
+        }
+
+        return false;
+    }
+
+    private function sendFreeTestClaimResult(int $chatId, array $claim): void
+    {
+        if (($claim['ok'] ?? false) !== true) {
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.not_available'));
+            return;
+        }
+
             $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? $this->catalog->get('messages.user.free_test.default_service')));
             $configText = htmlspecialchars((string) ($claim['config_text'] ?? ''));
             $inquiryLink = trim((string) ($claim['inquiry_link'] ?? ''));
@@ -1305,132 +1317,38 @@ final class MessageHandler
                     'inquiry_link' => htmlspecialchars($inquiryLink),
                 ]);
             }
-            $this->telegram->sendMessage($chatId, $msg);
-            return true;
-        }
-
-        if ($text === KeyboardBuilder::agency()) {
-            if ($this->settings->get('agency_request_enabled', '1') !== '1') {
-                return false;
-            }
-            $this->database->setUserState($userId, 'await_agency_request');
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->catalog->get('messages.user.agency.request_intro')
-            );
-            return true;
-        }
-
-        if ($text === KeyboardBuilder::admin()) {
-            if (!$this->database->isAdminUser($userId)) {
-                return false;
-            }
-            $this->openAdminRoot($chatId, $userId);
-            return true;
-        }
-
-        if ($text === $this->catalog->get('admin.common.back_to_panel')) {
-            if (!$this->database->isAdminUser($userId)) {
-                return false;
-            }
-            $this->database->clearUserState($userId);
-            $this->openAdminRoot($chatId, $userId);
-            return true;
-        }
-
-        if ($this->database->isAdminUser($userId)) {
-            if ($text === $this->catalog->get('buttons.admin.settings')) {
-                $this->openAdminSettingsView($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.admins')) {
-                $this->openAdminAdminsList($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.pins')) {
-                $this->openAdminPinsList($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.agencies')) {
-                $this->openAdminAgentsList($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.broadcast')) {
-                $this->openAdminBroadcastCompose($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.delivery')) {
-                $this->openAdminDeliveriesList($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.backup_topics')) {
-                $this->openAdminGroupOpsView($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.free_test')) {
-                $this->openAdminFreeTestMenu($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.charges')) {
-                $this->openAdminPaymentsList($chatId, $userId);
-                return true;
-            }
-            if ($text === $this->catalog->get('buttons.admin.requests')) {
-                $this->openAdminRequestsList($chatId, $userId);
-                return true;
-            }
-            if (preg_match('/^(' . preg_quote($this->catalog->get('admin.ui.payment_approve_prefix_regex'), '/') . '|' . preg_quote($this->catalog->get('admin.ui.payment_reject_prefix_regex'), '/') . ')\s*#(\d+)$/u', $text, $m) === 1) {
-                $paymentId = (int) ($m[2] ?? 0);
-                if ($paymentId > 0) {
-                    $this->openAdminPaymentView(
-                        $chatId,
-                        $userId,
-                        $paymentId,
-                        $this->messageRenderer->render('admin.common.legacy_button_payment')
-                    );
-                    return true;
-                }
-            }
-            if (preg_match('/^' . preg_quote($this->catalog->get('admin.common.legacy_free_request_prefix'), '/') . '\s*#(\d+)$/u', $text, $m) === 1) {
-                $requestId = (int) ($m[1] ?? 0);
-                if ($requestId > 0) {
-                    $this->openAdminRequestView(
-                        $chatId,
-                        $userId,
-                        'free',
-                        $requestId,
-                        'pending',
-                        $this->messageRenderer->render('admin.common.legacy_button_request')
-                    );
-                    return true;
-                }
-            }
-            if (preg_match('/^' . preg_quote($this->catalog->get('admin.common.legacy_agency_request_prefix'), '/') . '\s*#(\d+)$/u', $text, $m) === 1) {
-                $requestId = (int) ($m[1] ?? 0);
-                if ($requestId > 0) {
-                    $this->openAdminRequestView(
-                        $chatId,
-                        $userId,
-                        'agency',
-                        $requestId,
-                        'pending',
-                        $this->messageRenderer->render('admin.common.legacy_button_request')
-                    );
-                    return true;
-                }
-            }
-        }
-
-        if ($text === KeyboardBuilder::backMain()) {
-            $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
-            return true;
-        }
-
-        return false;
+        $this->telegram->sendMessage($chatId, $msg);
     }
 
-    private function startBuyTypeReplyFlow(int $chatId, int $userId): void
+    /** @param array<int,array<string,mixed>> $eligibleServices */
+    private function openUserFreeTestServiceSelection(int $chatId, int $userId, array $eligibleServices): void
+    {
+        $lines = [];
+        $options = [];
+        $buttons = [];
+        foreach (array_values($eligibleServices) as $idx => $service) {
+            $num = (string) ($idx + 1);
+            $serviceId = (int) ($service['service_id'] ?? 0);
+            if ($serviceId <= 0) {
+                continue;
+            }
+            $name = (string) ($service['service_name'] ?? '');
+            $lines[] = $this->catalog->get('messages.user.free_test.service_selection.row', ['num' => $num, 'name' => htmlspecialchars($name)]);
+            $options[$num] = $serviceId;
+            $buttons[] = [$this->catalog->get('messages.user.free_test.service_selection.button', ['num' => $num, 'name' => $name])];
+        }
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $this->database->setUserState($userId, 'user.free_test.await_service', ['options' => $options]);
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->messageRenderer->render('messages.user.free_test.service_selection.overview', [
+                'services' => implode("\n", $lines),
+            ], ['services']),
+            $this->uiKeyboard->replyMenu($buttons)
+        );
+    }
+
+        private function startBuyTypeReplyFlow(int $chatId, int $userId): void
     {
         if ($this->settings->get('shop_open', '1') !== '1') {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.shop_closed'));
@@ -1468,7 +1386,6 @@ final class MessageHandler
                 $this->catalog->get('buttons.admin.inventory') => 'admin:stock',
                 $this->catalog->get('buttons.admin.users') => 'admin:users',
                 $this->catalog->get('buttons.admin.settings') => 'admin:settings',
-                $this->catalog->get('buttons.admin.free_test') => 'admin:free_test:menu',
                 $this->catalog->get('buttons.admin.admins') => 'admin:admins',
                 $this->catalog->get('buttons.admin.broadcast') => 'admin:broadcast',
                 $this->catalog->get('buttons.admin.pins') => 'admin:pins',
@@ -1526,10 +1443,6 @@ final class MessageHandler
                 }
                 if ($route === 'admin:groupops') {
                     $this->openAdminGroupOpsView($chatId, $userId);
-                    return;
-                }
-                if ($route === 'admin:free_test:menu') {
-                    $this->openAdminFreeTestMenu($chatId, $userId);
                     return;
                 }
                 $this->database->setUserState($userId, 'admin.nav', [
@@ -1696,6 +1609,15 @@ final class MessageHandler
                 $this->openAdminServiceInventoryView($chatId, $userId, 0, $serviceId);
                 return;
             }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST)) {
+                $service = $this->database->getService($serviceId);
+                if (!is_array($service) || (string) ($service['mode'] ?? 'stock') !== 'stock') {
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.messages.inventory_bridge_not_stock'));
+                    return;
+                }
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
+                return;
+            }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD)) {
                 $this->database->setUserState($userId, 'admin.service.tariff.create', [
                     'service_id' => $serviceId,
@@ -1774,6 +1696,105 @@ final class MessageHandler
                 'is_active' => 1,
             ]);
             $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_updated'));
+            return;
+        }
+
+        if ($stateName === 'admin.service.free_test.view') {
+            $serviceId = (int) ($payload['service_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminServiceView($chatId, $userId, 0, $serviceId);
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE)) {
+                $rule = $this->database->getFreeTestRuleForService($serviceId);
+                $enabled = ((int) ($rule['is_enabled'] ?? 0)) !== 1;
+                $this->database->saveFreeTestRuleForService(
+                    $serviceId,
+                    $enabled,
+                    (string) ($rule['claim_mode'] ?? 'once_until_reset'),
+                    isset($rule['cooldown_days']) ? (int) $rule['cooldown_days'] : null,
+                    (int) ($rule['max_claims'] ?? 1),
+                    (int) ($rule['priority'] ?? 0)
+                );
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_rule_saved'));
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE)) {
+                $this->database->setUserState($userId, 'admin.service.free_test.mode', ['service_id' => $serviceId]);
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.claim_mode'), $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.types_packages.prompts.free_test_wizard.mode_cooldown'), $this->catalog->get('admin.types_packages.prompts.free_test_wizard.mode_once')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX)) {
+                $this->database->setUserState($userId, 'admin.service.free_test.max', ['service_id' => $serviceId]);
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.max_claims'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)) {
+                $this->database->setUserState($userId, 'admin.service.free_test.cooldown', ['service_id' => $serviceId]);
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.cooldown_days'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)) {
+                $this->database->setUserState($userId, 'admin.service.free_test.reset_user', ['service_id' => $serviceId]);
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.reset_user'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)) {
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
+                return;
+            }
+        }
+
+        if ($stateName === 'admin.service.free_test.mode') {
+            $serviceId = (int) ($payload['service_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
+                return;
+            }
+            $mode = $text === $this->catalog->get('admin.types_packages.prompts.free_test_wizard.mode_cooldown') ? 'cooldown' : ($text === $this->catalog->get('admin.types_packages.prompts.free_test_wizard.mode_once') ? 'once_until_reset' : '');
+            if ($mode === '') {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_invalid_input'));
+                return;
+            }
+            $rule = $this->database->getFreeTestRuleForService($serviceId);
+            $this->database->saveFreeTestRuleForService($serviceId, ((int) ($rule['is_enabled'] ?? 0)) === 1, $mode, isset($rule['cooldown_days']) ? (int) $rule['cooldown_days'] : null, (int) ($rule['max_claims'] ?? 1), (int) ($rule['priority'] ?? 0));
+            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_rule_saved'));
+            return;
+        }
+
+        if ($stateName === 'admin.service.free_test.max' || $stateName === 'admin.service.free_test.cooldown' || $stateName === 'admin.service.free_test.reset_user') {
+            $serviceId = (int) ($payload['service_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
+                return;
+            }
+            if ($stateName === 'admin.service.free_test.reset_user') {
+                $targetUserId = (int) preg_replace('/\D+/', '', $text);
+                if ($targetUserId <= 0) {
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_service_action'));
+                    return;
+                }
+                $this->database->resetFreeTestQuotaForUser($targetUserId, $serviceId);
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_quota_reset', ['target_user_id' => $targetUserId]));
+                return;
+            }
+            $value = (int) preg_replace('/\D+/', '', $text);
+            if ($value <= 0) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_invalid_input'));
+                return;
+            }
+            $rule = $this->database->getFreeTestRuleForService($serviceId);
+            $mode = (string) ($rule['claim_mode'] ?? 'once_until_reset');
+            $cooldownDays = isset($rule['cooldown_days']) ? (int) $rule['cooldown_days'] : null;
+            $maxClaims = (int) ($rule['max_claims'] ?? 1);
+            if ($stateName === 'admin.service.free_test.max') {
+                $maxClaims = $value;
+            } else {
+                $cooldownDays = $value;
+                $mode = 'cooldown';
+            }
+            $this->database->saveFreeTestRuleForService($serviceId, ((int) ($rule['is_enabled'] ?? 0)) === 1, $mode, $cooldownDays, $maxClaims, (int) ($rule['priority'] ?? 0));
+            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_rule_saved'));
             return;
         }
 
@@ -2108,7 +2129,7 @@ final class MessageHandler
             ],
         ];
         if ($mode === 'stock') {
-            $buttons[] = [$this->uiConst(self::ADMIN_SERVICE_INVENTORY)];
+            $buttons[] = [$this->uiConst(self::ADMIN_SERVICE_INVENTORY), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST)];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
 
@@ -2134,6 +2155,46 @@ final class MessageHandler
                 'stock_count' => $stockCount,
             ]),
             $this->uiKeyboard->replyMenu($buttons)
+        );
+    }
+
+    private function openAdminServiceFreeTestView(int $chatId, int $userId, int $serviceId, ?string $notice = null): void
+    {
+        $service = $this->database->getService($serviceId);
+        if (!is_array($service) || (string) ($service['mode'] ?? '') !== 'stock') {
+            $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+            return;
+        }
+        $rule = $this->database->getFreeTestRuleForService($serviceId) ?? [
+            'is_enabled' => 0,
+            'claim_mode' => 'once_until_reset',
+            'cooldown_days' => null,
+            'max_claims' => 1,
+        ];
+        $claimCount = $this->database->countFreeTestClaimsForService($serviceId);
+        $stockCount = $this->database->countAvailableConfigsByService($serviceId);
+        $this->database->setUserState($userId, 'admin.service.free_test.view', ['service_id' => $serviceId]);
+        if ($notice !== null && $notice !== '') {
+            $this->telegram->sendMessage($chatId, $notice);
+        }
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->messageRenderer->render('admin.ui.open.service_free_test.overview', [
+                'service_name' => (string) ($service['name'] ?? ''),
+                'is_enabled' => ((int) ($rule['is_enabled'] ?? 0)) === 1 ? $this->catalog->get('messages.generic.status_enabled_icon') : $this->catalog->get('messages.generic.status_disabled_icon'),
+                'claim_mode' => (string) ($rule['claim_mode'] ?? 'once_until_reset'),
+                'cooldown_days' => $rule['cooldown_days'] !== null ? (string) $rule['cooldown_days'] : $this->catalog->get('messages.generic.dash'),
+                'max_claims' => (string) ((int) ($rule['max_claims'] ?? 1)),
+                'claim_count' => (string) $claimCount,
+                'stock_count' => (string) $stockCount,
+            ])
+            ,
+            $this->uiKeyboard->replyMenu([
+                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE)],
+                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)],
+                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+            ])
         );
     }
 
@@ -3968,7 +4029,6 @@ final class MessageHandler
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
         $settingsRefreshLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_refresh');
         $settingsToggleBotLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_bot');
-        $settingsToggleFreeTestLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_free_test');
         $settingsToggleAgencyLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_agency');
         $settingsToggleGwCardLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_card');
         $settingsToggleGwCryptoLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_crypto');
@@ -3991,12 +4051,10 @@ final class MessageHandler
                 return;
             }
             $toggleMap = [
-                $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_FREE_TEST) => 'free_test_enabled',
                 $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY) => 'agency_request_enabled',
                 $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CARD) => 'gw_card_enabled',
                 $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CRYPTO) => 'gw_crypto_enabled',
                 $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_TETRA) => 'gw_tetrapay_enabled',
-                $settingsToggleFreeTestLabel => 'free_test_enabled',
                 $settingsToggleAgencyLabel => 'agency_request_enabled',
                 $settingsToggleGwCardLabel => 'gw_card_enabled',
                 $settingsToggleGwCryptoLabel => 'gw_crypto_enabled',
@@ -4303,7 +4361,6 @@ final class MessageHandler
     {
         $vals = [
             'bot_status' => $this->settings->get('bot_status', 'on'),
-            'free_test_enabled' => $this->settings->get('free_test_enabled', '1'),
             'agency_request_enabled' => $this->settings->get('agency_request_enabled', '1'),
             'gw_card_enabled' => $this->settings->get('gw_card_enabled', '0'),
             'gw_crypto_enabled' => $this->settings->get('gw_crypto_enabled', '0'),
@@ -4317,7 +4374,6 @@ final class MessageHandler
         $this->database->setUserState($userId, 'admin.settings.view', ['stack' => ['admin.root']]);
         $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.ui.open.settings_admins_pins.settings.overview', [
             'bot_status' => $vals['bot_status'],
-            'free_test_enabled' => $vals['free_test_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'agency_request_enabled' => $vals['agency_request_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'gw_card_enabled' => $vals['gw_card_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'gw_crypto_enabled' => $vals['gw_crypto_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
@@ -4329,7 +4385,7 @@ final class MessageHandler
             [$this->uiConst(self::ADMIN_SETTINGS_REFRESH), $this->uiConst(self::ADMIN_SETTINGS_EDIT)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
             [$this->catalog->get('admin.settings_admins_pins.actions.settings_set_delivery_mode')],
-            [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_FREE_TEST), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY)],
+            [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CARD), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CRYPTO), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_TETRA)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
         ]));
@@ -4475,8 +4531,6 @@ final class MessageHandler
         $deliveryDoLabel = $this->catalog->get('admin.final_modules.actions.delivery_do');
         $groupopsSetGroupLabel = $this->catalog->get('admin.final_modules.actions.groupops_set_group');
         $groupopsRestoreLabel = $this->catalog->get('admin.final_modules.actions.groupops_restore');
-        $freetestRuleLabel = $this->catalog->get('admin.final_modules.actions.freetest_rule');
-        $freetestResetLabel = $this->catalog->get('admin.final_modules.actions.freetest_reset');
         $deleteConfirmWord = $this->catalog->get('admin.final_modules.keywords.delete_confirm');
         $deliverConfirmWord = $this->catalog->get('admin.final_modules.keywords.deliver_confirm');
 
@@ -4975,403 +5029,7 @@ final class MessageHandler
             }
         }
 
-        if ($stateName === 'admin.freetest.menu') {
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminRoot($chatId, $userId);
-                return;
-            }
-            if ($text === $freetestRuleLabel || $text === $this->uiConst(self::ADMIN_FREETEST_RULE)) {
-                $this->database->setUserState($userId, 'admin.freetest.rule', []);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.prompts.freetest_rule_format'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
-                return;
-            }
-            if ($text === $freetestResetLabel || $text === $this->uiConst(self::ADMIN_FREETEST_RESET)) {
-                $this->database->setUserState($userId, 'admin.freetest.reset', []);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.prompts.freetest_reset_user_id_input'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
-                return;
-            }
-        }
-        if ($stateName === 'admin.freetest.rule') {
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminFreeTestMenu($chatId, $userId);
-                return;
-            }
-            $parts = array_map('trim', explode('|', $text));
-            $packageId = (int) ($parts[0] ?? 0);
-            $maxClaims = (int) ($parts[1] ?? 1);
-            $cooldownDays = (int) ($parts[2] ?? 0);
-            if ($packageId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.invalid_format'));
-                return;
-            }
-            $this->database->saveFreeTestRule($packageId, $maxClaims, $cooldownDays, true);
-            $this->openAdminFreeTestMenu($chatId, $userId, $this->messageRenderer->render('admin.final_modules.success.freetest_rule_saved'));
-            return;
-        }
-        if ($stateName === 'admin.freetest.reset') {
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminFreeTestMenu($chatId, $userId);
-                return;
-            }
-            $targetUserId = (int) preg_replace('/\D+/', '', $text);
-            if ($targetUserId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.valid_user_id_required'));
-                return;
-            }
-            $this->database->resetFreeTestQuota($targetUserId);
-            $this->openAdminFreeTestMenu($chatId, $userId, $this->messageRenderer->render('admin.final_modules.success.freetest_quota_reset'));
-            return;
-        }
-    }
-
-    private function openAdminAgentsList(int $chatId, int $userId, ?string $notice = null): void
-    {
-        $agents = $this->database->listUserIdsForBroadcast('agents');
-        $options = [];
-        $lines = [];
-        $buttons = [[$this->uiConst(self::ADMIN_AGENTS_REFRESH)]];
-        foreach (array_values($agents) as $idx => $aid) {
-            $num = (string) ($idx + 1);
-            $id = (int) $aid;
-            if ($id <= 0) {
-                continue;
-            }
-            $lines[] = $this->catalog->get('admin.ui.agents.row', ['num' => $num, 'id' => $id]);
-            $options[$num] = $id;
-            $buttons[] = [$this->catalog->get('admin.ui.agents.button', ['num' => $num, 'id' => $id])];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.agents.list', ['options' => $options]);
-        if ($notice) {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('admin.ui.agents.overview', [
-                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.agents.empty'),
-            ], ['list']),
-            $this->uiKeyboard->replyMenu($buttons)
-        );
-    }
-
-    private function openAdminAgentView(int $chatId, int $userId, int $agentId, ?string $notice = null): void
-    {
-        $lines = [];
-        $options = [];
-        $buttons = [];
-        foreach (array_values($this->database->listAllPackages()) as $idx => $pkg) {
-            $num = (string) ($idx + 1);
-            $pkgId = (int) ($pkg['id'] ?? 0);
-            if ($pkgId <= 0) {
-                continue;
-            }
-            $custom = $this->database->getAgencyPrice($agentId, $pkgId);
-            $lines[] = $this->catalog->get('admin.ui.agent_view.row', [
-                'num' => $num,
-                'pkg_id' => $pkgId,
-                'name' => (string) ($pkg['name'] ?? $this->catalog->get('messages.generic.dash')),
-                'custom' => $custom === null ? $this->catalog->get('messages.generic.dash') : (string) $custom,
-            ]);
-            $options[$num] = $pkgId;
-            $buttons[] = [$this->catalog->get('admin.ui.agent_view.package_button', ['num' => $num, 'id' => $pkgId])];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.agent.view', ['agent_id' => $agentId, 'options' => $options]);
-        if ($notice) {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('admin.ui.agent_view.overview', [
-                'agent_id' => $agentId,
-                'packages' => implode("\n", $lines),
-            ], ['packages']),
-            $this->uiKeyboard->replyMenu($buttons)
-        );
-    }
-
-    private function openAdminPanelsList(int $chatId, int $userId, ?string $notice = null): void
-    {
-        $baseUrl = trim($this->settings->get('pg_base_url', ''));
-        $username = trim($this->settings->get('pg_username', ''));
-        $hasConnection = $baseUrl !== '' || $username !== '';
-        $panelsListText = $this->messageRenderer->render('admin.panel_settings.messages.panels_list', [
-            'connection_status' => $hasConnection ? $this->catalog->get('admin.panel_settings.info.connection_exists') : $this->catalog->get('admin.panel_settings.info.connection_missing'),
-        ]);
-        $buttons = [[$this->uiConst(self::ADMIN_PANELS_REFRESH)]];
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.panels.list', []);
-        if ($notice) {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $this->telegram->sendMessage($chatId, $panelsListText, $this->uiKeyboard->replyMenu($buttons));
-    }
-
-    private function openAdminPanelSettings(int $chatId, int $userId, ?string $notice = null): void
-    {
-        [$baseUrl, $username, $passwordMasked, $hasConnection] = $this->getPanelConnectionSummary();
-        $this->database->setUserState($userId, 'admin.panel.settings', ['mode' => 'menu']);
-        if ($notice) {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $rows = $this->buildPanelSettingsKeyboard($hasConnection);
-        $overviewText = $this->messageRenderer->render('admin.panel_settings.messages.menu_overview', [
-            'base_url' => $baseUrl !== '' ? $baseUrl : '-',
-            'username' => $username !== '' ? $username : '-',
-            'password_masked' => $passwordMasked,
-            'status_line' => $hasConnection
-                ? ''
-                : $this->catalog->get('admin.panel_settings.messages.status_line', [
-                    'status_text' => $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
-                ]),
-            'status_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
-            'guide_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty'),
-        ]);
-
-        $this->telegram->sendMessage(
-            $chatId,
-            $overviewText,
-            $this->uiKeyboard->replyMenu($rows)
-        );
-    }
-
-    /** @return array{0:string,1:string,2:string,3:bool} */
-    private function getPanelConnectionSummary(): array
-    {
-        $baseUrl = trim($this->settings->get('pg_base_url', ''));
-        $username = trim($this->settings->get('pg_username', ''));
-        $password = trim($this->settings->get('pg_password', ''));
-        $passwordMasked = $password === '' ? '-' : str_repeat('*', min(strlen($password), 10));
-        $hasConnection = $baseUrl !== '' || $username !== '' || $password !== '';
-
-        return [$baseUrl, $username, $passwordMasked, $hasConnection];
-    }
-
-    /** @return list<list<string>> */
-    private function buildPanelSettingsKeyboard(bool $hasConnection): array
-    {
-        $rows = [[
-            $hasConnection ? $this->catalog->get('admin.final_modules.actions.panel_conn_edit') : $this->catalog->get('admin.final_modules.actions.panel_conn_add'),
-            $this->catalog->get('admin.final_modules.actions.panel_conn_status'),
-        ]];
-        if ($hasConnection) {
-            $rows[] = [$this->catalog->get('admin.final_modules.actions.panel_conn_delete')];
-            $rows[] = [UiLabels::back($this->catalog)];
-            return $rows;
-        }
-        $rows[] = [UiLabels::back($this->catalog)];
-
-        return $rows;
-    }
-
-    private function sendAdminPanelStatusOverview(int $chatId): void
-    {
-        [$baseUrl, $username, $passwordMasked, $hasConnection] = $this->getPanelConnectionSummary();
-        $snapshotText = $this->messageRenderer->render('admin.panel_settings.messages.menu_overview', [
-            'base_url' => $baseUrl !== '' ? $baseUrl : '-',
-            'username' => $username !== '' ? $username : '-',
-            'password_masked' => $passwordMasked,
-            'status_line' => $hasConnection
-                ? ''
-                : $this->catalog->get('admin.panel_settings.messages.status_line', [
-                    'status_text' => $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
-                ]),
-            'status_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.status_ready') : $this->catalog->get('admin.ui.open.panel_settings.status_empty'),
-            'guide_text' => $hasConnection ? $this->catalog->get('admin.ui.open.panel_settings.guide_ready') : $this->catalog->get('admin.ui.open.panel_settings.guide_empty'),
-        ]);
-        $this->telegram->sendMessage($chatId, $snapshotText);
-    }
-
-    /** @param array<string,mixed> $data */
-    private function promptPanelConnectionStep(int $chatId, int $userId, string $step, array $data): void
-    {
-        $text = match ($step) {
-            'base_url' => $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_base_url'),
-            'username' => $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_username'),
-            'password' => $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_password'),
-            default => '',
-        };
-        if ($text !== '') {
-            $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog)]]));
-        }
-    }
-
-    private function openAdminPanelDeleteConfirm(int $chatId): void
-    {
-        $message = $this->messageRenderer->render('admin.panel_settings.messages.delete_confirm', [
-            'delete_text' => $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_text'),
-            'delete_tip' => $this->catalog->get('admin.ui.open.panel_settings.delete_confirm_tip'),
-        ]);
-        $this->telegram->sendMessage(
-            $chatId,
-            $message,
-            $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.final_modules.actions.panel_conn_delete_confirm'), $this->catalog->get('admin.final_modules.actions.panel_conn_delete_cancel')]])
-        );
-    }
-
-    private function openAdminPanelView(int $chatId, int $userId, int $panelId, ?string $notice = null): void
-    {
-        $panel = $this->database->getProvisioningService($panelId);
-        if (!is_array($panel)) {
-            $this->openAdminPanelsList($chatId, $userId, $this->messageRenderer->render('admin.ui.panels.not_found'));
-            return;
-        }
-        $durationPolicy = (string) ($panel['duration_policy'] ?? 'fixed_days');
-        $durationDays = (int) ($panel['duration_days'] ?? 0);
-        $durationText = $durationPolicy === 'unlimited'
-            ? $this->catalog->get('admin.panels.labels.duration_unlimited')
-            : $this->catalog->get('admin.panels.labels.duration_days', ['days' => $durationDays]);
-        $summary = $this->messageRenderer->render('admin.panels.messages.panel_summary', [
-            'min_gb' => (string) ($panel['min_gb'] ?? '0'),
-            'max_gb' => (string) ($panel['max_gb'] ?? '0'),
-            'step_gb' => (string) ($panel['step_gb'] ?? '1'),
-            'price_per_gb' => (string) ((int) ($panel['price_per_gb'] ?? 0)),
-            'provider' => (string) ($panel['provider'] ?? 'pasarguard'),
-            'provider_group_ids' => (string) ($panel['provider_group_ids'] ?? '-'),
-            'duration' => $durationText,
-        ]);
-        if ($notice) {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $this->database->setUserState($userId, 'admin.panel.view', ['panel_id' => $panelId]);
-        $panelViewText = $this->messageRenderer->render('admin.panels.messages.panel_view', [
-            'panel_id' => $panelId,
-            'panel_title' => (string) ($panel['title'] ?? '-'),
-            'summary' => $summary,
-        ]);
-        $this->telegram->sendMessage($chatId, $panelViewText, $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_PANEL_TOGGLE), $this->uiConst(self::ADMIN_PANEL_DELETE)], [$this->uiConst(self::ADMIN_PANEL_PKG_ADD)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
-    }
-
-    /** @param array<string,mixed> $data */
-    private function promptPanelWizardStep(int $chatId, int $userId, string $stateName, string $step, array $data, array $extraPayload = []): void
-    {
-        $baseByStep = [
-            'title' => 'admin.final_modules.prompts.panel_wizard.title',
-            'min_gb' => 'admin.final_modules.prompts.panel_wizard.min_gb',
-            'max_gb' => 'admin.final_modules.prompts.panel_wizard.max_gb',
-            'step_gb' => 'admin.final_modules.prompts.panel_wizard.step_gb',
-            'price_per_gb' => 'admin.final_modules.prompts.panel_wizard.price_per_gb',
-            'duration_policy' => 'admin.final_modules.prompts.panel_wizard.duration_policy',
-            'duration_days' => 'admin.final_modules.prompts.panel_wizard.duration_days',
-            'provider' => 'admin.final_modules.prompts.panel_wizard.provider',
-            'group_ids' => 'admin.final_modules.prompts.panel_wizard.group_ids',
-            'description' => 'admin.final_modules.prompts.panel_wizard.description',
-        ];
-        $baseKey = (string) ($baseByStep[$step] ?? '');
-        $baseText = $baseKey !== '' ? $this->catalog->get($baseKey) : '';
-        $currentText = isset($data[$step])
-            ? $this->catalog->get('admin.final_modules.prompts.panel_wizard.current_value', ['value' => htmlspecialchars((string) $data[$step])])
-            : '';
-        $text = $this->messageRenderer->render('admin.common.notice_with_optional_note', [
-            'notice' => $baseText,
-            'note_line' => $currentText,
-        ], ['notice', 'note_line']);
-        $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => $step, 'data' => $data]));
-        $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
-    }
-
-    /** @param array<string,mixed> $data */
-    private function applyPanelWizardInput(int $chatId, int $userId, string $stateName, string $step, string $text, array &$data, array $extraPayload = []): bool
-    {
-        $raw = trim($text);
-        if ($raw === '' || str_starts_with($raw, '/')) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.valid_input_required'));
-            return false;
-        }
-        $next = '';
-        switch ($step) {
-            case 'title':
-                $data['title'] = $raw;
-                $next = 'min_gb';
-                break;
-            case 'min_gb':
-                $val = (float) str_replace(',', '.', $raw);
-                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.invalid_min_gb')); return false; }
-                $data['min_gb'] = $val;
-                $next = 'max_gb';
-                break;
-            case 'max_gb':
-                $val = (float) str_replace(',', '.', $raw);
-                if ($val < (float) ($data['min_gb'] ?? 0)) { $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.invalid_max_gb')); return false; }
-                $data['max_gb'] = $val;
-                $next = 'step_gb';
-                break;
-            case 'step_gb':
-                $val = (float) str_replace(',', '.', $raw);
-                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.invalid_step_gb')); return false; }
-                $data['step_gb'] = $val;
-                $next = 'price_per_gb';
-                break;
-            case 'price_per_gb':
-                $val = (int) preg_replace('/\D+/', '', $raw);
-                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.valid_price_required')); return false; }
-                $data['price_per_gb'] = $val;
-                $next = 'duration_policy';
-                break;
-            case 'duration_policy':
-                $policy = in_array($raw, ['fixed_days', 'unlimited'], true) ? $raw : '';
-                if ($policy === '') { $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.invalid_duration_policy')); return false; }
-                $data['duration_policy'] = $policy;
-                $next = $policy === 'fixed_days' ? 'duration_days' : 'provider';
-                break;
-            case 'duration_days':
-                $val = (int) preg_replace('/\D+/', '', $raw);
-                if ($val <= 0) { $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.invalid_duration_days')); return false; }
-                $data['duration_days'] = $val;
-                $next = 'provider';
-                break;
-            case 'provider':
-                $data['provider'] = $raw;
-                $next = 'group_ids';
-                break;
-            case 'group_ids':
-                if ($raw === '') { $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.group_ids_required')); return false; }
-                $data['group_ids'] = $raw;
-                $next = 'description';
-                break;
-            case 'description':
-                $data['description'] = ($raw === '-' || $raw === '—') ? '' : $raw;
-                $durationValue = (string) ($data['duration_policy'] ?? '');
-                if (($data['duration_policy'] ?? '') === 'fixed_days') {
-                    $durationValue = $this->catalog->get('admin.final_modules.prompts.panel_wizard.duration_with_days', ['policy' => (string) ($data['duration_policy'] ?? ''), 'days' => (int) ($data['duration_days'] ?? 0)]);
-                }
-                $summary = $this->catalog->get('admin.final_modules.prompts.panel_wizard.summary_template', [
-                    'title' => (string) ($data['title'] ?? ''),
-                    'min_gb' => (string) ($data['min_gb'] ?? ''),
-                    'max_gb' => (string) ($data['max_gb'] ?? ''),
-                    'step_gb' => (string) ($data['step_gb'] ?? ''),
-                    'price_per_gb' => (string) ($data['price_per_gb'] ?? ''),
-                    'duration_value' => $durationValue,
-                    'provider' => (string) ($data['provider'] ?? ''),
-                    'group_ids' => (string) ($data['group_ids'] ?? ''),
-                    'description' => (string) (($data['description'] ?? '') !== '' ? $data['description'] : '-'),
-                ]);
-                $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
-                $summaryText = $this->messageRenderer->render('admin.final_modules.messages.panel_wizard_summary', [
-                    'summary' => $summary,
-                ]);
-                $this->telegram->sendMessage(
-                    $chatId,
-                    $summaryText,
-                    $this->uiKeyboard->replyMenu([
-                        [$this->catalog->get('buttons.confirm_yes')],
-                        [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-                    ])
-                );
-                return false;
-            case 'confirm':
-                if ($raw !== $this->catalog->get('buttons.confirm_yes')) {
-                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.panel_wizard_confirm_required'));
-                    return false;
-                }
-                return true;
-            default:
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.invalid_state'));
-                return false;
-        }
-
-        $this->promptPanelWizardStep($chatId, $userId, $stateName, $next, $data, $extraPayload);
-        return false;
+        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.invalid_menu_option'));
     }
 
     private function openAdminBroadcastCompose(int $chatId, int $userId, ?string $notice = null): void
@@ -5443,25 +5101,6 @@ final class MessageHandler
                 'group_id' => $groupId !== '' ? "<code>{$groupId}</code>" : $this->catalog->get('admin.ui.open.groupops.group_id_unset'),
             ], ['group_id']),
             $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_GROUPOPS_SET_GROUP), $this->uiConst(self::ADMIN_GROUPOPS_RESTORE)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
-        );
-    }
-
-    private function openAdminFreeTestMenu(int $chatId, int $userId, ?string $notice = null): void
-    {
-        $lines = [];
-        foreach ($this->database->listFreeTestRules() as $rule) {
-            $lines[] = '#'.(int)($rule['package_id'] ?? 0).' | max='.(int)($rule['max_claims'] ?? 1).' | cd='.(int)($rule['cooldown_days'] ?? 0);
-        }
-        $this->database->setUserState($userId, 'admin.freetest.menu', []);
-        if ($notice) {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('admin.ui.freetest.overview', [
-                'rules' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.freetest.rules_empty'),
-            ], ['rules']),
-            $this->uiKeyboard->replyMenu([[$this->uiConst(self::ADMIN_FREETEST_RULE), $this->uiConst(self::ADMIN_FREETEST_RESET)], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
         );
     }
 
