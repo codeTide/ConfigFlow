@@ -59,6 +59,7 @@ final class Database implements WorkerApiStore
         );
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_claims");
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_package_rules");
+        $this->pdo->exec("DROP TABLE IF EXISTS free_test_requests");
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS service (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -118,8 +119,11 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE configs MODIFY package_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id");
             $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
+            $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale' AFTER tariff_id");
             $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_service (service_id)");
             $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_tariff (tariff_id)");
+            $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_inventory_bucket (inventory_bucket)");
+            $this->pdo->exec("UPDATE configs SET inventory_bucket = 'sale' WHERE inventory_bucket IS NULL OR TRIM(inventory_bucket) = ''");
         }
         if ($this->tableExists('payments')) {
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id");
@@ -426,22 +430,6 @@ final class Database implements WorkerApiStore
         $stmt = $this->pdo->prepare('DELETE FROM pinned_message_sends WHERE pin_id = :pin_id');
         $stmt->execute(['pin_id' => $pinId]);
     }
-    public function createFreeTestRequest(int $userId, string $note): int
-    {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO free_test_requests (user_id, note, status, created_at)
-             VALUES (:user_id, :note, :status, :created_at)'
-        );
-        $stmt->execute([
-            'user_id' => $userId,
-            'note' => $note,
-            'status' => 'pending',
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-
-        return (int) $this->pdo->lastInsertId();
-    }
-
     public function createAgencyRequest(int $userId, string $note): int
     {
         $stmt = $this->pdo->prepare(
@@ -456,26 +444,6 @@ final class Database implements WorkerApiStore
         ]);
 
         return (int) $this->pdo->lastInsertId();
-    }
-
-    public function listPendingFreeTestRequests(int $limit = 30): array
-    {
-        return $this->listFreeTestRequestsByStatus('pending', $limit, 0);
-    }
-
-    public function listFreeTestRequestsByStatus(string $status, int $limit = 30, int $offset = 0): array
-    {
-        $limit = max(1, min($limit, 100));
-        $offset = max(0, $offset);
-        $stmt = $this->pdo->prepare(
-            'SELECT id, user_id, note, created_at
-             FROM free_test_requests
-             WHERE status = :status
-             ORDER BY id DESC
-             LIMIT ' . $limit . ' OFFSET ' . $offset
-        );
-        $stmt->execute(['status' => $status]);
-        return $stmt->fetchAll();
     }
 
     public function listPendingAgencyRequests(int $limit = 30): array
@@ -498,30 +466,11 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function countFreeTestRequestsByStatus(string $status): int
-    {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_requests WHERE status = :status');
-        $stmt->execute(['status' => $status]);
-        return (int) $stmt->fetchColumn();
-    }
-
     public function countAgencyRequestsByStatus(string $status): int
     {
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM agency_requests WHERE status = :status');
         $stmt->execute(['status' => $status]);
         return (int) $stmt->fetchColumn();
-    }
-
-    public function getFreeTestRequestById(int $requestId): ?array
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT id, user_id, note, status, created_at, reviewed_at, admin_note
-             FROM free_test_requests
-             WHERE id = :id LIMIT 1'
-        );
-        $stmt->execute(['id' => $requestId]);
-        $row = $stmt->fetch();
-        return is_array($row) ? $row : null;
     }
 
     public function getAgencyRequestById(int $requestId): ?array
@@ -534,47 +483,6 @@ final class Database implements WorkerApiStore
         $stmt->execute(['id' => $requestId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
-    }
-
-    public function reviewFreeTestRequest(int $requestId, bool $approve, ?string $adminNote = null): array
-    {
-        $this->pdo->beginTransaction();
-        try {
-            $lockStmt = $this->pdo->prepare('SELECT id, user_id, status FROM free_test_requests WHERE id = :id LIMIT 1 FOR UPDATE');
-            $lockStmt->execute(['id' => $requestId]);
-            $row = $lockStmt->fetch();
-            if (!is_array($row)) {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'not_found'];
-            }
-            if (($row['status'] ?? '') !== 'pending') {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'already_reviewed'];
-            }
-
-            $status = $approve ? 'approved' : 'rejected';
-            $update = $this->pdo->prepare(
-                'UPDATE free_test_requests
-                 SET status = :status,
-                     admin_note = :admin_note,
-                     reviewed_at = :reviewed_at
-                 WHERE id = :id'
-            );
-            $update->execute([
-                'status' => $status,
-                'admin_note' => $adminNote,
-                'reviewed_at' => gmdate('Y-m-d H:i:s'),
-                'id' => $requestId,
-            ]);
-
-            $this->pdo->commit();
-            return ['ok' => true, 'status' => $status, 'user_id' => (int) $row['user_id']];
-        } catch (\Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['ok' => false, 'error' => 'db_error'];
-        }
     }
 
     public function reviewAgencyRequest(int $requestId, bool $approve, ?string $adminNote = null): array
@@ -978,7 +886,8 @@ final class Database implements WorkerApiStore
                 WHERE service_id = :service_id
                   AND sold_to IS NULL
                   AND reserved_payment_id IS NULL
-                  AND is_expired = 0';
+                  AND is_expired = 0
+                  AND inventory_bucket = \'sale\'';
         $params = ['service_id' => $serviceId];
         if ($tariffId !== null && $tariffId > 0) {
             $sql .= ' AND tariff_id = :tariff_id';
@@ -1020,18 +929,19 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
-    public function addConfigForService(int $serviceId, ?int $tariffId, string $serviceName, string $configText, ?string $inquiryLink = null): int
+    public function addConfigForService(int $serviceId, ?int $tariffId, string $serviceName, string $configText, ?string $inquiryLink = null, string $inventoryBucket = 'sale'): int
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO configs (
-                package_id, service_id, tariff_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
+                package_id, service_id, tariff_id, inventory_bucket, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
              ) VALUES (
-                NULL, :service_id, :tariff_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
+                NULL, :service_id, :tariff_id, :inventory_bucket, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
              )'
         );
         $stmt->execute([
             'service_id' => $serviceId,
             'tariff_id' => $tariffId !== null && $tariffId > 0 ? $tariffId : null,
+            'inventory_bucket' => $inventoryBucket === 'free_test' ? 'free_test' : 'sale',
             'service_name' => trim($serviceName),
             'config_text' => trim($configText),
             'inquiry_link' => $inquiryLink !== null && trim($inquiryLink) !== '' ? trim($inquiryLink) : null,
@@ -1839,6 +1749,7 @@ final class Database implements WorkerApiStore
                AND sold_to IS NULL
                AND reserved_payment_id IS NULL
                AND is_expired = 0
+               AND inventory_bucket = 'sale'
              ORDER BY id ASC
              LIMIT 1
              FOR UPDATE"
@@ -1854,7 +1765,8 @@ final class Database implements WorkerApiStore
                 WHERE service_id = :service_id
                   AND sold_to IS NULL
                   AND reserved_payment_id IS NULL
-                  AND is_expired = 0";
+                  AND is_expired = 0
+                  AND inventory_bucket = 'sale'";
         $params = ['service_id' => $serviceId];
         if ($tariffId !== null && $tariffId > 0) {
             $sql .= ' AND tariff_id = :tariff_id';
@@ -1868,12 +1780,13 @@ final class Database implements WorkerApiStore
 
     private function serviceHasAvailableStock(int $serviceId, ?int $tariffId = null): bool
     {
-        $sql = 'SELECT 1
+        $sql = "SELECT 1
                 FROM configs
                 WHERE service_id = :service_id
                   AND sold_to IS NULL
                   AND reserved_payment_id IS NULL
-                  AND is_expired = 0';
+                  AND is_expired = 0
+                  AND inventory_bucket = 'sale'";
         $params = ['service_id' => $serviceId];
         if ($tariffId !== null && $tariffId > 0) {
             $sql .= ' AND tariff_id = :tariff_id';
@@ -2844,7 +2757,7 @@ final class Database implements WorkerApiStore
         $stmt = $this->pdo->query(
             "SELECT s.id AS service_id, s.name AS service_name, s.mode, s.is_active,
                     r.is_enabled, r.claim_mode, r.cooldown_days, r.max_claims, r.priority,
-                    (SELECT COUNT(*) FROM configs c WHERE c.service_id = s.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0) AS available_stock,
+                    (SELECT COUNT(*) FROM configs c WHERE c.service_id = s.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0 AND c.inventory_bucket = 'free_test') AS available_stock,
                     (SELECT COUNT(*) FROM free_test_service_claims fc WHERE fc.service_id = s.id) AS total_claims
              FROM free_test_service_rules r
              JOIN service s ON s.id = r.service_id
@@ -2880,14 +2793,15 @@ final class Database implements WorkerApiStore
         $this->pdo->beginTransaction();
         try {
             $cfgStmt = $this->pdo->prepare(
-                'SELECT id, service_id, tariff_id, service_name, config_text, inquiry_link
+                "SELECT id, service_id, tariff_id, service_name, config_text, inquiry_link
                  FROM configs
                  WHERE service_id = :service_id
                    AND sold_to IS NULL
                    AND reserved_payment_id IS NULL
                    AND is_expired = 0
+                   AND inventory_bucket = 'free_test'
                  ORDER BY id ASC
-                 LIMIT 1 FOR UPDATE'
+                 LIMIT 1 FOR UPDATE"
             );
             $cfgStmt->execute(['service_id' => $serviceId]);
             $cfg = $cfgStmt->fetch();
@@ -2964,10 +2878,52 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
+    public function countAvailableFreeTestStockByService(int $serviceId): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*)
+             FROM configs
+             WHERE service_id = :service_id
+               AND inventory_bucket = 'free_test'
+               AND sold_to IS NULL
+               AND reserved_payment_id IS NULL
+               AND is_expired = 0"
+        );
+        $stmt->execute(['service_id' => $serviceId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     private function canUserClaimFreeTestForService(int $userId, int $serviceId, ?array $rule = null): bool
     {
         if ($userId <= 0 || $serviceId <= 0) {
             return false;
+        }
+        $rule ??= $this->getFreeTestRuleForService($serviceId);
+        if (!is_array($rule) || (int) ($rule['is_enabled'] ?? 0) !== 1) {
+            return false;
+        }
+
+        $service = $this->getService($serviceId);
+        if (!is_array($service) || (int) ($service['is_active'] ?? 0) !== 1 || (string) ($service['mode'] ?? '') !== 'stock') {
+            return false;
+        }
+
+        if ($this->countAvailableFreeTestStockByService($serviceId) <= 0) {
+            return false;
+        }
+
+        $claimMode = (string) ($rule['claim_mode'] ?? 'once_until_reset');
+        $maxClaims = max(1, (int) ($rule['max_claims'] ?? 1));
+        $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
+        $countStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
+        $claimCount = (int) $countStmt->fetchColumn();
+
+        if ($claimMode === 'once_until_reset') {
+            return $claimCount < 1;
+        }
+
+        if ($claimCount < $maxClaims) {
+            return true;
         }
         $rule ??= $this->getFreeTestRuleForService($serviceId);
         if (!is_array($rule) || (int) ($rule['is_enabled'] ?? 0) !== 1) {
@@ -2988,14 +2944,6 @@ final class Database implements WorkerApiStore
         $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
         $countStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
         $claimCount = (int) $countStmt->fetchColumn();
-
-        if ($claimMode === 'once_until_reset') {
-            return $claimCount < 1;
-        }
-
-        if ($claimCount < $maxClaims) {
-            return true;
-        }
 
         $cooldownDays = max(1, (int) ($rule['cooldown_days'] ?? 0));
         if ($cooldownDays <= 0) {

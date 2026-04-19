@@ -110,9 +110,6 @@
         "default_service": "سرویس تست",
         "ready": "🎁 <b>تست رایگان شما آماده است</b>\n\n📦 سرویس: <b>{service_name}</b>\n🧪 نوع سفارش: <b>تست رایگان</b>\n\n🔗 کانفیگ شما:\n<code>{config_text}</code>",
         "ready_with_inquiry": "🎁 <b>تست رایگان شما آماده است</b>\n\n📦 سرویس: <b>{service_name}</b>\n🧪 نوع سفارش: <b>تست رایگان</b>\n\n🔗 کانفیگ شما:\n<code>{config_text}</code>\n\n🌐 لینک استعلام:\n{inquiry_link}",
-        "note_as_text": "⚠️ لطفاً متن توضیح ارسال کنید، نه دکمه‌های منو.",
-        "note_required": "⚠️ لطفاً توضیح کوتاه تست را ارسال کنید.",
-        "request_submitted": "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید.\nشناسه درخواست: <code>{request_id}</code>",
         "service_selection": {
           "overview": "🎁 <b>انتخاب سرویس تست رایگان</b>\n\n🧩 سرویس‌های واجد شرایط: {services}\n\n<blockquote>💡 یک سرویس را انتخاب کنید تا تست رایگان همان سرویس برای شما ثبت و تحویل شود.</blockquote>",
           "row": "{num}) {name}",
@@ -412,9 +409,7 @@
         "settings_restored_count": "✅ بازیابی تنظیمات انجام شد.\nتعداد کلیدهای اعمال‌شده: <b>{count}</b>"
       },
       "user_notice": {
-        "free_approved": "✅ درخواست تست رایگان شما تایید شد.",
         "agency_approved": "✅ درخواست نمایندگی شما تایید شد.",
-        "free_rejected": "❌ درخواست تست رایگان شما رد شد.",
         "agency_rejected": "❌ درخواست نمایندگی شما رد شد.",
         "admin_note": "\n\n📝 توضیح ادمین:\n{note}"
       }
@@ -437,7 +432,6 @@
         "payment_verify_chain": "🧭 بررسی on-chain",
         "payment_approve": "✅ تایید پرداخت",
         "payment_reject": "❌ رد پرداخت",
-        "requests_free": "🎁 درخواست‌های تست رایگان",
         "requests_agency": "💼 درخواست‌های نمایندگی",
         "requests_pending": "⚠️ pending",
         "requests_approved": "✅ approved",
@@ -448,7 +442,6 @@
       "labels": {
         "action_approve": "تایید",
         "action_reject": "رد",
-        "request_free": "درخواست تست رایگان",
         "request_agency": "درخواست نمایندگی",
         "status_approved": "✅ تایید شد",
         "status_rejected": "❌ رد شد"
@@ -473,9 +466,7 @@
         "request_reviewed": "✅ {request_label} <code>{request_id}</code> {status_text}."
       },
       "user_notice": {
-        "free_approved": "✅ درخواست تست رایگان شما تایید شد.",
         "agency_approved": "✅ درخواست نمایندگی شما تایید شد.",
-        "free_rejected": "❌ درخواست تست رایگان شما رد شد.",
         "agency_rejected": "❌ درخواست نمایندگی شما رد شد.",
         "admin_note": "\n\n📝 توضیح ادمین:\n{note}"
       }
@@ -712,10 +703,8 @@
     },
     "requests": {
       "actions": {
-        "open_free": "👀 درخواست تست #{request_id}",
         "open_agency": "👀 درخواست نمایندگی #{request_id}"
       },
-      "new_free_request": "🎁 <b>درخواست تست رایگان جدید</b>\n\nشناسه: <code>{request_id}</code>\nکاربر: <code>{user_id}</code>\nتوضیح:\n{note}",
       "new_agency_request": "🤝 <b>درخواست نمایندگی جدید</b>\n\nشناسه: <code>{request_id}</code>\nکاربر: <code>{user_id}</code>\nمتن درخواست:\n{note}"
     },
     "users_stock": {
@@ -802,7 +791,8 @@
         "service_free_test_max": "🔢 سقف دریافت",
         "service_free_test_cooldown": "📅 فاصله زمانی",
         "service_free_test_reset": "🧹 ریست سهمیه",
-        "service_free_test_refresh": "📊 بازخوانی وضعیت"
+        "service_free_test_refresh": "📊 وضعیت",
+        "service_free_test_stock_add": "➕ افزودن موجودی تست رایگان"
       },
       "create_type": {
         "overview": "🆕 <b>افزودن نوع سرویس</b>\n\n✍️ راهنما: نام نوع سرویس جدید را ارسال کنید.\n\n<blockquote>💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید.</blockquote>"
@@ -862,7 +852,8 @@
           "mode_once": "🧭 once_until_reset",
           "max_claims": "🔢 <b>سقف دریافت را وارد کنید:</b>\n\n📌 تعداد مجاز دریافت کاربر را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار برای کنترل تعداد claim هر کاربر روی همین سرویس استفاده می‌شود.</blockquote>",
           "cooldown_days": "📅 <b>فاصله زمانی را وارد کنید:</b>\n\n📌 تعداد روز cooldown را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار فقط در مدل cooldown استفاده می‌شود.</blockquote>",
-          "reset_user": "🧹 <b>آیدی کاربر برای ریست سهمیه را وارد کنید:</b>\n\n📌 آیدی عددی کاربر را ارسال کنید:\n\n<blockquote>💡 با این عملیات history تست رایگان همان کاربر فقط در همین سرویس پاک می‌شود.</blockquote>"
+          "reset_user": "🧹 <b>آیدی کاربر برای ریست سهمیه را وارد کنید:</b>\n\n📌 آیدی عددی کاربر را ارسال کنید:\n\n<blockquote>💡 با این عملیات history تست رایگان همان کاربر فقط در همین سرویس پاک می‌شود.</blockquote>",
+          "stock_payload": "📦 <b>ثبت موجودی تست رایگان:</b>\n\n📝 لطفاً اطلاعات را در ۵ خط و با جداکننده <code>---</code> ارسال کنید:\nنام نمایشی\n---\nحجم\n---\nمدت‌زمان\n---\nلینک ساب\n---\nلینک تکی کانفیگ\n\n<blockquote>💡 هر ۵ بخش الزامی است و موجودی در باکت تست رایگان ذخیره می‌شود.</blockquote>"
         }
       },
       "messages": {
@@ -967,7 +958,8 @@
         "tariff_deleted": "✅ تعرفه حذف شد.",
         "service_stock_added": "✅ موجودی سرویس با شناسه <code>{config_id}</code> ثبت شد.",
         "service_free_test_rule_saved": "✅ تنظیمات تست رایگان سرویس ذخیره شد.",
-        "service_free_test_quota_reset": "✅ سهمیه تست رایگان کاربر <code>{target_user_id}</code> برای این سرویس ریست شد."
+        "service_free_test_quota_reset": "✅ سهمیه تست رایگان کاربر <code>{target_user_id}</code> برای این سرویس ریست شد.",
+        "service_free_test_stock_added": "✅ موجودی تست رایگان با شناسه <code>{config_id}</code> ثبت شد."
       }
     },
     "ui": {
@@ -1124,7 +1116,6 @@
             "filter_rejected": "❌ rejected",
             "row": "{num}) #{request_id} | U:{uid} | {created_at}",
             "button": "{num} - درخواست #{request_id}",
-            "kind_free": "تست رایگان",
             "kind_agency": "نمایندگی",
             "title": "🗂 <b>درخواست‌های {kind_title}</b>",
             "empty": "درخواستی برای این فیلتر یافت نشد.",
@@ -1135,7 +1126,6 @@
             "status_approved": "✅ approved",
             "status_rejected": "❌ rejected",
             "status_pending": "⏳ pending",
-            "kind_free": "درخواست تست رایگان",
             "kind_agency": "درخواست نمایندگی",
             "overview": "📝 <b>{kind_title}</b>\n\n🔢 شناسه: <code>{request_id}</code>\n👤 کاربر: <code>{user_id}</code>\n📶 وضعیت: {status_text}\n🕒 زمان ثبت: {created_at}\n🧾 متن درخواست: {note}\n\n<blockquote>💡 قبل از تایید یا رد، متن درخواست را کامل بررسی کنید.</blockquote>"
           }

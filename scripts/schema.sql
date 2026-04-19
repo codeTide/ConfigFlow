@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS configs (
     package_id BIGINT NULL,
     service_id BIGINT NULL,
     tariff_id BIGINT NULL,
+    inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale',
     service_name VARCHAR(255) NOT NULL,
     config_text TEXT NOT NULL,
     inquiry_link TEXT NULL,
@@ -86,6 +87,7 @@ CREATE TABLE IF NOT EXISTS configs (
     INDEX idx_configs_package (package_id),
     INDEX idx_configs_service (service_id),
     INDEX idx_configs_tariff (tariff_id),
+    INDEX idx_configs_inventory_bucket (inventory_bucket),
     INDEX idx_configs_sold (sold_to),
     INDEX idx_configs_available (package_id, sold_to, reserved_payment_id, is_expired)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -106,18 +108,6 @@ CREATE TABLE IF NOT EXISTS purchases (
     INDEX idx_purchases_tariff (tariff_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS free_test_requests (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    note TEXT NOT NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'pending',
-    admin_note TEXT NULL,
-    created_at DATETIME NOT NULL,
-    reviewed_at DATETIME NULL,
-    INDEX idx_free_test_user (user_id),
-    INDEX idx_free_test_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS agency_requests (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -130,24 +120,27 @@ CREATE TABLE IF NOT EXISTS agency_requests (
     INDEX idx_agency_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS free_test_package_rules (
-    package_id BIGINT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS free_test_service_rules (
+    service_id BIGINT PRIMARY KEY,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    claim_mode ENUM('cooldown','once_until_reset') NOT NULL DEFAULT 'once_until_reset',
+    cooldown_days INT NULL,
     max_claims INT NOT NULL DEFAULT 1,
-    cooldown_days INT NOT NULL DEFAULT 0,
-    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    priority INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
-    INDEX idx_free_test_enabled (is_enabled)
+    INDEX idx_free_test_service_enabled (is_enabled),
+    INDEX idx_free_test_service_priority (priority)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS free_test_claims (
+CREATE TABLE IF NOT EXISTS free_test_service_claims (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    package_id BIGINT NOT NULL,
+    service_id BIGINT NOT NULL,
     purchase_id BIGINT NOT NULL,
     claimed_at DATETIME NOT NULL,
-    INDEX idx_free_test_claims_user_pkg (user_id, package_id),
-    INDEX idx_free_test_claims_pkg (package_id)
+    INDEX idx_free_test_service_claims_user_service (user_id, service_id),
+    INDEX idx_free_test_service_claims_service (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS payments (

@@ -23,3 +23,4 @@ CREATE TABLE IF NOT EXISTS free_test_service_claims (
 
 DROP TABLE IF EXISTS free_test_claims;
 DROP TABLE IF EXISTS free_test_package_rules;
+DROP TABLE IF EXISTS free_test_requests;

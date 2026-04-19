@@ -28,6 +28,7 @@ final class MessageHandler
     private const ADMIN_SERVICE_FREE_TEST_COOLDOWN = '[legacy] admin.types_packages.actions.service_free_test_cooldown';
     private const ADMIN_SERVICE_FREE_TEST_RESET = '[legacy] admin.types_packages.actions.service_free_test_reset';
     private const ADMIN_SERVICE_FREE_TEST_REFRESH = '[legacy] admin.types_packages.actions.service_free_test_refresh';
+    private const ADMIN_SERVICE_FREE_TEST_STOCK_ADD = '[legacy] admin.types_packages.actions.service_free_test_stock_add';
     private const ADMIN_SERVICE_DELETE = '[legacy] admin.types_packages.actions.service_delete';
     private const ADMIN_SERVICE_TARIFF_ADD = '[legacy] admin.types_packages.actions.service_tariff_add';
     private const ADMIN_SERVICE_STOCK_ADD = '[legacy] admin.types_packages.actions.service_stock_add';
@@ -47,7 +48,6 @@ final class MessageHandler
     private const ADMIN_PAYMENT_APPROVE = '[legacy] admin.payments_requests.actions.payment_approve';
     private const ADMIN_PAYMENT_REJECT = '[legacy] admin.payments_requests.actions.payment_reject';
     private const ADMIN_PAYMENT_VERIFY_CHAIN = '[legacy] admin.payments_requests.actions.payment_verify_chain';
-    private const ADMIN_REQUESTS_FREE = '[legacy] admin.payments_requests.actions.requests_free';
     private const ADMIN_REQUESTS_AGENCY = '[legacy] admin.payments_requests.actions.requests_agency';
     private const ADMIN_REQUESTS_PENDING = '[legacy] admin.ui.open.requests.list.filter_pending';
     private const ADMIN_REQUESTS_APPROVED = '[legacy] admin.ui.open.requests.list.filter_approved';
@@ -275,6 +275,7 @@ final class MessageHandler
             || $state['state_name'] === 'admin.service.free_test.max'
             || $state['state_name'] === 'admin.service.free_test.cooldown'
             || $state['state_name'] === 'admin.service.free_test.reset_user'
+            || $state['state_name'] === 'admin.service.free_test.stock_add'
         ) {
             $this->handleAdminServicesState($chatId, $userId, $text, $state);
             return;
@@ -635,41 +636,6 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_free_test_note') {
-            if ($this->isBotMenuButton($text)) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.note_as_text'));
-                return;
-            }
-            if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.note_required'));
-                return;
-            }
-
-            $this->database->clearUserState($userId);
-            $requestId = $this->database->createFreeTestRequest($userId, $text);
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->catalog->get('messages.user.free_test.request_submitted', ['request_id' => $requestId])
-            );
-
-            foreach (Config::adminIds() as $adminId) {
-                $this->telegram->sendMessage(
-                    (int) $adminId,
-                    $this->catalog->get('admin.requests.new_free_request', [
-                        'request_id' => $requestId,
-                        'user_id' => $userId,
-                        'note' => htmlspecialchars($text),
-                    ]),
-                    $this->replyKeyboard([
-                        [$this->catalog->get('admin.requests.actions.open_free', ['request_id' => $requestId])],
-                        [$this->catalog->get('buttons.admin.requests')],
-                        [KeyboardBuilder::admin()],
-                    ])
-                );
-            }
-            return;
-        }
-
         if ($state['state_name'] === 'await_agency_request') {
             if ($this->isBotMenuButton($text)) {
                 $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_as_text'));
@@ -745,14 +711,14 @@ final class MessageHandler
             $requestId = (int) ($payload['request_id'] ?? 0);
             $approve = ((int) ($payload['approve'] ?? 0)) === 1;
             if ($text === UiLabels::back($this->catalog)) {
-                if ($requestKind === 'free' || $requestKind === 'agency') {
+                if ($requestKind === 'agency') {
                     $this->openAdminRequestView($chatId, $userId, $requestKind, $requestId, 'pending', $this->messageRenderer->render('admin.legacy.info.request_note_legacy_redirect'));
                 } else {
-                    $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->messageRenderer->render('admin.legacy.info.request_note_legacy_redirect'));
+                    $this->openAdminRequestsList($chatId, $userId, 'agency', 'pending', $this->messageRenderer->render('admin.legacy.info.request_note_legacy_redirect'));
                 }
                 return;
             }
-            if ($requestId <= 0 || ($requestKind !== 'free' && $requestKind !== 'agency')) {
+            if ($requestId <= 0 || $requestKind !== 'agency') {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_request_info'));
                 return;
@@ -763,9 +729,7 @@ final class MessageHandler
             }
             $adminNote = trim($text) === '-' ? null : trim($text);
 
-            $result = $requestKind === 'free'
-                ? $this->database->reviewFreeTestRequest($requestId, $approve, $adminNote)
-                : $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
+            $result = $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
             if (!($result['ok'] ?? false)) {
                 $msg = (($result['error'] ?? '') === 'already_reviewed')
                     ? $this->catalog->get('admin.legacy.errors.request_already_reviewed')
@@ -778,9 +742,7 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->messageRenderer->render('admin.payments_requests.success.request_reviewed', [
-                    'request_label' => $requestKind === 'free'
-                        ? $this->catalog->get('admin.payments_requests.labels.request_free')
-                        : $this->catalog->get('admin.payments_requests.labels.request_agency'),
+                    'request_label' => $this->catalog->get('admin.payments_requests.labels.request_agency'),
                     'request_id' => $requestId,
                     'status_text' => $approve
                         ? $this->catalog->get('admin.payments_requests.labels.status_approved')
@@ -789,8 +751,8 @@ final class MessageHandler
             );
 
             $userNotice = $approve
-                ? ($requestKind === 'free' ? $this->catalog->get('admin.legacy.user_notice.free_approved') : $this->catalog->get('admin.legacy.user_notice.agency_approved'))
-                : ($requestKind === 'free' ? $this->catalog->get('admin.legacy.user_notice.free_rejected') : $this->catalog->get('admin.legacy.user_notice.agency_rejected'));
+                ? $this->catalog->get('admin.legacy.user_notice.agency_approved')
+                : $this->catalog->get('admin.legacy.user_notice.agency_rejected');
             $noteLine = $adminNote !== null && $adminNote !== ''
                 ? $this->catalog->get('admin.legacy.user_notice.admin_note', ['note' => htmlspecialchars($adminNote)])
                 : '';
@@ -1739,6 +1701,11 @@ final class MessageHandler
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.reset_user'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)) {
+                $this->database->setUserState($userId, 'admin.service.free_test.stock_add', ['service_id' => $serviceId]);
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.free_test_wizard.stock_payload'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                return;
+            }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)) {
                 $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
                 return;
@@ -1795,6 +1762,32 @@ final class MessageHandler
             }
             $this->database->saveFreeTestRuleForService($serviceId, ((int) ($rule['is_enabled'] ?? 0)) === 1, $mode, $cooldownDays, $maxClaims, (int) ($rule['priority'] ?? 0));
             $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_rule_saved'));
+            return;
+        }
+
+        if ($stateName === 'admin.service.free_test.stock_add') {
+            $serviceId = (int) ($payload['service_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
+                return;
+            }
+            $parts = preg_split('/\n-{3,}\n/u', trim($text));
+            if (!is_array($parts) || count($parts) < 5) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_payload_format'));
+                return;
+            }
+            $displayName = trim((string) ($parts[0] ?? ''));
+            $volume = trim((string) ($parts[1] ?? ''));
+            $duration = trim((string) ($parts[2] ?? ''));
+            $subLink = trim((string) ($parts[3] ?? ''));
+            $singleConfig = trim((string) ($parts[4] ?? ''));
+            if ($displayName === '' || $subLink === '' || $singleConfig === '') {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+                return;
+            }
+            $configPayload = "🔗 لینک ساب:\n{$subLink}\n\n🔐 لینک تکی:\n{$singleConfig}\n\n📦 حجم: {$volume}\n⏳ مدت: {$duration}";
+            $configId = $this->database->addConfigForService($serviceId, null, $displayName, $configPayload, $subLink, 'free_test');
+            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_free_test_stock_added', ['config_id' => $configId]));
             return;
         }
 
@@ -2172,7 +2165,9 @@ final class MessageHandler
             'max_claims' => 1,
         ];
         $claimCount = $this->database->countFreeTestClaimsForService($serviceId);
-        $stockCount = $this->database->countAvailableConfigsByService($serviceId);
+        $stockCount = $this->database->countAvailableFreeTestStockByService($serviceId);
+        $isEnabledText = ((int) ($rule['is_enabled'] ?? 0)) === 1 ? '🟢 فعال' : '🔴 غیرفعال';
+        $claimModeText = ((string) ($rule['claim_mode'] ?? 'once_until_reset')) === 'cooldown' ? '⏱️ دوره‌ای' : '1️⃣ یک‌بار تا ریست';
         $this->database->setUserState($userId, 'admin.service.free_test.view', ['service_id' => $serviceId]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -2181,18 +2176,19 @@ final class MessageHandler
             $chatId,
             $this->messageRenderer->render('admin.ui.open.service_free_test.overview', [
                 'service_name' => (string) ($service['name'] ?? ''),
-                'is_enabled' => ((int) ($rule['is_enabled'] ?? 0)) === 1 ? $this->catalog->get('messages.generic.status_enabled_icon') : $this->catalog->get('messages.generic.status_disabled_icon'),
-                'claim_mode' => (string) ($rule['claim_mode'] ?? 'once_until_reset'),
-                'cooldown_days' => $rule['cooldown_days'] !== null ? (string) $rule['cooldown_days'] : $this->catalog->get('messages.generic.dash'),
-                'max_claims' => (string) ((int) ($rule['max_claims'] ?? 1)),
-                'claim_count' => (string) $claimCount,
-                'stock_count' => (string) $stockCount,
+                'is_enabled' => $isEnabledText,
+                'claim_mode' => $claimModeText,
+                'cooldown_days' => $rule['cooldown_days'] !== null ? $this->toPersianNumber((string) $rule['cooldown_days']) : $this->catalog->get('messages.generic.dash'),
+                'max_claims' => $this->toPersianNumber((string) ((int) ($rule['max_claims'] ?? 1))),
+                'claim_count' => $this->toPersianNumber((string) $claimCount),
+                'stock_count' => $this->toPersianNumber((string) $stockCount),
             ])
             ,
             $this->uiKeyboard->replyMenu([
-                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE)],
+                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)],
                 [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)],
-                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)],
+                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)],
+                [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
@@ -3526,7 +3522,6 @@ final class MessageHandler
         $paymentVerifyChainLabel = $this->catalog->get('admin.payments_requests.actions.payment_verify_chain');
         $paymentApproveLabel = $this->catalog->get('admin.payments_requests.actions.payment_approve');
         $paymentRejectLabel = $this->catalog->get('admin.payments_requests.actions.payment_reject');
-        $requestsFreeLabel = $this->catalog->get('admin.payments_requests.actions.requests_free');
         $requestsAgencyLabel = $this->catalog->get('admin.payments_requests.actions.requests_agency');
         $requestsPendingLabel = $this->catalog->get('admin.payments_requests.actions.requests_pending');
         $requestsApprovedLabel = $this->catalog->get('admin.payments_requests.actions.requests_approved');
@@ -3615,10 +3610,6 @@ final class MessageHandler
             $kind = (string) ($payload['kind'] ?? '');
             $status = (string) ($payload['status'] ?? 'pending');
             if ($kind === '') {
-                if ($text === $requestsFreeLabel || $text === $this->uiConst(self::ADMIN_REQUESTS_FREE)) {
-                    $this->openAdminRequestsList($chatId, $userId, 'free', 'pending');
-                    return;
-                }
                 if ($text === $requestsAgencyLabel || $text === $this->uiConst(self::ADMIN_REQUESTS_AGENCY)) {
                     $this->openAdminRequestsList($chatId, $userId, 'agency', 'pending');
                     return;
@@ -3697,8 +3688,8 @@ final class MessageHandler
             $requestId = (int) ($payload['request_id'] ?? 0);
             $status = (string) ($payload['status'] ?? 'pending');
             $action = (string) ($payload['action'] ?? '');
-            if ($kind === '' || $requestId <= 0 || ($action !== 'approve' && $action !== 'reject')) {
-                $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->messageRenderer->render('admin.payments_requests.errors.invalid_request_review_info'));
+            if ($kind !== 'agency' || $requestId <= 0 || ($action !== 'approve' && $action !== 'reject')) {
+                $this->openAdminRequestsList($chatId, $userId, 'agency', 'pending', $this->messageRenderer->render('admin.payments_requests.errors.invalid_request_review_info'));
                 return;
             }
             if ($text === UiLabels::back($this->catalog)) {
@@ -3708,9 +3699,7 @@ final class MessageHandler
 
             $adminNote = trim($text) === '-' ? null : trim($text);
             $approve = $action === 'approve';
-            $result = $kind === 'free'
-                ? $this->database->reviewFreeTestRequest($requestId, $approve, $adminNote)
-                : $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
+            $result = $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
             if (!($result['ok'] ?? false)) {
                 $msg = (($result['error'] ?? '') === 'already_reviewed')
                     ? $this->catalog->get('admin.payments_requests.errors.request_already_reviewed')
@@ -3720,9 +3709,7 @@ final class MessageHandler
                 return;
             }
 
-            $label = $kind === 'free'
-                ? $this->catalog->get('admin.payments_requests.labels.request_free')
-                : $this->catalog->get('admin.payments_requests.labels.request_agency');
+            $label = $this->catalog->get('admin.payments_requests.labels.request_agency');
             $statusText = $approve
                 ? $this->catalog->get('admin.payments_requests.labels.status_approved')
                 : $this->catalog->get('admin.payments_requests.labels.status_rejected');
@@ -3732,12 +3719,8 @@ final class MessageHandler
                 'status_text' => $statusText,
             ]));
             $userNotice = $approve
-                ? ($kind === 'free'
-                    ? $this->catalog->get('admin.payments_requests.user_notice.free_approved')
-                    : $this->catalog->get('admin.payments_requests.user_notice.agency_approved'))
-                : ($kind === 'free'
-                    ? $this->catalog->get('admin.payments_requests.user_notice.free_rejected')
-                    : $this->catalog->get('admin.payments_requests.user_notice.agency_rejected'));
+                ? $this->catalog->get('admin.payments_requests.user_notice.agency_approved')
+                : $this->catalog->get('admin.payments_requests.user_notice.agency_rejected');
             $noteLine = $adminNote !== null && $adminNote !== ''
                 ? $this->catalog->get('admin.payments_requests.user_notice.admin_note', [
                     'note' => htmlspecialchars($adminNote),
@@ -3913,28 +3896,14 @@ final class MessageHandler
         $this->telegram->sendMessage($targetUserId, $userNotice);
     }
 
-    private function openAdminRequestsList(int $chatId, int $userId, string $kind = '', string $status = 'pending', ?string $notice = null): void
+    private function openAdminRequestsList(int $chatId, int $userId, string $kind = 'agency', string $status = 'pending', ?string $notice = null): void
     {
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        if ($kind === '') {
-            $this->database->setUserState($userId, 'admin.requests.list', ['kind' => '', 'stack' => ['admin.root']]);
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->messageRenderer->render('admin.ui.open.requests.root.overview'),
-                $this->uiKeyboard->replyMenu([
-                    [$this->uiConst(self::ADMIN_REQUESTS_FREE)],
-                    [$this->uiConst(self::ADMIN_REQUESTS_AGENCY)],
-                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-                ])
-            );
-            return;
-        }
+        $kind = 'agency';
 
-        $items = $kind === 'free'
-            ? $this->database->listFreeTestRequestsByStatus($status, 20, 0)
-            : $this->database->listAgencyRequestsByStatus($status, 20, 0);
+        $items = $this->database->listAgencyRequestsByStatus($status, 20, 0);
         $options = [];
         $lines = [];
         $buttons = [[
@@ -3961,9 +3930,7 @@ final class MessageHandler
             'options' => $options,
             'stack' => ['admin.root'],
         ]);
-        $kindTitle = $kind === 'free'
-            ? $this->catalog->get('admin.ui.open.requests.list.kind_free')
-            : $this->catalog->get('admin.ui.open.requests.list.kind_agency');
+        $kindTitle = $this->catalog->get('admin.ui.open.requests.list.kind_agency');
         $this->telegram->sendMessage(
             $chatId,
             $this->messageRenderer->render('admin.ui.open.requests.list.overview', [
@@ -3977,9 +3944,7 @@ final class MessageHandler
 
     private function openAdminRequestView(int $chatId, int $userId, string $kind, int $requestId, string $backStatus = 'pending', ?string $notice = null): void
     {
-        $request = $kind === 'free'
-            ? $this->database->getFreeTestRequestById($requestId)
-            : $this->database->getAgencyRequestById($requestId);
+        $request = $this->database->getAgencyRequestById($requestId);
         if ($request === null) {
             $this->openAdminRequestsList($chatId, $userId, $kind, $backStatus, $this->messageRenderer->render('admin.ui.open.requests.view.not_found'));
             return;
@@ -3991,9 +3956,7 @@ final class MessageHandler
         $statusText = $status === 'approved'
             ? $this->catalog->get('admin.ui.open.requests.view.status_approved')
             : ($status === 'rejected' ? $this->catalog->get('admin.ui.open.requests.view.status_rejected') : $this->catalog->get('admin.ui.open.requests.view.status_pending'));
-        $kindTitle = $kind === 'free'
-            ? $this->catalog->get('admin.ui.open.requests.view.kind_free')
-            : $this->catalog->get('admin.ui.open.requests.view.kind_agency');
+        $kindTitle = $this->catalog->get('admin.ui.open.requests.view.kind_agency');
         $buttons = [];
         if ($status === 'pending') {
             $buttons[] = [$this->uiConst(self::ADMIN_REQUEST_APPROVE), $this->uiConst(self::ADMIN_REQUEST_REJECT)];
