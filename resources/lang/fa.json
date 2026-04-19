@@ -33,7 +33,8 @@
       "delivery": "📦 تحویل سفارش",
       "requests": "🗂 درخواست‌ها",
       "backup_topics": "🗃 بکاپ/تاپیک",
-      "exit_panel": "🚪 خروج"
+      "exit_panel": "🚪 خروج",
+      "types_tariffs": "🧩 سرویس‌ها"
     },
     "accept_rules": "✅ قوانین را می‌پذیرم",
     "pay": {
@@ -45,7 +46,8 @@
       "tronpays": "🧾 TronPays Rial",
       "verify": "🔄 بررسی پرداخت",
       "gateway_pay": "💳 پرداخت"
-    }
+    },
+    "my_stock_items": "📦 کانفیگ‌هام"
   },
   "menus": {
     "messages": {
@@ -57,7 +59,9 @@
       "support_link_desc_line": "\n📝 توضیح لینک: {description}",
       "my_configs_empty": "📦 هنوز کانفیگی برای حساب شما ثبت نشده است.",
       "my_configs_overview": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>\n\n🗂 آخرین سفارش‌ها: {orders}\n\n<blockquote>💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند.</blockquote>",
-      "referral_overview": "{title}\n\n📊 زیرمجموعه‌ها: <b>{total_referrals}</b>\n🛒 خریدهای زیرمجموعه: <b>{purchase_count}</b>\n💵 مجموع خرید زیرمجموعه: <b>{total_purchase_amount}</b> تومان\n🔗 لینک دعوت: \n\n<code>{ref_link}</code>\n\n<blockquote>💡 لینک دعوت را فقط برای مخاطب واقعی بفرستید؛ ثبت‌نام و خرید زیرمجموعه‌ها خودکار در آمار شما ثبت می‌شود.</blockquote>"
+      "referral_overview": "{title}\n\n📊 زیرمجموعه‌ها: <b>{total_referrals}</b>\n🛒 خریدهای زیرمجموعه: <b>{purchase_count}</b>\n💵 مجموع خرید زیرمجموعه: <b>{total_purchase_amount}</b> تومان\n🔗 لینک دعوت: \n\n<code>{ref_link}</code>\n\n<blockquote>💡 لینک دعوت را فقط برای مخاطب واقعی بفرستید؛ ثبت‌نام و خرید زیرمجموعه‌ها خودکار در آمار شما ثبت می‌شود.</blockquote>",
+      "my_stock_items_empty": "📦 هنوز کانفیگی برای حساب شما ثبت نشده است.",
+      "my_stock_items_overview": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>\n\n🗂 آخرین سفارش‌ها: {orders}\n\n<blockquote>💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند.</blockquote>"
     },
     "my_configs": {
       "order_row": "• #{id} | {package} | {service} | {amount} تومان{test_suffix}\n  ⏱ {created_at}",
@@ -66,6 +70,10 @@
     "referral": {
       "default_intro": "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>",
       "share_text": "از لینک من وارد شو:\n{ref_link}"
+    },
+    "my_stock_items": {
+      "order_row": "• #{id} | {tariff} | {service} | {amount} تومان{test_suffix}\n  ⏱ {created_at}",
+      "test_suffix": " (تست)"
     }
   },
   "messages": {
@@ -206,6 +214,13 @@
         "no_package_for_service": "پکیجی برای سرویس انتخابی یافت نشد.",
         "service_selection": {
           "overview": "🛒 <b>خرید کانفیگ</b>\n\n🧩 انتخاب سرویس: {options}\n\n<blockquote>💡 ابتدا سرویس را انتخاب کنید؛ در مرحله بعد لیست پکیج‌ها نمایش داده می‌شود و می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را مدیریت کنید.</blockquote>"
+        },
+        "default_tariff_name": "پکیج",
+        "no_tariff_for_service": "پکیجی برای سرویس انتخابی یافت نشد.",
+        "tariff_not_found": "پکیج پیدا نشد.",
+        "tariff_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان{stock_suffix}",
+        "tariff_selection": {
+          "overview": "📦 <b>انتخاب پکیج</b>\n\n📋 لیست پکیج‌ها: {options}\n\n<blockquote>💡 شماره هر پکیج را از روی دکمه‌های همین صفحه انتخاب کنید؛ در صورت نیاز با بازگشت می‌توانید سرویس را دوباره تغییر دهید.</blockquote>"
         }
       },
       "renew": {
@@ -240,7 +255,13 @@
           "tip": "💡 روش پرداخت مناسب را انتخاب کنید؛ بعد از تکمیل پرداخت، وضعیت تراکنش را بررسی کنید تا درخواست تمدید در صف تحویل قرار بگیرد.",
           "overview": "💳 <b>پرداخت تمدید</b>\n\n🧾 سفارش: <code>#{purchase_id}</code>\n📦 پکیج تمدید: <b>{package_name}</b>\n💵 مبلغ: <b>{amount}</b> تومان\n\n<blockquote>💡 روش پرداخت مناسب را انتخاب کنید؛ بعد از تکمیل پرداخت، وضعیت تراکنش را بررسی کنید تا درخواست تمدید در صف تحویل قرار بگیرد.</blockquote>"
         },
-        "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان"
+        "package_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان",
+        "no_tariff": "پکیج تمدید یافت نشد.",
+        "select_tariff": {
+          "overview": "♻️ <b>انتخاب پکیج تمدید</b>\n\n🧾 سفارش: <code>#{purchase_id}</code>\n📡 سرویس فعلی: <b>{service_name}</b>\n📦 پکیج فعلی: <b>{package_name}</b>\n📋 گزینه‌های تمدید: {options}\n\n<blockquote>💡 پکیج تمدید باید با سرویس فعلی شما سازگار باشد؛ اگر انتخاب را اشتباه انجام دادید با بازگشت به لیست سفارش‌ها برگردید و گزینه درست را انتخاب کنید.</blockquote>"
+        },
+        "tariff_button": "📦 پکیج {num}",
+        "tariff_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان"
       },
       "payment": {
         "errors": {
@@ -360,7 +381,8 @@
         "package_create_legacy_disabled": "💡 ایجاد Package از مسیر legacy غیرفعال شده است.",
         "noncanonical_prefix": "💡 مسیر قبلی canonical نیست. {msg}",
         "config_created_noncanonical": "💡 مسیر قبلی canonical نیست؛ کانفیگ با شناسه <code>{config_id}</code> ثبت شد.",
-        "settings_restored_group_topic": "♻️ بازیابی تنظیمات انجام شد.\nادمین: <code>{user_id}</code>\nتعداد کلید: <b>{count}</b>"
+        "settings_restored_group_topic": "♻️ بازیابی تنظیمات انجام شد.\nادمین: <code>{user_id}</code>\nتعداد کلید: <b>{count}</b>",
+        "stock_item_created_noncanonical": "💡 مسیر قبلی canonical نیست؛ کانفیگ با شناسه <code>{config_id}</code> ثبت شد."
       },
       "errors": {
         "invalid_freetest_rule_format": "⚠️ فرمت نامعتبر است. نمونه: <code>12|1|0</code>",
@@ -389,7 +411,10 @@
         "valid_json_input_not_sent": "⚠️ فایل/متن JSON معتبر ارسال نشد.",
         "invalid_json_missing_settings": "⚠️ ساختار JSON نامعتبر است. کلید settings پیدا نشد.",
         "pin_message_empty": "⚠️ متن پیام پین نمی‌تواند خالی باشد.",
-        "invalid_pin_edit_data": "⚠️ داده ویرایش پیام پین معتبر نیست."
+        "invalid_pin_edit_data": "⚠️ داده ویرایش پیام پین معتبر نیست.",
+        "invalid_service_or_raw_payload": "❌ نام سرویس یا متن کانفیگ معتبر نیست.",
+        "invalid_stock_item_separator": "❌ فرمت نامعتبر است. جداکننده --- را رعایت کنید.",
+        "raw_payload_required": "❌ لطفاً متن کانفیگ را طبق فرمت ارسال کنید."
       },
       "success": {
         "freetest_rule_saved": "✅ قانون تست رایگان ذخیره شد.",
@@ -631,7 +656,8 @@
         "invalid_duration_days": "❌ تعداد روز معتبر نیست.",
         "group_ids_required": "❌ شناسه گروه‌ها الزامی است.",
         "panel_wizard_confirm_required": "❌ برای ثبت روی دکمه «✅ تایید» بزنید.",
-        "invalid_state": "❌ وضعیت نامعتبر است. دوباره تلاش کنید."
+        "invalid_state": "❌ وضعیت نامعتبر است. دوباره تلاش کنید.",
+        "invalid_menu_option": "❌ ورودی معتبر وارد کنید."
       },
       "success": {
         "agent_price_deleted": "✅ قیمت اختصاصی حذف شد.",
@@ -645,7 +671,8 @@
         "group_id_saved": "✅ Group ID ذخیره شد.",
         "settings_restored": "✅ بازیابی تنظیمات انجام شد.",
         "freetest_rule_saved": "✅ قانون تست رایگان ذخیره شد.",
-        "freetest_quota_reset": "✅ سهمیه کاربر ریست شد."
+        "freetest_quota_reset": "✅ سهمیه کاربر ریست شد.",
+        "panel_tariff_created": "✅ سرویس پنلی ویرایش شد."
       }
     },
     "panel_settings": {
@@ -715,7 +742,9 @@
       "prompts": {
         "balance_action_overview": "💵 <b>{mode_text} موجودی کاربر</b>\n\n👤 کاربر: <code>{target_uid}</code>\n🔢 ورودی: مبلغ را به تومان ارسال کنید (فقط عدد).\n\n<blockquote>💡 با دکمه بازگشت می‌توانید به پروفایل کاربر برگردید.</blockquote>",
         "add_config_overview": "💡 ➕ <b>افزودن کانفیگ</b>\n\n🧾 فرمت: خط اول: نام سرویس\n---\nخط دوم: متن کانفیگ\n---\n(اختیاری) لینک استعلام\n\n<blockquote>💡 جداکننده بین بخش‌ها باید دقیقاً --- باشد.</blockquote>",
-        "search_config_overview": "🔎 <b>جستجو در کانفیگ‌ها</b>\n\n📝 ورودی: عبارت جستجو را ارسال کنید. برای پاک‌کردن از \"-\" استفاده کنید.\n\n<blockquote>💡 جستجو روی نام سرویس، متن کانفیگ و لینک استعلام انجام می‌شود.</blockquote>"
+        "search_config_overview": "🔎 <b>جستجو در کانفیگ‌ها</b>\n\n📝 ورودی: عبارت جستجو را ارسال کنید. برای پاک‌کردن از \"-\" استفاده کنید.\n\n<blockquote>💡 جستجو روی نام سرویس، متن کانفیگ و لینک استعلام انجام می‌شود.</blockquote>",
+        "add_stock_item_overview": "💡 ➕ <b>افزودن کانفیگ</b>\n\n🧾 فرمت: خط اول: نام سرویس\n---\nخط دوم: متن کانفیگ\n---\n(اختیاری) لینک استعلام\n\n<blockquote>💡 جداکننده بین بخش‌ها باید دقیقاً --- باشد.</blockquote>",
+        "search_stock_item_overview": "🔎 <b>جستجو در کانفیگ‌ها</b>\n\n📝 ورودی: عبارت جستجو را ارسال کنید. برای پاک‌کردن از \"-\" استفاده کنید.\n\n<blockquote>💡 جستجو روی نام سرویس، متن کانفیگ و لینک استعلام انجام می‌شود.</blockquote>"
       },
       "errors": {
         "invalid_user_list_option": "❌ گزینه نامعتبر است. لطفاً از لیست کاربران انتخاب کنید.",
@@ -731,7 +760,14 @@
         "invalid_config_detail_option": "❌ گزینه نامعتبر است. از دکمه‌های مدیریت کانفیگ استفاده کنید.",
         "config_text_required": "❌ لطفاً متن کانفیگ را طبق فرمت ارسال کنید.",
         "invalid_config_format": "❌ فرمت نامعتبر است. جداکننده --- را رعایت کنید.",
-        "invalid_service_or_config_text": "❌ نام سرویس یا متن کانفیگ معتبر نیست."
+        "invalid_service_or_config_text": "❌ نام سرویس یا متن کانفیگ معتبر نیست.",
+        "invalid_service_or_raw_payload": "❌ نام سرویس یا متن کانفیگ معتبر نیست.",
+        "invalid_stock_item_detail_option": "❌ گزینه نامعتبر است. از دکمه‌های مدیریت کانفیگ استفاده کنید.",
+        "invalid_stock_item_format": "❌ فرمت نامعتبر است. جداکننده --- را رعایت کنید.",
+        "invalid_stock_items_option": "❌ گزینه نامعتبر است. از دکمه‌های همین صفحه استفاده کنید.",
+        "invalid_stock_tariff_option": "❌ گزینه نامعتبر است. یکی از پکیج‌ها را انتخاب کنید.",
+        "raw_payload_required": "❌ لطفاً متن کانفیگ را طبق فرمت ارسال کنید.",
+        "stock_item_not_found": "❌ کانفیگ پیدا نشد."
       },
       "success": {
         "user_status_updated": "✅ وضعیت کاربر بروزرسانی شد.",
@@ -739,7 +775,10 @@
         "user_balance_updated": "✅ موجودی کاربر بروزرسانی شد.",
         "config_expire_status_updated": "✅ وضعیت انقضا بروزرسانی شد.",
         "config_deleted": "✅ کانفیگ حذف شد.",
-        "config_created": "✅ کانفیگ با شناسه <code>{config_id}</code> ثبت شد."
+        "config_created": "✅ کانفیگ با شناسه <code>{config_id}</code> ثبت شد.",
+        "stock_item_created": "✅ کانفیگ با شناسه <code>{config_id}</code> ثبت شد.",
+        "stock_item_deleted": "✅ کانفیگ حذف شد.",
+        "stock_item_expire_status_updated": "✅ وضعیت انقضا بروزرسانی شد."
       },
       "actions": {
         "users_refresh": "🔄 بروزرسانی لیست کاربران",
@@ -1106,6 +1145,28 @@
             "status_expired": "⏳ منقضی",
             "status_sold": "🔴 فروخته‌شده",
             "status_ready": "🟢 آماده"
+          },
+          "stock_item_detail": {
+            "not_found": "کانفیگ پیدا نشد.",
+            "overview": "🔎 <b>جزئیات کانفیگ</b>\n\n🔢 شناسه: <code>{config_id}</code>\n👤 سرویس: {service_name}\n📶 وضعیت: {status}\n\n<blockquote>💡 حذف کانفیگ غیرقابل بازگشت است.</blockquote>",
+            "status_expired": "⏳ منقضی",
+            "status_ready": "🟢 آماده",
+            "status_sold": "🔴 فروخته‌شده"
+          },
+          "stock_items": {
+            "empty": "کانفیگی مطابق فیلتر پیدا نشد.",
+            "invalid_service_tariff": "سرویس/پکیج معتبر نبود.",
+            "option_button": "{num} - کانفیگ",
+            "overview": "🗂 <b>لیست کانفیگ‌های پکیج</b>\n\n📦 پکیج: <code>{package_id}</code>\n🔎 فیلتر جستجو: {query_view}\n📋 کانفیگ‌ها: {list}\n\n<blockquote>💡 برای جزئیات هر کانفیگ، شماره همان مورد را انتخاب کنید.</blockquote>",
+            "query_none": "ندارد",
+            "row": "{num}) {status} {service} | C:{config_id}"
+          },
+          "tariffs": {
+            "button": "{num} - {name}",
+            "default_name": "پکیج",
+            "empty": "برای این سرویس پکیجی ثبت نشده است.",
+            "overview": "📦 <b>پکیج‌های موجودی</b>\n\n🧾 لیست پکیج‌ها: {list}\n\n<blockquote>💡 با انتخاب پکیج، لیست کانفیگ‌های موجودی همان پکیج باز می‌شود.</blockquote>",
+            "row": "{num}) {name} | P:{package_id} | موجود: {available}"
           }
         },
         "payments": {
@@ -1223,6 +1284,118 @@
           "order_approved": "✅ پرداخت سفارش شما تایید شد و در صف تحویل قرار گرفت.",
           "order_rejected": "❌ پرداخت سفارش شما رد شد."
         }
+      }
+    },
+    "types_tariffs": {
+      "actions": {
+        "add_service": "➕ افزودن سرویس",
+        "my_services": "📋 سرویس‌های من",
+        "service_tariff_delete": "🗑 حذف",
+        "service_tariff_edit": "✏️ ویرایش",
+        "service_tariff_status": "📊 وضعیت",
+        "service_tariffs_list": "🧾 تعرفه‌های سرویس",
+        "skip": "⏭ رد شدن",
+        "service_edit": "✏️ ویرایش",
+        "service_status": "📊 وضعیت",
+        "service_tariffs": "💳 تعرفه‌ها",
+        "service_inventory": "📚 موجودی",
+        "service_panel_bind": "🔌 اتصال پنل",
+        "service_toggle": "🔁 فعال/غیرفعال",
+        "service_delete": "🗑 حذف",
+        "service_tariff_add": "➕ افزودن",
+        "service_stock_add": "➕ افزودن موجودی",
+        "service_inventory_refresh": "🔄 بروزرسانی موجودی سرویس"
+      },
+      "errors": {
+        "confirm_required": "❌ برای ثبت نهایی روی دکمه «✅ تایید» بزنید.",
+        "invalid_service_action": "❌ گزینه نامعتبر است. از دکمه‌های مدیریت سرویس استفاده کنید.",
+        "invalid_service_inventory_option": "❌ گزینه موجودی سرویس معتبر نیست.",
+        "invalid_tariff_option": "❌ گزینه تعرفه معتبر نیست.",
+        "invalid_tariff_or_action": "❌ گزینه نامعتبر است. یکی از پکیج‌ها یا عملیات مدیریتی همین صفحه را انتخاب کنید.",
+        "service_delete_blocked": "❌ برای حذف سرویس، ابتدا تعرفه‌ها و موجودی‌های آن را حذف کنید.",
+        "service_inventory_invalid_input": "❌ ورودی موجودی سرویس معتبر نیست.",
+        "service_inventory_payload_format": "❌ فرمت ورودی موجودی نامعتبر است. جداکننده --- را رعایت کنید.",
+        "service_inventory_tariff_invalid": "❌ تعرفه انتخابی معتبر نیست.",
+        "service_mode_invalid": "❌ یکی از حالت‌های سرویس را انتخاب کنید.",
+        "service_name_duplicate": "❌ این نام سرویس قبلاً ثبت شده است. لطفاً یک نام متفاوت وارد کنید.",
+        "service_name_required": "❌ نام سرویس را ارسال کنید.",
+        "service_not_found": "❌ سرویس پیدا نشد.",
+        "tariff_delete_confirm_required": "❌ برای حذف تعرفه باید عبارت تایید حذف را ارسال کنید.",
+        "tariff_duration_days_required": "❌ وقتی سیاست مدت «ثابت» است، واردکردن تعداد روز الزامی است.",
+        "tariff_fixed_required": "❌ برای حالت fixed باید volume/duration/price معتبر وارد شود.",
+        "tariff_invalid_duration_policy": "❌ لطفاً یکی از گزینه‌های معتبر سیاست مدت را انتخاب کنید.",
+        "tariff_invalid_input": "❌ ورودی تعرفه معتبر نیست.",
+        "tariff_invalid_pricing_mode": "❌ نوع قیمت‌گذاری معتبر نیست.",
+        "tariff_not_found": "❌ تعرفه پیدا نشد.",
+        "tariff_per_gb_required": "❌ برای حالت per_gb باید حداقل/حداکثر (اختیاری) و قیمت هر گیگ معتبر باشد.",
+        "tariff_validation_failed": "❌ مقادیر تعرفه ناقص یا مبهم است."
+      },
+      "labels": {
+        "duration_policy_fixed": "📅 مدت ثابت",
+        "duration_policy_unlimited": "♾️ نامحدود",
+        "mode_panel_auto_fa": "ساخت خودکار از پنل",
+        "mode_stock_fa": "انباری",
+        "pricing_mode_fixed": "📦 ثابت",
+        "pricing_mode_fixed_plain": "ثابت",
+        "pricing_mode_per_gb": "📐 پلکانی بر اساس حجم",
+        "pricing_mode_per_gb_plain": "پلکانی بر اساس حجم",
+        "service_inventory_no_tariff": "بدون تعرفه",
+        "service_inventory_option_button": "{num} - آیتم",
+        "service_inventory_row": "{num}) {status} {service_name} | C:{config_id}",
+        "service_inventory_tariff_button": "تعرفه #{tariff_id}",
+        "service_list_button": "🧩 سرویس #{code} | {name}",
+        "tariff_fixed_detail": "📦 حجم: {volume_gb} گیگ\n📅 مدت: {duration_days} روز\n💰 قیمت: {price} تومان",
+        "tariff_fixed_row": "{volume_gb}گیگ/{duration_days}روز/{price}ت",
+        "tariff_list_row": "{num}) تعرفه #{tariff_id} | {summary}",
+        "tariff_option_button": "🎯 تعرفه #{tariff_id}",
+        "tariff_per_gb_row": "{min_volume_gb}-{max_volume_gb}گیگ قیمت/گیگ:{price_per_gb}",
+        "tariff_per_gb_detail_fixed_days": "📏 حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} تومان\n🧭 سیاست: {duration_policy}\n📅 روز: {duration_days}",
+        "tariff_per_gb_detail_unlimited": "📏 حداقل/حداکثر: {min_volume_gb}/{max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} تومان\n🧭 سیاست: {duration_policy}"
+      },
+      "messages": {
+        "inventory_bridge_not_stock": "مدیریت موجودی فقط برای سرویس‌های انباری فعال است.",
+        "service_inventory_empty": "موجودی‌ای برای این سرویس ثبت نشده است.",
+        "service_inventory_overview": "📚 <b>موجودی سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 آیتم‌ها: {list}",
+        "service_list_empty": "📭 هنوز سرویسی ثبت نشده؛ از «➕ افزودن سرویس» شروع کنید.",
+        "service_list_overview": "📋 <b>سرویس‌های من</b>\n\n🧩 روی یکی از سرویس‌ها بزنید تا مدیریت همان سرویس باز شود.\n⚙️ از دکمه‌های هر سرویس می‌توانید وضعیت، تعرفه‌ها و تنظیمات مرتبط را کنترل کنید.\n\n<blockquote>🚀 برای مدیریت سریع‌تر، ابتدا سرویس هدف را انتخاب کنید؛ سپس تغییرات لازم را مرحله‌به‌مرحله اعمال کنید تا تنظیمات همان سرویس دقیق و بدون خطا ثبت شود.</blockquote>",
+        "service_management_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\n📌 یکی از گزینه‌های زیر را انتخاب کنید.\n✨ از همین بخش می‌توانید سرویس جدید بسازید یا سرویس‌های فعلی را مدیریت کنید.\n\n<blockquote>🚀 برای مدیریت سریع‌تر، اول «📋 سرویس‌های من» را بررسی کنید و در صورت نیاز با «➕ افزودن سرویس» یک سرویس تازه با تنظیمات کامل ثبت کنید.</blockquote>",
+        "service_wizard_preview_panel": "🧾 <b>پیش‌نمایش سرویس</b>\n\n📝 نام: <b>{name}</b>\n⚙️ حالت تحویل: <b>{mode}</b>\n🖥 پنل: <b>{panel}</b>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا سرویس با همین تنظیمات ثبت نهایی شود.</blockquote>",
+        "service_wizard_preview_stock": "🧾 <b>پیش‌نمایش سرویس</b>\n\n📝 نام: <b>{name}</b>\n⚙️ حالت تحویل: <b>{mode}</b>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا سرویس با همین تنظیمات ثبت نهایی شود.</blockquote>",
+        "tariff_detail_overview": "💳 <b>جزئیات تعرفه</b>\n\n🔢 شناسه: <code>{tariff_id}</code>\n⚙️ حالت: {mode_text}\n{summary}\n\n<blockquote>💡 برای مدیریت دقیق‌تر همین تعرفه، از دکمه‌های پایین می‌توانید وضعیت را تغییر دهید، وارد ویرایش شوید یا در صورت نیاز حذف را انجام دهید تا همه‌چیز مرحله‌به‌مرحله و بدون ابهام کنترل شود.</blockquote>",
+        "tariff_wizard_summary": "🧾 <b>پیش‌نمایش تعرفه</b>\n\n{summary}\n\n<blockquote>✅ اگر اطلاعات این پیش‌نمایش کامل و دقیق است، برای ثبت نهایی تعرفه «تایید» را ارسال کنید تا همین تنظیمات بدون خطا ذخیره شود.</blockquote>",
+        "tariffs_bridge_overview": "💳 <b>مدیریت تعرفه‌ها</b>\n\n🧩 سرویس: <b>{service_name}</b>\n\n<blockquote>🧭 از دکمه‌های پایین می‌توانید تعرفه جدید بسازید یا لیست تعرفه‌های همین سرویس را ببینید.</blockquote>",
+        "tariffs_empty": "تعرفه‌ای برای این سرویس ثبت نشده است.",
+        "tariffs_overview": "💳 <b>تعرفه‌های سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📋 لیست تعرفه‌ها: {list}\n\n<blockquote>🧠 از این بخش می‌توانید تعرفه‌ها را ایجاد یا بازبینی کنید تا ساختار قیمت‌گذاری سرویس دقیق، قابل‌مدیریت و هماهنگ با سناریوی فروش شما باقی بماند.</blockquote>"
+      },
+      "prompts": {
+        "service_inventory": {
+          "payload": "💡 فرمت ورودی:\nخط اول: نام سرویس\n---\nخط دوم: متن کانفیگ\n---\n(اختیاری) لینک استعلام",
+          "tariff": "💡 تعرفه این آیتم را انتخاب کنید (اختیاری)."
+        },
+        "service_wizard": {
+          "mode": "⚙️ <b>نوع تحویل سرویس:</b>\n\n📦 انباری: از موجودی آماده تحویل می‌شود.\n🖥 پنلی خودکار: هنگام خرید به‌صورت خودکار ساخته می‌شود.\n\n<blockquote>🎯 یکی از گزینه‌های زیر را انتخاب کنید تا مسیر تحویل سرویس دقیق و بدون خطا تنظیم شود.</blockquote>",
+          "mode_panel_auto": "🖥 پنلی خودکار",
+          "mode_stock": "📦 انباری",
+          "name": "📝 <b>نام سرویس:</b>\n\n📌 نامی انتخاب کنید که برای کاربر نهایی واضح، کوتاه و قابل تشخیص باشد (مثلاً اقتصادی، پرسرعت، نامحدود).\n\n<blockquote>✍️ لطفاً نام سرویس را به‌صورت دقیق و بدون ابهام ارسال کنید تا در لیست فروش به‌خوبی دیده شود.</blockquote>"
+        },
+        "tariff_delete_confirm": "💡 برای حذف تعرفه #{tariff_id} عبارت «{confirm_word}» را ارسال کنید.",
+        "tariff_wizard": {
+          "duration_policy": "🧭 سیاست مدت را انتخاب کنید:\n\n📌 «📅 مدت ثابت» یعنی سرویس بعد از تعداد روز مشخص منقضی می‌شود و «♾️ نامحدود» یعنی بدون تاریخ پایان فعال می‌ماند.\n\n<blockquote>🔐 این انتخاب تعیین می‌کند اعتبار سرویس تاریخ پایان داشته باشد یا بدون محدودیت زمانی فعال بماند.</blockquote>",
+          "pricing_mode": "💳 نوع قیمت‌گذاری را انتخاب کنید:\n\n📌 یکی از حالت‌های زیر را انتخاب کنید تا ساختار تعرفه دقیق مشخص شود.\n🧮 «📦 ثابت» برای حجم/مدت/قیمت مشخص است و «📐 پلکانی بر اساس حجم» برای قیمت‌گذاری به‌ازای هر گیگ استفاده می‌شود.\n\n<blockquote>🎯 با انتخاب درست نوع قیمت‌گذاری، ادامه مراحل سریع‌تر و بدون ابهام پیش می‌رود.</blockquote>",
+          "summary_fixed": "🧩 حالت: {pricing_mode}\n📦 حجم: {volume_gb} گیگ\n⏳ مدت: {duration_days} روز\n💵 قیمت: {price} تومان",
+          "summary_per_gb_fixed_days": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}\n📅 مدت ثابت: {duration_days} روز",
+          "summary_per_gb_unlimited": "🧩 حالت: {pricing_mode}\n📉 حداقل/حداکثر حجم: {min_volume_gb} / {max_volume_gb} گیگ\n💰 قیمت هر گیگ: {price_per_gb} واحد\n🧭 سیاست مدت: {duration_policy}"
+        }
+      },
+      "success": {
+        "service_created": "✅ سرویس با شناسه <code>{service_id}</code> ثبت شد.",
+        "service_deleted": "✅ سرویس حذف شد.",
+        "service_status_updated": "✅ وضعیت سرویس بروزرسانی شد.",
+        "service_stock_added": "✅ موجودی سرویس با شناسه <code>{config_id}</code> ثبت شد.",
+        "service_updated": "✅ تنظیمات سرویس بروزرسانی شد.",
+        "tariff_created": "✅ تعرفه ثبت شد.",
+        "tariff_deleted": "✅ تعرفه حذف شد.",
+        "tariff_updated": "✅ تعرفه بروزرسانی شد."
       }
     }
   }
