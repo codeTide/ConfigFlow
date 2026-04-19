@@ -1874,15 +1874,13 @@ final class MessageHandler
 
         if ($stateName === 'admin.service.free_test.stock_add') {
             $serviceId = (int) ($payload['service_id'] ?? 0);
-            $step = (string) ($payload['step'] ?? 'volume');
+            $step = (string) ($payload['step'] ?? 'sub_link');
             /** @var array<string,mixed> $data */
             $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
 
             if ($text === UiLabels::back($this->catalog)) {
                 $prev = [
-                    'volume' => 'view',
-                    'duration' => 'volume',
-                    'sub_link' => 'duration',
+                    'sub_link' => 'view',
                     'single_stock_item_link' => 'sub_link',
                     'confirm' => 'single_stock_item_link',
                 ];
