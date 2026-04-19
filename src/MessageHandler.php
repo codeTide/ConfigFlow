@@ -39,11 +39,11 @@ final class MessageHandler
     private const ADMIN_USER_BALANCE_ADD = '[legacy] admin.users_stock.actions.user_balance_add';
     private const ADMIN_USER_BALANCE_SUB = '[legacy] admin.users_stock.actions.user_balance_sub';
     private const ADMIN_STOCK_REFRESH = '[legacy] admin.users_stock.actions.stock_refresh';
-    private const ADMIN_STOCK_ADD_CONFIG = '[legacy] admin.users_stock.actions.stock_add_stock_item';
+    private const ADMIN_STOCK_ADD_CONFIG = '[legacy] admin.users_stock.actions.stock_add_config';
     private const ADMIN_STOCK_SEARCH = '[legacy] admin.users_stock.actions.stock_search';
     private const ADMIN_STOCK_SEARCH_CLEAR = '[legacy] admin.users_stock.actions.stock_search_clear';
     private const ADMIN_STOCK_EXPIRE_TOGGLE = '[legacy] admin.users_stock.actions.stock_expire_toggle';
-    private const ADMIN_STOCK_DELETE_CONFIG = '[legacy] admin.users_stock.actions.stock_delete_stock_item';
+    private const ADMIN_STOCK_DELETE_CONFIG = '[legacy] admin.users_stock.actions.stock_delete_config';
     private const ADMIN_PAYMENTS_REFRESH = '[legacy] admin.payments_requests.actions.payments_refresh';
     private const ADMIN_PAYMENT_APPROVE = '[legacy] admin.payments_requests.actions.payment_approve';
     private const ADMIN_PAYMENT_REJECT = '[legacy] admin.payments_requests.actions.payment_reject';
