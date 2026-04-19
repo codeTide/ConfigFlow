@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ConfigFlow\Bot;
+namespace StockItemFlow\Bot;
 
 final class MessageHandler
 {
@@ -14,13 +14,13 @@ final class MessageHandler
     private const PAY_TRONPAYS = '[legacy] buttons.pay.tronpays';
     private const PAY_VERIFY = '[legacy] buttons.pay.verify';
     private const ACCEPT_RULES = '[legacy] buttons.accept_rules';
-    private const ADMIN_SERVICE_ADD = '[legacy] admin.types_packages.actions.add_service';
-    private const ADMIN_SERVICE_EDIT = '[legacy] admin.types_packages.actions.service_edit';
-    private const ADMIN_SERVICE_STATUS = '[legacy] admin.types_packages.actions.service_status';
-    private const ADMIN_SERVICE_TARIFFS = '[legacy] admin.types_packages.actions.service_tariffs';
-    private const ADMIN_SERVICE_INVENTORY = '[legacy] admin.types_packages.actions.service_inventory';
-    private const ADMIN_SERVICE_PANEL_BIND = '[legacy] admin.types_packages.actions.service_panel_bind';
-    private const ADMIN_SERVICE_TOGGLE = '[legacy] admin.types_packages.actions.service_toggle';
+    private const ADMIN_SERVICE_ADD = '[legacy] admin.types_tariffs.actions.add_service';
+    private const ADMIN_SERVICE_EDIT = '[legacy] admin.types_tariffs.actions.service_edit';
+    private const ADMIN_SERVICE_STATUS = '[legacy] admin.types_tariffs.actions.service_status';
+    private const ADMIN_SERVICE_TARIFFS = '[legacy] admin.types_tariffs.actions.service_tariffs';
+    private const ADMIN_SERVICE_INVENTORY = '[legacy] admin.types_tariffs.actions.service_inventory';
+    private const ADMIN_SERVICE_PANEL_BIND = '[legacy] admin.types_tariffs.actions.service_panel_bind';
+    private const ADMIN_SERVICE_TOGGLE = '[legacy] admin.types_tariffs.actions.service_toggle';
     private const ADMIN_SERVICE_FREE_TEST = 'admin.services.actions.free_test';
     private const ADMIN_SERVICE_FREE_TEST_TOGGLE = 'admin.services.actions.free_test_toggle';
     private const ADMIN_SERVICE_FREE_TEST_MODE = 'admin.services.actions.free_test_mode';
@@ -29,21 +29,21 @@ final class MessageHandler
     private const ADMIN_SERVICE_FREE_TEST_RESET = 'admin.services.actions.free_test_reset';
     private const ADMIN_SERVICE_FREE_TEST_REFRESH = 'admin.services.actions.free_test_status';
     private const ADMIN_SERVICE_FREE_TEST_STOCK_ADD = 'admin.services.actions.free_test_stock_add';
-    private const ADMIN_SERVICE_DELETE = '[legacy] admin.types_packages.actions.service_delete';
-    private const ADMIN_SERVICE_TARIFF_ADD = '[legacy] admin.types_packages.actions.service_tariff_add';
-    private const ADMIN_SERVICE_STOCK_ADD = '[legacy] admin.types_packages.actions.service_stock_add';
-    private const ADMIN_SERVICE_INVENTORY_REFRESH = '[legacy] admin.types_packages.actions.service_inventory_refresh';
+    private const ADMIN_SERVICE_DELETE = '[legacy] admin.types_tariffs.actions.service_delete';
+    private const ADMIN_SERVICE_TARIFF_ADD = '[legacy] admin.types_tariffs.actions.service_tariff_add';
+    private const ADMIN_SERVICE_STOCK_ADD = '[legacy] admin.types_tariffs.actions.service_stock_add';
+    private const ADMIN_SERVICE_INVENTORY_REFRESH = '[legacy] admin.types_tariffs.actions.service_inventory_refresh';
     private const ADMIN_USERS_REFRESH = '[legacy] admin.users_stock.actions.users_refresh';
     private const ADMIN_USER_TOGGLE_STATUS = '[legacy] admin.users_stock.actions.user_toggle_status';
     private const ADMIN_USER_TOGGLE_AGENT = '[legacy] admin.users_stock.actions.user_toggle_agent';
     private const ADMIN_USER_BALANCE_ADD = '[legacy] admin.users_stock.actions.user_balance_add';
     private const ADMIN_USER_BALANCE_SUB = '[legacy] admin.users_stock.actions.user_balance_sub';
     private const ADMIN_STOCK_REFRESH = '[legacy] admin.users_stock.actions.stock_refresh';
-    private const ADMIN_STOCK_ADD_CONFIG = '[legacy] admin.users_stock.actions.stock_add_config';
+    private const ADMIN_STOCK_ADD_CONFIG = '[legacy] admin.users_stock.actions.stock_add_stock_item';
     private const ADMIN_STOCK_SEARCH = '[legacy] admin.users_stock.actions.stock_search';
     private const ADMIN_STOCK_SEARCH_CLEAR = '[legacy] admin.users_stock.actions.stock_search_clear';
     private const ADMIN_STOCK_EXPIRE_TOGGLE = '[legacy] admin.users_stock.actions.stock_expire_toggle';
-    private const ADMIN_STOCK_DELETE_CONFIG = '[legacy] admin.users_stock.actions.stock_delete_config';
+    private const ADMIN_STOCK_DELETE_CONFIG = '[legacy] admin.users_stock.actions.stock_delete_stock_item';
     private const ADMIN_PAYMENTS_REFRESH = '[legacy] admin.payments_requests.actions.payments_refresh';
     private const ADMIN_PAYMENT_APPROVE = '[legacy] admin.payments_requests.actions.payment_approve';
     private const ADMIN_PAYMENT_REJECT = '[legacy] admin.payments_requests.actions.payment_reject';
@@ -208,8 +208,8 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_buy_package_selection' || $state['state_name'] === 'buy.await_package') {
-            $this->handleBuyPackageSelectionState($chatId, $userId, $text, $state);
+        if ($state['state_name'] === 'await_buy_tariff_selection' || $state['state_name'] === 'buy.await_tariff') {
+            $this->handleBuyTariffSelectionState($chatId, $userId, $text, $state);
             return;
         }
 
@@ -218,8 +218,8 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_renew_package_selection' || $state['state_name'] === 'renew.await_package') {
-            $this->handleRenewPackageSelectionState($chatId, $userId, $text, $state);
+        if ($state['state_name'] === 'await_renew_tariff_selection' || $state['state_name'] === 'renew.await_tariff') {
+            $this->handleRenewTariffSelectionState($chatId, $userId, $text, $state);
             return;
         }
 
@@ -387,7 +387,7 @@ final class MessageHandler
             $paymentId = $this->database->createPayment([
                 'kind' => 'wallet_charge',
                 'user_id' => $userId,
-                'package_id' => null,
+                'tariff_id' => null,
                 'amount' => $amount,
                 'payment_method' => 'card',
                 'status' => 'waiting_admin',
@@ -410,7 +410,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (Config::adminIds() as $adminId) {
+            foreach (StockItem::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.wallet_charge_new', [
@@ -461,7 +461,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (Config::adminIds() as $adminId) {
+            foreach (StockItem::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.card_receipt_new', [
@@ -511,7 +511,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (Config::adminIds() as $adminId) {
+            foreach (StockItem::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.renew_receipt_new', [
@@ -568,7 +568,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (Config::adminIds() as $adminId) {
+            foreach (StockItem::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.tx_new', [
@@ -625,7 +625,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (Config::adminIds() as $adminId) {
+            foreach (StockItem::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.tx_renew_new', [
@@ -657,7 +657,7 @@ final class MessageHandler
                 $this->catalog->get('messages.user.agency.request_submitted', ['request_id' => $requestId])
             );
 
-            foreach (Config::adminIds() as $adminId) {
+            foreach (StockItem::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.requests.new_agency_request', [
@@ -701,7 +701,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_request_note') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+            if (!in_array($userId, StockItem::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -770,7 +770,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_service_name') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+            if (!in_array($userId, StockItem::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -786,8 +786,8 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_admin_package') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+        if ($state['state_name'] === 'await_admin_tariff') {
+            if (!in_array($userId, StockItem::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -806,7 +806,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_user_balance') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+            if (!in_array($userId, StockItem::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -832,8 +832,8 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_admin_add_config') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+        if ($state['state_name'] === 'await_admin_add_stock_item') {
+            if (!in_array($userId, StockItem::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -842,7 +842,7 @@ final class MessageHandler
                 return;
             }
             $payload = $state['payload'] ?? [];
-            $packageId = (int) ($payload['package_id'] ?? 0);
+            $tariffId = (int) ($payload['tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.callback.deprecated_route'));
@@ -850,16 +850,16 @@ final class MessageHandler
             }
             $raw = trim((string) ($message['text'] ?? ''));
             if ($raw === '' || str_starts_with($raw, '/')) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.errors.config_text_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.errors.raw_payload_required'));
                 return;
             }
             $chunks = preg_split('/\n---\n/', $raw) ?: [];
             if (count($chunks) < 2) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.errors.invalid_config_separator'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.errors.invalid_stock_item_separator'));
                 return;
             }
             $serviceName = trim((string) ($chunks[0] ?? ''));
-            $configText = trim((string) ($chunks[1] ?? ''));
+            $stock_itemText = trim((string) ($chunks[1] ?? ''));
             $inquiry = null;
             if (isset($chunks[2])) {
                 $third = trim((string) $chunks[2]);
@@ -869,19 +869,19 @@ final class MessageHandler
                     $inquiry = $third;
                 }
             }
-            if ($serviceName === '' || $configText === '' || $packageId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.errors.invalid_service_or_config_text'));
+            if ($serviceName === '' || $stock_itemText === '' || $tariffId <= 0) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.errors.invalid_service_or_raw_payload'));
                 return;
             }
-            $configId = $this->database->addConfig($packageId, $serviceName, $configText, $inquiry);
+            $stock_itemId = $this->database->addStockItem($tariffId, $serviceName, $stock_itemText, $inquiry);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.info.config_created_noncanonical', ['config_id' => $configId]));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.info.stock_item_created_noncanonical', ['stock_item_id' => $stock_itemId]));
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.callback.deprecated_route'));
             return;
         }
 
         if ($state['state_name'] === 'await_admin_stock_search') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+            if (!in_array($userId, StockItem::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -890,7 +890,7 @@ final class MessageHandler
                 return;
             }
             $payload = $state['payload'] ?? [];
-            $packageId = (int) ($payload['package_id'] ?? 0);
+            $tariffId = (int) ($payload['tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.callback.deprecated_route'));
@@ -900,7 +900,7 @@ final class MessageHandler
             if ($query === '-' || $query === '—') {
                 $query = '';
             }
-            if ($packageId > 0 || $query !== '') {
+            if ($tariffId > 0 || $query !== '') {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.legacy.info.search_legacy_redirect'));
             }
             $this->database->clearUserState($userId);
@@ -909,7 +909,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_add_admin') {
-            if (!in_array($userId, Config::adminIds(), true)) {
+            if (!in_array($userId, StockItem::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -945,15 +945,15 @@ final class MessageHandler
             }
             $payload = $state['payload'] ?? [];
             $agentId = (int) ($payload['agent_id'] ?? 0);
-            $packageId = (int) ($payload['package_id'] ?? 0);
+            $tariffId = (int) ($payload['tariff_id'] ?? 0);
             $price = (int) preg_replace('/\D+/', '', $text);
-            if ($agentId <= 0 || $packageId <= 0 || $price <= 0) {
+            if ($agentId <= 0 || $tariffId <= 0 || $price <= 0) {
                 $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.valid_price_required'));
                 return;
             }
-            $this->database->setAgencyPrice($agentId, $packageId, $price);
+            $this->database->setAgencyPrice($agentId, $tariffId, $price);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.agent_price_saved', ['agent_id' => $agentId, 'package_id' => $packageId, 'price' => $price]));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.agent_price_saved', ['agent_id' => $agentId, 'tariff_id' => $tariffId, 'price' => $price]));
             return;
         }
 
@@ -1209,8 +1209,8 @@ final class MessageHandler
             return true;
         }
 
-        if ($text === KeyboardBuilder::myConfigs()) {
-            $this->showMyConfigsWithReplyFlow($chatId, $userId);
+        if ($text === KeyboardBuilder::myStockItems()) {
+            $this->showMyStockItemsWithReplyFlow($chatId, $userId);
             return true;
         }
 
@@ -1270,17 +1270,17 @@ final class MessageHandler
         }
 
             $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? $this->catalog->get('messages.user.free_test.default_service')));
-            $configText = htmlspecialchars((string) ($claim['config_text'] ?? ''));
-            $inquiryLink = trim((string) ($claim['inquiry_link'] ?? ''));
+            $stock_itemText = htmlspecialchars((string) ($claim['raw_payload'] ?? ''));
+            $inquiryLink = trim((string) ($claim['sub_link'] ?? ''));
             $msg = $this->catalog->get('messages.user.free_test.ready', [
                 'service_name' => $serviceName,
-                'config_text' => $configText,
+                'raw_payload' => $stock_itemText,
             ]);
             if ($inquiryLink !== '') {
                 $msg = $this->catalog->get('messages.user.free_test.ready_with_inquiry', [
                     'service_name' => $serviceName,
-                    'config_text' => $configText,
-                    'inquiry_link' => htmlspecialchars($inquiryLink),
+                    'raw_payload' => $stock_itemText,
+                    'sub_link' => htmlspecialchars($inquiryLink),
                 ]);
             }
         $this->telegram->sendMessage($chatId, $msg);
@@ -1348,7 +1348,7 @@ final class MessageHandler
 
         if (($state['state_name'] ?? '') === 'admin.root') {
             $adminRouteMap = [
-                $this->catalog->get('buttons.admin.types_packages') => 'admin:types',
+                $this->catalog->get('buttons.admin.types_tariffs') => 'admin:types',
                 $this->catalog->get('buttons.admin.inventory') => 'admin:stock',
                 $this->catalog->get('buttons.admin.users') => 'admin:users',
                 $this->catalog->get('buttons.admin.settings') => 'admin:settings',
@@ -1448,18 +1448,18 @@ final class MessageHandler
                 return;
             }
             if (
-                $text === $this->catalog->get('admin.types_packages.actions.add_service')
+                $text === $this->catalog->get('admin.types_tariffs.actions.add_service')
                 || $text === $this->uiConst(self::ADMIN_SERVICE_ADD)
             ) {
                 $this->database->setUserState($userId, 'admin.service.create', ['step' => 'name', 'data' => [], 'stack' => ['admin.service.landing']]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->catalog->get('admin.types_packages.prompts.service_wizard.name'),
+                    $this->catalog->get('admin.types_tariffs.prompts.service_wizard.name'),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
                 return;
             }
-            if ($text === $this->catalog->get('admin.types_packages.actions.my_services')) {
+            if ($text === $this->catalog->get('admin.types_tariffs.actions.my_services')) {
                 $this->openAdminServiceFlatList($chatId, $userId);
                 return;
             }
@@ -1487,7 +1487,7 @@ final class MessageHandler
                 return;
             }
 
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_package_or_action'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.invalid_tariff_or_action'));
             return;
         }
 
@@ -1521,7 +1521,7 @@ final class MessageHandler
             ]);
             $created = $this->database->getService($serviceId);
             $serviceCode = is_array($created) ? (string) ($created['service_code'] ?? (string) $serviceId) : (string) $serviceId;
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.success.service_created', ['service_id' => $serviceCode]));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.success.service_created', ['service_id' => $serviceCode]));
             $this->database->setUserState($userId, 'admin.service.landing', ['stack' => ['admin.root']]);
             return;
         }
@@ -1530,7 +1530,7 @@ final class MessageHandler
             $serviceId = (int) ($payload['service_id'] ?? 0);
             $service = $this->database->getService($serviceId);
             if (!is_array($service) || $serviceId <= 0) {
-                $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+                $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
                 return;
             }
             if ($text === UiLabels::back($this->catalog)) {
@@ -1549,7 +1549,7 @@ final class MessageHandler
                 $this->database->setUserState($userId, 'admin.service.edit', ['service_id' => $serviceId, 'step' => 'name', 'data' => $data]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->catalog->get('admin.types_packages.prompts.service_wizard.name'),
+                    $this->catalog->get('admin.types_tariffs.prompts.service_wizard.name'),
                     $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                 );
                 return;
@@ -1565,11 +1565,11 @@ final class MessageHandler
             if ($text === $this->uiConst(self::ADMIN_SERVICE_INVENTORY)) {
                 $service = $this->database->getService($serviceId);
                 if (!is_array($service)) {
-                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
                     return;
                 }
                 if ((string) ($service['mode'] ?? 'stock') !== 'stock') {
-                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.messages.inventory_bridge_not_stock'));
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.messages.inventory_bridge_not_stock'));
                     return;
                 }
                 $this->openAdminServiceInventoryView($chatId, $userId, 0, $serviceId);
@@ -1578,7 +1578,7 @@ final class MessageHandler
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST)) {
                 $service = $this->database->getService($serviceId);
                 if (!is_array($service) || (string) ($service['mode'] ?? 'stock') !== 'stock') {
-                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.messages.inventory_bridge_not_stock'));
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.messages.inventory_bridge_not_stock'));
                     return;
                 }
                 $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
@@ -1596,7 +1596,7 @@ final class MessageHandler
             if ($text === $this->uiConst(self::ADMIN_SERVICE_STOCK_ADD)) {
                 $service = $this->database->getService($serviceId);
                 if (!is_array($service) || (string) ($service['mode'] ?? 'stock') !== 'stock') {
-                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.messages.inventory_bridge_not_stock'));
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.messages.inventory_bridge_not_stock'));
                     return;
                 }
                 $this->database->setUserState($userId, 'admin.service.inventory.add', [
@@ -1610,24 +1610,24 @@ final class MessageHandler
             if ($text === $this->uiConst(self::ADMIN_SERVICE_TOGGLE)) {
                 $service = $this->database->getService($serviceId);
                 if (!is_array($service)) {
-                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
                     return;
                 }
                 $active = ((int) ($service['is_active'] ?? 0)) === 1;
                 $this->database->updateServiceActive($serviceId, !$active);
-                $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_status_updated'));
+                $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.success.service_status_updated'));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_DELETE)) {
-                if ($this->database->countTariffsByService($serviceId) > 0 || $this->database->countConfigsByService($serviceId) > 0) {
-                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.errors.service_delete_blocked'));
+                if ($this->database->countTariffsByService($serviceId) > 0 || $this->database->countStockItemsByService($serviceId) > 0) {
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_delete_blocked'));
                     return;
                 }
                 $this->database->deleteService($serviceId);
-                $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_packages.success.service_deleted'));
+                $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_tariffs.success.service_deleted'));
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_service_action'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.invalid_service_action'));
             return;
         }
 
@@ -1661,7 +1661,7 @@ final class MessageHandler
                 'panel_password' => isset($data['panel_password']) ? (string) $data['panel_password'] : null,
                 'is_active' => 1,
             ]);
-            $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_updated'));
+            $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_tariffs.success.service_updated'));
             return;
         }
 
@@ -1723,7 +1723,7 @@ final class MessageHandler
             }
             $mode = $text === $this->catalog->get('admin.services.prompts.free_test_mode_cooldown') ? 'cooldown' : ($text === $this->catalog->get('admin.services.prompts.free_test_mode_once') ? 'once_until_reset' : '');
             if ($mode === '') {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_invalid_input'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_invalid_input'));
                 return;
             }
             $rule = $this->database->getFreeTestRuleForService($serviceId);
@@ -1741,7 +1741,7 @@ final class MessageHandler
             if ($stateName === 'admin.service.free_test.reset_user') {
                 $targetUserId = (int) preg_replace('/\D+/', '', $text);
                 if ($targetUserId <= 0) {
-                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_service_action'));
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.invalid_service_action'));
                     return;
                 }
                 $this->database->resetFreeTestQuotaForUser($targetUserId, $serviceId);
@@ -1750,7 +1750,7 @@ final class MessageHandler
             }
             $value = (int) preg_replace('/\D+/', '', $text);
             if ($value <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_invalid_input'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_invalid_input'));
                 return;
             }
             $rule = $this->database->getFreeTestRuleForService($serviceId);
@@ -1779,8 +1779,8 @@ final class MessageHandler
                     'volume' => 'view',
                     'duration' => 'volume',
                     'sub_link' => 'duration',
-                    'single_config_link' => 'sub_link',
-                    'confirm' => 'single_config_link',
+                    'single_stock_item_link' => 'sub_link',
+                    'confirm' => 'single_stock_item_link',
                 ];
                 $backStep = $prev[$step] ?? 'view';
                 if ($backStep === 'view') {
@@ -1800,17 +1800,17 @@ final class MessageHandler
             $volume = trim((string) ($data['volume'] ?? ''));
             $duration = trim((string) ($data['duration'] ?? ''));
             $subLink = trim((string) ($data['sub_link'] ?? ''));
-            $singleConfig = trim((string) ($data['single_config_link'] ?? ''));
+            $singleStockItem = trim((string) ($data['single_stock_item_link'] ?? ''));
 
-            if ($serviceName === '' || $volume === '' || $duration === '' || $subLink === '' || $singleConfig === '') {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+            if ($serviceName === '' || $volume === '' || $duration === '' || $subLink === '' || $singleStockItem === '') {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
                 $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'volume', []);
                 return;
             }
 
-            $configPayload = "🔗 لینک ساب:\n{$subLink}\n\n🔐 لینک تکی:\n{$singleConfig}\n\n📦 حجم: {$volume}\n⏳ مدت: {$duration}";
-            $configId = $this->database->addConfigForService($serviceId, null, $serviceName, $configPayload, $subLink, 'free_test');
-            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_stock_added', ['config_id' => $configId]));
+            $stock_itemPayload = "🔗 لینک ساب:\n{$subLink}\n\n🔐 لینک تکی:\n{$singleStockItem}\n\n📦 حجم: {$volume}\n⏳ مدت: {$duration}";
+            $stock_itemId = $this->database->addStockItemForService($serviceId, null, $serviceName, $stock_itemPayload, $subLink, 'free_test');
+            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_stock_added', ['stock_item_id' => $stock_itemId]));
             return;
         }
 
@@ -1818,15 +1818,15 @@ final class MessageHandler
             $typeId = 0;
             $serviceId = (int) ($payload['service_id'] ?? 0);
             $selectedTariffId = (int) ($payload['selected_tariff_id'] ?? 0);
-            $serviceTariffsListAction = (string) $this->catalog->get('admin.types_packages.actions.service_tariffs_list');
+            $serviceTariffsListAction = (string) $this->catalog->get('admin.types_tariffs.actions.service_tariffs_list');
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminServiceTariffBridgeView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
-            if ($selectedTariffId > 0 && $text === $this->catalog->get('admin.types_packages.actions.service_tariff_edit')) {
+            if ($selectedTariffId > 0 && $text === $this->catalog->get('admin.types_tariffs.actions.service_tariff_edit')) {
                 $tariff = $this->database->getServiceTariff($selectedTariffId);
                 if (!is_array($tariff) || (int) ($tariff['service_id'] ?? 0) !== $serviceId) {
-                    $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.errors.tariff_not_found'));
+                    $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_not_found'));
                     return;
                 }
                 $data = [
@@ -1843,11 +1843,11 @@ final class MessageHandler
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, 'admin.service.tariff.edit', 'pricing_mode', $data, $selectedTariffId);
                 return;
             }
-            if ($selectedTariffId > 0 && $text === $this->catalog->get('admin.types_packages.actions.service_tariff_delete')) {
+            if ($selectedTariffId > 0 && $text === $this->catalog->get('admin.types_tariffs.actions.service_tariff_delete')) {
                 $this->database->setUserState($userId, 'admin.service.tariff.delete', ['service_id' => $serviceId, 'tariff_id' => $selectedTariffId]);
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->messageRenderer->render('admin.types_packages.prompts.tariff_delete_confirm', [
+                    $this->messageRenderer->render('admin.types_tariffs.prompts.tariff_delete_confirm', [
                         'tariff_id' => $selectedTariffId,
                         'confirm_word' => $this->catalog->get('admin.final_modules.keywords.delete_confirm'),
                     ]),
@@ -1855,7 +1855,7 @@ final class MessageHandler
                 );
                 return;
             }
-            if ($selectedTariffId > 0 && $text === $this->catalog->get('admin.types_packages.actions.service_tariff_status')) {
+            if ($selectedTariffId > 0 && $text === $this->catalog->get('admin.types_tariffs.actions.service_tariff_status')) {
                 $this->openAdminServiceTariffDetailView($chatId, $userId, $typeId, $serviceId, $selectedTariffId);
                 return;
             }
@@ -1875,14 +1875,14 @@ final class MessageHandler
                 $this->openAdminServiceTariffDetailView($chatId, $userId, $typeId, $serviceId, $tariffId);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_tariff_option'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.invalid_tariff_option'));
             return;
         }
 
         if ($stateName === 'admin.service.tariffs.bridge') {
             $typeId = 0;
             $serviceId = (int) ($payload['service_id'] ?? 0);
-            $serviceTariffsListAction = (string) $this->catalog->get('admin.types_packages.actions.service_tariffs_list');
+            $serviceTariffsListAction = (string) $this->catalog->get('admin.types_tariffs.actions.service_tariffs_list');
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId);
                 return;
@@ -1896,7 +1896,7 @@ final class MessageHandler
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, 'admin.service.tariff.create', 'pricing_mode', [], 0);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_tariff_option'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.invalid_tariff_option'));
             return;
         }
 
@@ -1918,12 +1918,12 @@ final class MessageHandler
             }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
             $selected = $this->extractOptionKey($text);
-            $configId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-            if ($configId > 0) {
-                $this->openAdminServiceInventoryDetailView($chatId, $userId, $typeId, $serviceId, $configId);
+            $stock_itemId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+            if ($stock_itemId > 0) {
+                $this->openAdminServiceInventoryDetailView($chatId, $userId, $typeId, $serviceId, $stock_itemId);
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_service_inventory_option'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.invalid_service_inventory_option'));
             return;
         }
 
@@ -1954,14 +1954,14 @@ final class MessageHandler
             if ($stateName === 'admin.service.tariff.create') {
                 $newId = $this->database->createServiceTariff(array_merge($data, ['service_id' => $serviceId, 'is_active' => 1]));
                 if ($newId > 0) {
-                    $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.tariff_created'));
+                    $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_tariffs.success.tariff_created'));
                     return;
                 }
                 $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
             $this->database->updateServiceTariff($tariffId, array_merge($data, ['is_active' => 1]));
-            $this->openAdminServiceTariffDetailView($chatId, $userId, $typeId, $serviceId, $tariffId, $this->messageRenderer->render('admin.types_packages.success.tariff_updated'));
+            $this->openAdminServiceTariffDetailView($chatId, $userId, $typeId, $serviceId, $tariffId, $this->messageRenderer->render('admin.types_tariffs.success.tariff_updated'));
             return;
         }
 
@@ -1974,11 +1974,11 @@ final class MessageHandler
                 return;
             }
             if (trim($text) !== $this->catalog->get('admin.final_modules.keywords.delete_confirm')) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_delete_confirm_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_delete_confirm_required'));
                 return;
             }
             $this->database->deleteServiceTariff($tariffId);
-            $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.tariff_deleted'));
+            $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_tariffs.success.tariff_deleted'));
             return;
         }
 
@@ -1997,64 +1997,64 @@ final class MessageHandler
                     return;
                 }
                 $this->database->setUserState($userId, 'admin.service.inventory.add', ['service_id' => $serviceId, 'step' => 'payload', 'data' => $data]);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.service_inventory.payload'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.prompts.service_inventory.payload'));
                 return;
             }
             if (!$this->applyServiceInventoryAddInput($chatId, $userId, $typeId, $serviceId, $step, $text, $data)) {
                 return;
             }
-            $configId = $this->database->addConfigForService(
+            $stock_itemId = $this->database->addStockItemForService(
                 $serviceId,
                 isset($data['tariff_id']) ? (int) $data['tariff_id'] : null,
                 (string) ($data['service_name'] ?? $this->catalog->get('messages.generic.dash')),
-                (string) ($data['config_text'] ?? ''),
-                isset($data['inquiry_link']) ? (string) $data['inquiry_link'] : null
+                (string) ($data['raw_payload'] ?? ''),
+                isset($data['sub_link']) ? (string) $data['sub_link'] : null
             );
-            $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.success.service_stock_added', ['config_id' => $configId]));
+            $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_tariffs.success.service_stock_added', ['stock_item_id' => $stock_itemId]));
             return;
         }
 
         if ($stateName === 'admin.service.inventory.detail') {
             $typeId = 0;
             $serviceId = (int) ($payload['service_id'] ?? 0);
-            $configId = (int) ($payload['config_id'] ?? 0);
+            $stock_itemId = (int) ($payload['stock_item_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId);
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_STOCK_EXPIRE_TOGGLE)) {
-                $cfg = $this->findConfigById($serviceId, $configId, true);
+                $cfg = $this->findStockItemById($serviceId, $stock_itemId, true);
                 if ($cfg === null) {
-                    $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.users_stock.errors.config_not_found'));
+                    $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.users_stock.errors.stock_item_not_found'));
                     return;
                 }
                 $isExpired = ((int) ($cfg['is_expired'] ?? 0)) === 1;
                 if ($isExpired) {
-                    $this->database->unexpireConfig($configId);
+                    $this->database->unexpireStockItem($stock_itemId);
                 } else {
-                    $this->database->expireConfig($configId);
+                    $this->database->expireStockItem($stock_itemId);
                 }
-                $this->openAdminServiceInventoryDetailView($chatId, $userId, $typeId, $serviceId, $configId, $this->messageRenderer->render('admin.users_stock.success.config_expire_status_updated'));
+                $this->openAdminServiceInventoryDetailView($chatId, $userId, $typeId, $serviceId, $stock_itemId, $this->messageRenderer->render('admin.users_stock.success.stock_item_expire_status_updated'));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_STOCK_DELETE_CONFIG)) {
-                $this->database->deleteConfig($configId);
-                $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.users_stock.success.config_deleted'));
+                $this->database->deleteStockItem($stock_itemId);
+                $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.users_stock.success.stock_item_deleted'));
                 return;
             }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_config_detail_option'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_stock_item_detail_option'));
             return;
         }
 
-        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.invalid_service_action'));
+        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.invalid_service_action'));
     }
 
     private function openAdminServiceLanding(int $chatId, int $userId, ?string $notice = null): void
     {
         $buttons = [
             [
-                $this->catalog->get('admin.types_packages.actions.my_services'),
-                $this->catalog->get('admin.types_packages.actions.add_service'),
+                $this->catalog->get('admin.types_tariffs.actions.my_services'),
+                $this->catalog->get('admin.types_tariffs.actions.add_service'),
             ],
         ];
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
@@ -2064,7 +2064,7 @@ final class MessageHandler
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->catalog->get('admin.types_packages.messages.service_management_overview'),
+            $this->catalog->get('admin.types_tariffs.messages.service_management_overview'),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
@@ -2088,7 +2088,7 @@ final class MessageHandler
         if ($services === []) {
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.types_packages.messages.service_list_empty')
+                $this->messageRenderer->render('admin.types_tariffs.messages.service_list_empty')
             );
             return;
         }
@@ -2101,7 +2101,7 @@ final class MessageHandler
             if ($code === '') {
                 $code = 'SVC' . (string) ($service['id'] ?? '0');
             }
-            $label = $this->catalog->get('admin.types_packages.labels.service_list_button', ['code' => $code, 'name' => $name]);
+            $label = $this->catalog->get('admin.types_tariffs.labels.service_list_button', ['code' => $code, 'name' => $name]);
             $options[$label] = $code;
             $buttons[] = [$label];
         }
@@ -2109,7 +2109,7 @@ final class MessageHandler
         $this->database->setUserState($userId, 'admin.service.list', ['service_options' => $options, 'stack' => ['admin.service.landing', 'admin.root']]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->catalog->get('admin.types_packages.messages.service_list_overview'),
+            $this->catalog->get('admin.types_tariffs.messages.service_list_overview'),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
@@ -2118,7 +2118,7 @@ final class MessageHandler
     {
         $service = $this->database->getService($serviceId);
         if (!is_array($service)) {
-            $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+            $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
             return;
         }
 
@@ -2134,7 +2134,7 @@ final class MessageHandler
             ? $this->catalog->get('admin.ui.open.service_view.status_active')
             : $this->catalog->get('admin.ui.open.service_view.status_inactive');
         $tariffCount = $this->database->countTariffsByService($serviceId);
-        $stockCount = $this->database->countAvailableConfigsByService($serviceId);
+        $stockCount = $this->database->countAvailableStockItemsByService($serviceId);
 
         $buttons = [
             [$this->uiConst(self::ADMIN_SERVICE_EDIT), $this->uiConst(self::ADMIN_SERVICE_TOGGLE)],
@@ -2178,7 +2178,7 @@ final class MessageHandler
     {
         $service = $this->database->getService($serviceId);
         if (!is_array($service) || (string) ($service['mode'] ?? '') !== 'stock') {
-            $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+            $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
             return;
         }
         $rule = $this->database->getFreeTestRuleForService($serviceId) ?? [
@@ -2226,7 +2226,7 @@ final class MessageHandler
         }
         if ($step === 'mode') {
             $this->database->setUserState($userId, 'admin.service.create', ['step' => 'name', 'data' => $data]);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.types_packages.prompts.service_wizard.name'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.types_tariffs.prompts.service_wizard.name'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return;
         }
         if ($step === 'panel_base_url') {
@@ -2264,7 +2264,7 @@ final class MessageHandler
         }
         if ($step === 'mode') {
             $this->database->setUserState($userId, 'admin.service.edit', ['service_id' => $serviceId, 'step' => 'name', 'data' => $data]);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.types_packages.prompts.service_wizard.name'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.types_tariffs.prompts.service_wizard.name'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return;
         }
         if ($step === 'panel_base_url') {
@@ -2306,14 +2306,14 @@ final class MessageHandler
     ): bool {
         $raw = trim($text);
         if ($raw === '' || str_starts_with($raw, '/')) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_name_required'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_name_required'));
             return false;
         }
 
         if ($step === 'name') {
             $excludeServiceId = isset($extraPayload['service_id']) ? (int) $extraPayload['service_id'] : null;
             if ($this->database->serviceNameExists($raw, $excludeServiceId)) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_name_duplicate'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_name_duplicate'));
                 return false;
             }
             $data['name'] = $raw;
@@ -2321,8 +2321,8 @@ final class MessageHandler
             return false;
         }
         if ($step === 'mode') {
-            $modeStock = $this->catalog->get('admin.types_packages.prompts.service_wizard.mode_stock');
-            $modePanel = $this->catalog->get('admin.types_packages.prompts.service_wizard.mode_panel_auto');
+            $modeStock = $this->catalog->get('admin.types_tariffs.prompts.service_wizard.mode_stock');
+            $modePanel = $this->catalog->get('admin.types_tariffs.prompts.service_wizard.mode_panel_auto');
             $mode = '';
             if ($raw === $modeStock) {
                 $mode = 'stock';
@@ -2330,7 +2330,7 @@ final class MessageHandler
                 $mode = 'panel_auto';
             }
             if ($mode === '') {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_mode_invalid'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_mode_invalid'));
                 return false;
             }
             $data['mode'] = $mode;
@@ -2342,9 +2342,9 @@ final class MessageHandler
                 $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
                 $this->telegram->sendMessage(
                     $chatId,
-                    $this->messageRenderer->render('admin.types_packages.messages.service_wizard_preview_stock', [
+                    $this->messageRenderer->render('admin.types_tariffs.messages.service_wizard_preview_stock', [
                         'name' => (string) ($data['name'] ?? ''),
-                        'mode' => $this->catalog->get('admin.types_packages.labels.mode_stock_fa'),
+                        'mode' => $this->catalog->get('admin.types_tariffs.labels.mode_stock_fa'),
                     ]),
                     $this->uiKeyboard->replyMenu([
                         [$this->catalog->get('buttons.confirm_yes')],
@@ -2380,9 +2380,9 @@ final class MessageHandler
             $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.types_packages.messages.service_wizard_preview_panel', [
+                $this->messageRenderer->render('admin.types_tariffs.messages.service_wizard_preview_panel', [
                     'name' => (string) ($data['name'] ?? ''),
-                    'mode' => $this->catalog->get('admin.types_packages.labels.mode_panel_auto_fa'),
+                    'mode' => $this->catalog->get('admin.types_tariffs.labels.mode_panel_auto_fa'),
                     'panel' => $panelName,
                 ]),
                 $this->uiKeyboard->replyMenu([
@@ -2394,7 +2394,7 @@ final class MessageHandler
         }
         if ($step === 'confirm') {
             if ($raw !== $this->catalog->get('buttons.confirm_yes')) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.confirm_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.confirm_required'));
                 return false;
             }
             if ((string) ($data['mode'] ?? '') === 'panel_auto') {
@@ -2423,9 +2423,9 @@ final class MessageHandler
         $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'mode', 'data' => $data]));
         $this->telegram->sendMessage(
             $chatId,
-            $this->catalog->get('admin.types_packages.prompts.service_wizard.mode'),
+            $this->catalog->get('admin.types_tariffs.prompts.service_wizard.mode'),
             $this->uiKeyboard->replyMenu([
-                [$this->catalog->get('admin.types_packages.prompts.service_wizard.mode_stock'), $this->catalog->get('admin.types_packages.prompts.service_wizard.mode_panel_auto')],
+                [$this->catalog->get('admin.types_tariffs.prompts.service_wizard.mode_stock'), $this->catalog->get('admin.types_tariffs.prompts.service_wizard.mode_panel_auto')],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
@@ -2435,7 +2435,7 @@ final class MessageHandler
     {
         $service = $this->database->getService($serviceId);
         if (!is_array($service)) {
-            $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+            $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
             return;
         }
         $tariffs = $this->database->listTariffsByService($serviceId);
@@ -2450,22 +2450,22 @@ final class MessageHandler
             }
             $mode = (string) ($tariff['pricing_mode'] ?? 'fixed');
             $summary = $mode === 'fixed'
-                ? $this->catalog->get('admin.types_packages.labels.tariff_fixed_row', [
+                ? $this->catalog->get('admin.types_tariffs.labels.tariff_fixed_row', [
                     'volume_gb' => (string) ($tariff['volume_gb'] ?? '0'),
                     'duration_days' => (string) ($tariff['duration_days'] ?? '0'),
                     'price' => (string) ($tariff['price'] ?? '0'),
                 ])
-                : $this->catalog->get('admin.types_packages.labels.tariff_per_gb_row', [
+                : $this->catalog->get('admin.types_tariffs.labels.tariff_per_gb_row', [
                     'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
                     'max_volume_gb' => (string) ($tariff['max_volume_gb'] ?? '0'),
                     'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
                 ]);
-            $lines[] = $this->catalog->get('admin.types_packages.labels.tariff_list_row', [
+            $lines[] = $this->catalog->get('admin.types_tariffs.labels.tariff_list_row', [
                 'num' => $num,
                 'tariff_id' => $tariffId,
                 'summary' => $summary,
             ]);
-            $buttonLabel = $this->catalog->get('admin.types_packages.labels.tariff_option_button', ['num' => $num, 'tariff_id' => $tariffId]);
+            $buttonLabel = $this->catalog->get('admin.types_tariffs.labels.tariff_option_button', ['num' => $num, 'tariff_id' => $tariffId]);
             $options[$num] = $tariffId;
             $options[$buttonLabel] = $tariffId;
             $buttons[] = [$buttonLabel];
@@ -2480,9 +2480,9 @@ final class MessageHandler
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.types_packages.messages.tariffs_overview', [
+            $this->messageRenderer->render('admin.types_tariffs.messages.tariffs_overview', [
                 'service_name' => (string) ($service['name'] ?? $this->catalog->get('messages.generic.dash')),
-                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.types_packages.messages.tariffs_empty'),
+                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.types_tariffs.messages.tariffs_empty'),
             ], ['list']),
             $this->uiKeyboard->replyMenu($buttons)
         );
@@ -2492,7 +2492,7 @@ final class MessageHandler
     {
         $service = $this->database->getService($serviceId);
         if (!is_array($service)) {
-            $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+            $this->openAdminServiceFlatList($chatId, $userId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
             return;
         }
         $this->database->setUserState($userId, 'admin.service.tariffs.bridge', [
@@ -2503,11 +2503,11 @@ final class MessageHandler
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.types_packages.messages.tariffs_bridge_overview', [
+            $this->messageRenderer->render('admin.types_tariffs.messages.tariffs_bridge_overview', [
                 'service_name' => (string) ($service['name'] ?? $this->catalog->get('messages.generic.dash')),
             ]),
             $this->uiKeyboard->replyMenu([
-                [$this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD), $this->catalog->get('admin.types_packages.actions.service_tariffs_list')],
+                [$this->uiConst(self::ADMIN_SERVICE_TARIFF_ADD), $this->catalog->get('admin.types_tariffs.actions.service_tariffs_list')],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
@@ -2517,16 +2517,16 @@ final class MessageHandler
     {
         $tariff = $this->database->getServiceTariff($tariffId);
         if (!is_array($tariff) || (int) ($tariff['service_id'] ?? 0) !== $serviceId) {
-            $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.errors.tariff_not_found'));
+            $this->openAdminServiceTariffsView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_not_found'));
             return;
         }
         $mode = (string) ($tariff['pricing_mode'] ?? 'fixed');
         $modeText = $mode === 'fixed'
-            ? $this->catalog->get('admin.types_packages.labels.pricing_mode_fixed')
-            : $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb');
+            ? $this->catalog->get('admin.types_tariffs.labels.pricing_mode_fixed')
+            : $this->catalog->get('admin.types_tariffs.labels.pricing_mode_per_gb');
         $modeText = $this->removeEmoji((string) $modeText);
         if ($mode === 'fixed') {
-            $summary = $this->catalog->get('admin.types_packages.labels.tariff_fixed_detail', [
+            $summary = $this->catalog->get('admin.types_tariffs.labels.tariff_fixed_detail', [
                 'volume_gb' => $this->toPersianNumber((string) ($tariff['volume_gb'] ?? '0')),
                 'duration_days' => $this->toPersianNumber((string) ($tariff['duration_days'] ?? '0')),
                 'price' => $this->toPersianNumber((string) ($tariff['price'] ?? '0')),
@@ -2534,19 +2534,19 @@ final class MessageHandler
         } else {
             $durationPolicy = (string) ($tariff['duration_policy'] ?? '');
             $durationPolicyText = $durationPolicy === 'unlimited'
-                ? $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited'))
+                ? $this->removeEmoji((string) $this->catalog->get('admin.types_tariffs.labels.duration_policy_unlimited'))
                 : ($durationPolicy === 'fixed_days'
-                    ? $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_fixed'))
+                    ? $this->removeEmoji((string) $this->catalog->get('admin.types_tariffs.labels.duration_policy_fixed'))
                     : $this->catalog->get('messages.generic.dash'));
             $summary = $this->catalog->get(
                 $durationPolicy === 'fixed_days'
-                    ? 'admin.types_packages.labels.tariff_per_gb_detail_fixed_days'
-                    : 'admin.types_packages.labels.tariff_per_gb_detail_unlimited',
+                    ? 'admin.types_tariffs.labels.tariff_per_gb_detail_fixed_days'
+                    : 'admin.types_tariffs.labels.tariff_per_gb_detail_unlimited',
                 [
                     'min_volume_gb' => $this->toPersianNumber((string) ($tariff['min_volume_gb'] ?? '0')),
                     'max_volume_gb' => (($tariff['max_volume_gb'] ?? null) !== null)
                         ? $this->toPersianNumber((string) $tariff['max_volume_gb'])
-                        : $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited')),
+                        : $this->removeEmoji((string) $this->catalog->get('admin.types_tariffs.labels.duration_policy_unlimited')),
                     'price_per_gb' => $this->toPersianNumber((string) ($tariff['price_per_gb'] ?? '0')),
                     'duration_policy' => $durationPolicyText,
                     'duration_days' => $this->toPersianNumber((string) (($tariff['duration_days'] ?? null) !== null ? $tariff['duration_days'] : $this->catalog->get('messages.generic.dash'))),
@@ -2562,16 +2562,16 @@ final class MessageHandler
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.types_packages.messages.tariff_detail_overview', [
+            $this->messageRenderer->render('admin.types_tariffs.messages.tariff_detail_overview', [
                 'tariff_id' => $this->toPersianNumber((string) $tariffId),
                 'mode_text' => $modeText,
                 'summary' => $summary,
             ]),
             $this->uiKeyboard->replyMenu([
                 [
-                    $this->catalog->get('admin.types_packages.actions.service_tariff_status'),
-                    $this->catalog->get('admin.types_packages.actions.service_tariff_edit'),
-                    $this->catalog->get('admin.types_packages.actions.service_tariff_delete'),
+                    $this->catalog->get('admin.types_tariffs.actions.service_tariff_status'),
+                    $this->catalog->get('admin.types_tariffs.actions.service_tariff_edit'),
+                    $this->catalog->get('admin.types_tariffs.actions.service_tariff_delete'),
                 ],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
@@ -2620,9 +2620,9 @@ final class MessageHandler
             $this->database->setUserState($userId, $stateName, $payload);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.types_packages.prompts.tariff_wizard.pricing_mode'),
+                $this->messageRenderer->render('admin.types_tariffs.prompts.tariff_wizard.pricing_mode'),
                 $this->uiKeyboard->replyMenu([
-                    [$this->catalog->get('admin.types_packages.labels.pricing_mode_fixed'), $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb')],
+                    [$this->catalog->get('admin.types_tariffs.labels.pricing_mode_fixed'), $this->catalog->get('admin.types_tariffs.labels.pricing_mode_per_gb')],
                     [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
                 ])
             );
@@ -2636,15 +2636,15 @@ final class MessageHandler
             $this->database->setUserState($userId, $stateName, $payload);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.types_packages.prompts.tariff_wizard.duration_policy'),
+                $this->messageRenderer->render('admin.types_tariffs.prompts.tariff_wizard.duration_policy'),
                 $this->uiKeyboard->replyMenu([
-                    [$this->catalog->get('admin.types_packages.labels.duration_policy_fixed'), $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited')],
+                    [$this->catalog->get('admin.types_tariffs.labels.duration_policy_fixed'), $this->catalog->get('admin.types_tariffs.labels.duration_policy_unlimited')],
                     [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
                 ])
             );
             return;
         }
-        $text = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.' . $step);
+        $text = $this->catalog->get('admin.types_tariffs.prompts.tariff_wizard.' . $step);
         $payload = ['service_id' => $serviceId, 'step' => $step, 'data' => $data];
         if ($stateName === 'admin.service.tariff.edit' && $tariffId > 0) {
             $payload['tariff_id'] = $tariffId;
@@ -2652,7 +2652,7 @@ final class MessageHandler
         $this->database->setUserState($userId, $stateName, $payload);
         $rows = [[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]];
         if ($step === 'max_volume_gb') {
-            array_unshift($rows, [$this->catalog->get('admin.types_packages.actions.skip')]);
+            array_unshift($rows, [$this->catalog->get('admin.types_tariffs.actions.skip')]);
         }
         $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->replyMenu($rows));
     }
@@ -2662,28 +2662,28 @@ final class MessageHandler
     {
         $raw = trim($text);
         if ($raw === '' || str_starts_with($raw, '/')) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_invalid_input'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_invalid_input'));
             return false;
         }
 
         if ($step === 'pricing_mode') {
-            if ($raw === $this->catalog->get('admin.types_packages.labels.pricing_mode_fixed') || $raw === 'fixed') {
+            if ($raw === $this->catalog->get('admin.types_tariffs.labels.pricing_mode_fixed') || $raw === 'fixed') {
                 $data['pricing_mode'] = 'fixed';
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, $stateName, 'volume_gb', $data, $tariffId);
                 return false;
             }
-            if ($raw === $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb') || $raw === 'per_gb') {
+            if ($raw === $this->catalog->get('admin.types_tariffs.labels.pricing_mode_per_gb') || $raw === 'per_gb') {
                 $data['pricing_mode'] = 'per_gb';
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, $stateName, 'min_volume_gb', $data, $tariffId);
                 return false;
             }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_invalid_pricing_mode'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_invalid_pricing_mode'));
             return false;
         }
         if ($step === 'volume_gb') {
             $val = (float) str_replace(',', '.', $raw);
             if ($val <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_fixed_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_fixed_required'));
                 return false;
             }
             $data['volume_gb'] = $val;
@@ -2693,7 +2693,7 @@ final class MessageHandler
         if ($step === 'duration_days' && (string) ($data['pricing_mode'] ?? '') === 'fixed') {
             $days = (int) preg_replace('/\D+/', '', $raw);
             if ($days <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_fixed_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_fixed_required'));
                 return false;
             }
             $data['duration_days'] = $days;
@@ -2703,12 +2703,12 @@ final class MessageHandler
         if ($step === 'price') {
             $price = (int) preg_replace('/\D+/', '', $raw);
             if ($price <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_fixed_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_fixed_required'));
                 return false;
             }
             $data['price'] = $price;
-            $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_fixed', [
-                'pricing_mode' => $this->catalog->get('admin.types_packages.labels.pricing_mode_fixed_plain'),
+            $summary = $this->catalog->get('admin.types_tariffs.prompts.tariff_wizard.summary_fixed', [
+                'pricing_mode' => $this->catalog->get('admin.types_tariffs.labels.pricing_mode_fixed_plain'),
                 'volume_gb' => strtr((string) ($data['volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'duration_days' => strtr((string) ($data['duration_days'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'price' => strtr((string) ($data['price'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
@@ -2720,7 +2720,7 @@ final class MessageHandler
             $this->database->setUserState($userId, $stateName, $payload);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]),
+                $this->messageRenderer->render('admin.types_tariffs.messages.tariff_wizard_summary', ['summary' => $summary]),
                 $this->uiKeyboard->replyMenu([
                     [$this->catalog->get('buttons.confirm_yes')],
                     [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
@@ -2731,7 +2731,7 @@ final class MessageHandler
         if ($step === 'min_volume_gb') {
             $val = (float) str_replace(',', '.', $raw);
             if ($val <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_per_gb_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_per_gb_required'));
                 return false;
             }
             $data['min_volume_gb'] = $val;
@@ -2739,14 +2739,14 @@ final class MessageHandler
             return false;
         }
         if ($step === 'max_volume_gb') {
-            if ($raw === $this->catalog->get('admin.types_packages.actions.skip')) {
+            if ($raw === $this->catalog->get('admin.types_tariffs.actions.skip')) {
                 $data['max_volume_gb'] = null;
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, $stateName, 'price_per_gb', $data, $tariffId);
                 return false;
             }
             $val = (float) str_replace(',', '.', $raw);
             if ($val < (float) ($data['min_volume_gb'] ?? 0)) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_per_gb_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_per_gb_required'));
                 return false;
             }
             $data['max_volume_gb'] = $val;
@@ -2756,7 +2756,7 @@ final class MessageHandler
         if ($step === 'price_per_gb') {
             $val = (int) preg_replace('/\D+/', '', $raw);
             if ($val <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_per_gb_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_per_gb_required'));
                 return false;
             }
             $data['price_per_gb'] = $val;
@@ -2765,13 +2765,13 @@ final class MessageHandler
         }
         if ($step === 'duration_policy') {
             $policy = '';
-            if ($raw === $this->catalog->get('admin.types_packages.labels.duration_policy_fixed') || $raw === 'fixed_days') {
+            if ($raw === $this->catalog->get('admin.types_tariffs.labels.duration_policy_fixed') || $raw === 'fixed_days') {
                 $policy = 'fixed_days';
-            } elseif ($raw === $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited') || $raw === 'unlimited') {
+            } elseif ($raw === $this->catalog->get('admin.types_tariffs.labels.duration_policy_unlimited') || $raw === 'unlimited') {
                 $policy = 'unlimited';
             }
             if ($policy === '') {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_invalid_duration_policy'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_invalid_duration_policy'));
                 return false;
             }
             $data['duration_policy'] = $policy;
@@ -2779,12 +2779,12 @@ final class MessageHandler
                 $this->promptTariffWizardStep($chatId, $userId, $typeId, $serviceId, $stateName, 'duration_days', $data, $tariffId);
                 return false;
             }
-            $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_per_gb_unlimited', [
-                'pricing_mode' => $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb_plain'),
+            $summary = $this->catalog->get('admin.types_tariffs.prompts.tariff_wizard.summary_per_gb_unlimited', [
+                'pricing_mode' => $this->catalog->get('admin.types_tariffs.labels.pricing_mode_per_gb_plain'),
                 'min_volume_gb' => strtr((string) ($data['min_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'max_volume_gb' => strtr((string) (($data['max_volume_gb'] ?? null) !== null ? $data['max_volume_gb'] : 'نامحدود'), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'price_per_gb' => strtr((string) ($data['price_per_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
-                'duration_policy' => $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited')),
+                'duration_policy' => $this->removeEmoji((string) $this->catalog->get('admin.types_tariffs.labels.duration_policy_unlimited')),
             ]);
             $payload = ['service_id' => $serviceId, 'step' => 'confirm', 'data' => $data];
             if ($stateName === 'admin.service.tariff.edit' && $tariffId > 0) {
@@ -2793,7 +2793,7 @@ final class MessageHandler
             $this->database->setUserState($userId, $stateName, $payload);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]),
+                $this->messageRenderer->render('admin.types_tariffs.messages.tariff_wizard_summary', ['summary' => $summary]),
                 $this->uiKeyboard->replyMenu([
                     [$this->catalog->get('buttons.confirm_yes')],
                     [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
@@ -2804,16 +2804,16 @@ final class MessageHandler
         if ($step === 'duration_days' && (string) ($data['pricing_mode'] ?? '') === 'per_gb') {
             $days = (int) preg_replace('/\D+/', '', $raw);
             if ($days <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_duration_days_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_duration_days_required'));
                 return false;
             }
             $data['duration_days'] = $days;
-            $summary = $this->catalog->get('admin.types_packages.prompts.tariff_wizard.summary_per_gb_fixed_days', [
-                'pricing_mode' => $this->catalog->get('admin.types_packages.labels.pricing_mode_per_gb_plain'),
+            $summary = $this->catalog->get('admin.types_tariffs.prompts.tariff_wizard.summary_per_gb_fixed_days', [
+                'pricing_mode' => $this->catalog->get('admin.types_tariffs.labels.pricing_mode_per_gb_plain'),
                 'min_volume_gb' => strtr((string) ($data['min_volume_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'max_volume_gb' => strtr((string) (($data['max_volume_gb'] ?? null) !== null ? $data['max_volume_gb'] : 'نامحدود'), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
                 'price_per_gb' => strtr((string) ($data['price_per_gb'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
-                'duration_policy' => $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_fixed')),
+                'duration_policy' => $this->removeEmoji((string) $this->catalog->get('admin.types_tariffs.labels.duration_policy_fixed')),
                 'duration_days' => strtr((string) ($data['duration_days'] ?? $this->catalog->get('messages.generic.dash')), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹','.'=>'٫']),
             ]);
             $payload = ['service_id' => $serviceId, 'step' => 'confirm', 'data' => $data];
@@ -2823,7 +2823,7 @@ final class MessageHandler
             $this->database->setUserState($userId, $stateName, $payload);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.types_packages.messages.tariff_wizard_summary', ['summary' => $summary]),
+                $this->messageRenderer->render('admin.types_tariffs.messages.tariff_wizard_summary', ['summary' => $summary]),
                 $this->uiKeyboard->replyMenu([
                     [$this->catalog->get('buttons.confirm_yes')],
                     [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
@@ -2833,11 +2833,11 @@ final class MessageHandler
         }
         if ($step === 'confirm') {
             if ($raw !== $this->catalog->get('buttons.confirm_yes')) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.confirm_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.confirm_required'));
                 return false;
             }
             if (!$this->validateTariffData($data)) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.tariff_validation_failed'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.tariff_validation_failed'));
                 return false;
             }
             return true;
@@ -2895,28 +2895,28 @@ final class MessageHandler
     {
         $service = $this->database->getService($serviceId);
         if (!is_array($service)) {
-            $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_packages.errors.service_not_found'));
+            $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
             return;
         }
-        $configs = $this->database->listConfigsByService($serviceId, null, 20, 0);
+        $stock_items = $this->database->listStockItemsByService($serviceId, null, 20, 0);
         $options = [];
         $lines = [];
-        foreach (array_values($configs) as $idx => $cfg) {
+        foreach (array_values($stock_items) as $idx => $cfg) {
             $num = (string) ($idx + 1);
-            $configId = (int) ($cfg['id'] ?? 0);
-            if ($configId <= 0) {
+            $stock_itemId = (int) ($cfg['id'] ?? 0);
+            if ($stock_itemId <= 0) {
                 continue;
             }
             $status = ((int) ($cfg['is_expired'] ?? 0)) === 1
                 ? $this->catalog->get('admin.ui.open.stock.common.status_symbol_expired')
                 : (((int) ($cfg['sold_to'] ?? 0)) > 0 ? $this->catalog->get('admin.ui.open.stock.common.status_symbol_sold') : $this->catalog->get('admin.ui.open.stock.common.status_symbol_ready'));
-            $lines[] = $this->catalog->get('admin.types_packages.labels.service_inventory_row', [
+            $lines[] = $this->catalog->get('admin.types_tariffs.labels.service_inventory_row', [
                 'num' => $num,
                 'status' => $status,
                 'service_name' => (string) ($cfg['service_name'] ?? $this->catalog->get('messages.generic.dash')),
-                'config_id' => $configId,
+                'stock_item_id' => $stock_itemId,
             ]);
-            $options[$num] = $configId;
+            $options[$num] = $stock_itemId;
         }
         $this->database->setUserState($userId, 'admin.service.inventory', ['service_id' => $serviceId, 'options' => $options]);
         if ($notice !== null && $notice !== '') {
@@ -2924,36 +2924,36 @@ final class MessageHandler
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.types_packages.messages.service_inventory_overview', [
+            $this->messageRenderer->render('admin.types_tariffs.messages.service_inventory_overview', [
                 'service_name' => (string) ($service['name'] ?? $this->catalog->get('messages.generic.dash')),
-                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.types_packages.messages.service_inventory_empty'),
+                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.types_tariffs.messages.service_inventory_empty'),
             ], ['list']),
             $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_SERVICE_INVENTORY_REFRESH), $this->uiConst(self::ADMIN_SERVICE_STOCK_ADD)],
-                ...array_map(fn ($num) => [$this->catalog->get('admin.types_packages.labels.service_inventory_option_button', ['num' => $num])], array_keys($options)),
+                ...array_map(fn ($num) => [$this->catalog->get('admin.types_tariffs.labels.service_inventory_option_button', ['num' => $num])], array_keys($options)),
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
     }
 
-    private function openAdminServiceInventoryDetailView(int $chatId, int $userId, int $typeId, int $serviceId, int $configId, ?string $notice = null): void
+    private function openAdminServiceInventoryDetailView(int $chatId, int $userId, int $typeId, int $serviceId, int $stock_itemId, ?string $notice = null): void
     {
-        $cfg = $this->findConfigById($serviceId, $configId, true);
+        $cfg = $this->findStockItemById($serviceId, $stock_itemId, true);
         if ($cfg === null) {
-            $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.users_stock.errors.config_not_found'));
+            $this->openAdminServiceInventoryView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.users_stock.errors.stock_item_not_found'));
             return;
         }
         $status = ((int) ($cfg['is_expired'] ?? 0)) === 1
-            ? $this->catalog->get('admin.ui.open.stock.config_detail.status_expired')
-            : (((int) ($cfg['sold_to'] ?? 0)) > 0 ? $this->catalog->get('admin.ui.open.stock.config_detail.status_sold') : $this->catalog->get('admin.ui.open.stock.config_detail.status_ready'));
-        $this->database->setUserState($userId, 'admin.service.inventory.detail', ['service_id' => $serviceId, 'config_id' => $configId]);
+            ? $this->catalog->get('admin.ui.open.stock.stock_item_detail.status_expired')
+            : (((int) ($cfg['sold_to'] ?? 0)) > 0 ? $this->catalog->get('admin.ui.open.stock.stock_item_detail.status_sold') : $this->catalog->get('admin.ui.open.stock.stock_item_detail.status_ready'));
+        $this->database->setUserState($userId, 'admin.service.inventory.detail', ['service_id' => $serviceId, 'stock_item_id' => $stock_itemId]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.ui.open.stock.config_detail.overview', [
-                'config_id' => $configId,
+            $this->messageRenderer->render('admin.ui.open.stock.stock_item_detail.overview', [
+                'stock_item_id' => $stock_itemId,
                 'service_name' => (string) ($cfg['service_name'] ?? $this->catalog->get('messages.generic.dash')),
                 'status' => $status,
             ]),
@@ -2968,14 +2968,14 @@ final class MessageHandler
     private function promptServiceInventoryTariffStep(int $chatId, int $userId, int $typeId, int $serviceId, array $data, string $stateName): void
     {
         $tariffs = $this->database->listTariffsByService($serviceId);
-        $options = [$this->catalog->get('admin.types_packages.labels.service_inventory_no_tariff') => 0];
-        $rows = [[$this->catalog->get('admin.types_packages.labels.service_inventory_no_tariff')]];
+        $options = [$this->catalog->get('admin.types_tariffs.labels.service_inventory_no_tariff') => 0];
+        $rows = [[$this->catalog->get('admin.types_tariffs.labels.service_inventory_no_tariff')]];
         foreach ($tariffs as $tariff) {
             $tariffId = (int) ($tariff['id'] ?? 0);
             if ($tariffId <= 0) {
                 continue;
             }
-            $label = $this->catalog->get('admin.types_packages.labels.service_inventory_tariff_button', [
+            $label = $this->catalog->get('admin.types_tariffs.labels.service_inventory_tariff_button', [
                 'tariff_id' => $tariffId,
             ]);
             $options[$label] = $tariffId;
@@ -2988,7 +2988,7 @@ final class MessageHandler
             'data' => $data,
             'tariff_options' => $options,
         ]);
-        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.service_inventory.tariff'), $this->uiKeyboard->replyMenu($rows));
+        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.prompts.service_inventory.tariff'), $this->uiKeyboard->replyMenu($rows));
     }
 
     /** @param array<string,mixed> $data */
@@ -2996,7 +2996,7 @@ final class MessageHandler
     {
         $raw = trim($text);
         if ($raw === '' || str_starts_with($raw, '/')) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
             return false;
         }
         $state = $this->database->getUserState($userId);
@@ -3004,14 +3004,14 @@ final class MessageHandler
         if ($step === 'tariff') {
             $options = is_array($payload['tariff_options'] ?? null) ? $payload['tariff_options'] : [];
             if (!array_key_exists($raw, $options)) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_tariff_invalid'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_tariff_invalid'));
                 return false;
             }
             $selectedTariffId = (int) $options[$raw];
             if ($selectedTariffId > 0) {
                 $tariff = $this->database->getServiceTariff($selectedTariffId);
                 if (!is_array($tariff) || (int) ($tariff['service_id'] ?? 0) !== $serviceId) {
-                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_tariff_invalid'));
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_tariff_invalid'));
                     return false;
                 }
                 $data['tariff_id'] = $selectedTariffId;
@@ -3019,29 +3019,29 @@ final class MessageHandler
                 $data['tariff_id'] = null;
             }
             $this->database->setUserState($userId, 'admin.service.inventory.add', ['service_id' => $serviceId, 'step' => 'payload', 'data' => $data]);
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.prompts.service_inventory.payload'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.prompts.service_inventory.payload'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return false;
         }
         if ($step === 'payload') {
             $chunks = preg_split('/\n---\n/', $raw) ?: [];
             if (count($chunks) < 2) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_payload_format'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_payload_format'));
                 return false;
             }
             $serviceName = trim((string) ($chunks[0] ?? ''));
-            $configText = trim((string) ($chunks[1] ?? ''));
+            $stock_itemText = trim((string) ($chunks[1] ?? ''));
             $inquiry = null;
             if (isset($chunks[2])) {
                 $third = trim((string) $chunks[2]);
                 $inquiry = $third !== '' ? $third : null;
             }
-            if ($serviceName === '' || $configText === '') {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+            if ($serviceName === '' || $stock_itemText === '') {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
                 return false;
             }
             $data['service_name'] = $serviceName;
-            $data['config_text'] = $configText;
-            $data['inquiry_link'] = $inquiry;
+            $data['raw_payload'] = $stock_itemText;
+            $data['sub_link'] = $inquiry;
             return true;
         }
         return false;
@@ -3070,7 +3070,7 @@ final class MessageHandler
                 'volume' => htmlspecialchars($volumeForDisplay),
                 'duration' => htmlspecialchars((string) ($data['duration'] ?? $this->catalog->get('messages.generic.dash'))),
                 'sub_link' => htmlspecialchars((string) ($data['sub_link'] ?? $this->catalog->get('messages.generic.dash'))),
-                'single_config_link' => htmlspecialchars((string) ($data['single_config_link'] ?? $this->catalog->get('messages.generic.dash'))),
+                'single_stock_item_link' => htmlspecialchars((string) ($data['single_stock_item_link'] ?? $this->catalog->get('messages.generic.dash'))),
             ]);
             $this->telegram->sendMessage(
                 $chatId,
@@ -3089,7 +3089,7 @@ final class MessageHandler
                 'volume' => 'admin.services.prompts.free_test_stock_volume',
                 'duration' => 'admin.services.prompts.free_test_stock_duration',
                 'sub_link' => 'admin.services.prompts.free_test_stock_sub_link',
-                'single_config_link' => 'admin.services.prompts.free_test_stock_config_link',
+                'single_stock_item_link' => 'admin.services.prompts.free_test_stock_stock_item_link',
                 default => 'admin.services.prompts.free_test_stock_volume',
             }),
             $this->uiKeyboard->replyMenu(
@@ -3105,19 +3105,19 @@ final class MessageHandler
     {
         $raw = trim($text);
         if ($raw === '' || str_starts_with($raw, '/')) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
             return false;
         }
 
         if ($step === 'volume') {
             $normalized = str_replace(' ', '', str_replace(',', '.', $raw));
             if (!preg_match('/^\d+(?:\.\d+)?$/', $normalized)) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
                 return false;
             }
             $volume = (float) $normalized;
             if ($volume <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
                 return false;
             }
             $data['volume'] = $normalized;
@@ -3133,7 +3133,7 @@ final class MessageHandler
             }
             $days = (int) preg_replace('/\D+/', '', $raw);
             if ($days <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
                 return false;
             }
             $data['duration'] = $raw;
@@ -3143,25 +3143,25 @@ final class MessageHandler
 
         if ($step === 'sub_link') {
             $data['sub_link'] = $raw;
-            $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'single_config_link', $data);
+            $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'single_stock_item_link', $data);
             return false;
         }
 
-        if ($step === 'single_config_link') {
-            $data['single_config_link'] = $raw;
+        if ($step === 'single_stock_item_link') {
+            $data['single_stock_item_link'] = $raw;
             $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'confirm', $data);
             return false;
         }
 
         if ($step === 'confirm') {
             if ($raw !== $this->catalog->get('buttons.confirm_yes')) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.confirm_required'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.confirm_required'));
                 return false;
             }
             return true;
         }
 
-        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
         return false;
     }
 
@@ -3273,58 +3273,58 @@ final class MessageHandler
         }
 
         if ($stateName === 'admin.stock.view') {
-            $level = (string) ($payload['level'] ?? 'packages');
+            $level = (string) ($payload['level'] ?? 'tariffs');
             if ($text === UiLabels::back($this->catalog)) {
-                if ($level === 'packages') {
+                if ($level === 'tariffs') {
                     $this->openAdminRoot($chatId, $userId);
                     return;
                 }
-                if ($level === 'configs') {
-                    $this->openAdminStockPackagesView($chatId, $userId, 0);
+                if ($level === 'stock_items') {
+                    $this->openAdminStockTariffsView($chatId, $userId, 0);
                     return;
                 }
-                if ($level === 'config_detail') {
-                    $packageId = (int) ($payload['package_id'] ?? 0);
+                if ($level === 'stock_item_detail') {
+                    $tariffId = (int) ($payload['tariff_id'] ?? 0);
                     $query = (string) ($payload['query'] ?? '');
-                    $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query);
+                    $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, $query);
                     return;
                 }
                 $this->openAdminRoot($chatId, $userId);
                 return;
             }
 
-            if ($level === 'packages') {
+            if ($level === 'tariffs') {
                 if ($text === $this->uiConst(self::ADMIN_STOCK_REFRESH)) {
-                    $this->openAdminStockPackagesView($chatId, $userId, 0);
+                    $this->openAdminStockTariffsView($chatId, $userId, 0);
                     return;
                 }
                 $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
                 $selected = $this->extractOptionKey($text);
-                $packageId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-                if ($packageId > 0) {
-                    $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, '');
+                $tariffId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+                if ($tariffId > 0) {
+                    $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, '');
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_stock_package_option'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_stock_tariff_option'));
                 return;
             }
 
-            if ($level === 'configs') {
-                $packageId = (int) ($payload['package_id'] ?? 0);
+            if ($level === 'stock_items') {
+                $tariffId = (int) ($payload['tariff_id'] ?? 0);
                 $query = (string) ($payload['query'] ?? '');
                 if ($text === $this->uiConst(self::ADMIN_STOCK_REFRESH)) {
-                    $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query);
+                    $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, $query);
                     return;
                 }
                 if ($text === $this->uiConst(self::ADMIN_STOCK_ADD_CONFIG)) {
                     $this->database->setUserState($userId, 'admin.stock.update', [
-                        'mode' => 'add_config',
-                        'package_id' => $packageId,
+                        'mode' => 'add_stock_item',
+                        'tariff_id' => $tariffId,
                         'stack' => ['admin.stock.view', 'admin.root'],
                     ]);
                     $this->telegram->sendMessage(
                         $chatId,
-                        $this->messageRenderer->render('admin.users_stock.prompts.add_config_overview'),
+                        $this->messageRenderer->render('admin.users_stock.prompts.add_stock_item_overview'),
                         $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                     );
                     return;
@@ -3332,67 +3332,67 @@ final class MessageHandler
                 if ($text === $this->uiConst(self::ADMIN_STOCK_SEARCH)) {
                     $this->database->setUserState($userId, 'admin.stock.update', [
                         'mode' => 'search',
-                        'package_id' => $packageId,
+                        'tariff_id' => $tariffId,
                         'query' => $query,
                         'stack' => ['admin.stock.view', 'admin.root'],
                     ]);
                     $this->telegram->sendMessage(
                         $chatId,
-                        $this->messageRenderer->render('admin.users_stock.prompts.search_config_overview'),
+                        $this->messageRenderer->render('admin.users_stock.prompts.search_stock_item_overview'),
                         $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
                     );
                     return;
                 }
                 if ($text === $this->uiConst(self::ADMIN_STOCK_SEARCH_CLEAR)) {
-                    $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, '');
+                    $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, '');
                     return;
                 }
                 $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
                 $selected = $this->extractOptionKey($text);
-                $configId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-                if ($configId > 0) {
-                    $this->openAdminStockConfigDetailView($chatId, $userId, 0, $packageId, $configId, $query);
+                $stock_itemId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+                if ($stock_itemId > 0) {
+                    $this->openAdminStockStockItemDetailView($chatId, $userId, 0, $tariffId, $stock_itemId, $query);
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_configs_option'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_stock_items_option'));
                 return;
             }
 
-            if ($level === 'config_detail') {
-                $packageId = (int) ($payload['package_id'] ?? 0);
-                $configId = (int) ($payload['config_id'] ?? 0);
+            if ($level === 'stock_item_detail') {
+                $tariffId = (int) ($payload['tariff_id'] ?? 0);
+                $stock_itemId = (int) ($payload['stock_item_id'] ?? 0);
                 $query = (string) ($payload['query'] ?? '');
                 if ($text === $this->uiConst(self::ADMIN_STOCK_EXPIRE_TOGGLE)) {
-                    $cfg = $this->findConfigById($packageId, $configId);
+                    $cfg = $this->findStockItemById($tariffId, $stock_itemId);
                     if ($cfg === null) {
-                        $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query, $this->messageRenderer->render('admin.users_stock.errors.config_not_found'));
+                        $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, $query, $this->messageRenderer->render('admin.users_stock.errors.stock_item_not_found'));
                         return;
                     }
                     $isExpired = ((int) ($cfg['is_expired'] ?? 0)) === 1;
                     if ($isExpired) {
-                        $this->database->unexpireConfig($configId);
+                        $this->database->unexpireStockItem($stock_itemId);
                     } else {
-                        $this->database->expireConfig($configId);
+                        $this->database->expireStockItem($stock_itemId);
                     }
-                    $this->openAdminStockConfigDetailView($chatId, $userId, 0, $packageId, $configId, $query, $this->messageRenderer->render('admin.users_stock.success.config_expire_status_updated'));
+                    $this->openAdminStockStockItemDetailView($chatId, $userId, 0, $tariffId, $stock_itemId, $query, $this->messageRenderer->render('admin.users_stock.success.stock_item_expire_status_updated'));
                     return;
                 }
                 if ($text === $this->uiConst(self::ADMIN_STOCK_DELETE_CONFIG)) {
-                    $this->database->deleteConfig($configId);
-                    $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query, $this->messageRenderer->render('admin.users_stock.success.config_deleted'));
+                    $this->database->deleteStockItem($stock_itemId);
+                    $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, $query, $this->messageRenderer->render('admin.users_stock.success.stock_item_deleted'));
                     return;
                 }
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_config_detail_option'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_stock_item_detail_option'));
                 return;
             }
         }
 
         if ($stateName === 'admin.stock.update') {
             $mode = (string) ($payload['mode'] ?? '');
-            $packageId = (int) ($payload['package_id'] ?? 0);
+            $tariffId = (int) ($payload['tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $query = (string) ($payload['query'] ?? '');
-                $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query);
+                $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, $query);
                 return;
             }
             if ($mode === 'search') {
@@ -3400,22 +3400,22 @@ final class MessageHandler
                 if ($query === '-' || $query === '—') {
                     $query = '';
                 }
-                $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query);
+                $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, $query);
                 return;
             }
-            if ($mode === 'add_config') {
+            if ($mode === 'add_stock_item') {
                 $raw = trim((string) ($message['text'] ?? ''));
                 if ($raw === '' || str_starts_with($raw, '/')) {
-                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.config_text_required'));
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.raw_payload_required'));
                     return;
                 }
                 $chunks = preg_split('/\n---\n/', $raw) ?: [];
                 if (count($chunks) < 2) {
-                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_config_format'));
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_stock_item_format'));
                     return;
                 }
                 $serviceName = trim((string) ($chunks[0] ?? ''));
-                $configText = trim((string) ($chunks[1] ?? ''));
+                $stock_itemText = trim((string) ($chunks[1] ?? ''));
                 $inquiry = null;
                 if (isset($chunks[2])) {
                     $third = trim((string) $chunks[2]);
@@ -3425,12 +3425,12 @@ final class MessageHandler
                         $inquiry = $third;
                     }
                 }
-                if ($serviceName === '' || $configText === '' || $packageId <= 0) {
-                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_service_or_config_text'));
+                if ($serviceName === '' || $stock_itemText === '' || $tariffId <= 0) {
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.users_stock.errors.invalid_service_or_raw_payload'));
                     return;
                 }
-                $configId = $this->database->addConfig($packageId, $serviceName, $configText, $inquiry);
-                $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, '', $this->messageRenderer->render('admin.users_stock.success.config_created', ['config_id' => $configId]));
+                $stock_itemId = $this->database->addStockItem($tariffId, $serviceName, $stock_itemText, $inquiry);
+                $this->openAdminStockStockItemsView($chatId, $userId, 0, $tariffId, '', $this->messageRenderer->render('admin.users_stock.success.stock_item_created', ['stock_item_id' => $stock_itemId]));
                 return;
             }
         }
@@ -3511,54 +3511,54 @@ final class MessageHandler
 
     private function openAdminStockTypesView(int $chatId, int $userId, ?string $notice = null): void
     {
-        $this->openAdminStockPackagesView($chatId, $userId, 0, $notice);
+        $this->openAdminStockTariffsView($chatId, $userId, 0, $notice);
     }
 
-    private function openAdminStockPackagesView(int $chatId, int $userId, int $typeId, ?string $notice = null): void
+    private function openAdminStockTariffsView(int $chatId, int $userId, int $typeId, ?string $notice = null): void
     {
-        $packages = $this->database->listAllPackages();
+        $tariffs = $this->database->listAllTariffs();
         $options = [];
         $lines = [];
         $buttons = [[$this->uiConst(self::ADMIN_STOCK_REFRESH)]];
-        foreach (array_values($packages) as $idx => $pkg) {
+        foreach (array_values($tariffs) as $idx => $pkg) {
             $num = (string) ($idx + 1);
-            $packageId = (int) ($pkg['id'] ?? 0);
-            if ($packageId <= 0) {
+            $tariffId = (int) ($pkg['id'] ?? 0);
+            if ($tariffId <= 0) {
                 continue;
             }
-            $available = $this->database->countAvailableConfigsForPackage($packageId);
-            $name = trim((string) ($pkg['name'] ?? $this->catalog->get('admin.ui.open.stock.packages.default_name')));
-            $lines[] = $this->catalog->get('admin.ui.open.stock.packages.row', ['num' => $num, 'name' => $name, 'package_id' => $packageId, 'available' => $available]);
-            $options[$num] = $packageId;
-            $buttons[] = [$this->catalog->get('admin.ui.open.stock.packages.button', ['num' => $num, 'name' => $name])];
+            $available = $this->database->countAvailableStockItemsForTariff($tariffId);
+            $name = trim((string) ($pkg['name'] ?? $this->catalog->get('admin.ui.open.stock.tariffs.default_name')));
+            $lines[] = $this->catalog->get('admin.ui.open.stock.tariffs.row', ['num' => $num, 'name' => $name, 'tariff_id' => $tariffId, 'available' => $available]);
+            $options[$num] = $tariffId;
+            $buttons[] = [$this->catalog->get('admin.ui.open.stock.tariffs.button', ['num' => $num, 'name' => $name])];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.stock.view', ['level' => 'packages', 'options' => $options, 'stack' => ['admin.stock.view', 'admin.root']]);
+        $this->database->setUserState($userId, 'admin.stock.view', ['level' => 'tariffs', 'options' => $options, 'stack' => ['admin.stock.view', 'admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.ui.open.stock.packages.overview', [
-                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.packages.empty'),
+            $this->messageRenderer->render('admin.ui.open.stock.tariffs.overview', [
+                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.tariffs.empty'),
             ], ['list']),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
 
-    private function openAdminStockConfigsView(int $chatId, int $userId, int $typeId, int $packageId, string $query = '', ?string $notice = null): void
+    private function openAdminStockStockItemsView(int $chatId, int $userId, int $typeId, int $tariffId, string $query = '', ?string $notice = null): void
     {
-        if ($packageId <= 0) {
-            $this->openAdminStockPackagesView($chatId, $userId, 0, $this->messageRenderer->render('admin.ui.open.stock.configs.invalid_service_package'));
+        if ($tariffId <= 0) {
+            $this->openAdminStockTariffsView($chatId, $userId, 0, $this->messageRenderer->render('admin.ui.open.stock.stock_items.invalid_service_tariff'));
             return;
         }
-        $configs = $this->database->listConfigsByPackageFiltered($packageId, 'all', $query !== '' ? $query : null, 20, 0);
+        $stock_items = $this->database->listStockItemsByTariffFiltered($tariffId, 'all', $query !== '' ? $query : null, 20, 0);
         $options = [];
         $lines = [];
-        foreach (array_values($configs) as $idx => $cfg) {
+        foreach (array_values($stock_items) as $idx => $cfg) {
             $num = (string) ($idx + 1);
-            $configId = (int) ($cfg['id'] ?? 0);
-            if ($configId <= 0) {
+            $stock_itemId = (int) ($cfg['id'] ?? 0);
+            if ($stock_itemId <= 0) {
                 continue;
             }
             $soldTo = (int) ($cfg['sold_to'] ?? 0);
@@ -3567,20 +3567,20 @@ final class MessageHandler
                 ? $this->catalog->get('admin.ui.open.stock.common.status_symbol_expired')
                 : ($soldTo > 0 ? $this->catalog->get('admin.ui.open.stock.common.status_symbol_sold') : $this->catalog->get('admin.ui.open.stock.common.status_symbol_ready'));
             $service = trim((string) ($cfg['service_name'] ?? $this->catalog->get('messages.generic.dash')));
-            $lines[] = $this->catalog->get('admin.ui.open.stock.configs.row', ['num' => $num, 'status' => $status, 'service' => $service, 'config_id' => $configId]);
-            $options[$num] = $configId;
+            $lines[] = $this->catalog->get('admin.ui.open.stock.stock_items.row', ['num' => $num, 'status' => $status, 'service' => $service, 'stock_item_id' => $stock_itemId]);
+            $options[$num] = $stock_itemId;
         }
         $buttons = [
             [$this->uiConst(self::ADMIN_STOCK_REFRESH), $this->uiConst(self::ADMIN_STOCK_ADD_CONFIG)],
             [$this->uiConst(self::ADMIN_STOCK_SEARCH), $this->uiConst(self::ADMIN_STOCK_SEARCH_CLEAR)],
         ];
         foreach (array_keys($options) as $num) {
-            $buttons[] = [$this->catalog->get('admin.ui.open.stock.configs.option_button', ['num' => $num])];
+            $buttons[] = [$this->catalog->get('admin.ui.open.stock.stock_items.option_button', ['num' => $num])];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.stock.view', [
-            'level' => 'configs',
-            'package_id' => $packageId,
+            'level' => 'stock_items',
+            'tariff_id' => $tariffId,
             'query' => $query,
             'options' => $options,
             'stack' => ['admin.stock.view', 'admin.root'],
@@ -3588,44 +3588,44 @@ final class MessageHandler
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
-        $queryView = $query === '' ? $this->catalog->get('admin.ui.open.stock.configs.query_none') : '<code>' . htmlspecialchars($query) . '</code>';
+        $queryView = $query === '' ? $this->catalog->get('admin.ui.open.stock.stock_items.query_none') : '<code>' . htmlspecialchars($query) . '</code>';
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.ui.open.stock.configs.overview', [
-                'package_id' => $packageId,
+            $this->messageRenderer->render('admin.ui.open.stock.stock_items.overview', [
+                'tariff_id' => $tariffId,
                 'query_view' => $queryView,
-                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.configs.empty'),
+                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.stock_items.empty'),
             ], ['query_view', 'list']),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
 
-    private function openAdminStockConfigDetailView(int $chatId, int $userId, int $typeId, int $packageId, int $configId, string $query = '', ?string $notice = null): void
+    private function openAdminStockStockItemDetailView(int $chatId, int $userId, int $typeId, int $tariffId, int $stock_itemId, string $query = '', ?string $notice = null): void
     {
-        $cfg = $this->findConfigById($packageId, $configId);
+        $cfg = $this->findStockItemById($tariffId, $stock_itemId);
         if ($cfg === null) {
-            $this->openAdminStockConfigsView($chatId, $userId, $typeId, $packageId, $query, $this->messageRenderer->render('admin.ui.open.stock.config_detail.not_found'));
+            $this->openAdminStockStockItemsView($chatId, $userId, $typeId, $tariffId, $query, $this->messageRenderer->render('admin.ui.open.stock.stock_item_detail.not_found'));
             return;
         }
         $soldTo = (int) ($cfg['sold_to'] ?? 0);
         $expired = ((int) ($cfg['is_expired'] ?? 0)) === 1;
         $status = $expired
-            ? $this->catalog->get('admin.ui.open.stock.config_detail.status_expired')
-            : ($soldTo > 0 ? $this->catalog->get('admin.ui.open.stock.config_detail.status_sold') : $this->catalog->get('admin.ui.open.stock.config_detail.status_ready'));
+            ? $this->catalog->get('admin.ui.open.stock.stock_item_detail.status_expired')
+            : ($soldTo > 0 ? $this->catalog->get('admin.ui.open.stock.stock_item_detail.status_sold') : $this->catalog->get('admin.ui.open.stock.stock_item_detail.status_ready'));
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->database->setUserState($userId, 'admin.stock.view', [
-            'level' => 'config_detail',
-            'package_id' => $packageId,
-            'config_id' => $configId,
+            'level' => 'stock_item_detail',
+            'tariff_id' => $tariffId,
+            'stock_item_id' => $stock_itemId,
             'query' => $query,
             'stack' => ['admin.stock.view', 'admin.root'],
         ]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('admin.ui.open.stock.config_detail.overview', [
-                'config_id' => $configId,
+            $this->messageRenderer->render('admin.ui.open.stock.stock_item_detail.overview', [
+                'stock_item_id' => $stock_itemId,
                 'service_name' => (string) ($cfg['service_name'] ?? $this->catalog->get('messages.generic.dash')),
                 'status' => $status,
             ]),
@@ -3636,13 +3636,13 @@ final class MessageHandler
         );
     }
 
-    private function findConfigById(int $ownerId, int $configId, bool $serviceBased = false): ?array
+    private function findStockItemById(int $ownerId, int $stock_itemId, bool $serviceBased = false): ?array
     {
         $rows = $serviceBased
-            ? $this->database->listConfigsByService($ownerId, null, 100, 0)
-            : $this->database->listConfigsByPackage($ownerId, 100, 0);
+            ? $this->database->listStockItemsByService($ownerId, null, 100, 0)
+            : $this->database->listStockItemsByTariff($ownerId, 100, 0);
         foreach ($rows as $cfg) {
-            if ((int) ($cfg['id'] ?? 0) === $configId) {
+            if ((int) ($cfg['id'] ?? 0) === $stock_itemId) {
                 return $cfg;
             }
         }
@@ -4320,7 +4320,7 @@ final class MessageHandler
                 $this->openAdminAdminView($chatId, $userId, $targetUid);
                 return;
             }
-            if ($targetUid > 0 && trim($text) === $confirmDeleteWord && !in_array($targetUid, Config::adminIds(), true)) {
+            if ($targetUid > 0 && trim($text) === $confirmDeleteWord && !in_array($targetUid, StockItem::adminIds(), true)) {
                 $this->database->removeAdminUser($targetUid);
                 $this->openAdminAdminsList($chatId, $userId, $this->messageRenderer->render('admin.settings_admins_pins.success.admin_deleted'));
                 return;
@@ -4510,7 +4510,7 @@ final class MessageHandler
             $options[$num] = $uid;
             $buttons[] = [$this->catalog->get('admin.ui.open.settings_admins_pins.admins.button', ['num' => $num, 'uid' => $uid])];
         }
-        foreach (Config::adminIds() as $ownerId) {
+        foreach (StockItem::adminIds() as $ownerId) {
             $lines[] = $this->catalog->get('admin.ui.open.settings_admins_pins.admins.owner_row', ['emoji' => $this->catalog->get('admin.ui.open.settings_admins_pins.admins.owner_emoji'), 'owner_id' => $ownerId]);
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
@@ -4529,7 +4529,7 @@ final class MessageHandler
 
     private function openAdminAdminView(int $chatId, int $userId, int $targetUid, ?string $notice = null): void
     {
-        if (in_array($targetUid, Config::adminIds(), true)) {
+        if (in_array($targetUid, StockItem::adminIds(), true)) {
             $this->openAdminAdminsList($chatId, $userId, $this->messageRenderer->render('admin.ui.open.settings_admins_pins.admin_view.owner_locked'));
             return;
         }
@@ -4665,14 +4665,14 @@ final class MessageHandler
             $selected = $this->extractOptionKey($text);
                 $pkgId = isset($options[$selected]) ? (int) $options[$selected] : 0;
                 if ($pkgId > 0) {
-                    $this->database->setUserState($userId, 'admin.agent.edit', ['agent_id' => $agentId, 'package_id' => $pkgId]);
+                    $this->database->setUserState($userId, 'admin.agent.edit', ['agent_id' => $agentId, 'tariff_id' => $pkgId]);
                     $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.prompts.agent_price_input'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                     return;
                 }
             }
         if ($stateName === 'admin.agent.edit') {
             $agentId = (int) ($payload['agent_id'] ?? 0);
-            $pkgId = (int) ($payload['package_id'] ?? 0);
+            $pkgId = (int) ($payload['tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminAgentView($chatId, $userId, $agentId);
                 return;
@@ -4844,7 +4844,7 @@ final class MessageHandler
                 'provider_group_ids' => (string) ($data['group_ids'] ?? ''),
                 'is_active' => 1,
             ]);
-            $this->openAdminPanelView($chatId, $userId, $panelId, $this->messageRenderer->render('admin.final_modules.success.panel_package_created'));
+            $this->openAdminPanelView($chatId, $userId, $panelId, $this->messageRenderer->render('admin.final_modules.success.panel_tariff_created'));
             return;
         }
         if ($stateName === 'admin.panel.settings') {
@@ -5161,7 +5161,7 @@ final class MessageHandler
             if ($id <= 0) {
                 continue;
             }
-            $lines[] = $this->catalog->get('admin.ui.open.deliveries.list.row', ['num' => $num, 'order_id' => $id, 'user_id' => (int) ($ord['user_id'] ?? 0), 'package_id' => (int) ($ord['package_id'] ?? 0)]);
+            $lines[] = $this->catalog->get('admin.ui.open.deliveries.list.row', ['num' => $num, 'order_id' => $id, 'user_id' => (int) ($ord['user_id'] ?? 0), 'tariff_id' => (int) ($ord['tariff_id'] ?? 0)]);
             $options[$num] = $id;
             $buttons[] = [$this->catalog->get('admin.ui.open.deliveries.list.button', ['num' => $num, 'order_id' => $id])];
         }
@@ -5246,27 +5246,27 @@ final class MessageHandler
         );
     }
 
-    private function showBuyPackageSelection(int $chatId, int $userId, int $typeId): void
+    private function showBuyTariffSelection(int $chatId, int $userId, int $typeId): void
     {
         $stockOnly = $this->settings->get('delivery_mode', 'stock_only') === 'stock_only';
-        $packages = $this->database->getActivePackagesByTypeWithStock($typeId, $stockOnly);
-        if ($packages === []) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.no_package_for_service'));
+        $tariffs = $this->database->getActiveTariffsByTypeWithStock($typeId, $stockOnly);
+        if ($tariffs === []) {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.no_tariff_for_service'));
             return;
         }
 
         $lines = [];
         $optionMap = [];
         $buttons = [];
-        foreach (array_values($packages) as $idx => $pkg) {
+        foreach (array_values($tariffs) as $idx => $pkg) {
             $num = (string) ($idx + 1);
             $pkgId = (int) ($pkg['id'] ?? 0);
             if ($pkgId <= 0) {
                 continue;
             }
-            $price = $this->database->effectivePackagePrice($userId, $pkg);
+            $price = $this->database->effectiveTariffPrice($userId, $pkg);
             $stockText = isset($pkg['stock']) ? $this->catalog->get('messages.user.buy.stock_suffix', ['stock' => (int) $pkg['stock']]) : '';
-            $label = $this->catalog->get('messages.user.buy.package_row', [
+            $label = $this->catalog->get('messages.user.buy.tariff_row', [
                 'name' => (string) $pkg['name'],
                 'volume_gb' => (string) $pkg['volume_gb'],
                 'duration_days' => (string) $pkg['duration_days'],
@@ -5275,14 +5275,14 @@ final class MessageHandler
             ]);
             $lines[] = "{$num}) " . htmlspecialchars($label);
             $optionMap[$num] = $pkgId;
-            $buttons[] = [$num . ' - ' . (string) ($pkg['name'] ?? $this->catalog->get('messages.user.buy.default_package_name'))];
+            $buttons[] = [$num . ' - ' . (string) ($pkg['name'] ?? $this->catalog->get('messages.user.buy.default_tariff_name'))];
         }
 
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'buy.await_package', ['options' => $optionMap, 'stack' => ['buy.await_package'], 'package_id' => null, 'payment_method' => null]);
+        $this->database->setUserState($userId, 'buy.await_tariff', ['options' => $optionMap, 'stack' => ['buy.await_tariff'], 'tariff_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('messages.user.buy.package_selection.overview', [
+            $this->messageRenderer->render('messages.user.buy.tariff_selection.overview', [
                 'options' => implode("\n", $lines),
             ], ['options']),
             $this->uiKeyboard->replyMenu($buttons)
@@ -5470,7 +5470,7 @@ final class MessageHandler
                 ])
                 : $this->catalog->get('messages.user.buy.service.tariff_per_gb_summary', [
                     'min_volume_gb' => (string) ($tariff['min_volume_gb'] ?? '0'),
-                    'max_volume_gb' => (string) (($tariff['max_volume_gb'] ?? null) !== null ? $tariff['max_volume_gb'] : $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited'))),
+                    'max_volume_gb' => (string) (($tariff['max_volume_gb'] ?? null) !== null ? $tariff['max_volume_gb'] : $this->removeEmoji((string) $this->catalog->get('admin.types_tariffs.labels.duration_policy_unlimited'))),
                     'price_per_gb' => (string) ($tariff['price_per_gb'] ?? '0'),
                 ]);
             $lines[] = $this->catalog->get('messages.user.buy.service.tariff_row', [
@@ -5535,7 +5535,7 @@ final class MessageHandler
                     'min_volume_gb' => $this->toPersianNumber($this->formatGbValue((float) ($tariff['min_volume_gb'] ?? 0))),
                     'max_volume_gb' => ($tariff['max_volume_gb'] ?? null) !== null
                         ? $this->toPersianNumber($this->formatGbValue((float) $tariff['max_volume_gb']))
-                        : $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited')),
+                        : $this->removeEmoji((string) $this->catalog->get('admin.types_tariffs.labels.duration_policy_unlimited')),
                     'price_per_gb' => $this->toPersianNumber((string) ($tariff['price_per_gb'] ?? '0')),
                 ]),
                 $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
@@ -5566,7 +5566,7 @@ final class MessageHandler
         $this->openServicePaymentSelection($chatId, $userId, $serviceId, $tariffId, $volume);
     }
 
-    private function handleBuyPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
+    private function handleBuyTariffSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
         if ($text === UiLabels::back($this->catalog)) {
             $this->startBuyTypeReplyFlow($chatId, $userId);
@@ -5580,8 +5580,8 @@ final class MessageHandler
 
         $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
         $selected = $this->extractOptionKey($text);
-        $packageId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-        if ($packageId <= 0) {
+        $tariffId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        if ($tariffId <= 0) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.common.invalid_option'));
             return;
         }
@@ -5589,7 +5589,7 @@ final class MessageHandler
         if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
             $rulesText = trim($this->settings->get('purchase_rules_text', ''));
             $rulesText = $rulesText !== '' ? $rulesText : $this->catalog->get('messages.user.buy.rules.default_text');
-            $this->database->setUserState($userId, 'buy.await_rules_accept', ['package_id' => $packageId, 'stack' => ['buy.await_package'], 'payment_method' => null]);
+            $this->database->setUserState($userId, 'buy.await_rules_accept', ['tariff_id' => $tariffId, 'stack' => ['buy.await_tariff'], 'payment_method' => null]);
             $this->telegram->sendMessage(
                 $chatId,
                 $this->messageRenderer->render('messages.user.buy.rules.overview', [
@@ -5601,14 +5601,14 @@ final class MessageHandler
         }
 
         $this->database->clearUserState($userId);
-        $package = $this->database->getPackage($packageId);
-        if ($package === null) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.package_not_found'));
+        $tariff = $this->database->getServiceTariff($tariffId);
+        if ($tariff === null) {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.tariff_not_found'));
             return;
         }
         $textOut = $this->messageRenderer->render('messages.user.buy.payment.overview', [
-            'package_name' => (string) $package['name'],
-            'amount' => (int) $this->database->effectivePackagePrice($userId, $package),
+            'tariff_name' => (string) $tariff['name'],
+            'amount' => (int) $this->database->effectiveTariffPrice($userId, $tariff),
         ]);
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
@@ -5627,14 +5627,14 @@ final class MessageHandler
             $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'buy.await_payment_method', ['package_id' => $packageId, 'stack' => ['buy.await_package'], 'payment_method' => null, 'gateway' => null]);
+        $this->database->setUserState($userId, 'buy.await_payment_method', ['tariff_id' => $tariffId, 'stack' => ['buy.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
 
-    private function showMyConfigsWithReplyFlow(int $chatId, int $userId): void
+    private function showMyStockItemsWithReplyFlow(int $chatId, int $userId): void
     {
         $items = $this->database->listUserPurchasesSummary($userId, 8);
-        $this->telegram->sendMessage($chatId, $this->menus->myConfigsText($userId));
+        $this->telegram->sendMessage($chatId, $this->menus->myStockItemsText($userId));
 
         if ($this->settings->get('manual_renewal_enabled', '1') !== '1' || $items === []) {
             return;
@@ -5660,7 +5660,7 @@ final class MessageHandler
         }
 
         $buttons[] = [UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'renew.await_purchase', ['options' => $optionMap, 'stack' => [], 'purchase_id' => null, 'package_id' => null, 'payment_method' => null]);
+        $this->database->setUserState($userId, 'renew.await_purchase', ['options' => $optionMap, 'stack' => [], 'purchase_id' => null, 'tariff_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
             $this->messageRenderer->render('messages.user.renew.select_order.overview', [
@@ -5696,22 +5696,22 @@ final class MessageHandler
             return;
         }
 
-        $packages = $this->database->getActivePackagesByType(0);
-        if ($packages === []) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.no_package'));
+        $tariffs = $this->database->getActiveTariffsByType(0);
+        if ($tariffs === []) {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.no_tariff'));
             return;
         }
 
         $lines = [];
         $optionMap = [];
         $buttons = [];
-        foreach (array_values($packages) as $idx => $pkg) {
+        foreach (array_values($tariffs) as $idx => $pkg) {
             $num = (string) ($idx + 1);
             $pkgId = (int) ($pkg['id'] ?? 0);
             if ($pkgId <= 0) {
                 continue;
             }
-            $label = $this->catalog->get('messages.user.renew.package_row', [
+            $label = $this->catalog->get('messages.user.renew.tariff_row', [
                 'name' => (string) $pkg['name'],
                 'volume_gb' => (string) $pkg['volume_gb'],
                 'duration_days' => (string) $pkg['duration_days'],
@@ -5719,27 +5719,27 @@ final class MessageHandler
             ]);
             $lines[] = "{$num}) " . htmlspecialchars($label);
             $optionMap[$num] = $pkgId;
-            $buttons[] = [$this->catalog->get('messages.user.renew.package_button', ['num' => $num])];
+            $buttons[] = [$this->catalog->get('messages.user.renew.tariff_button', ['num' => $num])];
         }
 
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'renew.await_package', ['options' => $optionMap, 'purchase_id' => $purchaseId, 'stack' => ['renew.await_purchase'], 'package_id' => null, 'payment_method' => null]);
+        $this->database->setUserState($userId, 'renew.await_tariff', ['options' => $optionMap, 'purchase_id' => $purchaseId, 'stack' => ['renew.await_purchase'], 'tariff_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('messages.user.renew.select_package.overview', [
+            $this->messageRenderer->render('messages.user.renew.select_tariff.overview', [
                 'purchase_id' => $purchaseId,
                 'service_name' => (string) ($purchase['service_name'] ?? $this->catalog->get('messages.generic.dash')),
-                'package_name' => (string) ($purchase['package_name'] ?? $this->catalog->get('messages.generic.dash')),
+                'tariff_name' => (string) ($purchase['tariff_name'] ?? $this->catalog->get('messages.generic.dash')),
                 'options' => implode("\n", $lines),
             ], ['options']),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }
 
-    private function handleRenewPackageSelectionState(int $chatId, int $userId, string $text, array $state): void
+    private function handleRenewTariffSelectionState(int $chatId, int $userId, string $text, array $state): void
     {
         if ($text === UiLabels::back($this->catalog)) {
-            $this->showMyConfigsWithReplyFlow($chatId, $userId);
+            $this->showMyStockItemsWithReplyFlow($chatId, $userId);
             return;
         }
         if ($this->isMainMenuInput($text)) {
@@ -5750,25 +5750,25 @@ final class MessageHandler
 
         $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
         $selected = $this->extractOptionKey($text);
-        $packageId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        $tariffId = isset($options[$selected]) ? (int) $options[$selected] : 0;
         $purchaseId = (int) ($state['payload']['purchase_id'] ?? 0);
-        if ($packageId <= 0 || $purchaseId <= 0) {
+        if ($tariffId <= 0 || $purchaseId <= 0) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.common.invalid_option'));
             return;
         }
 
         $this->database->clearUserState($userId);
-        $package = $this->database->getPackage($packageId);
+        $tariff = $this->database->getServiceTariff($tariffId);
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
-        if ($package === null || !is_array($purchase)) {
+        if ($tariff === null || !is_array($purchase)) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.invalid_data'));
             return;
         }
 
         $textOut = $this->messageRenderer->render('messages.user.renew.payment.overview', [
             'purchase_id' => $purchaseId,
-            'package_name' => (string) $package['name'],
-            'amount' => (int) $package['price'],
+            'tariff_name' => (string) $tariff['name'],
+            'amount' => (int) $tariff['price'],
         ]);
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
@@ -5787,7 +5787,7 @@ final class MessageHandler
             $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'renew.await_payment_method', ['purchase_id' => $purchaseId, 'package_id' => $packageId, 'stack' => ['renew.await_purchase', 'renew.await_package'], 'payment_method' => null, 'gateway' => null]);
+        $this->database->setUserState($userId, 'renew.await_payment_method', ['purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'stack' => ['renew.await_purchase', 'renew.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
 
@@ -5802,18 +5802,18 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
-        $packageId = (int) ($state['payload']['package_id'] ?? 0);
-        if ($packageId <= 0) {
+        $tariffId = (int) ($state['payload']['tariff_id'] ?? 0);
+        if ($tariffId <= 0) {
             $this->database->clearUserState($userId);
             return;
         }
-        if (!$this->ensurePurchaseAllowedForPackageMessage($chatId, $userId, $packageId)) {
+        if (!$this->ensurePurchaseAllowedForTariffMessage($chatId, $userId, $tariffId)) {
             return;
         }
 
         if ($text === $this->catalog->get('buttons.pay.wallet') || $text === $this->uiConst(self::PAY_WALLET)) {
             $this->database->clearUserState($userId);
-            $result = $this->database->walletPayPackage($userId, $packageId);
+            $result = $this->database->walletPayServiceTariff($userId, $tariffId);
             if (!($result['ok'] ?? false)) {
                 $msg = match ($result['error'] ?? '') {
                     'insufficient_balance' => $this->catalog->get('messages.user.payment.errors.insufficient_balance'),
@@ -5824,7 +5824,7 @@ final class MessageHandler
                 return;
             }
             $this->database->setUserState($userId, 'buy.done', [
-                'package_id' => $packageId,
+                'tariff_id' => $tariffId,
                 'payment_method' => 'wallet',
                 'gateway' => null,
             ]);
@@ -5841,13 +5841,13 @@ final class MessageHandler
 
         if ($text === $this->catalog->get('buttons.pay.card') || $text === $this->uiConst(self::PAY_CARD) || $text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
             $this->database->clearUserState($userId);
-            $this->createPurchasePaymentByMethod($chatId, $userId, $packageId, $text);
+            $this->createPurchasePaymentByMethod($chatId, $userId, $tariffId, $text);
             return;
         }
 
         if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === $this->uiConst(self::PAY_SWAPWALLET) || $text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
             $this->database->clearUserState($userId);
-            $this->createPurchaseGatewayInvoice($chatId, $userId, $packageId, $text);
+            $this->createPurchaseGatewayInvoice($chatId, $userId, $tariffId, $text);
             return;
         }
 
@@ -5881,7 +5881,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.create_order_failed'));
             return;
         }
-        if ($serviceMode === 'stock' && $this->database->countAvailableConfigsByService($serviceId, $tariffId) <= 0) {
+        if ($serviceMode === 'stock' && $this->database->countAvailableStockItemsByService($serviceId, $tariffId) <= 0) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.no_stock'));
             return;
         }
@@ -5919,7 +5919,7 @@ final class MessageHandler
         $durationText = $isPerGb
             ? ((string) ($tariff['duration_policy'] ?? '') === 'fixed_days'
                 ? $this->toPersianNumber((string) ($tariff['duration_days'] ?? '0')) . ' روز'
-                : $this->removeEmoji((string) $this->catalog->get('admin.types_packages.labels.duration_policy_unlimited')))
+                : $this->removeEmoji((string) $this->catalog->get('admin.types_tariffs.labels.duration_policy_unlimited')))
             : $this->toPersianNumber((string) ($tariff['duration_days'] ?? '0')) . ' روز';
         $textOut = $this->messageRenderer->render('messages.user.buy.service.payment.overview', [
             'service_name' => $serviceTitle,
@@ -6134,7 +6134,7 @@ final class MessageHandler
         if ($text === UiLabels::back($this->catalog)) {
             $purchaseId = (int) ($state['payload']['purchase_id'] ?? 0);
             if ($purchaseId > 0) {
-                $this->showMyConfigsWithReplyFlow($chatId, $userId);
+                $this->showMyStockItemsWithReplyFlow($chatId, $userId);
                 return;
             }
             $this->database->clearUserState($userId);
@@ -6147,14 +6147,14 @@ final class MessageHandler
             return;
         }
         $purchaseId = (int) ($state['payload']['purchase_id'] ?? 0);
-        $packageId = (int) ($state['payload']['package_id'] ?? 0);
-        if ($purchaseId <= 0 || $packageId <= 0) {
+        $tariffId = (int) ($state['payload']['tariff_id'] ?? 0);
+        if ($purchaseId <= 0 || $tariffId <= 0) {
             $this->database->clearUserState($userId);
             return;
         }
         if ($text === $this->catalog->get('buttons.pay.wallet') || $text === $this->uiConst(self::PAY_WALLET)) {
             $this->database->clearUserState($userId);
-            $result = $this->database->walletPayRenewal($userId, $purchaseId, $packageId);
+            $result = $this->database->walletPayRenewal($userId, $purchaseId, $tariffId);
             if (!($result['ok'] ?? false)) {
                 $msg = match ($result['error'] ?? '') {
                     'insufficient_balance' => $this->catalog->get('messages.user.payment.errors.insufficient_balance'),
@@ -6168,7 +6168,7 @@ final class MessageHandler
             }
             $this->database->setUserState($userId, 'renew.done', [
                 'purchase_id' => $purchaseId,
-                'package_id' => $packageId,
+                'tariff_id' => $tariffId,
                 'payment_method' => 'wallet',
                 'gateway' => null,
             ]);
@@ -6183,13 +6183,13 @@ final class MessageHandler
 
         if ($text === $this->catalog->get('buttons.pay.card') || $text === $this->uiConst(self::PAY_CARD) || $text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
             $this->database->clearUserState($userId);
-            $this->createRenewalPaymentByMethod($chatId, $userId, $purchaseId, $packageId, $text);
+            $this->createRenewalPaymentByMethod($chatId, $userId, $purchaseId, $tariffId, $text);
             return;
         }
 
         if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === $this->uiConst(self::PAY_SWAPWALLET) || $text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
             $this->database->clearUserState($userId);
-            $this->createRenewalGatewayInvoice($chatId, $userId, $purchaseId, $packageId, $text);
+            $this->createRenewalGatewayInvoice($chatId, $userId, $purchaseId, $tariffId, $text);
             return;
         }
 
@@ -6199,20 +6199,20 @@ final class MessageHandler
         }
     }
 
-    private function createPurchasePaymentByMethod(int $chatId, int $userId, int $packageId, string $methodLabel): void
+    private function createPurchasePaymentByMethod(int $chatId, int $userId, int $tariffId, string $methodLabel): void
     {
         $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
-        $package = $this->database->getPackage($packageId);
-        if ($package === null) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.package_not_found'));
+        $tariff = $this->database->getServiceTariff($tariffId);
+        if ($tariff === null) {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.tariff_not_found'));
             return;
         }
-        $amount = (int) $this->database->effectivePackagePrice($userId, $package);
+        $amount = (int) $this->database->effectiveTariffPrice($userId, $tariff);
         $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $tariffId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
@@ -6221,7 +6221,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $tariffId,
             'payment_id' => $paymentId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
@@ -6267,7 +6267,7 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $authority);
         }
         $payUrl = (string) ($tp['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_purchase'), 'package_id' => $packageId, 'payment_method' => 'tetrapay']);
+        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_purchase'), 'tariff_id' => $tariffId, 'payment_method' => 'tetrapay']);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
     }
 
@@ -6284,7 +6284,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
@@ -6293,7 +6293,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'order_mode' => 'panel_only',
             'service_id' => $serviceId,
             'selected_volume_gb' => $selectedVolumeGb,
@@ -6355,7 +6355,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.common.invalid_option'));
             return;
         }
-        if ((string) ($service['mode'] ?? 'stock') === 'stock' && $this->database->countAvailableConfigsByService($serviceId, $tariffId) <= 0) {
+        if ((string) ($service['mode'] ?? 'stock') === 'stock' && $this->database->countAvailableStockItemsByService($serviceId, $tariffId) <= 0) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.no_stock'));
             return;
         }
@@ -6369,7 +6369,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'amount' => $amount,
@@ -6380,7 +6380,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'selected_volume_gb' => $selectedVolumeGb,
@@ -6434,21 +6434,21 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
     }
 
-    private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
+    private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $tariffId, string $methodLabel): void
     {
         $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
-        $package = $this->database->getPackage($packageId);
-        if (!is_array($purchase) || $package === null) {
+        $tariff = $this->database->getServiceTariff($tariffId);
+        if (!is_array($purchase) || $tariff === null) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.renew.invalid_data'));
             return;
         }
-        $amount = (int) $package['price'];
+        $amount = (int) $tariff['price'];
         $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
         $paymentId = $this->database->createPayment([
             'kind' => 'renewal',
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $tariffId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
@@ -6457,7 +6457,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $tariffId,
             'payment_id' => $paymentId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
@@ -6503,23 +6503,23 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $authority);
         }
         $payUrl = (string) ($tp['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => 'tetrapay']);
+        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'payment_method' => 'tetrapay']);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_renew'), $pendingId, $amount, $payUrl);
     }
 
-    private function createPurchaseGatewayInvoice(int $chatId, int $userId, int $packageId, string $methodLabel): void
+    private function createPurchaseGatewayInvoice(int $chatId, int $userId, int $tariffId, string $methodLabel): void
     {
         $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
-        $package = $this->database->getPackage($packageId);
-        if ($package === null) {
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.package_not_found'));
+        $tariff = $this->database->getServiceTariff($tariffId);
+        if ($tariff === null) {
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.tariff_not_found'));
             return;
         }
-        $amount = (int) $this->database->effectivePackagePrice($userId, $package);
+        $amount = (int) $this->database->effectiveTariffPrice($userId, $tariff);
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $tariffId,
             'amount' => $amount,
             'payment_method' => $gateway,
             'status' => 'waiting_gateway',
@@ -6527,7 +6527,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $tariffId,
             'payment_id' => $paymentId,
             'amount' => $amount,
             'payment_method' => $gateway,
@@ -6545,11 +6545,11 @@ final class MessageHandler
                 $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
             }
             $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'package_id' => $packageId, 'payment_method' => $gateway]);
+            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'tariff_id' => $tariffId, 'payment_method' => $gateway]);
             $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_purchase'), $pendingId, $amount, $payUrl);
             return;
         }
-        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-' . $userId . '-' . $packageId . '-' . time());
+        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-' . $userId . '-' . $tariffId . '-' . time());
         if (!($invoice['ok'] ?? false)) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
             return;
@@ -6559,7 +6559,7 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
         }
         $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'package_id' => $packageId, 'payment_method' => $gateway]);
+        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'tariff_id' => $tariffId, 'payment_method' => $gateway]);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
     }
 
@@ -6575,7 +6575,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'amount' => $amount,
             'payment_method' => $gateway,
             'status' => 'waiting_gateway',
@@ -6583,7 +6583,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'order_mode' => 'panel_only',
             'service_id' => $serviceId,
             'selected_volume_gb' => $selectedVolumeGb,
@@ -6633,7 +6633,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.common.invalid_option'));
             return;
         }
-        if ((string) ($service['mode'] ?? 'stock') === 'stock' && $this->database->countAvailableConfigsByService($serviceId, $tariffId) <= 0) {
+        if ((string) ($service['mode'] ?? 'stock') === 'stock' && $this->database->countAvailableStockItemsByService($serviceId, $tariffId) <= 0) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.no_stock'));
             return;
         }
@@ -6647,7 +6647,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'amount' => $amount,
@@ -6657,7 +6657,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'selected_volume_gb' => $selectedVolumeGb,
@@ -6699,20 +6699,20 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
     }
 
-    private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
+    private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $tariffId, string $methodLabel): void
     {
         $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
-        $package = $this->database->getPackage($packageId);
+        $tariff = $this->database->getServiceTariff($tariffId);
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
-        if ($package === null || !is_array($purchase)) {
+        if ($tariff === null || !is_array($purchase)) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.renew.invalid_data'));
             return;
         }
-        $amount = (int) $package['price'];
+        $amount = (int) $tariff['price'];
         $paymentId = $this->database->createPayment([
             'kind' => 'renewal',
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $tariffId,
             'amount' => $amount,
             'payment_method' => $gateway,
             'status' => 'waiting_gateway',
@@ -6720,7 +6720,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $tariffId,
             'payment_id' => $paymentId,
             'amount' => $amount,
             'payment_method' => $gateway,
@@ -6738,11 +6738,11 @@ final class MessageHandler
                 $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
             }
             $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => $gateway]);
+            $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'payment_method' => $gateway]);
             $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_renew'), $pendingId, $amount, $payUrl);
             return;
         }
-        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'rnw-' . $userId . '-' . $packageId . '-' . time());
+        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'rnw-' . $userId . '-' . $tariffId . '-' . time());
         if (!($invoice['ok'] ?? false)) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
             return;
@@ -6752,7 +6752,7 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
         }
         $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => $gateway]);
+        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'payment_method' => $gateway]);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_renew'), $pendingId, $amount, $payUrl);
     }
 
@@ -6791,14 +6791,14 @@ final class MessageHandler
             if ($changed) {
                 if ((string) ($payment['kind'] ?? '') === 'purchase') {
                     $this->database->setUserState($userId, 'buy.done', [
-                        'package_id' => (int) ($state['payload']['package_id'] ?? 0),
+                        'tariff_id' => (int) ($state['payload']['tariff_id'] ?? 0),
                         'payment_method' => (string) ($state['payload']['payment_method'] ?? ''),
                         'gateway' => $gateway,
                     ]);
                 } elseif ((string) ($payment['kind'] ?? '') === 'renewal') {
                     $this->database->setUserState($userId, 'renew.done', [
                         'purchase_id' => (int) ($state['payload']['purchase_id'] ?? 0),
-                        'package_id' => (int) ($state['payload']['package_id'] ?? 0),
+                        'tariff_id' => (int) ($state['payload']['tariff_id'] ?? 0),
                         'payment_method' => (string) ($state['payload']['payment_method'] ?? ''),
                         'gateway' => $gateway,
                     ]);
@@ -6831,8 +6831,8 @@ final class MessageHandler
                 $this->openPanelServiceSelection($chatId, $userId);
                 return;
             }
-            $packageId = (int) ($state['payload']['package_id'] ?? 0);
-            if ($packageId > 0) {
+            $tariffId = (int) ($state['payload']['tariff_id'] ?? 0);
+            if ($tariffId > 0) {
                 $this->startBuyTypeReplyFlow($chatId, $userId);
                 return;
             }
@@ -6870,21 +6870,21 @@ final class MessageHandler
             $this->openServicePaymentSelection($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb);
             return;
         }
-        $packageId = (int) ($state['payload']['package_id'] ?? 0);
-        if ($packageId <= 0) {
+        $tariffId = (int) ($state['payload']['tariff_id'] ?? 0);
+        if ($tariffId <= 0) {
             $this->database->clearUserState($userId);
             return;
         }
         $this->database->acceptPurchaseRules($userId);
         $this->database->clearUserState($userId);
-        $package = $this->database->getPackage($packageId);
-        if ($package === null) {
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.package_not_found'));
+        $tariff = $this->database->getServiceTariff($tariffId);
+        if ($tariff === null) {
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.tariff_not_found'));
             return;
         }
         $textOut = $this->messageRenderer->render('messages.user.buy.payment.overview', [
-            'package_name' => (string) $package['name'],
-            'amount' => (int) $this->database->effectivePackagePrice($userId, $package),
+            'tariff_name' => (string) $tariff['name'],
+            'amount' => (int) $this->database->effectiveTariffPrice($userId, $tariff),
         ]);
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         if ($this->settings->get('gw_card_enabled', '0') === '1') {
@@ -6903,7 +6903,7 @@ final class MessageHandler
             $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'buy.await_payment_method', ['package_id' => $packageId, 'stack' => ['buy.await_package'], 'payment_method' => null, 'gateway' => null]);
+        $this->database->setUserState($userId, 'buy.await_payment_method', ['tariff_id' => $tariffId, 'stack' => ['buy.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
 
@@ -6927,7 +6927,7 @@ final class MessageHandler
         );
     }
 
-    private function ensurePurchaseAllowedForPackageMessage(int $chatId, int $userId, int $packageId): bool
+    private function ensurePurchaseAllowedForTariffMessage(int $chatId, int $userId, int $tariffId): bool
     {
         if ($this->settings->get('shop_open', '1') !== '1') {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.shop_closed'));
@@ -6937,7 +6937,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.rules.need_accept_first'));
             return false;
         }
-        if ($this->settings->get('delivery_mode', 'stock_only') === 'stock_only' && !$this->database->packageHasAvailableStock($packageId)) {
+        if ($this->settings->get('delivery_mode', 'stock_only') === 'stock_only' && !$this->database->tariffHasAvailableStock($tariffId)) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.out_of_stock'));
             return false;
         }
@@ -7022,7 +7022,7 @@ final class MessageHandler
         }
         return in_array($text, [
             KeyboardBuilder::buy(),
-            KeyboardBuilder::myConfigs(),
+            KeyboardBuilder::myStockItems(),
             KeyboardBuilder::freeTest(),
             KeyboardBuilder::profile(),
             KeyboardBuilder::wallet(),
@@ -7036,7 +7036,7 @@ final class MessageHandler
             KeyboardBuilder::backPurchases(),
             KeyboardBuilder::checkChannel(),
             KeyboardBuilder::buy(),
-            KeyboardBuilder::myConfigs(),
+            KeyboardBuilder::myStockItems(),
             KeyboardBuilder::freeTest(),
             KeyboardBuilder::profile(),
             KeyboardBuilder::wallet(),
