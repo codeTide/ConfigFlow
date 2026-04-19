@@ -29,6 +29,7 @@ final class MessageHandler
     private const ADMIN_SERVICE_FREE_TEST_RESET = 'admin.services.actions.free_test_reset';
     private const ADMIN_SERVICE_FREE_TEST_REFRESH = 'admin.services.actions.free_test_status';
     private const ADMIN_SERVICE_FREE_TEST_STOCK_ADD = 'admin.services.actions.free_test_stock_add';
+    private const ADMIN_SERVICE_FREE_TEST_DEFAULT_CONFIG = 'admin.services.actions.free_test_default_config';
     private const ADMIN_SERVICE_DELETE = '[legacy] admin.types_tariffs.actions.service_delete';
     private const ADMIN_SERVICE_TARIFF_ADD = '[legacy] admin.types_tariffs.actions.service_tariff_add';
     private const ADMIN_SERVICE_STOCK_ADD = '[legacy] admin.types_tariffs.actions.service_stock_add';
@@ -284,6 +285,7 @@ final class MessageHandler
             || $state['state_name'] === 'admin.service.free_test.cooldown'
             || $state['state_name'] === 'admin.service.free_test.reset_user'
             || $state['state_name'] === 'admin.service.free_test.stock_add'
+            || $state['state_name'] === 'admin.service.free_test.default_config'
         ) {
             $this->handleAdminServicesState($chatId, $userId, $text, $state);
             return;
@@ -1748,7 +1750,17 @@ final class MessageHandler
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)) {
-                $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'volume', []);
+                $defaultData = $this->buildFreeTestStockDefaultData($serviceId);
+                if ($defaultData !== null) {
+                    $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'sub_link', $defaultData);
+                    return;
+                }
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.errors.free_test_defaults_required'));
+                return;
+            }
+            if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_DEFAULT_CONFIG)) {
+                $this->database->setUserState($userId, 'admin.service.free_test.default_config', ['service_id' => $serviceId, 'step' => 'volume']);
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.prompts.free_test_stock_volume'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)) {
@@ -1810,17 +1822,65 @@ final class MessageHandler
             return;
         }
 
-        if ($stateName === 'admin.service.free_test.stock_add') {
+        if ($stateName === 'admin.service.free_test.default_config') {
             $serviceId = (int) ($payload['service_id'] ?? 0);
             $step = (string) ($payload['step'] ?? 'volume');
+            /** @var array<string,mixed> $data */
+            $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            if ($text === UiLabels::back($this->catalog)) {
+                if ($step === 'duration') {
+                    $this->database->setUserState($userId, 'admin.service.free_test.default_config', ['service_id' => $serviceId, 'step' => 'volume', 'data' => $data]);
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.prompts.free_test_stock_volume'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                    return;
+                }
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
+                return;
+            }
+            $raw = trim($text);
+            if ($raw === '' || str_starts_with($raw, '/')) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
+                return;
+            }
+            if ($step === 'volume') {
+                $normalized = str_replace(' ', '', str_replace(',', '.', $raw));
+                if (!preg_match('/^\d+(?:\.\d+)?$/', $normalized) || (float) $normalized <= 0) {
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
+                    return;
+                }
+                $data['volume'] = $normalized;
+                $this->database->setUserState($userId, 'admin.service.free_test.default_config', ['service_id' => $serviceId, 'step' => 'duration', 'data' => $data]);
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.prompts.free_test_stock_duration'), $this->uiKeyboard->replyMenu([[$this->catalog->get('admin.services.prompts.free_test_stock_duration_unlimited')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                return;
+            }
+            $volume = (float) ($data['volume'] ?? 0);
+            if ($volume <= 0) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
+                return;
+            }
+            if ($raw === $this->catalog->get('admin.services.prompts.free_test_stock_duration_unlimited')) {
+                $this->database->saveFreeTestStockDefaultsForService($serviceId, $volume, 0);
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_defaults_saved'));
+                return;
+            }
+            $days = (int) preg_replace('/\D+/', '', $raw);
+            if ($days <= 0) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
+                return;
+            }
+            $this->database->saveFreeTestStockDefaultsForService($serviceId, $volume, $days);
+            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_defaults_saved'));
+            return;
+        }
+
+        if ($stateName === 'admin.service.free_test.stock_add') {
+            $serviceId = (int) ($payload['service_id'] ?? 0);
+            $step = (string) ($payload['step'] ?? 'sub_link');
             /** @var array<string,mixed> $data */
             $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
 
             if ($text === UiLabels::back($this->catalog)) {
                 $prev = [
-                    'volume' => 'view',
-                    'duration' => 'volume',
-                    'sub_link' => 'duration',
+                    'sub_link' => 'view',
                     'single_stock_item_link' => 'sub_link',
                     'confirm' => 'single_stock_item_link',
                 ];
@@ -1846,13 +1906,14 @@ final class MessageHandler
 
             if ($serviceName === '' || $volume === '' || $duration === '' || $subLink === '' || $singleStockItem === '') {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
-                $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'volume', []);
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.services.errors.free_test_defaults_required'));
+                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
                 return;
             }
 
             $volumeGb = (float) str_replace(',', '.', $volume);
             $durationDays = $duration === 'نامحدود' ? null : (int) preg_replace('/\D+/', '', $duration);
-            $stock_itemId = $this->database->addStockItemForService(
+            $this->database->addStockItemForService(
                 $serviceId,
                 null,
                 $serviceName,
@@ -1866,7 +1927,7 @@ final class MessageHandler
             $this->database->setUserState($userId, 'admin.service.free_test.view', ['service_id' => $serviceId]);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.services.success.free_test_stock_added', ['stock_item_id' => $stock_itemId]),
+                $this->messageRenderer->render('admin.services.success.free_test_stock_added'),
                 $this->adminServiceFreeTestKeyboard()
             );
             return;
@@ -2249,6 +2310,9 @@ final class MessageHandler
         $stockCount = $this->database->countAvailableFreeTestStockByService($serviceId);
         $isEnabledText = ((int) ($rule['is_enabled'] ?? 0)) === 1 ? '🟢 فعال' : '🔴 غیرفعال';
         $claimModeText = ((string) ($rule['claim_mode'] ?? 'once_until_reset')) === 'cooldown' ? '⏱️ دوره‌ای' : '1️⃣ یک‌بار تا ریست';
+        $defaultVolume = isset($rule['default_volume_gb']) && $rule['default_volume_gb'] !== null ? trim((string) $rule['default_volume_gb']) : '';
+        $defaultDurationDays = isset($rule['default_duration_days']) && $rule['default_duration_days'] !== null ? (int) $rule['default_duration_days'] : null;
+        $defaultDuration = $defaultDurationDays === null ? '' : ($defaultDurationDays === 0 ? 'نامحدود' : (string) $defaultDurationDays);
         $this->database->setUserState($userId, 'admin.service.free_test.view', ['service_id' => $serviceId]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -2263,6 +2327,8 @@ final class MessageHandler
                 'max_claims' => $this->toPersianNumber((string) ((int) ($rule['max_claims'] ?? 1))),
                 'claim_count' => $this->toPersianNumber((string) $claimCount),
                 'stock_count' => $this->toPersianNumber((string) $stockCount),
+                'default_volume' => $defaultVolume !== '' ? htmlspecialchars($defaultVolume) : $this->catalog->get('messages.generic.dash'),
+                'default_duration' => $defaultDuration !== '' ? htmlspecialchars($defaultDuration) : $this->catalog->get('messages.generic.dash'),
             ])
             ,
             $this->adminServiceFreeTestKeyboard()
@@ -2274,6 +2340,7 @@ final class MessageHandler
         return $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)],
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)],
+            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_DEFAULT_CONFIG)],
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)],
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
@@ -3161,6 +3228,40 @@ final class MessageHandler
                     : [[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]
             )
         );
+    }
+
+
+    /** @return array<string,string>|null */
+    private function buildFreeTestStockDefaultData(int $serviceId): ?array
+    {
+        $rule = $this->database->getFreeTestRuleForService($serviceId);
+        $volumeRaw = is_array($rule) && isset($rule['default_volume_gb']) && $rule['default_volume_gb'] !== null ? trim((string) $rule['default_volume_gb']) : '';
+        $durationRaw = is_array($rule) && isset($rule['default_duration_days']) && $rule['default_duration_days'] !== null ? trim((string) $rule['default_duration_days']) : '';
+        if ($volumeRaw === '' || $durationRaw === '') {
+            return null;
+        }
+
+        $volumeNormalized = str_replace(' ', '', str_replace(',', '.', $volumeRaw));
+        if (!preg_match('/^\d+(?:\.\d+)?$/', $volumeNormalized) || (float) $volumeNormalized <= 0) {
+            return null;
+        }
+
+        if ((int) $durationRaw === 0) {
+            return [
+                'volume' => $volumeNormalized,
+                'duration' => 'نامحدود',
+            ];
+        }
+
+        $durationDays = (int) preg_replace('/\D+/', '', $durationRaw);
+        if ($durationDays <= 0) {
+            return null;
+        }
+
+        return [
+            'volume' => $volumeNormalized,
+            'duration' => (string) $durationDays,
+        ];
     }
 
     /** @param array<string,mixed> $data */
