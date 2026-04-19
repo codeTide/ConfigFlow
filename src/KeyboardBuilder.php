@@ -83,7 +83,7 @@ final class KeyboardBuilder
     {
         $keyboard = [
             [self::label('buttons.admin.types_packages', ''), self::label('buttons.admin.inventory', ''), self::label('buttons.admin.users', '')],
-            [self::label('buttons.admin.settings', ''), self::label('buttons.admin.free_test', '')],
+            [self::label('buttons.admin.settings', '')],
             [self::label('buttons.admin.admins', ''), self::label('buttons.admin.broadcast', ''), self::label('buttons.admin.pins', '')],
             [self::label('buttons.admin.agencies', '')],
             [self::label('buttons.admin.charges', ''), self::label('buttons.admin.delivery', ''), self::label('buttons.admin.requests', '')],
