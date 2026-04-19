@@ -1481,7 +1481,7 @@ final class MessageHandler
                 $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {
                 if ($route === 'admin:types') {
-                    $this->openAdminServiceFlatList($chatId, $userId);
+                    $this->openAdminServiceLanding($chatId, $userId);
                     return;
                 }
                 if ($route === 'admin:users') {
