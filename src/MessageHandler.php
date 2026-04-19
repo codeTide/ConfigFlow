@@ -1748,6 +1748,11 @@ final class MessageHandler
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)) {
+                $defaultData = $this->buildFreeTestStockDefaultData();
+                if ($defaultData !== null) {
+                    $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'sub_link', $defaultData);
+                    return;
+                }
                 $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'volume', []);
                 return;
             }
@@ -1846,13 +1851,18 @@ final class MessageHandler
 
             if ($serviceName === '' || $volume === '' || $duration === '' || $subLink === '' || $singleStockItem === '') {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_inventory_invalid_input'));
+                $fallbackData = $this->buildFreeTestStockDefaultData();
+                if ($fallbackData !== null) {
+                    $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'sub_link', $fallbackData);
+                    return;
+                }
                 $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'volume', []);
                 return;
             }
 
             $volumeGb = (float) str_replace(',', '.', $volume);
             $durationDays = $duration === 'نامحدود' ? null : (int) preg_replace('/\D+/', '', $duration);
-            $stock_itemId = $this->database->addStockItemForService(
+            $this->database->addStockItemForService(
                 $serviceId,
                 null,
                 $serviceName,
@@ -1866,7 +1876,7 @@ final class MessageHandler
             $this->database->setUserState($userId, 'admin.service.free_test.view', ['service_id' => $serviceId]);
             $this->telegram->sendMessage(
                 $chatId,
-                $this->messageRenderer->render('admin.services.success.free_test_stock_added', ['stock_item_id' => $stock_itemId]),
+                $this->messageRenderer->render('admin.services.success.free_test_stock_added'),
                 $this->adminServiceFreeTestKeyboard()
             );
             return;
@@ -3161,6 +3171,41 @@ final class MessageHandler
                     : [[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]
             )
         );
+    }
+
+
+    /** @return array<string,string>|null */
+    private function buildFreeTestStockDefaultData(): ?array
+    {
+        $volumeRaw = trim($this->settings->get('free_test_default_volume', ''));
+        $durationRaw = trim($this->settings->get('free_test_default_duration', ''));
+
+        if ($volumeRaw === '' || $durationRaw === '') {
+            return null;
+        }
+
+        $volumeNormalized = str_replace(' ', '', str_replace(',', '.', $volumeRaw));
+        if (!preg_match('/^\d+(?:\.\d+)?$/', $volumeNormalized) || (float) $volumeNormalized <= 0) {
+            return null;
+        }
+
+        $durationNormalized = mb_strtolower($durationRaw);
+        if (in_array($durationNormalized, ['نامحدود', 'unlimited'], true)) {
+            return [
+                'volume' => $volumeNormalized,
+                'duration' => 'نامحدود',
+            ];
+        }
+
+        $durationDays = (int) preg_replace('/\D+/', '', $durationRaw);
+        if ($durationDays <= 0) {
+            return null;
+        }
+
+        return [
+            'volume' => $volumeNormalized,
+            'duration' => (string) $durationDays,
+        ];
     }
 
     /** @param array<string,mixed> $data */
