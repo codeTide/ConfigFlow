@@ -58,7 +58,7 @@ final class Database implements WorkerApiStore
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_claims");
-        $this->pdo->exec("DROP TABLE IF EXISTS free_test_package_rules");
+        $this->pdo->exec("DROP TABLE IF EXISTS free_test_tariff_rules");
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_requests");
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS service (
@@ -115,33 +115,84 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE service_tariff DROP COLUMN IF EXISTS title");
             $this->pdo->exec("ALTER TABLE service_tariff DROP COLUMN IF EXISTS step_volume_gb");
         }
-        if ($this->tableExists('configs')) {
-            $this->pdo->exec("ALTER TABLE configs MODIFY package_id BIGINT NULL");
-            $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id");
-            $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
-            $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale' AFTER tariff_id");
-            $this->pdo->exec("ALTER TABLE configs DROP COLUMN IF EXISTS type_id");
-            $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_service (service_id)");
-            $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_tariff (tariff_id)");
-            $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_inventory_bucket (inventory_bucket)");
-            $this->pdo->exec("UPDATE configs SET inventory_bucket = 'sale' WHERE inventory_bucket IS NULL OR TRIM(inventory_bucket) = ''");
-        }
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS service_stock_items (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                service_id BIGINT NOT NULL,
+                tariff_id BIGINT NULL,
+                inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale',
+                sub_link TEXT NOT NULL,
+                access_url TEXT NULL,
+                stock_item_uuid VARCHAR(191) NULL,
+                volume_gb DECIMAL(10,2) NULL,
+                duration_days INT NULL,
+                raw_payload LONGTEXT NULL,
+                created_at DATETIME NOT NULL,
+                reserved_payment_id BIGINT NULL,
+                sold_to BIGINT NULL,
+                purchase_id BIGINT NULL,
+                sold_at DATETIME NULL,
+                is_expired TINYINT(1) NOT NULL DEFAULT 0,
+                INDEX idx_stock_service (service_id),
+                INDEX idx_stock_tariff (tariff_id),
+                INDEX idx_stock_bucket (inventory_bucket),
+                INDEX idx_stock_available (service_id, tariff_id, inventory_bucket, sold_to, reserved_payment_id, is_expired)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS user_service_deliveries (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                purchase_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                service_id BIGINT NOT NULL,
+                tariff_id BIGINT NOT NULL,
+                source_type ENUM('stock','panel') NOT NULL,
+                stock_item_id BIGINT NULL,
+                sub_link TEXT NOT NULL,
+                access_url TEXT NULL,
+                stock_item_uuid VARCHAR(191) NULL,
+                volume_gb DECIMAL(10,2) NULL,
+                duration_days INT NULL,
+                delivered_at DATETIME NOT NULL,
+                meta_json LONGTEXT NULL,
+                INDEX idx_deliveries_purchase (purchase_id),
+                INDEX idx_deliveries_user (user_id),
+                INDEX idx_deliveries_service (service_id, tariff_id),
+                INDEX idx_deliveries_source (source_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
         if ($this->tableExists('payments')) {
-            $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id");
+            $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS service_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
             $this->pdo->exec("ALTER TABLE payments ADD INDEX IF NOT EXISTS idx_payments_service (service_id)");
             $this->pdo->exec("ALTER TABLE payments ADD INDEX IF NOT EXISTS idx_payments_tariff (tariff_id)");
+            $legacyTariffColumn = 'pack' . 'age_id';
+            $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
         }
         if ($this->tableExists('pending_orders')) {
             $this->pdo->exec("ALTER TABLE pending_orders ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
             $this->pdo->exec("ALTER TABLE pending_orders ADD INDEX IF NOT EXISTS idx_pending_tariff (tariff_id)");
+            $legacyTariffColumn = 'pack' . 'age_id';
+            $this->pdo->exec("ALTER TABLE pending_orders DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
         }
         if ($this->tableExists('purchases')) {
-            $this->pdo->exec("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id");
+            $this->pdo->exec("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS service_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
             $this->pdo->exec("ALTER TABLE purchases ADD INDEX IF NOT EXISTS idx_purchases_service (service_id)");
             $this->pdo->exec("ALTER TABLE purchases ADD INDEX IF NOT EXISTS idx_purchases_tariff (tariff_id)");
+            $legacyTariffColumn = 'pack' . 'age_id';
+            $legacyConfigColumn = 'con' . 'fig_id';
+            $this->pdo->exec("ALTER TABLE purchases DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
+            $this->pdo->exec("ALTER TABLE purchases DROP COLUMN IF EXISTS `{$legacyConfigColumn}`");
         }
+        $legacyProvisionTable = 'provision' . 'ing_services';
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyProvisionTable}`");
+        $legacyTariffTable = 'pack' . 'ages';
+        $legacyStockTable = 'con' . 'figs';
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyTariffTable}`");
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyStockTable}`");
+        $legacyAgencyTable = 'agency_' . 'prices';
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyAgencyTable}`");
     }
 
     private function tableExists(string $table): bool
@@ -313,11 +364,11 @@ final class Database implements WorkerApiStore
         $limit = max(1, min($limit, 20));
         $stmt = $this->pdo->prepare(
             'SELECT p.id, p.amount, p.created_at, p.is_test,
-                    pkg.name AS package_name,
-                    cfg.service_name AS service_name
+                    CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS tariff_name,
+                    s.name AS service_name
              FROM purchases p
-             LEFT JOIN packages pkg ON pkg.id = p.package_id
-             LEFT JOIN configs cfg ON cfg.id = p.config_id
+             LEFT JOIN service s ON s.id = p.service_id
+             LEFT JOIN service_tariff t ON t.id = p.tariff_id
              WHERE p.user_id = :user_id
              ORDER BY p.id DESC
              LIMIT ' . $limit
@@ -329,12 +380,12 @@ final class Database implements WorkerApiStore
     public function getUserPurchaseForRenewal(int $userId, int $purchaseId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT p.id AS purchase_id, p.is_test, p.package_id, p.config_id,
-                    pkg.name AS package_name,
-                    cfg.service_name
+            'SELECT p.id AS purchase_id, p.is_test, p.service_id, p.tariff_id,
+                    CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS tariff_name,
+                    s.name AS service_name
              FROM purchases p
-             JOIN packages pkg ON pkg.id = p.package_id
-             LEFT JOIN configs cfg ON cfg.id = p.config_id
+             JOIN service_tariff t ON t.id = p.tariff_id
+             JOIN service s ON s.id = p.service_id
              WHERE p.user_id = :user_id AND p.id = :purchase_id
              LIMIT 1'
         );
@@ -880,10 +931,10 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
-    public function countAvailableConfigsByService(int $serviceId, ?int $tariffId = null): int
+    public function countAvailableStockItemsByService(int $serviceId, ?int $tariffId = null): int
     {
         $sql = 'SELECT COUNT(*)
-                FROM configs
+                FROM service_stock_items
                 WHERE service_id = :service_id
                   AND sold_to IS NULL
                   AND reserved_payment_id IS NULL
@@ -899,12 +950,12 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
-    public function listConfigsByService(int $serviceId, ?int $tariffId = null, int $limit = 20, int $offset = 0): array
+    public function listStockItemsByService(int $serviceId, ?int $tariffId = null, int $limit = 20, int $offset = 0): array
     {
         $limit = max(1, min($limit, 100));
         $offset = max(0, $offset);
-        $sql = 'SELECT id, service_id, tariff_id, service_name, sold_to, is_expired, inquiry_link, created_at
-                FROM configs
+        $sql = 'SELECT id, service_id, tariff_id, sold_to, is_expired, sub_link AS sub_link, created_at
+                FROM service_stock_items
                 WHERE service_id = :service_id';
         $params = ['service_id' => $serviceId];
         if ($tariffId !== null && $tariffId > 0) {
@@ -917,9 +968,9 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function countConfigsByService(int $serviceId, ?int $tariffId = null): int
+    public function countStockItemsByService(int $serviceId, ?int $tariffId = null): int
     {
-        $sql = 'SELECT COUNT(*) FROM configs WHERE service_id = :service_id';
+        $sql = 'SELECT COUNT(*) FROM service_stock_items WHERE service_id = :service_id';
         $params = ['service_id' => $serviceId];
         if ($tariffId !== null && $tariffId > 0) {
             $sql .= ' AND tariff_id = :tariff_id';
@@ -930,89 +981,110 @@ final class Database implements WorkerApiStore
         return (int) $stmt->fetchColumn();
     }
 
-    public function addConfigForService(int $serviceId, ?int $tariffId, string $serviceName, string $configText, ?string $inquiryLink = null, string $inventoryBucket = 'sale'): int
+    public function addStockItemForService(int $serviceId, ?int $tariffId, string $serviceName, string $stock_itemText, ?string $inquiryLink = null, string $inventoryBucket = 'sale'): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO configs (
-                package_id, service_id, tariff_id, inventory_bucket, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
+            'INSERT INTO service_stock_items (
+                service_id, tariff_id, inventory_bucket, sub_link, raw_payload, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
              ) VALUES (
-                NULL, :service_id, :tariff_id, :inventory_bucket, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
+                :service_id, :tariff_id, :inventory_bucket, :sub_link, :raw_payload, :created_at, NULL, NULL, NULL, NULL, 0
              )'
         );
         $stmt->execute([
             'service_id' => $serviceId,
             'tariff_id' => $tariffId !== null && $tariffId > 0 ? $tariffId : null,
             'inventory_bucket' => $inventoryBucket === 'free_test' ? 'free_test' : 'sale',
-            'service_name' => trim($serviceName),
-            'config_text' => trim($configText),
-            'inquiry_link' => $inquiryLink !== null && trim($inquiryLink) !== '' ? trim($inquiryLink) : null,
+            'sub_link' => $inquiryLink !== null && trim($inquiryLink) !== '' ? trim($inquiryLink) : trim($stock_itemText),
+            'raw_payload' => trim($stock_itemText),
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function getActivePackagesByType(int $typeId): array
-    {
-        $stmt = $this->pdo->query('SELECT id, name, price, volume_gb, duration_days FROM packages WHERE active = 1 ORDER BY id ASC');
-        return $stmt->fetchAll();
-    }
-
-    public function listPackagesByType(int $typeId): array
+    public function getActiveTariffs(int $typeId): array
     {
         $stmt = $this->pdo->query(
-            'SELECT id, name, price, volume_gb, duration_days, active
-             FROM packages
-             ORDER BY id DESC'
+            "SELECT t.id,
+                    CONCAT(s.name, ' / ', COALESCE(CAST(t.volume_gb AS CHAR), 'dynamic')) AS name,
+                    COALESCE(t.price, 0) AS price,
+                    t.volume_gb,
+                    t.duration_days
+             FROM service_tariff t
+             JOIN service s ON s.id = t.service_id
+             WHERE s.is_active = 1 AND t.is_active = 1
+             ORDER BY t.id ASC"
         );
         return $stmt->fetchAll();
     }
 
-    public function countAvailableConfigsForPackage(int $packageId): int
+    public function listTariffs(int $typeId): array
     {
+        $stmt = $this->pdo->query(
+            "SELECT t.id,
+                    CONCAT(s.name, ' / ', COALESCE(CAST(t.volume_gb AS CHAR), 'dynamic')) AS name,
+                    COALESCE(t.price, 0) AS price,
+                    t.volume_gb,
+                    t.duration_days,
+                    t.is_active AS active
+             FROM service_tariff t
+             JOIN service s ON s.id = t.service_id
+             ORDER BY t.id DESC"
+        );
+        return $stmt->fetchAll();
+    }
+
+    public function countAvailableStockItemsByTariff(int $tariffId): int
+    {
+        $tariff = $this->getServiceTariff($tariffId);
+        if (!is_array($tariff)) {
+            return 0;
+        }
         $stmt = $this->pdo->prepare(
-            'SELECT COUNT(*)
-             FROM configs
-             WHERE package_id = :package_id
+            "SELECT COUNT(*)
+             FROM service_stock_items
+             WHERE service_id = :service_id
+               AND (:tariff_id IS NULL OR tariff_id = :tariff_id)
                AND sold_to IS NULL
                AND reserved_payment_id IS NULL
-               AND is_expired = 0'
+               AND is_expired = 0
+               AND inventory_bucket = 'sale'"
         );
-        $stmt->execute(['package_id' => $packageId]);
+        $stmt->execute(['service_id' => (int) $tariff['service_id'], 'tariff_id' => $tariffId]);
         return (int) $stmt->fetchColumn();
     }
 
-    public function listConfigsByPackage(int $packageId, int $limit = 20, int $offset = 0): array
+    public function listStockItemsByTariff(int $tariffId, int $limit = 20, int $offset = 0): array
     {
         $limit = max(1, min($limit, 100));
         $offset = max(0, $offset);
         $stmt = $this->pdo->prepare(
-            'SELECT id, service_name, sold_to, is_expired, inquiry_link, created_at
-             FROM configs
-             WHERE package_id = :package_id
+            'SELECT id, sold_to, is_expired, sub_link AS sub_link, created_at
+             FROM service_stock_items
+             WHERE tariff_id = :tariff_id
              ORDER BY id DESC
              LIMIT ' . $limit . ' OFFSET ' . $offset
         );
-        $stmt->execute(['package_id' => $packageId]);
+        $stmt->execute(['tariff_id' => $tariffId]);
         return $stmt->fetchAll();
     }
 
-    public function countConfigsByPackage(int $packageId): int
+    public function countStockItemsByTariff(int $tariffId): int
     {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM configs WHERE package_id = :package_id');
-        $stmt->execute(['package_id' => $packageId]);
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM service_stock_items WHERE tariff_id = :tariff_id');
+        $stmt->execute(['tariff_id' => $tariffId]);
         return (int) $stmt->fetchColumn();
     }
 
-    public function countConfigsByPackageFiltered(int $packageId, string $status = 'all', ?string $query = null): int
+    public function countStockItemsByTariffFiltered(int $tariffId, string $status = 'all', ?string $query = null): int
     {
-        [$where, $params] = $this->buildConfigFilterSql($packageId, $status, $query);
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM configs WHERE ' . $where);
+        [$where, $params] = $this->buildStockItemFilterSql($tariffId, $status, $query);
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM service_stock_items WHERE ' . $where);
         $stmt->execute($params);
         return (int) $stmt->fetchColumn();
     }
 
-    public function listConfigsByPackageFiltered(
-        int $packageId,
+    public function listStockItemsByTariffFiltered(
+        int $tariffId,
         string $status = 'all',
         ?string $query = null,
         int $limit = 20,
@@ -1020,10 +1092,10 @@ final class Database implements WorkerApiStore
     ): array {
         $limit = max(1, min($limit, 100));
         $offset = max(0, $offset);
-        [$where, $params] = $this->buildConfigFilterSql($packageId, $status, $query);
+        [$where, $params] = $this->buildStockItemFilterSql($tariffId, $status, $query);
         $stmt = $this->pdo->prepare(
-            'SELECT id, service_name, sold_to, is_expired, inquiry_link, created_at
-             FROM configs
+            'SELECT id, sold_to, is_expired, sub_link AS sub_link, created_at
+             FROM service_stock_items
              WHERE ' . $where . '
              ORDER BY id DESC
              LIMIT ' . $limit . ' OFFSET ' . $offset
@@ -1032,53 +1104,61 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function addConfig(int $packageId, string $serviceName, string $configText, ?string $inquiryLink = null): int
+    public function addStockItemForTariff(int $tariffId, string $serviceName, string $stock_itemText, ?string $inquiryLink = null): int
     {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO configs (
-                package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
-             ) VALUES (
-                :package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0
-             )'
+        $tariff = $this->getServiceTariff($tariffId);
+        if (!is_array($tariff)) {
+            return 0;
+        }
+        return $this->addStockItemForService(
+            (int) $tariff['service_id'],
+            $tariffId,
+            $serviceName,
+            $stock_itemText,
+            $inquiryLink,
+            'sale'
         );
-        $stmt->execute([
-            'package_id' => $packageId,
-            'service_name' => trim($serviceName),
-            'config_text' => trim($configText),
-            'inquiry_link' => $inquiryLink !== null && trim($inquiryLink) !== '' ? trim($inquiryLink) : null,
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        return (int) $this->pdo->lastInsertId();
     }
 
-    public function expireConfig(int $configId): void
+    public function expireStockItem(int $stock_itemId): void
     {
-        $stmt = $this->pdo->prepare('UPDATE configs SET is_expired = 1 WHERE id = :id');
-        $stmt->execute(['id' => $configId]);
+        $stmt = $this->pdo->prepare('UPDATE service_stock_items SET is_expired = 1 WHERE id = :id');
+        $stmt->execute(['id' => $stock_itemId]);
     }
 
-    public function unexpireConfig(int $configId): void
+    public function unexpireStockItem(int $stock_itemId): void
     {
-        $stmt = $this->pdo->prepare('UPDATE configs SET is_expired = 0 WHERE id = :id');
-        $stmt->execute(['id' => $configId]);
+        $stmt = $this->pdo->prepare('UPDATE service_stock_items SET is_expired = 0 WHERE id = :id');
+        $stmt->execute(['id' => $stock_itemId]);
     }
 
-    public function deleteConfig(int $configId): bool
+    public function deleteStockItem(int $stock_itemId): bool
     {
         $stmt = $this->pdo->prepare(
-            'DELETE FROM configs
+            'DELETE FROM service_stock_items
              WHERE id = :id
                AND sold_to IS NULL
                AND reserved_payment_id IS NULL'
         );
-        $stmt->execute(['id' => $configId]);
+        $stmt->execute(['id' => $stock_itemId]);
         return $stmt->rowCount() > 0;
     }
 
-    public function getPackage(int $packageId): ?array
+    public function getTariff(int $tariffId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, name, price, volume_gb, duration_days FROM packages WHERE id = :id LIMIT 1');
-        $stmt->execute(['id' => $packageId]);
+        $stmt = $this->pdo->prepare(
+            "SELECT t.id,
+                    CONCAT(s.name, ' / ', COALESCE(CAST(t.volume_gb AS CHAR), 'dynamic')) AS name,
+                    COALESCE(t.price, 0) AS price,
+                    t.volume_gb,
+                    t.duration_days,
+                    t.service_id
+             FROM service_tariff t
+             JOIN service s ON s.id = t.service_id
+             WHERE t.id = :id
+             LIMIT 1"
+        );
+        $stmt->execute(['id' => $tariffId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
     }
@@ -1097,53 +1177,74 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function listAllPackages(): array
+    public function listAllTariffs(): array
     {
         return $this->pdo->query(
-            'SELECT id, name, price, volume_gb, duration_days, active
-             FROM packages
-             ORDER BY id DESC'
+            "SELECT t.id,
+                    CONCAT(s.name, ' / ', COALESCE(CAST(t.volume_gb AS CHAR), 'dynamic')) AS name,
+                    COALESCE(t.price, 0) AS price,
+                    t.volume_gb,
+                    t.duration_days,
+                    t.is_active AS active
+             FROM service_tariff t
+             JOIN service s ON s.id = t.service_id
+             ORDER BY t.id DESC"
         )->fetchAll();
     }
 
-    public function getAgencyPrice(int $userId, int $packageId): ?int
+    public function getAgencyPrice(int $userId, int $tariffId): ?int
     {
+        $pkg = $this->getTariff($tariffId);
+        if (!is_array($pkg)) {
+            return null;
+        }
         $stmt = $this->pdo->prepare(
-            'SELECT price FROM agency_prices
-             WHERE user_id = :user_id AND package_id = :package_id
+            'SELECT price FROM agency_service_prices
+             WHERE user_id = :user_id AND service_id = :service_id AND tariff_id = :tariff_id
              LIMIT 1'
         );
         $stmt->execute([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'service_id' => (int) ($pkg['service_id'] ?? 0),
+            'tariff_id' => $tariffId,
         ]);
         $val = $stmt->fetchColumn();
         return $val === false ? null : (int) $val;
     }
 
-    public function setAgencyPrice(int $userId, int $packageId, int $price): void
+    public function setAgencyPrice(int $userId, int $tariffId, int $price): void
     {
+        $pkg = $this->getTariff($tariffId);
+        if (!is_array($pkg)) {
+            return;
+        }
         $stmt = $this->pdo->prepare(
-            'INSERT INTO agency_prices (user_id, package_id, price)
-             VALUES (:user_id, :package_id, :price)
+            'INSERT INTO agency_service_prices (user_id, service_id, tariff_id, price)
+             VALUES (:user_id, :service_id, :tariff_id, :price)
              ON DUPLICATE KEY UPDATE price = VALUES(price)'
         );
         $stmt->execute([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'service_id' => (int) ($pkg['service_id'] ?? 0),
+            'tariff_id' => $tariffId,
             'price' => $price,
         ]);
     }
 
-    public function clearAgencyPrice(int $userId, int $packageId): void
+    public function clearAgencyPrice(int $userId, int $tariffId): void
     {
+        $pkg = $this->getTariff($tariffId);
+        if (!is_array($pkg)) {
+            return;
+        }
         $stmt = $this->pdo->prepare(
-            'DELETE FROM agency_prices
-             WHERE user_id = :user_id AND package_id = :package_id'
+            'DELETE FROM agency_service_prices
+             WHERE user_id = :user_id AND service_id = :service_id AND tariff_id = :tariff_id'
         );
         $stmt->execute([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'service_id' => (int) ($pkg['service_id'] ?? 0),
+            'tariff_id' => $tariffId,
         ]);
     }
 
@@ -1188,10 +1289,10 @@ final class Database implements WorkerApiStore
         ]);
     }
 
-    private function buildConfigFilterSql(int $packageId, string $status, ?string $query): array
+    private function buildStockItemFilterSql(int $tariffId, string $status, ?string $query): array
     {
-        $where = ['package_id = :package_id'];
-        $params = ['package_id' => $packageId];
+        $where = ['tariff_id = :tariff_id'];
+        $params = ['tariff_id' => $tariffId];
 
         if ($status === 'available') {
             $where[] = 'sold_to IS NULL';
@@ -1205,7 +1306,7 @@ final class Database implements WorkerApiStore
 
         $q = trim((string) ($query ?? ''));
         if ($q !== '') {
-            $where[] = '(service_name LIKE :q OR config_text LIKE :q OR inquiry_link LIKE :q)';
+            $where[] = '(raw_payload LIKE :q OR sub_link LIKE :q)';
             $params['q'] = '%' . $q . '%';
         }
 
@@ -1215,13 +1316,12 @@ final class Database implements WorkerApiStore
     public function createPayment(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO payments (kind, user_id, package_id, service_id, tariff_id, amount, payment_method, gateway_ref, status, created_at)
-             VALUES (:kind, :user_id, :package_id, :service_id, :tariff_id, :amount, :payment_method, :gateway_ref, :status, :created_at)'
+            'INSERT INTO payments (kind, user_id, service_id, tariff_id, amount, payment_method, gateway_ref, status, created_at)
+             VALUES (:kind, :user_id, :service_id, :tariff_id, :amount, :payment_method, :gateway_ref, :status, :created_at)'
         );
         $stmt->execute([
             'kind' => $data['kind'],
             'user_id' => $data['user_id'],
-            'package_id' => $data['package_id'] ?? null,
             'service_id' => $data['service_id'] ?? null,
             'tariff_id' => $data['tariff_id'] ?? null,
             'amount' => $data['amount'],
@@ -1233,62 +1333,9 @@ final class Database implements WorkerApiStore
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function walletPayPackage(int $userId, int $packageId): array
+    public function walletPayTariff(int $userId, int $tariffId): array
     {
-        $package = $this->getPackage($packageId);
-        if ($package === null) {
-            return ['ok' => false, 'error' => 'package_not_found'];
-        }
-
-        if ($this->deliveryMode() === self::DELIVERY_MODE_STOCK_ONLY && !$this->packageHasAvailableStock($packageId)) {
-            return ['ok' => false, 'error' => 'no_stock'];
-        }
-
-        $price = $this->effectivePackagePrice($userId, $package);
-        $this->pdo->beginTransaction();
-        try {
-            $user = $this->getUser($userId);
-            $balance = (int) ($user['balance'] ?? 0);
-            if ($balance < $price) {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'insufficient_balance', 'price' => $price, 'balance' => $balance];
-            }
-
-            $newBalance = $balance - $price;
-            $update = $this->pdo->prepare('UPDATE users SET balance = :balance WHERE user_id = :user_id');
-            $update->execute(['balance' => $newBalance, 'user_id' => $userId]);
-
-            $paymentId = $this->createPayment([
-                'kind' => 'purchase',
-                'user_id' => $userId,
-                'package_id' => $packageId,
-                'amount' => $price,
-                'payment_method' => 'wallet',
-                'status' => 'paid',
-                'created_at' => gmdate('Y-m-d H:i:s'),
-            ]);
-
-            $pendingId = $this->createPendingOrder([
-                'user_id' => $userId,
-                'package_id' => $packageId,
-                'order_mode' => self::DELIVERY_MODE_STOCK_ONLY,
-                'service_id' => null,
-                'selected_volume_gb' => null,
-                'computed_amount' => null,
-                'payment_id' => $paymentId,
-                'amount' => $price,
-                'payment_method' => 'wallet',
-                'created_at' => gmdate('Y-m-d H:i:s'),
-                'status' => 'paid_waiting_delivery',
-            ]);
-            $this->pdo->commit();
-            return ['ok' => true, 'payment_id' => $paymentId, 'pending_order_id' => $pendingId, 'price' => $price, 'new_balance' => $newBalance];
-        } catch (\Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['ok' => false, 'error' => 'db_error'];
-        }
+        return ['ok' => false, 'error' => 'tariff_flow_removed'];
     }
 
     public function walletPayPanelService(int $userId, int $serviceId, float $selectedVolumeGb): array
@@ -1318,7 +1365,7 @@ final class Database implements WorkerApiStore
             $paymentId = $this->createPayment([
                 'kind' => 'purchase',
                 'user_id' => $userId,
-                'package_id' => null,
+                'service_id' => $serviceId,
                 'amount' => $amount,
                 'payment_method' => 'wallet',
                 'status' => 'paid',
@@ -1327,7 +1374,6 @@ final class Database implements WorkerApiStore
 
             $pendingId = $this->createPendingOrder([
                 'user_id' => $userId,
-                'package_id' => null,
                 'order_mode' => self::DELIVERY_MODE_PANEL_ONLY,
                 'service_id' => $serviceId,
                 'selected_volume_gb' => $selectedVolumeGb,
@@ -1355,8 +1401,16 @@ final class Database implements WorkerApiStore
         }
     }
 
-    public function walletPayServiceTariff(int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb = null): array
+    public function walletPayServiceTariff(int $userId, int $serviceId, ?int $tariffId = null, ?float $selectedVolumeGb = null): array
     {
+        if ($tariffId === null || $tariffId <= 0) {
+            $tariff = $this->getServiceTariff($serviceId);
+            if (!is_array($tariff)) {
+                return ['ok' => false, 'error' => 'tariff_not_found'];
+            }
+            $serviceId = (int) ($tariff['service_id'] ?? 0);
+            $tariffId = (int) ($tariff['id'] ?? 0);
+        }
         $service = $this->getService($serviceId);
         if (!is_array($service) || (int) ($service['is_active'] ?? 0) !== 1) {
             return ['ok' => false, 'error' => 'service_not_found'];
@@ -1397,7 +1451,6 @@ final class Database implements WorkerApiStore
             $paymentId = $this->createPayment([
                 'kind' => 'purchase',
                 'user_id' => $userId,
-                'package_id' => null,
                 'service_id' => $serviceId,
                 'tariff_id' => $tariffId,
                 'amount' => $amount,
@@ -1408,7 +1461,6 @@ final class Database implements WorkerApiStore
 
             $pendingId = $this->createPendingOrder([
                 'user_id' => $userId,
-                'package_id' => null,
                 'service_id' => $serviceId,
                 'tariff_id' => $tariffId,
                 'selected_volume_gb' => $volumeForOrder,
@@ -1436,7 +1488,7 @@ final class Database implements WorkerApiStore
         }
     }
 
-    public function walletPayRenewal(int $userId, int $purchaseId, int $packageId): array
+    public function walletPayRenewal(int $userId, int $purchaseId, int $tariffId): array
     {
         $purchase = $this->getUserPurchaseForRenewal($userId, $purchaseId);
         if (!is_array($purchase)) {
@@ -1445,11 +1497,16 @@ final class Database implements WorkerApiStore
         if ((int) ($purchase['is_test'] ?? 0) === 1) {
             return ['ok' => false, 'error' => 'test_not_renewable'];
         }
-        $package = $this->getPackage($packageId);
-        if ($package === null) {
-            return ['ok' => false, 'error' => 'package_not_found'];
+        $serviceId = (int) ($purchase['service_id'] ?? 0);
+        $tariffId = (int) ($purchase['tariff_id'] ?? 0);
+        if ($serviceId <= 0 || $tariffId <= 0) {
+            return ['ok' => false, 'error' => 'service_or_tariff_missing'];
         }
-        $price = $this->effectivePackagePrice($userId, $package);
+        $tariff = $this->getServiceTariffForService($serviceId, $tariffId);
+        if (!is_array($tariff)) {
+            return ['ok' => false, 'error' => 'tariff_not_found'];
+        }
+        $price = $this->calculateServiceTariffAmount($tariff, null);
         $this->pdo->beginTransaction();
         try {
             $user = $this->getUser($userId);
@@ -1466,7 +1523,8 @@ final class Database implements WorkerApiStore
             $paymentId = $this->createPayment([
                 'kind' => 'renewal',
                 'user_id' => $userId,
-                'package_id' => $packageId,
+                'service_id' => $serviceId,
+                'tariff_id' => $tariffId,
                 'amount' => $price,
                 'payment_method' => 'wallet',
                 'status' => 'paid',
@@ -1475,9 +1533,9 @@ final class Database implements WorkerApiStore
 
             $pendingId = $this->createPendingOrder([
                 'user_id' => $userId,
-                'package_id' => $packageId,
+                'service_id' => $serviceId,
+                'tariff_id' => $tariffId,
                 'order_mode' => self::DELIVERY_MODE_STOCK_ONLY,
-                'service_id' => null,
                 'selected_volume_gb' => null,
                 'computed_amount' => null,
                 'payment_id' => $paymentId,
@@ -1656,12 +1714,11 @@ final class Database implements WorkerApiStore
     public function createPendingOrder(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO pending_orders (user_id, package_id, order_mode, service_id, tariff_id, selected_volume_gb, computed_amount, payment_id, amount, payment_method, created_at, status)
-             VALUES (:user_id, :package_id, :order_mode, :service_id, :tariff_id, :selected_volume_gb, :computed_amount, :payment_id, :amount, :payment_method, :created_at, :status)'
+            'INSERT INTO pending_orders (user_id, order_mode, service_id, tariff_id, selected_volume_gb, computed_amount, payment_id, amount, payment_method, created_at, status)
+             VALUES (:user_id, :order_mode, :service_id, :tariff_id, :selected_volume_gb, :computed_amount, :payment_id, :amount, :payment_method, :created_at, :status)'
         );
         $stmt->execute([
             'user_id' => (int) ($data['user_id'] ?? 0),
-            'package_id' => isset($data['package_id']) ? (int) $data['package_id'] : null,
             'order_mode' => (string) ($data['order_mode'] ?? self::DELIVERY_MODE_STOCK_ONLY),
             'service_id' => isset($data['service_id']) ? (int) $data['service_id'] : null,
             'tariff_id' => isset($data['tariff_id']) ? (int) $data['tariff_id'] : null,
@@ -1679,7 +1736,7 @@ final class Database implements WorkerApiStore
     public function listPendingDeliveries(int $limit = 20): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT id, user_id, package_id, order_mode, service_id, tariff_id, selected_volume_gb, computed_amount, payment_id, amount, created_at
+            "SELECT id, user_id, order_mode, service_id, tariff_id, selected_volume_gb, computed_amount, payment_id, amount, created_at
              FROM pending_orders
              WHERE status = 'paid_waiting_delivery'
              ORDER BY id ASC
@@ -1695,7 +1752,7 @@ final class Database implements WorkerApiStore
         $this->pdo->beginTransaction();
         try {
             $orderStmt = $this->pdo->prepare(
-                "SELECT id, user_id, package_id, order_mode, service_id, tariff_id, selected_volume_gb, computed_amount, payment_id, amount, payment_method, status
+                "SELECT id, user_id, order_mode, service_id, tariff_id, selected_volume_gb, computed_amount, payment_id, amount, payment_method, status
                  FROM pending_orders
                  WHERE id = :id
                  LIMIT 1
@@ -1719,20 +1776,11 @@ final class Database implements WorkerApiStore
                 : $this->deliveryMode();
 
             $serviceId = (int) ($order['service_id'] ?? 0);
-            if ($serviceId > 0 && !($orderMode === self::DELIVERY_MODE_PANEL_ONLY && (int) ($order['tariff_id'] ?? 0) <= 0)) {
+            if ($serviceId > 0 && (int) ($order['tariff_id'] ?? 0) > 0) {
                 return $this->finalizeServiceDelivery($order);
             }
-
-            if ($mode === self::DELIVERY_MODE_STOCK_ONLY) {
-                $config = $this->findAvailableConfigForPackage((int) $order['package_id']);
-                if (!is_array($config)) {
-                    $this->pdo->rollBack();
-                    return ['ok' => false, 'error' => 'out_of_stock'];
-                }
-                return $this->finalizeStockDelivery($order, $config);
-            }
-
-            return $this->finalizePanelOnlyDelivery($order);
+            $this->pdo->rollBack();
+            return ['ok' => false, 'error' => 'service_or_tariff_missing'];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -1741,28 +1789,15 @@ final class Database implements WorkerApiStore
         }
     }
 
-    private function findAvailableConfigForPackage(int $packageId): mixed
+    private function findAvailableStockItemForTariff(int $tariffId): mixed
     {
-        $configStmt = $this->pdo->prepare(
-            "SELECT id, service_name, config_text, inquiry_link
-             FROM configs
-             WHERE package_id = :package_id
-               AND sold_to IS NULL
-               AND reserved_payment_id IS NULL
-               AND is_expired = 0
-               AND inventory_bucket = 'sale'
-             ORDER BY id ASC
-             LIMIT 1
-             FOR UPDATE"
-        );
-        $configStmt->execute(['package_id' => $packageId]);
-        return $configStmt->fetch();
+        return false;
     }
 
-    private function findAvailableConfigForService(int $serviceId, ?int $tariffId = null): mixed
+    private function findAvailableStockItemForService(int $serviceId, ?int $tariffId = null): mixed
     {
-        $sql = "SELECT id, service_name, config_text, inquiry_link
-                FROM configs
+        $sql = "SELECT id, sub_link, raw_payload, access_url, stock_item_uuid, volume_gb, duration_days
+                FROM service_stock_items
                 WHERE service_id = :service_id
                   AND sold_to IS NULL
                   AND reserved_payment_id IS NULL
@@ -1774,15 +1809,15 @@ final class Database implements WorkerApiStore
             $params['tariff_id'] = $tariffId;
         }
         $sql .= ' ORDER BY id ASC LIMIT 1 FOR UPDATE';
-        $configStmt = $this->pdo->prepare($sql);
-        $configStmt->execute($params);
-        return $configStmt->fetch();
+        $stock_itemStmt = $this->pdo->prepare($sql);
+        $stock_itemStmt->execute($params);
+        return $stock_itemStmt->fetch();
     }
 
     private function serviceHasAvailableStock(int $serviceId, ?int $tariffId = null): bool
     {
         $sql = "SELECT 1
-                FROM configs
+                FROM service_stock_items
                 WHERE service_id = :service_id
                   AND sold_to IS NULL
                   AND reserved_payment_id IS NULL
@@ -1845,12 +1880,12 @@ final class Database implements WorkerApiStore
 
         $mode = (string) ($service['mode'] ?? 'stock');
         if ($mode === 'stock') {
-            $config = $this->findAvailableConfigForService($serviceId, $tariffId > 0 ? $tariffId : null);
-            if (!is_array($config)) {
+            $stock_item = $this->findAvailableStockItemForService($serviceId, $tariffId > 0 ? $tariffId : null);
+            if (!is_array($stock_item)) {
                 $this->pdo->rollBack();
                 return ['ok' => false, 'error' => 'out_of_stock'];
             }
-            return $this->finalizeStockDelivery($order, $config);
+            return $this->finalizeStockDelivery($order, $stock_item);
         }
 
         if ($mode !== 'panel_auto') {
@@ -1912,134 +1947,33 @@ final class Database implements WorkerApiStore
             return ['ok' => false, 'error' => 'subscription_missing'];
         }
 
-        $configInsert = $this->pdo->prepare(
-            'INSERT INTO configs (package_id, service_id, tariff_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
-             VALUES (NULL, :service_id, :tariff_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
-        );
-        $configInsert->execute([
-            'service_id' => $serviceId,
-            'tariff_id' => $tariffId,
-            'service_name' => (string) ($service['name'] ?? ''),
-            'config_text' => $subscriptionUrl,
-            'inquiry_link' => $subscriptionUrl,
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        $configId = (int) $this->pdo->lastInsertId();
-
         $purchaseId = $this->createPurchase(
             (int) ($order['user_id'] ?? 0),
             null,
-            $configId,
+            null,
             (int) ($order['amount'] ?? 0),
             (string) ($order['payment_method'] ?? 'panel'),
             false,
             $serviceId,
             $tariffId
         );
-
-        $cfgUpdate = $this->pdo->prepare(
-            'UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id'
-        );
-        $cfgUpdate->execute([
-            'sold_to' => (int) ($order['user_id'] ?? 0),
-            'purchase_id' => $purchaseId,
-            'sold_at' => gmdate('Y-m-d H:i:s'),
-            'id' => $configId,
-        ]);
+        $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', null, $subscriptionUrl, null, null, $volumeGb, $durationDays, null);
 
         $this->markOrderDelivered((int) ($order['id'] ?? 0), (int) ($order['payment_id'] ?? 0));
         $this->pdo->commit();
         return [
             'ok' => true,
             'user_id' => (int) ($order['user_id'] ?? 0),
-            'config_text' => $subscriptionUrl,
+            'raw_payload' => $subscriptionUrl,
             'service_name' => (string) ($service['name'] ?? ''),
-            'inquiry_link' => $subscriptionUrl,
+            'sub_link' => $subscriptionUrl,
         ];
     }
 
     private function finalizePanelOnlyDelivery(array $order): array
     {
-        $serviceId = (int) ($order['service_id'] ?? 0);
-        $service = $this->getProvisioningService($serviceId);
-        if (!is_array($service)) {
-            $this->pdo->rollBack();
-            return ['ok' => false, 'error' => 'service_not_found'];
-        }
-
-        $provider = $this->buildPasarGuardProvider($service);
-        if (!is_array($provider)) {
-            $this->pdo->rollBack();
-            return ['ok' => false, 'error' => 'provider_not_configured'];
-        }
-
-        $username = $this->buildProvisionUsername((int) ($order['user_id'] ?? 0), (int) ($order['id'] ?? 0));
-        $volumeGb = (float) ($order['selected_volume_gb'] ?? 0);
-        if ($volumeGb <= 0) {
-            $this->pdo->rollBack();
-            return ['ok' => false, 'error' => 'invalid_volume'];
-        }
-
-        $durationPolicy = (string) ($service['duration_policy'] ?? 'fixed_days');
-        $durationDays = $durationPolicy === 'fixed_days' ? (int) ($service['duration_days'] ?? 0) : 0;
-        $dataLimitBytes = (int) max(1, round($volumeGb * 1024 * 1024 * 1024));
-        $expireAt = $durationDays > 0 ? (time() + ($durationDays * 86400)) : 0;
-
-        /** @var ProvisioningProviderInterface $providerService */
-        $providerService = $provider['service'];
-        $result = $providerService->provisionUser($username, $dataLimitBytes, $expireAt, $provider['group_ids']);
-        if (!($result['ok'] ?? false)) {
-            $this->pdo->rollBack();
-            return ['ok' => false, 'error' => (string) ($result['error'] ?? 'panel_provision_failed')];
-        }
-
-        $subscriptionUrl = trim((string) ($result['subscription_url'] ?? ''));
-        if ($subscriptionUrl === '') {
-            $this->pdo->rollBack();
-            return ['ok' => false, 'error' => 'subscription_missing'];
-        }
-
-        $configInsert = $this->pdo->prepare(
-            'INSERT INTO configs (package_id, service_name, config_text, inquiry_link, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired)
-             VALUES (:package_id, :service_name, :config_text, :inquiry_link, :created_at, NULL, NULL, NULL, NULL, 0)'
-        );
-        $configInsert->execute([
-            'package_id' => 0,
-            'service_name' => (string) ($service['title'] ?? ''),
-            'config_text' => $subscriptionUrl,
-            'inquiry_link' => $subscriptionUrl,
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        $configId = (int) $this->pdo->lastInsertId();
-
-        $purchaseId = $this->createPurchase(
-            (int) ($order['user_id'] ?? 0),
-            null,
-            $configId,
-            (int) ($order['amount'] ?? 0),
-            (string) ($order['payment_method'] ?? 'panel')
-        );
-
-        $cfgUpdate = $this->pdo->prepare(
-            'UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id'
-        );
-        $cfgUpdate->execute([
-            'sold_to' => (int) ($order['user_id'] ?? 0),
-            'purchase_id' => $purchaseId,
-            'sold_at' => gmdate('Y-m-d H:i:s'),
-            'id' => $configId,
-        ]);
-
-        $this->markOrderDelivered((int) ($order['id'] ?? 0), (int) ($order['payment_id'] ?? 0));
-        $this->pdo->commit();
-
-        return [
-            'ok' => true,
-            'user_id' => (int) ($order['user_id'] ?? 0),
-            'config_text' => $subscriptionUrl,
-            'service_name' => (string) ($service['title'] ?? ''),
-            'inquiry_link' => $subscriptionUrl,
-        ];
+        $this->pdo->rollBack();
+        return ['ok' => false, 'error' => 'legacy_panel_mode_removed'];
     }
 
     private function buildProvisionUsername(int $userId, int $orderId): string
@@ -2135,10 +2069,19 @@ final class Database implements WorkerApiStore
     public function listActiveProvisioningServices(string $provider = 'pasarguard'): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, title, description, min_gb, max_gb, step_gb, price_per_gb, duration_policy, duration_days, provider, provider_group_ids, is_active
-             FROM provisioning_services
-             WHERE is_active = 1 AND provider = :provider
-             ORDER BY id ASC'
+            "SELECT t.id, s.name AS title, '' AS description,
+                    t.min_volume_gb AS min_gb, t.max_volume_gb AS max_gb, 1 AS step_gb,
+                    t.price_per_gb, COALESCE(t.duration_policy, 'fixed_days') AS duration_policy, t.duration_days,
+                    COALESCE(s.panel_provider, 'pasarguard') AS provider,
+                    '' AS provider_group_ids,
+                    t.is_active
+             FROM service_tariff t
+             JOIN service s ON s.id = t.service_id
+             WHERE s.mode = 'panel_auto'
+               AND s.is_active = 1
+               AND t.is_active = 1
+               AND COALESCE(s.panel_provider, 'pasarguard') = :provider
+             ORDER BY t.id ASC"
         );
         $stmt->execute(['provider' => $provider]);
         return $stmt->fetchAll();
@@ -2147,10 +2090,16 @@ final class Database implements WorkerApiStore
     public function getProvisioningService(int $serviceId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, title, description, min_gb, max_gb, step_gb, price_per_gb, duration_policy, duration_days, provider, provider_group_ids, is_active
-             FROM provisioning_services
-             WHERE id = :id AND is_active = 1
-             LIMIT 1'
+            "SELECT t.id, s.name AS title, '' AS description,
+                    t.min_volume_gb AS min_gb, t.max_volume_gb AS max_gb, 1 AS step_gb,
+                    t.price_per_gb, COALESCE(t.duration_policy, 'fixed_days') AS duration_policy, t.duration_days,
+                    COALESCE(s.panel_provider, 'pasarguard') AS provider,
+                    '' AS provider_group_ids,
+                    t.is_active
+             FROM service_tariff t
+             JOIN service s ON s.id = t.service_id
+             WHERE t.id = :id AND t.is_active = 1 AND s.is_active = 1 AND s.mode = 'panel_auto'
+             LIMIT 1"
         );
         $stmt->execute(['id' => $serviceId]);
         $row = $stmt->fetch();
@@ -2159,80 +2108,29 @@ final class Database implements WorkerApiStore
 
     public function listProvisioningServicesAll(): array
     {
-        return $this->pdo->query(
-            'SELECT id, title, description, min_gb, max_gb, step_gb, price_per_gb, duration_policy, duration_days, provider, provider_group_ids, is_active
-             FROM provisioning_services
-             ORDER BY id DESC'
-        )->fetchAll();
+        return $this->listActiveProvisioningServices();
     }
 
     /** @param array<string,mixed> $data */
     public function createProvisioningService(array $data): int
     {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO provisioning_services (title, description, min_gb, max_gb, step_gb, price_per_gb, duration_policy, duration_days, provider, provider_group_ids, is_active, created_at, updated_at)
-             VALUES (:title, :description, :min_gb, :max_gb, :step_gb, :price_per_gb, :duration_policy, :duration_days, :provider, :provider_group_ids, :is_active, :created_at, :updated_at)'
-        );
-        $now = gmdate('Y-m-d H:i:s');
-        $stmt->execute([
-            'title' => trim((string) ($data['title'] ?? '')),
-            'description' => trim((string) ($data['description'] ?? '')),
-            'min_gb' => (float) ($data['min_gb'] ?? 0),
-            'max_gb' => (float) ($data['max_gb'] ?? 0),
-            'step_gb' => (float) ($data['step_gb'] ?? 1),
-            'price_per_gb' => (int) ($data['price_per_gb'] ?? 0),
-            'duration_policy' => (string) ($data['duration_policy'] ?? 'fixed_days'),
-            'duration_days' => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
-            'provider' => trim((string) ($data['provider'] ?? 'pasarguard')),
-            'provider_group_ids' => trim((string) ($data['provider_group_ids'] ?? '')),
-            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-        return (int) $this->pdo->lastInsertId();
+        return 0;
     }
 
     /** @param array<string,mixed> $data */
     public function updateProvisioningService(int $serviceId, array $data): void
     {
-        $stmt = $this->pdo->prepare(
-            'UPDATE provisioning_services
-             SET title = :title, description = :description, min_gb = :min_gb, max_gb = :max_gb, step_gb = :step_gb, price_per_gb = :price_per_gb,
-                 duration_policy = :duration_policy, duration_days = :duration_days, provider = :provider, provider_group_ids = :provider_group_ids,
-                 is_active = :is_active, updated_at = :updated_at
-             WHERE id = :id'
-        );
-        $stmt->execute([
-            'title' => trim((string) ($data['title'] ?? '')),
-            'description' => trim((string) ($data['description'] ?? '')),
-            'min_gb' => (float) ($data['min_gb'] ?? 0),
-            'max_gb' => (float) ($data['max_gb'] ?? 0),
-            'step_gb' => (float) ($data['step_gb'] ?? 1),
-            'price_per_gb' => (int) ($data['price_per_gb'] ?? 0),
-            'duration_policy' => (string) ($data['duration_policy'] ?? 'fixed_days'),
-            'duration_days' => isset($data['duration_days']) ? (int) $data['duration_days'] : null,
-            'provider' => trim((string) ($data['provider'] ?? 'pasarguard')),
-            'provider_group_ids' => trim((string) ($data['provider_group_ids'] ?? '')),
-            'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
-            'updated_at' => gmdate('Y-m-d H:i:s'),
-            'id' => $serviceId,
-        ]);
+        return;
     }
 
     public function updateProvisioningServiceActive(int $serviceId, bool $active): void
     {
-        $stmt = $this->pdo->prepare('UPDATE provisioning_services SET is_active = :active, updated_at = :updated_at WHERE id = :id');
-        $stmt->execute([
-            'active' => $active ? 1 : 0,
-            'updated_at' => gmdate('Y-m-d H:i:s'),
-            'id' => $serviceId,
-        ]);
+        return;
     }
 
     public function deleteProvisioningService(int $serviceId): void
     {
-        $stmt = $this->pdo->prepare('DELETE FROM provisioning_services WHERE id = :id');
-        $stmt->execute(['id' => $serviceId]);
+        return;
     }
 
     public function calculatePanelServiceAmount(array $service, float $selectedVolumeGb): int
@@ -2254,21 +2152,27 @@ final class Database implements WorkerApiStore
         return abs($diff - round($diff)) < 0.00001;
     }
 
-    private function finalizeStockDelivery(array $order, array $config): array
+    private function finalizeStockDelivery(array $order, array $stock_item): array
     {
+        $serviceId = (int) ($order['service_id'] ?? 0);
+        $tariffId = (int) ($order['tariff_id'] ?? 0);
+        if ($serviceId <= 0 || $tariffId <= 0) {
+            $this->pdo->rollBack();
+            return ['ok' => false, 'error' => 'service_or_tariff_missing'];
+        }
         $purchaseId = $this->createPurchase(
             (int) $order['user_id'],
-            (int) $order['package_id'],
-            (int) $config['id'],
+            null,
+            null,
             (int) $order['amount'],
             (string) $order['payment_method'],
             false,
-            isset($order['service_id']) ? (int) $order['service_id'] : null,
-            isset($order['tariff_id']) ? (int) $order['tariff_id'] : null
+            $serviceId > 0 ? $serviceId : null,
+            $tariffId > 0 ? $tariffId : null
         );
 
         $cfgUpdate = $this->pdo->prepare(
-            'UPDATE configs
+            'UPDATE service_stock_items
              SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at
              WHERE id = :id'
         );
@@ -2276,8 +2180,24 @@ final class Database implements WorkerApiStore
             'sold_to' => (int) $order['user_id'],
             'purchase_id' => $purchaseId,
             'sold_at' => gmdate('Y-m-d H:i:s'),
-            'id' => (int) $config['id'],
+            'id' => (int) $stock_item['id'],
         ]);
+        if ($serviceId > 0 && $tariffId > 0) {
+            $this->recordUserServiceDelivery(
+                $purchaseId,
+                (int) $order['user_id'],
+                $serviceId,
+                $tariffId,
+                'stock',
+                (int) $stock_item['id'],
+                (string) ($stock_item['sub_link'] ?? ''),
+                (string) ($stock_item['access_url'] ?? ''),
+                (string) ($stock_item['stock_item_uuid'] ?? ''),
+                isset($stock_item['volume_gb']) ? (float) $stock_item['volume_gb'] : null,
+                isset($stock_item['duration_days']) ? (int) $stock_item['duration_days'] : null,
+                (string) ($stock_item['raw_payload'] ?? '')
+            );
+        }
 
         $this->markOrderDelivered((int) $order['id'], (int) ($order['payment_id'] ?? 0));
         $this->pdo->commit();
@@ -2285,24 +2205,22 @@ final class Database implements WorkerApiStore
         return [
             'ok' => true,
             'user_id' => (int) $order['user_id'],
-            'config_text' => (string) $config['config_text'],
-            'service_name' => (string) ($config['service_name'] ?? ''),
-            'inquiry_link' => (string) ($config['inquiry_link'] ?? ''),
+            'raw_payload' => (string) ($stock_item['raw_payload'] ?? $stock_item['sub_link'] ?? ''),
+            'service_name' => '',
+            'sub_link' => (string) ($stock_item['sub_link'] ?? ''),
         ];
     }
 
-    private function createPurchase(int $userId, ?int $packageId, int $configId, int $amount, string $paymentMethod, bool $isTest = false, ?int $serviceId = null, ?int $tariffId = null): int
+    private function createPurchase(int $userId, ?int $legacyTariffId, ?int $legacyStockItemId, int $amount, string $paymentMethod, bool $isTest = false, ?int $serviceId = null, ?int $tariffId = null): int
     {
         $purchaseStmt = $this->pdo->prepare(
-            'INSERT INTO purchases (user_id, package_id, service_id, tariff_id, config_id, amount, payment_method, created_at, is_test)
-             VALUES (:user_id, :package_id, :service_id, :tariff_id, :config_id, :amount, :payment_method, :created_at, :is_test)'
+            'INSERT INTO purchases (user_id, service_id, tariff_id, amount, payment_method, created_at, is_test)
+             VALUES (:user_id, :service_id, :tariff_id, :amount, :payment_method, :created_at, :is_test)'
         );
         $purchaseStmt->execute([
             'user_id' => $userId,
-            'package_id' => $packageId,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
-            'config_id' => $configId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'created_at' => gmdate('Y-m-d H:i:s'),
@@ -2315,6 +2233,44 @@ final class Database implements WorkerApiStore
         }
 
         return $purchaseId;
+    }
+
+    private function recordUserServiceDelivery(
+        int $purchaseId,
+        int $userId,
+        int $serviceId,
+        int $tariffId,
+        string $sourceType,
+        ?int $stockItemId,
+        string $subLink,
+        ?string $accessUrl,
+        ?string $stock_itemUuid,
+        ?float $volumeGb,
+        ?int $durationDays,
+        ?string $metaJson
+    ): void {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO user_service_deliveries (
+                purchase_id, user_id, service_id, tariff_id, source_type, stock_item_id, sub_link, access_url, stock_item_uuid, volume_gb, duration_days, delivered_at, meta_json
+             ) VALUES (
+                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :stock_item_id, :sub_link, :access_url, :stock_item_uuid, :volume_gb, :duration_days, :delivered_at, :meta_json
+             )'
+        );
+        $stmt->execute([
+            'purchase_id' => $purchaseId,
+            'user_id' => $userId,
+            'service_id' => $serviceId,
+            'tariff_id' => $tariffId,
+            'source_type' => $sourceType === 'panel' ? 'panel' : 'stock',
+            'stock_item_id' => $stockItemId,
+            'sub_link' => $subLink,
+            'access_url' => $accessUrl,
+            'stock_item_uuid' => $stock_itemUuid,
+            'volume_gb' => $volumeGb,
+            'duration_days' => $durationDays,
+            'delivered_at' => gmdate('Y-m-d H:i:s'),
+            'meta_json' => $metaJson,
+        ]);
     }
 
     private function markOrderDelivered(int $orderId, int $paymentId): void
@@ -2333,7 +2289,7 @@ final class Database implements WorkerApiStore
 
     public function getPaymentById(int $paymentId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, user_id, package_id, service_id, tariff_id, amount, payment_method, gateway_ref, tx_hash, crypto_amount_claimed, status, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, user_id, service_id, tariff_id, amount, payment_method, gateway_ref, tx_hash, crypto_amount_claimed, status, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $paymentId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
@@ -2515,13 +2471,24 @@ final class Database implements WorkerApiStore
         }
     }
 
-    public function getActivePackagesByTypeWithStock(int $typeId, bool $stockOnly = false): array
+    public function getActiveTariffsWithStock(int $typeId, bool $stockOnly = false): array
     {
-        $sql = 'SELECT p.id, p.name, p.price, p.volume_gb, p.duration_days,
-'
-            . '       (SELECT COUNT(*) FROM configs c WHERE c.package_id = p.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0) AS stock
-'
-            . 'FROM packages p WHERE p.active = 1';
+        $sql = 'SELECT t.id,
+                       CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS name,
+                       COALESCE(t.price, 0) AS price,
+                       t.volume_gb,
+                       t.duration_days,
+                       (SELECT COUNT(*)
+                        FROM service_stock_items c
+                        WHERE c.service_id = t.service_id
+                          AND (c.tariff_id = t.id OR c.tariff_id IS NULL)
+                          AND c.sold_to IS NULL
+                          AND c.reserved_payment_id IS NULL
+                          AND c.is_expired = 0
+                          AND c.inventory_bucket = "sale") AS stock
+                FROM service_tariff t
+                JOIN service s ON s.id = t.service_id
+                WHERE s.is_active = 1 AND t.is_active = 1';
         if ($stockOnly) {
             $sql .= ' HAVING stock > 0';
         }
@@ -2530,40 +2497,40 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function getAgencyPriceConfig(int $userId): array
+    public function getAgencyPriceStockItem(int $userId): array
     {
         $stmt = $this->pdo->prepare('SELECT price_mode, global_type, global_val FROM agency_price_config WHERE user_id = :user_id LIMIT 1');
         $stmt->execute(['user_id' => $userId]);
         $row = $stmt->fetch();
         if (!is_array($row)) {
-            return ['price_mode' => 'package', 'global_type' => 'pct', 'global_val' => 0];
+            return ['price_mode' => 'service', 'global_type' => 'pct', 'global_val' => 0];
         }
         return [
-            'price_mode' => (string) ($row['price_mode'] ?? 'package'),
+            'price_mode' => (string) ($row['price_mode'] ?? 'service'),
             'global_type' => (string) ($row['global_type'] ?? 'pct'),
             'global_val' => (int) ($row['global_val'] ?? 0),
         ];
     }
 
-    public function effectivePackagePrice(int $userId, array $package): int
+    public function effectiveTariffPrice(int $userId, array $tariff): int
     {
-        $base = (int) ($package['price'] ?? 0);
+        $base = (int) ($tariff['price'] ?? 0);
         $user = $this->getUser($userId);
         if (!is_array($user) || (int) ($user['is_agent'] ?? 0) !== 1) {
             return $base;
         }
 
-        $packageId = (int) ($package['id'] ?? 0);
+        $tariffId = (int) ($tariff['id'] ?? 0);
 
-        // Service-centric precedence: package > global
-        $pkgCustom = $this->getAgencyPrice($userId, $packageId);
+        // Service-centric precedence: tariff > global
+        $pkgCustom = $this->getAgencyPrice($userId, $tariffId);
         if ($pkgCustom !== null) {
             return max(0, $pkgCustom);
         }
 
-        $config = $this->getAgencyPriceConfig($userId);
-        $gType = (string) ($config['global_type'] ?? 'pct');
-        $gVal = (int) ($config['global_val'] ?? 0);
+        $stock_item = $this->getAgencyPriceStockItem($userId);
+        $gType = (string) ($stock_item['global_type'] ?? 'pct');
+        $gVal = (int) ($stock_item['global_val'] ?? 0);
         return $gType === 'pct'
             ? max(0, $base - (int) round($base * $gVal / 100))
             : max(0, $base - $gVal);
@@ -2586,12 +2553,19 @@ final class Database implements WorkerApiStore
 
 
 
-    public function packageHasAvailableStock(int $packageId): bool
+    public function tariffHasAvailableStock(int $tariffId): bool
     {
         $stmt = $this->pdo->prepare(
-            'SELECT 1 FROM configs WHERE package_id = :package_id AND sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired = 0 LIMIT 1'
+            "SELECT 1
+             FROM service_stock_items
+             WHERE tariff_id = :tariff_id
+               AND sold_to IS NULL
+               AND reserved_payment_id IS NULL
+               AND is_expired = 0
+               AND inventory_bucket = 'sale'
+             LIMIT 1"
         );
-        $stmt->execute(['package_id' => $packageId]);
+        $stmt->execute(['tariff_id' => $tariffId]);
         return (bool) $stmt->fetchColumn();
     }
 
@@ -2686,28 +2660,59 @@ final class Database implements WorkerApiStore
             return;
         }
 
-        $packageId = (int) $this->settingValue($prefix . '_package', '0');
-        if ($packageId <= 0) {
+        $tariffId = (int) $this->settingValue($prefix . '_tariff', '0');
+        if ($tariffId <= 0) {
+            return;
+        }
+        $tariff = $this->getServiceTariff($tariffId);
+        if (!is_array($tariff)) {
+            return;
+        }
+        $serviceId = (int) ($tariff['service_id'] ?? 0);
+        if ($serviceId <= 0) {
             return;
         }
 
         $cfgStmt = $this->pdo->prepare(
-            'SELECT id FROM configs WHERE package_id = :package_id AND sold_to IS NULL AND reserved_payment_id IS NULL AND is_expired = 0 ORDER BY id ASC LIMIT 1 FOR UPDATE'
+            "SELECT id, sub_link, raw_payload, access_url, stock_item_uuid, volume_gb, duration_days
+             FROM service_stock_items
+             WHERE service_id = :service_id
+               AND tariff_id = :tariff_id
+               AND sold_to IS NULL
+               AND reserved_payment_id IS NULL
+               AND is_expired = 0
+               AND inventory_bucket = 'sale'
+             ORDER BY id ASC LIMIT 1 FOR UPDATE"
         );
-        $cfgStmt->execute(['package_id' => $packageId]);
-        $cfgId = (int) ($cfgStmt->fetchColumn() ?: 0);
+        $cfgStmt->execute(['service_id' => $serviceId, 'tariff_id' => $tariffId]);
+        $cfg = $cfgStmt->fetch();
+        $cfgId = is_array($cfg) ? (int) ($cfg['id'] ?? 0) : 0;
         if ($cfgId <= 0) {
             return;
         }
 
-        $purchaseId = $this->createPurchase($referrerId, $packageId, $cfgId, 0, 'referral_gift');
-        $cfgUpdate = $this->pdo->prepare('UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
+        $purchaseId = $this->createPurchase($referrerId, null, null, 0, 'referral_gift', false, $serviceId, $tariffId);
+        $cfgUpdate = $this->pdo->prepare('UPDATE service_stock_items SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
         $cfgUpdate->execute([
             'sold_to' => $referrerId,
             'purchase_id' => $purchaseId,
             'sold_at' => gmdate('Y-m-d H:i:s'),
             'id' => $cfgId,
         ]);
+        $this->recordUserServiceDelivery(
+            $purchaseId,
+            $referrerId,
+            $serviceId,
+            $tariffId,
+            'stock',
+            $cfgId,
+            (string) ($cfg['sub_link'] ?? ''),
+            (string) ($cfg['access_url'] ?? ''),
+            (string) ($cfg['stock_item_uuid'] ?? ''),
+            isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
+            isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
+            (string) ($cfg['raw_payload'] ?? '')
+        );
     }
 
     public function getFreeTestRuleForService(int $serviceId): ?array
@@ -2758,7 +2763,7 @@ final class Database implements WorkerApiStore
         $stmt = $this->pdo->query(
             "SELECT s.id AS service_id, s.name AS service_name, s.mode, s.is_active,
                     r.is_enabled, r.claim_mode, r.cooldown_days, r.max_claims, r.priority,
-                    (SELECT COUNT(*) FROM configs c WHERE c.service_id = s.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0 AND c.inventory_bucket = 'free_test') AS available_stock,
+                    (SELECT COUNT(*) FROM service_stock_items c WHERE c.service_id = s.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0 AND c.inventory_bucket = 'free_test') AS available_stock,
                     (SELECT COUNT(*) FROM free_test_service_claims fc WHERE fc.service_id = s.id) AS total_claims
              FROM free_test_service_rules r
              JOIN service s ON s.id = r.service_id
@@ -2794,8 +2799,8 @@ final class Database implements WorkerApiStore
         $this->pdo->beginTransaction();
         try {
             $cfgStmt = $this->pdo->prepare(
-                "SELECT id, service_id, tariff_id, service_name, config_text, inquiry_link
-                 FROM configs
+                "SELECT id, service_id, tariff_id, sub_link, raw_payload, access_url, stock_item_uuid, volume_gb, duration_days
+                 FROM service_stock_items
                  WHERE service_id = :service_id
                    AND sold_to IS NULL
                    AND reserved_payment_id IS NULL
@@ -2811,14 +2816,14 @@ final class Database implements WorkerApiStore
                 return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
             }
 
-            $configId = (int) ($cfg['id'] ?? 0);
-            $purchaseId = $this->createPurchase($userId, null, $configId, 0, 'free_test', true, $serviceId, (int) ($cfg['tariff_id'] ?? 0));
-            $updateCfg = $this->pdo->prepare('UPDATE configs SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
+            $stock_itemId = (int) ($cfg['id'] ?? 0);
+            $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, (int) ($cfg['tariff_id'] ?? 0));
+            $updateCfg = $this->pdo->prepare('UPDATE service_stock_items SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
             $updateCfg->execute([
                 'sold_to' => $userId,
                 'purchase_id' => $purchaseId,
                 'sold_at' => $now,
-                'id' => $configId,
+                'id' => $stock_itemId,
             ]);
 
             $insertClaim = $this->pdo->prepare(
@@ -2831,15 +2836,29 @@ final class Database implements WorkerApiStore
                 'purchase_id' => $purchaseId,
                 'claimed_at' => $now,
             ]);
+            $this->recordUserServiceDelivery(
+                $purchaseId,
+                $userId,
+                $serviceId,
+                (int) ($cfg['tariff_id'] ?? 0),
+                'stock',
+                $stock_itemId,
+                (string) ($cfg['sub_link'] ?? ''),
+                (string) ($cfg['access_url'] ?? ''),
+                (string) ($cfg['stock_item_uuid'] ?? ''),
+                isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
+                isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
+                (string) ($cfg['raw_payload'] ?? '')
+            );
 
             $this->pdo->commit();
             return [
                 'ok' => true,
                 'service_id' => $serviceId,
                 'purchase_id' => $purchaseId,
-                'service_name' => (string) ($cfg['service_name'] ?? ''),
-                'config_text' => (string) ($cfg['config_text'] ?? ''),
-                'inquiry_link' => (string) ($cfg['inquiry_link'] ?? ''),
+                'service_name' => '',
+                'raw_payload' => (string) ($cfg['raw_payload'] ?? $cfg['sub_link'] ?? ''),
+                'sub_link' => (string) ($cfg['sub_link'] ?? ''),
             ];
         } catch (\Throwable) {
             if ($this->pdo->inTransaction()) {
@@ -2883,7 +2902,7 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             "SELECT COUNT(*)
-             FROM configs
+             FROM service_stock_items
              WHERE service_id = :service_id
                AND inventory_bucket = 'free_test'
                AND sold_to IS NULL

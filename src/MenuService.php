@@ -36,7 +36,7 @@ final class MenuService
         if ($isAdmin) {
             $rows[] = [KeyboardBuilder::admin()];
         }
-        $rows[] = [KeyboardBuilder::myConfigs(), KeyboardBuilder::buy(), KeyboardBuilder::profile()];
+        $rows[] = [KeyboardBuilder::myStockItems(), KeyboardBuilder::buy(), KeyboardBuilder::profile()];
         $rows[] = $freeTestEnabled ? [KeyboardBuilder::freeTest(), KeyboardBuilder::support()] : [KeyboardBuilder::support()];
 
         return $this->uiKeyboard->replyMenu($rows);
@@ -66,7 +66,7 @@ final class MenuService
     public function adminRootReplyKeyboard(): array
     {
         return $this->uiKeyboard->replyMenu([
-            [$this->catalog->get('buttons.admin.types_packages'), $this->catalog->get('buttons.admin.inventory'), $this->catalog->get('buttons.admin.users')],
+            [$this->catalog->get('buttons.admin.types_tariffs'), $this->catalog->get('buttons.admin.inventory'), $this->catalog->get('buttons.admin.users')],
             [$this->catalog->get('buttons.admin.settings')],
             [$this->catalog->get('buttons.admin.admins'), $this->catalog->get('buttons.admin.broadcast'), $this->catalog->get('buttons.admin.pins')],
             [$this->catalog->get('buttons.admin.agencies')],
@@ -131,24 +131,24 @@ final class MenuService
         ]);
     }
 
-    public function myConfigsText(int $userId): string
+    public function myStockItemsText(int $userId): string
     {
         $count = $this->database->countUserPurchases($userId);
         if ($count === 0) {
-            return $this->messageRenderer->render('menus.messages.my_configs_empty');
+            return $this->messageRenderer->render('menus.messages.my_stock_items_empty');
         }
 
         $items = $this->database->listUserPurchasesSummary($userId, 8);
         $lines = [];
         foreach ($items as $item) {
-            $packageName = trim((string) ($item['package_name'] ?? '—'));
+            $tariffName = trim((string) ($item['tariff_name'] ?? '—'));
             $serviceName = trim((string) ($item['service_name'] ?? '—'));
             $amount = (int) ($item['amount'] ?? 0);
             $createdAt = (string) ($item['created_at'] ?? '');
-            $isTest = ((int) ($item['is_test'] ?? 0)) === 1 ? $this->catalog->get('menus.my_configs.test_suffix') : '';
-            $lines[] = $this->catalog->get('menus.my_configs.order_row', [
+            $isTest = ((int) ($item['is_test'] ?? 0)) === 1 ? $this->catalog->get('menus.my_stock_items.test_suffix') : '';
+            $lines[] = $this->catalog->get('menus.my_stock_items.order_row', [
                 'id' => (int) ($item['id'] ?? 0),
-                'package' => htmlspecialchars($packageName),
+                'tariff' => htmlspecialchars($tariffName),
                 'service' => htmlspecialchars($serviceName),
                 'amount' => $amount,
                 'test_suffix' => $isTest,
@@ -157,7 +157,7 @@ final class MenuService
         }
 
         // Guardrail: row-template + implode is intentionally allowed only for data-driven lists.
-        return $this->messageRenderer->render('menus.messages.my_configs_overview', [
+        return $this->messageRenderer->render('menus.messages.my_stock_items_overview', [
             'count' => $count,
             'orders' => implode("\n", $lines),
         ], ['orders']);
