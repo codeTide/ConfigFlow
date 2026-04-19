@@ -20,3 +20,6 @@ CREATE TABLE IF NOT EXISTS free_test_service_claims (
   INDEX idx_free_test_service_claims_user_service (user_id, service_id),
   INDEX idx_free_test_service_claims_service (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS free_test_claims;
+DROP TABLE IF EXISTS free_test_package_rules;
