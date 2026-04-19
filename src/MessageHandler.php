@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace StockItemFlow\Bot;
+namespace ConfigFlow\Bot;
 
 final class MessageHandler
 {
@@ -410,7 +410,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (StockItem::adminIds() as $adminId) {
+            foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.wallet_charge_new', [
@@ -461,7 +461,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (StockItem::adminIds() as $adminId) {
+            foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.card_receipt_new', [
@@ -511,7 +511,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (StockItem::adminIds() as $adminId) {
+            foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.renew_receipt_new', [
@@ -568,7 +568,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (StockItem::adminIds() as $adminId) {
+            foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.tx_new', [
@@ -625,7 +625,7 @@ final class MessageHandler
                 ],
                 [KeyboardBuilder::admin()],
             ]);
-            foreach (StockItem::adminIds() as $adminId) {
+            foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.payments.tx_renew_new', [
@@ -657,7 +657,7 @@ final class MessageHandler
                 $this->catalog->get('messages.user.agency.request_submitted', ['request_id' => $requestId])
             );
 
-            foreach (StockItem::adminIds() as $adminId) {
+            foreach (Config::adminIds() as $adminId) {
                 $this->telegram->sendMessage(
                     (int) $adminId,
                     $this->catalog->get('admin.requests.new_agency_request', [
@@ -701,7 +701,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_request_note') {
-            if (!in_array($userId, StockItem::adminIds(), true)) {
+            if (!in_array($userId, Config::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -770,7 +770,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_service_name') {
-            if (!in_array($userId, StockItem::adminIds(), true)) {
+            if (!in_array($userId, Config::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -806,7 +806,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_user_balance') {
-            if (!in_array($userId, StockItem::adminIds(), true)) {
+            if (!in_array($userId, Config::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -881,7 +881,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_stock_search') {
-            if (!in_array($userId, StockItem::adminIds(), true)) {
+            if (!in_array($userId, Config::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -909,7 +909,7 @@ final class MessageHandler
         }
 
         if ($state['state_name'] === 'await_admin_add_admin') {
-            if (!in_array($userId, StockItem::adminIds(), true)) {
+            if (!in_array($userId, Config::adminIds(), true)) {
                 $this->database->clearUserState($userId);
                 return;
             }
@@ -4320,7 +4320,7 @@ final class MessageHandler
                 $this->openAdminAdminView($chatId, $userId, $targetUid);
                 return;
             }
-            if ($targetUid > 0 && trim($text) === $confirmDeleteWord && !in_array($targetUid, StockItem::adminIds(), true)) {
+            if ($targetUid > 0 && trim($text) === $confirmDeleteWord && !in_array($targetUid, Config::adminIds(), true)) {
                 $this->database->removeAdminUser($targetUid);
                 $this->openAdminAdminsList($chatId, $userId, $this->messageRenderer->render('admin.settings_admins_pins.success.admin_deleted'));
                 return;
@@ -4510,7 +4510,7 @@ final class MessageHandler
             $options[$num] = $uid;
             $buttons[] = [$this->catalog->get('admin.ui.open.settings_admins_pins.admins.button', ['num' => $num, 'uid' => $uid])];
         }
-        foreach (StockItem::adminIds() as $ownerId) {
+        foreach (Config::adminIds() as $ownerId) {
             $lines[] = $this->catalog->get('admin.ui.open.settings_admins_pins.admins.owner_row', ['emoji' => $this->catalog->get('admin.ui.open.settings_admins_pins.admins.owner_emoji'), 'owner_id' => $ownerId]);
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
@@ -4529,7 +4529,7 @@ final class MessageHandler
 
     private function openAdminAdminView(int $chatId, int $userId, int $targetUid, ?string $notice = null): void
     {
-        if (in_array($targetUid, StockItem::adminIds(), true)) {
+        if (in_array($targetUid, Config::adminIds(), true)) {
             $this->openAdminAdminsList($chatId, $userId, $this->messageRenderer->render('admin.ui.open.settings_admins_pins.admin_view.owner_locked'));
             return;
         }
