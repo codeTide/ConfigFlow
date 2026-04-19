@@ -3085,7 +3085,11 @@ final class MessageHandler
                 'single_config_link' => 'admin.services.prompts.free_test_stock_config_link',
                 default => 'admin.services.prompts.free_test_stock_volume',
             }),
-            $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+            $this->uiKeyboard->replyMenu(
+                $step === 'duration'
+                    ? [[$this->catalog->get('admin.services.prompts.free_test_stock_duration_unlimited')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]
+                    : [[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]
+            )
         );
     }
 
@@ -3110,6 +3114,11 @@ final class MessageHandler
         }
 
         if ($step === 'duration') {
+            if ($raw === $this->catalog->get('admin.services.prompts.free_test_stock_duration_unlimited')) {
+                $data['duration'] = 'نامحدود';
+                $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'sub_link', $data);
+                return false;
+            }
             $days = (int) preg_replace('/\D+/', '', $raw);
             if ($days <= 0) {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
