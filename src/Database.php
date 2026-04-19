@@ -2898,6 +2898,7 @@ final class Database implements WorkerApiStore
         if ($userId <= 0 || $serviceId <= 0) {
             return false;
         }
+
         $rule ??= $this->getFreeTestRuleForService($serviceId);
         if (!is_array($rule) || (int) ($rule['is_enabled'] ?? 0) !== 1) {
             return false;
@@ -2922,33 +2923,19 @@ final class Database implements WorkerApiStore
             return $claimCount < 1;
         }
 
-        if ($claimCount < $maxClaims) {
-            return true;
-        }
-        $rule ??= $this->getFreeTestRuleForService($serviceId);
-        if (!is_array($rule) || (int) ($rule['is_enabled'] ?? 0) !== 1) {
+        if ($claimMode !== 'cooldown') {
             return false;
         }
 
-        $service = $this->getService($serviceId);
-        if (!is_array($service) || (int) ($service['is_active'] ?? 0) !== 1 || (string) ($service['mode'] ?? '') !== 'stock') {
+        if ($claimCount >= $maxClaims) {
             return false;
         }
-
-        if ($this->countAvailableConfigsByService($serviceId) <= 0) {
-            return false;
-        }
-
-        $claimMode = (string) ($rule['claim_mode'] ?? 'once_until_reset');
-        $maxClaims = max(1, (int) ($rule['max_claims'] ?? 1));
-        $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
-        $countStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
-        $claimCount = (int) $countStmt->fetchColumn();
 
         $cooldownDays = max(1, (int) ($rule['cooldown_days'] ?? 0));
         if ($cooldownDays <= 0) {
             return false;
         }
+
         $lastStmt = $this->pdo->prepare(
             'SELECT claimed_at
              FROM free_test_service_claims
@@ -2960,10 +2947,12 @@ final class Database implements WorkerApiStore
         if ($lastAt === '') {
             return true;
         }
+
         $lastTs = strtotime($lastAt);
         if ($lastTs === false) {
             return true;
         }
+
         $nextAllowed = strtotime('+' . $cooldownDays . ' days', $lastTs);
         return $nextAllowed !== false && time() >= $nextAllowed;
     }
