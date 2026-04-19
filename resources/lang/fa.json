@@ -783,7 +783,7 @@
       "success": {
         "free_test_rule_saved": "✅ تنظیمات تست رایگان سرویس ذخیره شد.",
         "free_test_quota_reset": "✅ سهمیه تست رایگان کاربر <code>{target_user_id}</code> برای این سرویس ریست شد.",
-        "free_test_stock_added": "✅ موجودی تست رایگان با شناسه <code>{config_id}</code> ثبت شد."
+        "free_test_stock_added": "✅ موجودی تست رایگان با شناسه <code>{stock_item_id}</code> ثبت شد."
       }
     },
     "ui": {

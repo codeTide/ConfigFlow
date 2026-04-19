@@ -4,11 +4,9 @@ CREATE TABLE IF NOT EXISTS service_stock_items (
     tariff_id BIGINT NULL,
     inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale',
     sub_link TEXT NOT NULL,
-    access_url TEXT NULL,
-    config_uuid VARCHAR(191) NULL,
+    config_link TEXT NULL,
     volume_gb DECIMAL(10,2) NULL,
     duration_days INT NULL,
-    raw_payload LONGTEXT NULL,
     created_at DATETIME NOT NULL,
     reserved_payment_id BIGINT NULL,
     sold_to BIGINT NULL,
@@ -31,7 +29,7 @@ CREATE TABLE IF NOT EXISTS user_service_deliveries (
     stock_item_id BIGINT NULL,
     sub_link TEXT NOT NULL,
     access_url TEXT NULL,
-    config_uuid VARCHAR(191) NULL,
+    stock_item_uuid VARCHAR(191) NULL,
     volume_gb DECIMAL(10,2) NULL,
     duration_days INT NULL,
     delivered_at DATETIME NOT NULL,
@@ -43,8 +41,8 @@ CREATE TABLE IF NOT EXISTS user_service_deliveries (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO service_stock_items (
-    service_id, tariff_id, inventory_bucket, sub_link, access_url, config_uuid,
-    volume_gb, duration_days, raw_payload, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
+    service_id, tariff_id, inventory_bucket, sub_link, config_link,
+    volume_gb, duration_days, created_at, reserved_payment_id, sold_to, purchase_id, sold_at, is_expired
 )
 SELECT
     c.service_id,
@@ -54,8 +52,6 @@ SELECT
     NULL,
     NULL,
     NULL,
-    NULL,
-    c.config_text,
     c.created_at,
     c.reserved_payment_id,
     c.sold_to,
@@ -74,7 +70,7 @@ WHERE c.service_id IS NOT NULL
 
 INSERT INTO user_service_deliveries (
     purchase_id, user_id, service_id, tariff_id, source_type, stock_item_id,
-    sub_link, access_url, config_uuid, volume_gb, duration_days, delivered_at, meta_json
+    sub_link, access_url, stock_item_uuid, volume_gb, duration_days, delivered_at, meta_json
 )
 SELECT
     p.id,
@@ -84,8 +80,8 @@ SELECT
     CASE WHEN s.id IS NULL THEN 'panel' ELSE 'stock' END,
     s.id,
     COALESCE(NULLIF(s.sub_link, ''), ''),
-    s.access_url,
-    s.config_uuid,
+    s.config_link,
+    NULL,
     s.volume_gb,
     s.duration_days,
     COALESCE(s.sold_at, p.created_at),
