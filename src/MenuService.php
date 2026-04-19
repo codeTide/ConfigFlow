@@ -31,7 +31,7 @@ final class MenuService
     public function mainMenuReplyKeyboard(int $userId): array
     {
         $isAdmin = $this->database->isAdminUser($userId);
-        $freeTestEnabled = $this->settings->get('free_test_enabled', '1') === '1';
+        $freeTestEnabled = $this->database->countAvailableFreeTestServices($userId) > 0;
         $rows = [];
         if ($isAdmin) {
             $rows[] = [KeyboardBuilder::admin()];
@@ -67,7 +67,7 @@ final class MenuService
     {
         return $this->uiKeyboard->replyMenu([
             [$this->catalog->get('buttons.admin.types_packages'), $this->catalog->get('buttons.admin.inventory'), $this->catalog->get('buttons.admin.users')],
-            [$this->catalog->get('buttons.admin.settings'), $this->catalog->get('buttons.admin.free_test')],
+            [$this->catalog->get('buttons.admin.settings')],
             [$this->catalog->get('buttons.admin.admins'), $this->catalog->get('buttons.admin.broadcast'), $this->catalog->get('buttons.admin.pins')],
             [$this->catalog->get('buttons.admin.agencies')],
             [$this->catalog->get('buttons.admin.charges'), $this->catalog->get('buttons.admin.delivery'), $this->catalog->get('buttons.admin.requests')],

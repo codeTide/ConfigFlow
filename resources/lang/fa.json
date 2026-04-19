@@ -24,7 +24,6 @@
       "inventory": "📚 موجودی",
       "users": "👥 کاربران",
       "settings": "⚙️ تنظیمات",
-      "free_test": "🧪 تست رایگان",
       "admins": "👮 ادمین‌ها",
       "broadcast": "📣 همگانی",
       "pins": "📌 پین‌ها",
@@ -113,7 +112,12 @@
         "ready_with_inquiry": "🎁 <b>تست رایگان شما آماده است</b>\n\n📦 سرویس: <b>{service_name}</b>\n🧪 نوع سفارش: <b>تست رایگان</b>\n\n🔗 کانفیگ شما:\n<code>{config_text}</code>\n\n🌐 لینک استعلام:\n{inquiry_link}",
         "note_as_text": "⚠️ لطفاً متن توضیح ارسال کنید، نه دکمه‌های منو.",
         "note_required": "⚠️ لطفاً توضیح کوتاه تست را ارسال کنید.",
-        "request_submitted": "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید.\nشناسه درخواست: <code>{request_id}</code>"
+        "request_submitted": "✅ درخواست تست رایگان ثبت شد و برای بررسی ادمین ارسال گردید.\nشناسه درخواست: <code>{request_id}</code>",
+        "service_selection": {
+          "overview": "🎁 <b>انتخاب سرویس تست رایگان</b>\n\n🧩 سرویس‌های واجد شرایط: {services}\n\n<blockquote>💡 یک سرویس را انتخاب کنید تا تست رایگان همان سرویس برای شما ثبت و تحویل شود.</blockquote>",
+          "row": "{num}) {name}",
+          "button": "🎯 {num} - {name}"
+        }
       },
       "agency": {
         "request_intro": "🤝 <b>درخواست نمایندگی</b>\n\nلطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید:\nپیام شما برای تیم ادمین ثبت می‌شود.",
@@ -480,7 +484,6 @@
       "actions": {
         "settings_refresh": "🔄 بروزرسانی",
         "settings_toggle_bot": "⚙️ وضعیت ربات",
-        "settings_toggle_free_test": "🎁 تست رایگان",
         "settings_toggle_agency": "💼 نمایندگی",
         "settings_toggle_gw_card": "💵 کارت‌به‌کارت",
         "settings_toggle_gw_crypto": "🎁 کریپتو",
@@ -792,7 +795,14 @@
         "service_tariff_status": "📊 وضعیت",
         "service_tariffs_list": "🧾 تعرفه‌های سرویس",
         "service_tariff_delete": "🗑 حذف",
-        "skip": "⏭ رد شدن"
+        "skip": "⏭ رد شدن",
+        "service_free_test": "🎁 تست رایگان",
+        "service_free_test_toggle": "🔁 فعال/غیرفعال",
+        "service_free_test_mode": "🧭 مدل دریافت",
+        "service_free_test_max": "🔢 سقف دریافت",
+        "service_free_test_cooldown": "📅 فاصله زمانی",
+        "service_free_test_reset": "🧹 ریست سهمیه",
+        "service_free_test_refresh": "📊 بازخوانی وضعیت"
       },
       "create_type": {
         "overview": "🆕 <b>افزودن نوع سرویس</b>\n\n✍️ راهنما: نام نوع سرویس جدید را ارسال کنید.\n\n<blockquote>💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید.</blockquote>"
@@ -845,6 +855,14 @@
           "summary_label": "💡 خلاصه",
           "summary_tip": "💡 برای ثبت نهایی، «تایید» را ارسال کنید.",
           "summary_template": "💡 عنوان: {name}\nحجم: {volume} GB\nمدت: {duration} روز\nقیمت: {price} تومان"
+        },
+        "free_test_wizard": {
+          "claim_mode": "🧭 <b>مدل دریافت تست رایگان را انتخاب کنید:</b>\n\n🎯 یکی از دو حالت «cooldown» یا «once_until_reset» را انتخاب کنید.\n\n<blockquote>💡 در حالت cooldown کاربر با فاصله زمانی می‌تواند دوباره دریافت کند؛ در حالت once_until_reset فقط یک بار تا زمان ریست ادمین مجاز است.</blockquote>",
+          "mode_cooldown": "🧭 cooldown",
+          "mode_once": "🧭 once_until_reset",
+          "max_claims": "🔢 <b>سقف دریافت را وارد کنید:</b>\n\n📌 تعداد مجاز دریافت کاربر را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار برای کنترل تعداد claim هر کاربر روی همین سرویس استفاده می‌شود.</blockquote>",
+          "cooldown_days": "📅 <b>فاصله زمانی را وارد کنید:</b>\n\n📌 تعداد روز cooldown را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار فقط در مدل cooldown استفاده می‌شود.</blockquote>",
+          "reset_user": "🧹 <b>آیدی کاربر برای ریست سهمیه را وارد کنید:</b>\n\n📌 آیدی عددی کاربر را ارسال کنید:\n\n<blockquote>💡 با این عملیات history تست رایگان همان کاربر فقط در همین سرویس پاک می‌شود.</blockquote>"
         }
       },
       "messages": {
@@ -947,7 +965,9 @@
         "tariff_created": "✅ تعرفه ثبت شد.",
         "tariff_updated": "✅ تعرفه بروزرسانی شد.",
         "tariff_deleted": "✅ تعرفه حذف شد.",
-        "service_stock_added": "✅ موجودی سرویس با شناسه <code>{config_id}</code> ثبت شد."
+        "service_stock_added": "✅ موجودی سرویس با شناسه <code>{config_id}</code> ثبت شد.",
+        "service_free_test_rule_saved": "✅ تنظیمات تست رایگان سرویس ذخیره شد.",
+        "service_free_test_quota_reset": "✅ سهمیه تست رایگان کاربر <code>{target_user_id}</code> برای این سرویس ریست شد."
       }
     },
     "ui": {
@@ -980,10 +1000,6 @@
       "broadcast": {
         "overview": "📣 <b>ارسال همگانی</b>\n\n📝 مرحله ۱: متن پیام همگانی را ارسال کنید.\n\n<blockquote>💡 بعد از متن، scope انتخاب می‌شود و سپس ارسال نهایی تایید می‌گردد.</blockquote>"
       },
-      "freetest": {
-        "rules_empty": "قانونی ثبت نشده است.",
-        "overview": "🧪 <b>مدیریت تست رایگان</b>\n\n📋 قوانین: {rules}\n\n<blockquote>💡 اگر کاربری به‌اشتباه سهمیه‌اش مصرف شده یا نیاز به بررسی دوباره دارد، از همین بخش می‌توانید سهمیه او را ریست کنید.</blockquote>"
-      },
       "open": {
         "services_landing": {
           "empty_overview": "🧩 <b>مدیریت سرویس‌ها</b>\n\nهنوز سرویسی ثبت نشده است.\n\n<blockquote>💡 برای شروع، از دکمه «🧩 افزودن سرویس (جدید)» استفاده کنید.</blockquote>",
@@ -1005,16 +1021,6 @@
           "status_inactive": "🔴 غیرفعال"
         },
         "service_view": {
-          "packages_empty": "برای این سرویس هنوز آیتمی ثبت نشده است.",
-          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 سرویس: {service_name} | <code>{service_id}</code>\n📶 وضعیت: {status_text}\n📦 آیتم‌ها: {packages}\n\n<blockquote>💡 برای مدیریت هر آیتم، شماره همان آیتم را انتخاب کنید.</blockquote>",
-          "not_found": "سرویس پیدا نشد.",
-          "service_button": "🧩 سرویس #{service_id} | {name}"
-        },
-        "package_view": {
-          "overview": "📦 <b>جزئیات پکیج</b>\n\n👤 نام: <b>{package_name}</b> | <code>{package_id}</code>\n🧩 سرویس: {service_name} | <code>{service_id}</code>\n💾 حجم: {volume} GB\n⏳ مدت: {days} روز\n💵 قیمت: {amount} تومان\n📶 وضعیت: {status_text}\n\n<blockquote>💡 در این صفحه می‌توانید وضعیت پکیج را تغییر دهید یا آن را حذف کنید.</blockquote>",
-          "not_found_in_type": "پکیج پیدا نشد یا با سرویس انتخابی سازگار نیست."
-        },
-        "service_view": {
           "mode_stock": "انباری",
           "mode_panel_auto": "پنلی خودکار",
           "status_active": "فعال",
@@ -1022,6 +1028,10 @@
           "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
           "overview_stock": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
           "panel_none": "تنظیم نشده"
+        },
+        "package_view": {
+          "overview": "📦 <b>جزئیات پکیج</b>\n\n👤 نام: <b>{package_name}</b> | <code>{package_id}</code>\n🧩 سرویس: {service_name} | <code>{service_id}</code>\n💾 حجم: {volume} GB\n⏳ مدت: {days} روز\n💵 قیمت: {amount} تومان\n📶 وضعیت: {status_text}\n\n<blockquote>💡 در این صفحه می‌توانید وضعیت پکیج را تغییر دهید یا آن را حذف کنید.</blockquote>",
+          "not_found_in_type": "پکیج پیدا نشد یا با سرویس انتخابی سازگار نیست."
         },
         "panels_list": {
           "title": "🖥 <b>مدیریت سرویس‌های پنلی</b>",
@@ -1133,7 +1143,7 @@
         "settings_admins_pins": {
           "settings": {
             "channel_unset": "❌ تنظیم نشده",
-            "overview": "⚙️ <b>تنظیمات سریع</b>\n\n🤖 bot_status: {bot_status}\n🎁 free_test_enabled: {free_test_enabled}\n🤝 agency_request_enabled: {agency_request_enabled}\n💳 gw_card_enabled: {gw_card_enabled}\n💎 gw_crypto_enabled: {gw_crypto_enabled}\n🏦 gw_tetrapay_enabled: {gw_tetrapay_enabled}\n📢 channel_id: {channel_id}\n🚚 {delivery_mode_label}: {delivery_mode}\n\n<blockquote>💡 تغییرات این صفحه فوری اعمال می‌شوند.</blockquote>"
+            "overview": "⚙️ <b>تنظیمات سریع</b>\n\n🤖 bot_status: {bot_status}\n🤝 agency_request_enabled: {agency_request_enabled}\n💳 gw_card_enabled: {gw_card_enabled}\n💎 gw_crypto_enabled: {gw_crypto_enabled}\n🏦 gw_tetrapay_enabled: {gw_tetrapay_enabled}\n📢 channel_id: {channel_id}\n🚚 {delivery_mode_label}: {delivery_mode}\n\n<blockquote>💡 تغییرات این صفحه فوری اعمال می‌شوند.</blockquote>"
           },
           "admins": {
             "empty": "ادمینی ثبت نشده است.",
@@ -1181,6 +1191,9 @@
         "groupops": {
           "group_id_unset": "❌ تنظیم نشده",
           "overview": "🗂 <b>گروه/بکاپ</b>\n\n🧩 Group ID فعلی: {group_id}\n\n<blockquote>💡 بازیابی تنظیمات فقط با JSON معتبر انجام می‌شود.</blockquote>"
+        },
+        "service_free_test": {
+          "overview": "🎁 <b>مدیریت تست رایگان سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📶 وضعیت تست رایگان: {is_enabled}\n🧭 مدل دریافت: <b>{claim_mode}</b>\n📅 فاصله زمانی: <b>{cooldown_days}</b>\n🔢 سقف دریافت: <b>{max_claims}</b>\n🧾 تعداد claimهای ثبت‌شده: <b>{claim_count}</b>\n📚 موجودی آزاد قابل تحویل: <b>{stock_count}</b>\n\n<blockquote>💡 از دکمه‌های پایین می‌توانید تنظیمات دریافت را مرحله‌ای مدیریت کنید و سهمیه کاربر را برای همین سرویس ریست کنید.</blockquote>"
         }
       },
       "audit": {
