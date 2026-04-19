@@ -39,6 +39,8 @@ final class Database implements WorkerApiStore
                 claim_mode ENUM('cooldown','once_until_reset') NOT NULL DEFAULT 'once_until_reset',
                 cooldown_days INT NULL,
                 max_claims INT NOT NULL DEFAULT 1,
+                default_volume_gb DECIMAL(10,2) NULL,
+                default_duration_days INT NULL,
                 priority INT NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
@@ -46,6 +48,10 @@ final class Database implements WorkerApiStore
                 INDEX idx_free_test_service_priority (priority)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+        if ($this->tableExists('free_test_service_rules')) {
+            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS default_volume_gb DECIMAL(10,2) NULL AFTER max_claims");
+            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS default_duration_days INT NULL AFTER default_volume_gb");
+        }
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS free_test_service_claims (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -2779,7 +2785,7 @@ final class Database implements WorkerApiStore
     public function getFreeTestRuleForService(int $serviceId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT service_id, is_enabled, claim_mode, cooldown_days, max_claims, priority, created_at, updated_at
+            'SELECT service_id, is_enabled, claim_mode, cooldown_days, max_claims, default_volume_gb, default_duration_days, priority, created_at, updated_at
              FROM free_test_service_rules
              WHERE service_id = :service_id
              LIMIT 1'
@@ -2814,6 +2820,31 @@ final class Database implements WorkerApiStore
             'cooldown_days' => $cooldownDays,
             'max_claims' => $maxClaims,
             'priority' => $priority,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    public function saveFreeTestStockDefaultsForService(int $serviceId, float $defaultVolumeGb, ?int $defaultDurationDays): void
+    {
+        $defaultVolumeGb = max(0.01, $defaultVolumeGb);
+        if ($defaultDurationDays !== null) {
+            $defaultDurationDays = max(0, $defaultDurationDays);
+        }
+        $now = gmdate('Y-m-d H:i:s');
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO free_test_service_rules (service_id, is_enabled, claim_mode, cooldown_days, max_claims, default_volume_gb, default_duration_days, priority, created_at, updated_at)
+             VALUES (:service_id, 0, :claim_mode, NULL, 1, :default_volume_gb, :default_duration_days, 0, :created_at, :updated_at)
+             ON DUPLICATE KEY UPDATE
+                default_volume_gb = VALUES(default_volume_gb),
+                default_duration_days = VALUES(default_duration_days),
+                updated_at = VALUES(updated_at)'
+        );
+        $stmt->execute([
+            'service_id' => $serviceId,
+            'claim_mode' => 'once_until_reset',
+            'default_volume_gb' => $defaultVolumeGb,
+            'default_duration_days' => $defaultDurationDays,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
