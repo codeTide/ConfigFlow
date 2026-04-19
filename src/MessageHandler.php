@@ -1706,7 +1706,7 @@ final class MessageHandler
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)) {
-                $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'display_name', []);
+                $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'volume', []);
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)) {
@@ -1770,14 +1770,13 @@ final class MessageHandler
 
         if ($stateName === 'admin.service.free_test.stock_add') {
             $serviceId = (int) ($payload['service_id'] ?? 0);
-            $step = (string) ($payload['step'] ?? 'display_name');
+            $step = (string) ($payload['step'] ?? 'volume');
             /** @var array<string,mixed> $data */
             $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
 
             if ($text === UiLabels::back($this->catalog)) {
                 $prev = [
-                    'display_name' => 'view',
-                    'volume' => 'display_name',
+                    'volume' => 'view',
                     'duration' => 'volume',
                     'sub_link' => 'duration',
                     'single_config_link' => 'sub_link',
@@ -1796,20 +1795,21 @@ final class MessageHandler
                 return;
             }
 
-            $displayName = trim((string) ($data['display_name'] ?? ''));
+            $service = $this->database->getService($serviceId);
+            $serviceName = trim((string) ($service['name'] ?? ''));
             $volume = trim((string) ($data['volume'] ?? ''));
             $duration = trim((string) ($data['duration'] ?? ''));
             $subLink = trim((string) ($data['sub_link'] ?? ''));
             $singleConfig = trim((string) ($data['single_config_link'] ?? ''));
 
-            if ($displayName === '' || $volume === '' || $duration === '' || $subLink === '' || $singleConfig === '') {
+            if ($serviceName === '' || $volume === '' || $duration === '' || $subLink === '' || $singleConfig === '') {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
-                $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'display_name', []);
+                $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'volume', []);
                 return;
             }
 
             $configPayload = "🔗 لینک ساب:\n{$subLink}\n\n🔐 لینک تکی:\n{$singleConfig}\n\n📦 حجم: {$volume}\n⏳ مدت: {$duration}";
-            $configId = $this->database->addConfigForService($serviceId, null, $displayName, $configPayload, $subLink, 'free_test');
+            $configId = $this->database->addConfigForService($serviceId, null, $serviceName, $configPayload, $subLink, 'free_test');
             $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_stock_added', ['config_id' => $configId]));
             return;
         }
@@ -3057,9 +3057,17 @@ final class MessageHandler
         ]);
 
         if ($step === 'confirm') {
+            $service = $this->database->getService($serviceId);
+            $volumeRaw = trim((string) ($data['volume'] ?? ''));
+            $volumeForDisplay = $volumeRaw;
+            if ($volumeRaw === '') {
+                $volumeForDisplay = (string) $this->catalog->get('messages.generic.dash');
+            } elseif (!preg_match('/[[:alpha:]\p{Arabic}]/u', $volumeRaw)) {
+                $volumeForDisplay = $volumeRaw . ' گیگ';
+            }
             $summary = $this->messageRenderer->render('admin.services.prompts.free_test_stock_confirm', [
-                'display_name' => htmlspecialchars((string) ($data['display_name'] ?? $this->catalog->get('messages.generic.dash'))),
-                'volume' => htmlspecialchars((string) ($data['volume'] ?? $this->catalog->get('messages.generic.dash'))),
+                'service_name' => htmlspecialchars((string) (($service['name'] ?? '') !== '' ? $service['name'] : $this->catalog->get('messages.generic.dash'))),
+                'volume' => htmlspecialchars($volumeForDisplay),
                 'duration' => htmlspecialchars((string) ($data['duration'] ?? $this->catalog->get('messages.generic.dash'))),
                 'sub_link' => htmlspecialchars((string) ($data['sub_link'] ?? $this->catalog->get('messages.generic.dash'))),
                 'single_config_link' => htmlspecialchars((string) ($data['single_config_link'] ?? $this->catalog->get('messages.generic.dash'))),
@@ -3078,14 +3086,17 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->messageRenderer->render(match ($step) {
-                'display_name' => 'admin.services.prompts.free_test_stock_name',
                 'volume' => 'admin.services.prompts.free_test_stock_volume',
                 'duration' => 'admin.services.prompts.free_test_stock_duration',
                 'sub_link' => 'admin.services.prompts.free_test_stock_sub_link',
                 'single_config_link' => 'admin.services.prompts.free_test_stock_config_link',
-                default => 'admin.services.prompts.free_test_stock_name',
+                default => 'admin.services.prompts.free_test_stock_volume',
             }),
-            $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+            $this->uiKeyboard->replyMenu(
+                $step === 'duration'
+                    ? [[$this->catalog->get('admin.services.prompts.free_test_stock_duration_unlimited')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]
+                    : [[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]
+            )
         );
     }
 
@@ -3098,24 +3109,28 @@ final class MessageHandler
             return false;
         }
 
-        if ($step === 'display_name') {
-            $data['display_name'] = $raw;
-            $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'volume', $data);
-            return false;
-        }
-
         if ($step === 'volume') {
-            $volume = (float) str_replace(',', '.', preg_replace('/[^\d.,]/u', '', $raw) ?? '');
+            $normalized = str_replace(' ', '', str_replace(',', '.', $raw));
+            if (!preg_match('/^\d+(?:\.\d+)?$/', $normalized)) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+                return false;
+            }
+            $volume = (float) $normalized;
             if ($volume <= 0) {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
                 return false;
             }
-            $data['volume'] = $raw;
+            $data['volume'] = $normalized;
             $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'duration', $data);
             return false;
         }
 
         if ($step === 'duration') {
+            if ($raw === $this->catalog->get('admin.services.prompts.free_test_stock_duration_unlimited')) {
+                $data['duration'] = 'نامحدود';
+                $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'sub_link', $data);
+                return false;
+            }
             $days = (int) preg_replace('/\D+/', '', $raw);
             if ($days <= 0) {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
