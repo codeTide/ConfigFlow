@@ -963,12 +963,11 @@
         "free_test_max_claims": "🔢 <b>سقف دریافت را وارد کنید:</b>\n\n📌 تعداد مجاز دریافت کاربر را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار برای کنترل تعداد claim هر کاربر روی همین سرویس استفاده می‌شود.</blockquote>",
         "free_test_cooldown_days": "📅 <b>فاصله زمانی را وارد کنید:</b>\n\n📌 تعداد روز فاصله زمانی را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار فقط در مدل دریافت دوره‌ای استفاده می‌شود.</blockquote>",
         "free_test_reset_user": "🧹 <b>آیدی کاربر برای ریست سهمیه را وارد کنید:</b>\n\n📌 آیدی عددی کاربر را ارسال کنید:\n\n<blockquote>💡 با این عملیات history تست رایگان همان کاربر فقط در همین سرویس پاک می‌شود.</blockquote>",
-        "free_test_stock_name": "📝 <b>نام نمایشی را وارد کنید:</b>\n\n📌 نام باید خالی نباشد:\n\n<blockquote>💡 این نام در لیست موجودی تست رایگان نمایش داده می‌شود.</blockquote>",
         "free_test_stock_volume": "📦 <b>حجم را وارد کنید:</b>\n\n📌 مقدار حجم معتبر (مثلاً 50GB یا 50) را ارسال کنید:\n\n<blockquote>💡 حجم باید معتبر و بزرگ‌تر از صفر باشد.</blockquote>",
         "free_test_stock_duration": "⏳ <b>مدت‌زمان را وارد کنید:</b>\n\n📌 تعداد روز را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 مدت‌زمان باید معتبر و بزرگ‌تر از صفر باشد.</blockquote>",
         "free_test_stock_sub_link": "🔗 <b>لینک ساب را وارد کنید:</b>\n\n📌 لینک نباید خالی باشد:\n\n<blockquote>💡 این لینک به‌عنوان inquiry_link موجودی تست رایگان ذخیره می‌شود.</blockquote>",
         "free_test_stock_config_link": "🔐 <b>لینک تکی کانفیگ را وارد کنید:</b>\n\n📌 لینک نباید خالی باشد:\n\n<blockquote>💡 این لینک داخل متن کانفیگ تست رایگان قرار می‌گیرد.</blockquote>",
-        "free_test_stock_confirm": "🧾 <b>پیش‌نمایش موجودی تست رایگان</b>\n\n📝 نام نمایشی: <b>{display_name}</b>\n📦 حجم: <b>{volume}</b>\n⏳ مدت‌زمان: <b>{duration}</b>\n🔗 لینک ساب: <code>{sub_link}</code>\n🔐 لینک تکی کانفیگ: <code>{single_config_link}</code>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا موجودی تست رایگان ثبت شود.</blockquote>"
+        "free_test_stock_confirm": "🧾 <b>پیش‌نمایش موجودی تست رایگان</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📦 حجم: <b>{volume}</b>\n⏳ مدت‌زمان: <b>{duration}</b>\n🔗 لینک ساب: <code>{sub_link}</code>\n🔐 لینک تکی کانفیگ: <code>{single_config_link}</code>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا موجودی تست رایگان ثبت شود.</blockquote>"
       },
       "success": {
         "free_test_rule_saved": "✅ تنظیمات تست رایگان سرویس ذخیره شد.",
