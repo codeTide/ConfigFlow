@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace StockItemFlow\Bot;
+namespace ConfigFlow\Bot;
 
 final class KeyboardBuilder
 {
