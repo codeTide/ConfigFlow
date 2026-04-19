@@ -3058,9 +3058,16 @@ final class MessageHandler
 
         if ($step === 'confirm') {
             $service = $this->database->getService($serviceId);
+            $volumeRaw = trim((string) ($data['volume'] ?? ''));
+            $volumeForDisplay = $volumeRaw;
+            if ($volumeRaw === '') {
+                $volumeForDisplay = (string) $this->catalog->get('messages.generic.dash');
+            } elseif (!preg_match('/[[:alpha:]\p{Arabic}]/u', $volumeRaw)) {
+                $volumeForDisplay = $volumeRaw . ' گیگ';
+            }
             $summary = $this->messageRenderer->render('admin.services.prompts.free_test_stock_confirm', [
                 'service_name' => htmlspecialchars((string) (($service['name'] ?? '') !== '' ? $service['name'] : $this->catalog->get('messages.generic.dash'))),
-                'volume' => htmlspecialchars((string) ($data['volume'] ?? $this->catalog->get('messages.generic.dash'))),
+                'volume' => htmlspecialchars($volumeForDisplay),
                 'duration' => htmlspecialchars((string) ($data['duration'] ?? $this->catalog->get('messages.generic.dash'))),
                 'sub_link' => htmlspecialchars((string) ($data['sub_link'] ?? $this->catalog->get('messages.generic.dash'))),
                 'single_config_link' => htmlspecialchars((string) ($data['single_config_link'] ?? $this->catalog->get('messages.generic.dash'))),
@@ -3103,12 +3110,17 @@ final class MessageHandler
         }
 
         if ($step === 'volume') {
-            $volume = (float) str_replace(',', '.', preg_replace('/[^\d.,]/u', '', $raw) ?? '');
+            $normalized = str_replace(' ', '', str_replace(',', '.', $raw));
+            if (!preg_match('/^\d+(?:\.\d+)?$/', $normalized)) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
+                return false;
+            }
+            $volume = (float) $normalized;
             if ($volume <= 0) {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_packages.errors.service_inventory_invalid_input'));
                 return false;
             }
-            $data['volume'] = $raw;
+            $data['volume'] = $normalized;
             $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'duration', $data);
             return false;
         }

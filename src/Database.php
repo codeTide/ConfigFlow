@@ -120,6 +120,7 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS service_id BIGINT NULL AFTER package_id");
             $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
             $this->pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale' AFTER tariff_id");
+            $this->pdo->exec("ALTER TABLE configs DROP COLUMN IF EXISTS type_id");
             $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_service (service_id)");
             $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_tariff (tariff_id)");
             $this->pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_inventory_bucket (inventory_bucket)");
