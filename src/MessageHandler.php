@@ -3112,7 +3112,7 @@ final class MessageHandler
                 'volume' => htmlspecialchars($volumeForDisplay),
                 'duration' => htmlspecialchars((string) ($data['duration'] ?? $this->catalog->get('messages.generic.dash'))),
                 'sub_link' => htmlspecialchars((string) ($data['sub_link'] ?? $this->catalog->get('messages.generic.dash'))),
-                'single_stock_item_link' => htmlspecialchars((string) ($data['single_stock_item_link'] ?? $this->catalog->get('messages.generic.dash'))),
+                'single_config_link' => htmlspecialchars((string) ($data['single_stock_item_link'] ?? $this->catalog->get('messages.generic.dash'))),
             ]);
             $this->telegram->sendMessage(
                 $chatId,
@@ -3131,7 +3131,7 @@ final class MessageHandler
                 'volume' => 'admin.services.prompts.free_test_stock_volume',
                 'duration' => 'admin.services.prompts.free_test_stock_duration',
                 'sub_link' => 'admin.services.prompts.free_test_stock_sub_link',
-                'single_stock_item_link' => 'admin.services.prompts.free_test_stock_stock_item_link',
+                'single_stock_item_link' => 'admin.services.prompts.free_test_stock_config_link',
                 default => 'admin.services.prompts.free_test_stock_volume',
             }),
             $this->uiKeyboard->replyMenu(
