@@ -68,12 +68,13 @@ $pdo->exec(
         INDEX idx_agency_status (status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
 );
-$pdo->exec("ALTER TABLE configs ADD COLUMN IF NOT EXISTS inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale'");
-$pdo->exec("ALTER TABLE configs ADD INDEX IF NOT EXISTS idx_configs_inventory_bucket (inventory_bucket)");
-$pdo->exec("UPDATE configs SET inventory_bucket = 'sale' WHERE inventory_bucket IS NULL OR TRIM(inventory_bucket) = ''");
 $pdo->exec("DROP TABLE IF EXISTS free_test_requests");
 $pdo->exec("DROP TABLE IF EXISTS free_test_package_rules");
 $pdo->exec("DROP TABLE IF EXISTS free_test_claims");
+$pdo->exec("DROP TABLE IF EXISTS packages");
+$pdo->exec("DROP TABLE IF EXISTS configs");
+$pdo->exec("DROP TABLE IF EXISTS agency_prices");
+$pdo->exec("DROP TABLE IF EXISTS provisioning_services");
 $migrator = new \ConfigFlow\Bot\MigrationRunner($pdo, __DIR__ . '/../migrations');
 $migrator->applyAll();
 

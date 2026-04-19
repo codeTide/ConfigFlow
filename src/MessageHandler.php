@@ -208,7 +208,7 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_buy_package_selection' || $state['state_name'] === 'buy.await_package') {
+        if ($state['state_name'] === 'await_buy_tariff_selection' || $state['state_name'] === 'buy.await_tariff') {
             $this->handleBuyPackageSelectionState($chatId, $userId, $text, $state);
             return;
         }
@@ -218,7 +218,7 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_renew_package_selection' || $state['state_name'] === 'renew.await_package') {
+        if ($state['state_name'] === 'await_renew_tariff_selection' || $state['state_name'] === 'renew.await_tariff') {
             $this->handleRenewPackageSelectionState($chatId, $userId, $text, $state);
             return;
         }
@@ -387,7 +387,7 @@ final class MessageHandler
             $paymentId = $this->database->createPayment([
                 'kind' => 'wallet_charge',
                 'user_id' => $userId,
-                'package_id' => null,
+                'tariff_id' => null,
                 'amount' => $amount,
                 'payment_method' => 'card',
                 'status' => 'waiting_admin',
@@ -842,7 +842,7 @@ final class MessageHandler
                 return;
             }
             $payload = $state['payload'] ?? [];
-            $packageId = (int) ($payload['package_id'] ?? 0);
+            $packageId = (int) ($payload['tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.callback.deprecated_route'));
@@ -890,7 +890,7 @@ final class MessageHandler
                 return;
             }
             $payload = $state['payload'] ?? [];
-            $packageId = (int) ($payload['package_id'] ?? 0);
+            $packageId = (int) ($payload['tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $this->database->clearUserState($userId);
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.callback.deprecated_route'));
@@ -945,7 +945,7 @@ final class MessageHandler
             }
             $payload = $state['payload'] ?? [];
             $agentId = (int) ($payload['agent_id'] ?? 0);
-            $packageId = (int) ($payload['package_id'] ?? 0);
+            $packageId = (int) ($payload['tariff_id'] ?? 0);
             $price = (int) preg_replace('/\D+/', '', $text);
             if ($agentId <= 0 || $packageId <= 0 || $price <= 0) {
                 $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.valid_price_required'));
@@ -953,7 +953,7 @@ final class MessageHandler
             }
             $this->database->setAgencyPrice($agentId, $packageId, $price);
             $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.agent_price_saved', ['agent_id' => $agentId, 'package_id' => $packageId, 'price' => $price]));
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.agent_price_saved', ['agent_id' => $agentId, 'tariff_id' => $packageId, 'price' => $price]));
             return;
         }
 
@@ -3284,7 +3284,7 @@ final class MessageHandler
                     return;
                 }
                 if ($level === 'config_detail') {
-                    $packageId = (int) ($payload['package_id'] ?? 0);
+                    $packageId = (int) ($payload['tariff_id'] ?? 0);
                     $query = (string) ($payload['query'] ?? '');
                     $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query);
                     return;
@@ -3310,7 +3310,7 @@ final class MessageHandler
             }
 
             if ($level === 'configs') {
-                $packageId = (int) ($payload['package_id'] ?? 0);
+                $packageId = (int) ($payload['tariff_id'] ?? 0);
                 $query = (string) ($payload['query'] ?? '');
                 if ($text === $this->uiConst(self::ADMIN_STOCK_REFRESH)) {
                     $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query);
@@ -3319,7 +3319,7 @@ final class MessageHandler
                 if ($text === $this->uiConst(self::ADMIN_STOCK_ADD_CONFIG)) {
                     $this->database->setUserState($userId, 'admin.stock.update', [
                         'mode' => 'add_config',
-                        'package_id' => $packageId,
+                        'tariff_id' => $packageId,
                         'stack' => ['admin.stock.view', 'admin.root'],
                     ]);
                     $this->telegram->sendMessage(
@@ -3332,7 +3332,7 @@ final class MessageHandler
                 if ($text === $this->uiConst(self::ADMIN_STOCK_SEARCH)) {
                     $this->database->setUserState($userId, 'admin.stock.update', [
                         'mode' => 'search',
-                        'package_id' => $packageId,
+                        'tariff_id' => $packageId,
                         'query' => $query,
                         'stack' => ['admin.stock.view', 'admin.root'],
                     ]);
@@ -3359,7 +3359,7 @@ final class MessageHandler
             }
 
             if ($level === 'config_detail') {
-                $packageId = (int) ($payload['package_id'] ?? 0);
+                $packageId = (int) ($payload['tariff_id'] ?? 0);
                 $configId = (int) ($payload['config_id'] ?? 0);
                 $query = (string) ($payload['query'] ?? '');
                 if ($text === $this->uiConst(self::ADMIN_STOCK_EXPIRE_TOGGLE)) {
@@ -3389,7 +3389,7 @@ final class MessageHandler
 
         if ($stateName === 'admin.stock.update') {
             $mode = (string) ($payload['mode'] ?? '');
-            $packageId = (int) ($payload['package_id'] ?? 0);
+            $packageId = (int) ($payload['tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $query = (string) ($payload['query'] ?? '');
                 $this->openAdminStockConfigsView($chatId, $userId, 0, $packageId, $query);
@@ -3528,7 +3528,7 @@ final class MessageHandler
             }
             $available = $this->database->countAvailableConfigsForPackage($packageId);
             $name = trim((string) ($pkg['name'] ?? $this->catalog->get('admin.ui.open.stock.packages.default_name')));
-            $lines[] = $this->catalog->get('admin.ui.open.stock.packages.row', ['num' => $num, 'name' => $name, 'package_id' => $packageId, 'available' => $available]);
+            $lines[] = $this->catalog->get('admin.ui.open.stock.packages.row', ['num' => $num, 'name' => $name, 'tariff_id' => $packageId, 'available' => $available]);
             $options[$num] = $packageId;
             $buttons[] = [$this->catalog->get('admin.ui.open.stock.packages.button', ['num' => $num, 'name' => $name])];
         }
@@ -3580,7 +3580,7 @@ final class MessageHandler
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.stock.view', [
             'level' => 'configs',
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'query' => $query,
             'options' => $options,
             'stack' => ['admin.stock.view', 'admin.root'],
@@ -3592,7 +3592,7 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->messageRenderer->render('admin.ui.open.stock.configs.overview', [
-                'package_id' => $packageId,
+                'tariff_id' => $packageId,
                 'query_view' => $queryView,
                 'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.stock.configs.empty'),
             ], ['query_view', 'list']),
@@ -3617,7 +3617,7 @@ final class MessageHandler
         }
         $this->database->setUserState($userId, 'admin.stock.view', [
             'level' => 'config_detail',
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'config_id' => $configId,
             'query' => $query,
             'stack' => ['admin.stock.view', 'admin.root'],
@@ -4665,14 +4665,14 @@ final class MessageHandler
             $selected = $this->extractOptionKey($text);
                 $pkgId = isset($options[$selected]) ? (int) $options[$selected] : 0;
                 if ($pkgId > 0) {
-                    $this->database->setUserState($userId, 'admin.agent.edit', ['agent_id' => $agentId, 'package_id' => $pkgId]);
+                    $this->database->setUserState($userId, 'admin.agent.edit', ['agent_id' => $agentId, 'tariff_id' => $pkgId]);
                     $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.prompts.agent_price_input'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                     return;
                 }
             }
         if ($stateName === 'admin.agent.edit') {
             $agentId = (int) ($payload['agent_id'] ?? 0);
-            $pkgId = (int) ($payload['package_id'] ?? 0);
+            $pkgId = (int) ($payload['tariff_id'] ?? 0);
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminAgentView($chatId, $userId, $agentId);
                 return;
@@ -5161,7 +5161,7 @@ final class MessageHandler
             if ($id <= 0) {
                 continue;
             }
-            $lines[] = $this->catalog->get('admin.ui.open.deliveries.list.row', ['num' => $num, 'order_id' => $id, 'user_id' => (int) ($ord['user_id'] ?? 0), 'package_id' => (int) ($ord['package_id'] ?? 0)]);
+            $lines[] = $this->catalog->get('admin.ui.open.deliveries.list.row', ['num' => $num, 'order_id' => $id, 'user_id' => (int) ($ord['user_id'] ?? 0), 'tariff_id' => (int) ($ord['tariff_id'] ?? 0)]);
             $options[$num] = $id;
             $buttons[] = [$this->catalog->get('admin.ui.open.deliveries.list.button', ['num' => $num, 'order_id' => $id])];
         }
@@ -5279,7 +5279,7 @@ final class MessageHandler
         }
 
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'buy.await_package', ['options' => $optionMap, 'stack' => ['buy.await_package'], 'package_id' => null, 'payment_method' => null]);
+        $this->database->setUserState($userId, 'buy.await_tariff', ['options' => $optionMap, 'stack' => ['buy.await_tariff'], 'tariff_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
             $this->messageRenderer->render('messages.user.buy.package_selection.overview', [
@@ -5589,7 +5589,7 @@ final class MessageHandler
         if ($this->settings->get('purchase_rules_enabled', '0') === '1' && !$this->database->hasAcceptedPurchaseRules($userId)) {
             $rulesText = trim($this->settings->get('purchase_rules_text', ''));
             $rulesText = $rulesText !== '' ? $rulesText : $this->catalog->get('messages.user.buy.rules.default_text');
-            $this->database->setUserState($userId, 'buy.await_rules_accept', ['package_id' => $packageId, 'stack' => ['buy.await_package'], 'payment_method' => null]);
+            $this->database->setUserState($userId, 'buy.await_rules_accept', ['tariff_id' => $packageId, 'stack' => ['buy.await_tariff'], 'payment_method' => null]);
             $this->telegram->sendMessage(
                 $chatId,
                 $this->messageRenderer->render('messages.user.buy.rules.overview', [
@@ -5601,7 +5601,7 @@ final class MessageHandler
         }
 
         $this->database->clearUserState($userId);
-        $package = $this->database->getPackage($packageId);
+        $package = $this->database->getServiceTariff($packageId);
         if ($package === null) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.package_not_found'));
             return;
@@ -5627,7 +5627,7 @@ final class MessageHandler
             $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'buy.await_payment_method', ['package_id' => $packageId, 'stack' => ['buy.await_package'], 'payment_method' => null, 'gateway' => null]);
+        $this->database->setUserState($userId, 'buy.await_payment_method', ['tariff_id' => $packageId, 'stack' => ['buy.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
 
@@ -5660,7 +5660,7 @@ final class MessageHandler
         }
 
         $buttons[] = [UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'renew.await_purchase', ['options' => $optionMap, 'stack' => [], 'purchase_id' => null, 'package_id' => null, 'payment_method' => null]);
+        $this->database->setUserState($userId, 'renew.await_purchase', ['options' => $optionMap, 'stack' => [], 'purchase_id' => null, 'tariff_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
             $this->messageRenderer->render('messages.user.renew.select_order.overview', [
@@ -5723,7 +5723,7 @@ final class MessageHandler
         }
 
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'renew.await_package', ['options' => $optionMap, 'purchase_id' => $purchaseId, 'stack' => ['renew.await_purchase'], 'package_id' => null, 'payment_method' => null]);
+        $this->database->setUserState($userId, 'renew.await_tariff', ['options' => $optionMap, 'purchase_id' => $purchaseId, 'stack' => ['renew.await_purchase'], 'tariff_id' => null, 'payment_method' => null]);
         $this->telegram->sendMessage(
             $chatId,
             $this->messageRenderer->render('messages.user.renew.select_package.overview', [
@@ -5758,7 +5758,7 @@ final class MessageHandler
         }
 
         $this->database->clearUserState($userId);
-        $package = $this->database->getPackage($packageId);
+        $package = $this->database->getServiceTariff($packageId);
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         if ($package === null || !is_array($purchase)) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.invalid_data'));
@@ -5787,7 +5787,7 @@ final class MessageHandler
             $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'renew.await_payment_method', ['purchase_id' => $purchaseId, 'package_id' => $packageId, 'stack' => ['renew.await_purchase', 'renew.await_package'], 'payment_method' => null, 'gateway' => null]);
+        $this->database->setUserState($userId, 'renew.await_payment_method', ['purchase_id' => $purchaseId, 'tariff_id' => $packageId, 'stack' => ['renew.await_purchase', 'renew.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
 
@@ -5802,7 +5802,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
-        $packageId = (int) ($state['payload']['package_id'] ?? 0);
+        $packageId = (int) ($state['payload']['tariff_id'] ?? 0);
         if ($packageId <= 0) {
             $this->database->clearUserState($userId);
             return;
@@ -5813,7 +5813,7 @@ final class MessageHandler
 
         if ($text === $this->catalog->get('buttons.pay.wallet') || $text === $this->uiConst(self::PAY_WALLET)) {
             $this->database->clearUserState($userId);
-            $result = $this->database->walletPayPackage($userId, $packageId);
+            $result = $this->database->walletPayServiceTariff($userId, $packageId);
             if (!($result['ok'] ?? false)) {
                 $msg = match ($result['error'] ?? '') {
                     'insufficient_balance' => $this->catalog->get('messages.user.payment.errors.insufficient_balance'),
@@ -5824,7 +5824,7 @@ final class MessageHandler
                 return;
             }
             $this->database->setUserState($userId, 'buy.done', [
-                'package_id' => $packageId,
+                'tariff_id' => $packageId,
                 'payment_method' => 'wallet',
                 'gateway' => null,
             ]);
@@ -6147,7 +6147,7 @@ final class MessageHandler
             return;
         }
         $purchaseId = (int) ($state['payload']['purchase_id'] ?? 0);
-        $packageId = (int) ($state['payload']['package_id'] ?? 0);
+        $packageId = (int) ($state['payload']['tariff_id'] ?? 0);
         if ($purchaseId <= 0 || $packageId <= 0) {
             $this->database->clearUserState($userId);
             return;
@@ -6168,7 +6168,7 @@ final class MessageHandler
             }
             $this->database->setUserState($userId, 'renew.done', [
                 'purchase_id' => $purchaseId,
-                'package_id' => $packageId,
+                'tariff_id' => $packageId,
                 'payment_method' => 'wallet',
                 'gateway' => null,
             ]);
@@ -6202,7 +6202,7 @@ final class MessageHandler
     private function createPurchasePaymentByMethod(int $chatId, int $userId, int $packageId, string $methodLabel): void
     {
         $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
-        $package = $this->database->getPackage($packageId);
+        $package = $this->database->getServiceTariff($packageId);
         if ($package === null) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.package_not_found'));
             return;
@@ -6212,7 +6212,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
@@ -6221,7 +6221,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'payment_id' => $paymentId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
@@ -6267,7 +6267,7 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $authority);
         }
         $payUrl = (string) ($tp['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_purchase'), 'package_id' => $packageId, 'payment_method' => 'tetrapay']);
+        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_purchase'), 'tariff_id' => $packageId, 'payment_method' => 'tetrapay']);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
     }
 
@@ -6284,7 +6284,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
@@ -6293,7 +6293,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'order_mode' => 'panel_only',
             'service_id' => $serviceId,
             'selected_volume_gb' => $selectedVolumeGb,
@@ -6369,7 +6369,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'amount' => $amount,
@@ -6380,7 +6380,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'selected_volume_gb' => $selectedVolumeGb,
@@ -6438,7 +6438,7 @@ final class MessageHandler
     {
         $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
-        $package = $this->database->getPackage($packageId);
+        $package = $this->database->getServiceTariff($packageId);
         if (!is_array($purchase) || $package === null) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.renew.invalid_data'));
             return;
@@ -6448,7 +6448,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'renewal',
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
@@ -6457,7 +6457,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'payment_id' => $paymentId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
@@ -6503,14 +6503,14 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $authority);
         }
         $payUrl = (string) ($tp['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => 'tetrapay']);
+        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $packageId, 'payment_method' => 'tetrapay']);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_renew'), $pendingId, $amount, $payUrl);
     }
 
     private function createPurchaseGatewayInvoice(int $chatId, int $userId, int $packageId, string $methodLabel): void
     {
         $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
-        $package = $this->database->getPackage($packageId);
+        $package = $this->database->getServiceTariff($packageId);
         if ($package === null) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.package_not_found'));
             return;
@@ -6519,7 +6519,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'amount' => $amount,
             'payment_method' => $gateway,
             'status' => 'waiting_gateway',
@@ -6527,7 +6527,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'payment_id' => $paymentId,
             'amount' => $amount,
             'payment_method' => $gateway,
@@ -6545,7 +6545,7 @@ final class MessageHandler
                 $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
             }
             $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'package_id' => $packageId, 'payment_method' => $gateway]);
+            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'tariff_id' => $packageId, 'payment_method' => $gateway]);
             $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_purchase'), $pendingId, $amount, $payUrl);
             return;
         }
@@ -6559,7 +6559,7 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
         }
         $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'package_id' => $packageId, 'payment_method' => $gateway]);
+        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'tariff_id' => $packageId, 'payment_method' => $gateway]);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
     }
 
@@ -6575,7 +6575,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'amount' => $amount,
             'payment_method' => $gateway,
             'status' => 'waiting_gateway',
@@ -6583,7 +6583,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'order_mode' => 'panel_only',
             'service_id' => $serviceId,
             'selected_volume_gb' => $selectedVolumeGb,
@@ -6647,7 +6647,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'amount' => $amount,
@@ -6657,7 +6657,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => null,
+            'tariff_id' => null,
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'selected_volume_gb' => $selectedVolumeGb,
@@ -6702,7 +6702,7 @@ final class MessageHandler
     private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $packageId, string $methodLabel): void
     {
         $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
-        $package = $this->database->getPackage($packageId);
+        $package = $this->database->getServiceTariff($packageId);
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         if ($package === null || !is_array($purchase)) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.renew.invalid_data'));
@@ -6712,7 +6712,7 @@ final class MessageHandler
         $paymentId = $this->database->createPayment([
             'kind' => 'renewal',
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'amount' => $amount,
             'payment_method' => $gateway,
             'status' => 'waiting_gateway',
@@ -6720,7 +6720,7 @@ final class MessageHandler
         ]);
         $pendingId = $this->database->createPendingOrder([
             'user_id' => $userId,
-            'package_id' => $packageId,
+            'tariff_id' => $packageId,
             'payment_id' => $paymentId,
             'amount' => $amount,
             'payment_method' => $gateway,
@@ -6738,7 +6738,7 @@ final class MessageHandler
                 $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
             }
             $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => $gateway]);
+            $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $packageId, 'payment_method' => $gateway]);
             $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_renew'), $pendingId, $amount, $payUrl);
             return;
         }
@@ -6752,7 +6752,7 @@ final class MessageHandler
             $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
         }
         $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_renew'), 'purchase_id' => $purchaseId, 'package_id' => $packageId, 'payment_method' => $gateway]);
+        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $packageId, 'payment_method' => $gateway]);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_renew'), $pendingId, $amount, $payUrl);
     }
 
@@ -6791,14 +6791,14 @@ final class MessageHandler
             if ($changed) {
                 if ((string) ($payment['kind'] ?? '') === 'purchase') {
                     $this->database->setUserState($userId, 'buy.done', [
-                        'package_id' => (int) ($state['payload']['package_id'] ?? 0),
+                        'tariff_id' => (int) ($state['payload']['tariff_id'] ?? 0),
                         'payment_method' => (string) ($state['payload']['payment_method'] ?? ''),
                         'gateway' => $gateway,
                     ]);
                 } elseif ((string) ($payment['kind'] ?? '') === 'renewal') {
                     $this->database->setUserState($userId, 'renew.done', [
                         'purchase_id' => (int) ($state['payload']['purchase_id'] ?? 0),
-                        'package_id' => (int) ($state['payload']['package_id'] ?? 0),
+                        'tariff_id' => (int) ($state['payload']['tariff_id'] ?? 0),
                         'payment_method' => (string) ($state['payload']['payment_method'] ?? ''),
                         'gateway' => $gateway,
                     ]);
@@ -6831,7 +6831,7 @@ final class MessageHandler
                 $this->openPanelServiceSelection($chatId, $userId);
                 return;
             }
-            $packageId = (int) ($state['payload']['package_id'] ?? 0);
+            $packageId = (int) ($state['payload']['tariff_id'] ?? 0);
             if ($packageId > 0) {
                 $this->startBuyTypeReplyFlow($chatId, $userId);
                 return;
@@ -6870,14 +6870,14 @@ final class MessageHandler
             $this->openServicePaymentSelection($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb);
             return;
         }
-        $packageId = (int) ($state['payload']['package_id'] ?? 0);
+        $packageId = (int) ($state['payload']['tariff_id'] ?? 0);
         if ($packageId <= 0) {
             $this->database->clearUserState($userId);
             return;
         }
         $this->database->acceptPurchaseRules($userId);
         $this->database->clearUserState($userId);
-        $package = $this->database->getPackage($packageId);
+        $package = $this->database->getServiceTariff($packageId);
         if ($package === null) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.package_not_found'));
             return;
@@ -6903,7 +6903,7 @@ final class MessageHandler
             $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'buy.await_payment_method', ['package_id' => $packageId, 'stack' => ['buy.await_package'], 'payment_method' => null, 'gateway' => null]);
+        $this->database->setUserState($userId, 'buy.await_payment_method', ['tariff_id' => $packageId, 'stack' => ['buy.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
 

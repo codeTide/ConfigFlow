@@ -60,45 +60,34 @@ CREATE TABLE IF NOT EXISTS service_tariff (
     INDEX idx_service_tariff_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS packages (
+CREATE TABLE IF NOT EXISTS service_stock_items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    volume_gb DECIMAL(10,2) NOT NULL,
-    duration_days INT NOT NULL,
-    price INT NOT NULL,
-    active TINYINT(1) NOT NULL DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS configs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    package_id BIGINT NULL,
-    service_id BIGINT NULL,
+    service_id BIGINT NOT NULL,
     tariff_id BIGINT NULL,
     inventory_bucket VARCHAR(32) NOT NULL DEFAULT 'sale',
-    service_name VARCHAR(255) NOT NULL,
-    config_text TEXT NOT NULL,
-    inquiry_link TEXT NULL,
+    sub_link TEXT NOT NULL,
+    access_url TEXT NULL,
+    config_uuid VARCHAR(191) NULL,
+    volume_gb DECIMAL(10,2) NULL,
+    duration_days INT NULL,
+    raw_payload LONGTEXT NULL,
     created_at DATETIME NOT NULL,
     reserved_payment_id BIGINT NULL,
     sold_to BIGINT NULL,
     purchase_id BIGINT NULL,
     sold_at DATETIME NULL,
     is_expired TINYINT(1) NOT NULL DEFAULT 0,
-    INDEX idx_configs_package (package_id),
-    INDEX idx_configs_service (service_id),
-    INDEX idx_configs_tariff (tariff_id),
-    INDEX idx_configs_inventory_bucket (inventory_bucket),
-    INDEX idx_configs_sold (sold_to),
-    INDEX idx_configs_available (package_id, sold_to, reserved_payment_id, is_expired)
+    INDEX idx_stock_service (service_id),
+    INDEX idx_stock_tariff (tariff_id),
+    INDEX idx_stock_bucket (inventory_bucket),
+    INDEX idx_stock_available (service_id, tariff_id, inventory_bucket, sold_to, reserved_payment_id, is_expired)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS purchases (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    package_id BIGINT NULL,
     service_id BIGINT NULL,
     tariff_id BIGINT NULL,
-    config_id BIGINT NOT NULL,
     amount INT NOT NULL,
     payment_method VARCHAR(64) NOT NULL,
     created_at DATETIME NOT NULL,
@@ -147,7 +136,6 @@ CREATE TABLE IF NOT EXISTS payments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     kind VARCHAR(32) NOT NULL,
     user_id BIGINT NOT NULL,
-    package_id BIGINT NULL,
     service_id BIGINT NULL,
     tariff_id BIGINT NULL,
     amount INT NOT NULL,
@@ -174,7 +162,6 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE TABLE IF NOT EXISTS pending_orders (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    package_id BIGINT NULL,
     order_mode VARCHAR(32) NOT NULL DEFAULT 'stock_only',
     service_id BIGINT NULL,
     tariff_id BIGINT NULL,
@@ -206,19 +193,20 @@ CREATE TABLE IF NOT EXISTS admin_users (
     permissions TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS agency_prices (
+CREATE TABLE IF NOT EXISTS agency_service_prices (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    package_id BIGINT NOT NULL,
+    service_id BIGINT NOT NULL,
+    tariff_id BIGINT NOT NULL,
     price INT NOT NULL,
-    UNIQUE KEY uniq_agency_price (user_id, package_id),
-    INDEX idx_agency_user (user_id),
-    INDEX idx_agency_package (package_id)
+    UNIQUE KEY uniq_agency_service_price (user_id, service_id, tariff_id),
+    INDEX idx_agency_service_price_user (user_id),
+    INDEX idx_agency_service_price_service (service_id, tariff_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS agency_price_config (
     user_id BIGINT PRIMARY KEY,
-    price_mode VARCHAR(32) NOT NULL DEFAULT 'package',
+    price_mode VARCHAR(32) NOT NULL DEFAULT 'service',
     global_type VARCHAR(16) NOT NULL DEFAULT 'pct',
     global_val INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -252,21 +240,23 @@ CREATE TABLE IF NOT EXISTS purchase_rule_acceptances (
     accepted_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS provisioning_services (
+CREATE TABLE IF NOT EXISTS user_service_deliveries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    description TEXT NULL,
-    min_gb DECIMAL(10,2) NOT NULL,
-    max_gb DECIMAL(10,2) NOT NULL,
-    step_gb DECIMAL(10,2) NOT NULL DEFAULT 1,
-    price_per_gb INT NOT NULL,
-    duration_policy VARCHAR(32) NOT NULL DEFAULT 'fixed_days',
+    purchase_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    service_id BIGINT NOT NULL,
+    tariff_id BIGINT NOT NULL,
+    source_type ENUM('stock','panel') NOT NULL,
+    stock_item_id BIGINT NULL,
+    sub_link TEXT NOT NULL,
+    access_url TEXT NULL,
+    config_uuid VARCHAR(191) NULL,
+    volume_gb DECIMAL(10,2) NULL,
     duration_days INT NULL,
-    provider VARCHAR(64) NOT NULL DEFAULT 'pasarguard',
-    provider_group_ids TEXT NOT NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-    INDEX idx_provisioning_services_active (is_active),
-    INDEX idx_provisioning_services_provider (provider)
+    delivered_at DATETIME NOT NULL,
+    meta_json LONGTEXT NULL,
+    INDEX idx_deliveries_purchase (purchase_id),
+    INDEX idx_deliveries_user (user_id),
+    INDEX idx_deliveries_service (service_id, tariff_id),
+    INDEX idx_deliveries_source (source_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
