@@ -784,15 +784,7 @@
         "service_tariff_status": "📊 وضعیت",
         "service_tariffs_list": "🧾 تعرفه‌های سرویس",
         "service_tariff_delete": "🗑 حذف",
-        "skip": "⏭ رد شدن",
-        "service_free_test": "🎁 تست رایگان",
-        "service_free_test_toggle": "🔁 فعال/غیرفعال",
-        "service_free_test_mode": "🧭 مدل دریافت",
-        "service_free_test_max": "🔢 سقف دریافت",
-        "service_free_test_cooldown": "📅 فاصله زمانی",
-        "service_free_test_reset": "🧹 ریست سهمیه",
-        "service_free_test_refresh": "📊 وضعیت",
-        "service_free_test_stock_add": "➕ افزودن موجودی تست رایگان"
+        "skip": "⏭ رد شدن"
       },
       "create_type": {
         "overview": "🆕 <b>افزودن نوع سرویس</b>\n\n✍️ راهنما: نام نوع سرویس جدید را ارسال کنید.\n\n<blockquote>💡 بعد از ثبت، به لیست نوع‌ها برمی‌گردید و می‌توانید پکیج‌های مرتبط را مدیریت کنید.</blockquote>"
@@ -845,15 +837,6 @@
           "summary_label": "💡 خلاصه",
           "summary_tip": "💡 برای ثبت نهایی، «تایید» را ارسال کنید.",
           "summary_template": "💡 عنوان: {name}\nحجم: {volume} GB\nمدت: {duration} روز\nقیمت: {price} تومان"
-        },
-        "free_test_wizard": {
-          "claim_mode": "🧭 <b>مدل دریافت تست رایگان را انتخاب کنید:</b>\n\n🎯 یکی از دو حالت «cooldown» یا «once_until_reset» را انتخاب کنید.\n\n<blockquote>💡 در حالت cooldown کاربر با فاصله زمانی می‌تواند دوباره دریافت کند؛ در حالت once_until_reset فقط یک بار تا زمان ریست ادمین مجاز است.</blockquote>",
-          "mode_cooldown": "🧭 cooldown",
-          "mode_once": "🧭 once_until_reset",
-          "max_claims": "🔢 <b>سقف دریافت را وارد کنید:</b>\n\n📌 تعداد مجاز دریافت کاربر را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار برای کنترل تعداد claim هر کاربر روی همین سرویس استفاده می‌شود.</blockquote>",
-          "cooldown_days": "📅 <b>فاصله زمانی را وارد کنید:</b>\n\n📌 تعداد روز cooldown را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار فقط در مدل cooldown استفاده می‌شود.</blockquote>",
-          "reset_user": "🧹 <b>آیدی کاربر برای ریست سهمیه را وارد کنید:</b>\n\n📌 آیدی عددی کاربر را ارسال کنید:\n\n<blockquote>💡 با این عملیات history تست رایگان همان کاربر فقط در همین سرویس پاک می‌شود.</blockquote>",
-          "stock_payload": "📦 <b>ثبت موجودی تست رایگان:</b>\n\n📝 لطفاً اطلاعات را در ۵ خط و با جداکننده <code>---</code> ارسال کنید:\nنام نمایشی\n---\nحجم\n---\nمدت‌زمان\n---\nلینک ساب\n---\nلینک تکی کانفیگ\n\n<blockquote>💡 هر ۵ بخش الزامی است و موجودی در باکت تست رایگان ذخیره می‌شود.</blockquote>"
         }
       },
       "messages": {
@@ -956,10 +939,41 @@
         "tariff_created": "✅ تعرفه ثبت شد.",
         "tariff_updated": "✅ تعرفه بروزرسانی شد.",
         "tariff_deleted": "✅ تعرفه حذف شد.",
-        "service_stock_added": "✅ موجودی سرویس با شناسه <code>{config_id}</code> ثبت شد.",
-        "service_free_test_rule_saved": "✅ تنظیمات تست رایگان سرویس ذخیره شد.",
-        "service_free_test_quota_reset": "✅ سهمیه تست رایگان کاربر <code>{target_user_id}</code> برای این سرویس ریست شد.",
-        "service_free_test_stock_added": "✅ موجودی تست رایگان با شناسه <code>{config_id}</code> ثبت شد."
+        "service_stock_added": "✅ موجودی سرویس با شناسه <code>{config_id}</code> ثبت شد."
+      }
+    },
+    "services": {
+      "actions": {
+        "free_test": "🎁 تست رایگان",
+        "free_test_toggle": "🔁 فعال/غیرفعال",
+        "free_test_mode": "🧭 مدل دریافت",
+        "free_test_max_claims": "🔢 سقف دریافت",
+        "free_test_cooldown": "📅 فاصله زمانی",
+        "free_test_stock_add": "➕ افزودن موجودی تست رایگان",
+        "free_test_reset": "🧹 ریست سهمیه",
+        "free_test_status": "📊 وضعیت"
+      },
+      "messages": {
+        "free_test_overview": "🎁 <b>مدیریت تست رایگان سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📶 وضعیت تست رایگان: {is_enabled}\n🧭 مدل دریافت: <b>{claim_mode}</b>\n📅 فاصله زمانی: <b>{cooldown_days}</b>\n🔢 سقف دریافت: <b>{max_claims}</b>\n🧾 تعداد claimهای ثبت‌شده: <b>{claim_count}</b>\n📚 موجودی آزاد قابل تحویل: <b>{stock_count}</b>\n\n<blockquote>💡 از دکمه‌های پایین می‌توانید تنظیمات دریافت را مرحله‌ای مدیریت کنید و سهمیه کاربر را برای همین سرویس ریست کنید.</blockquote>"
+      },
+      "prompts": {
+        "free_test_mode": "🧭 <b>مدل دریافت تست رایگان را انتخاب کنید:</b>\n\n🎯 یکی از دو حالت «⏱️ دوره‌ای» یا «1️⃣ یک‌بار تا ریست» را انتخاب کنید:\n\n<blockquote>💡 در حالت دوره‌ای، کاربر با فاصله زمانی می‌تواند دوباره دریافت کند؛ در حالت یک‌بار تا ریست، فقط یک بار تا زمان ریست ادمین مجاز است.</blockquote>",
+        "free_test_mode_cooldown": "⏱️ دوره‌ای",
+        "free_test_mode_once": "1️⃣ یک‌بار تا ریست",
+        "free_test_max_claims": "🔢 <b>سقف دریافت را وارد کنید:</b>\n\n📌 تعداد مجاز دریافت کاربر را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار برای کنترل تعداد claim هر کاربر روی همین سرویس استفاده می‌شود.</blockquote>",
+        "free_test_cooldown_days": "📅 <b>فاصله زمانی را وارد کنید:</b>\n\n📌 تعداد روز فاصله زمانی را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 این مقدار فقط در مدل دریافت دوره‌ای استفاده می‌شود.</blockquote>",
+        "free_test_reset_user": "🧹 <b>آیدی کاربر برای ریست سهمیه را وارد کنید:</b>\n\n📌 آیدی عددی کاربر را ارسال کنید:\n\n<blockquote>💡 با این عملیات history تست رایگان همان کاربر فقط در همین سرویس پاک می‌شود.</blockquote>",
+        "free_test_stock_name": "📝 <b>نام نمایشی را وارد کنید:</b>\n\n📌 نام باید خالی نباشد:\n\n<blockquote>💡 این نام در لیست موجودی تست رایگان نمایش داده می‌شود.</blockquote>",
+        "free_test_stock_volume": "📦 <b>حجم را وارد کنید:</b>\n\n📌 مقدار حجم معتبر (مثلاً 50GB یا 50) را ارسال کنید:\n\n<blockquote>💡 حجم باید معتبر و بزرگ‌تر از صفر باشد.</blockquote>",
+        "free_test_stock_duration": "⏳ <b>مدت‌زمان را وارد کنید:</b>\n\n📌 تعداد روز را به‌صورت عدد صحیح ارسال کنید:\n\n<blockquote>💡 مدت‌زمان باید معتبر و بزرگ‌تر از صفر باشد.</blockquote>",
+        "free_test_stock_sub_link": "🔗 <b>لینک ساب را وارد کنید:</b>\n\n📌 لینک نباید خالی باشد:\n\n<blockquote>💡 این لینک به‌عنوان inquiry_link موجودی تست رایگان ذخیره می‌شود.</blockquote>",
+        "free_test_stock_config_link": "🔐 <b>لینک تکی کانفیگ را وارد کنید:</b>\n\n📌 لینک نباید خالی باشد:\n\n<blockquote>💡 این لینک داخل متن کانفیگ تست رایگان قرار می‌گیرد.</blockquote>",
+        "free_test_stock_confirm": "🧾 <b>پیش‌نمایش موجودی تست رایگان</b>\n\n📝 نام نمایشی: <b>{display_name}</b>\n📦 حجم: <b>{volume}</b>\n⏳ مدت‌زمان: <b>{duration}</b>\n🔗 لینک ساب: <code>{sub_link}</code>\n🔐 لینک تکی کانفیگ: <code>{single_config_link}</code>\n\n<blockquote>✅ اگر اطلاعات بالا کاملاً درست است، روی «✅ تایید» بزنید تا موجودی تست رایگان ثبت شود.</blockquote>"
+      },
+      "success": {
+        "free_test_rule_saved": "✅ تنظیمات تست رایگان سرویس ذخیره شد.",
+        "free_test_quota_reset": "✅ سهمیه تست رایگان کاربر <code>{target_user_id}</code> برای این سرویس ریست شد.",
+        "free_test_stock_added": "✅ موجودی تست رایگان با شناسه <code>{config_id}</code> ثبت شد."
       }
     },
     "ui": {
@@ -1181,9 +1195,6 @@
         "groupops": {
           "group_id_unset": "❌ تنظیم نشده",
           "overview": "🗂 <b>گروه/بکاپ</b>\n\n🧩 Group ID فعلی: {group_id}\n\n<blockquote>💡 بازیابی تنظیمات فقط با JSON معتبر انجام می‌شود.</blockquote>"
-        },
-        "service_free_test": {
-          "overview": "🎁 <b>مدیریت تست رایگان سرویس</b>\n\n🧩 سرویس: <b>{service_name}</b>\n📶 وضعیت تست رایگان: {is_enabled}\n🧭 مدل دریافت: <b>{claim_mode}</b>\n📅 فاصله زمانی: <b>{cooldown_days}</b>\n🔢 سقف دریافت: <b>{max_claims}</b>\n🧾 تعداد claimهای ثبت‌شده: <b>{claim_count}</b>\n📚 موجودی آزاد قابل تحویل: <b>{stock_count}</b>\n\n<blockquote>💡 از دکمه‌های پایین می‌توانید تنظیمات دریافت را مرحله‌ای مدیریت کنید و سهمیه کاربر را برای همین سرویس ریست کنید.</blockquote>"
         }
       },
       "audit": {
