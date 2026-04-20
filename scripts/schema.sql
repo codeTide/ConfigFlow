@@ -248,10 +248,10 @@ CREATE TABLE IF NOT EXISTS user_service_deliveries (
     service_id BIGINT NOT NULL,
     tariff_id BIGINT NULL,
     source_type ENUM('stock','panel') NOT NULL,
+    is_test TINYINT(1) NOT NULL DEFAULT 0,
     stock_item_id BIGINT NULL,
+    subscription_token VARCHAR(64) NOT NULL,
     sub_link TEXT NOT NULL,
-    access_url TEXT NULL,
-    stock_item_uuid VARCHAR(191) NULL,
     volume_gb DECIMAL(10,2) NULL,
     duration_days INT NULL,
     delivered_at DATETIME NOT NULL,
@@ -259,5 +259,6 @@ CREATE TABLE IF NOT EXISTS user_service_deliveries (
     INDEX idx_deliveries_purchase (purchase_id),
     INDEX idx_deliveries_user (user_id),
     INDEX idx_deliveries_service (service_id, tariff_id),
-    INDEX idx_deliveries_source (source_type)
+    INDEX idx_deliveries_source (source_type),
+    UNIQUE KEY uq_deliveries_subscription_token (subscription_token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
