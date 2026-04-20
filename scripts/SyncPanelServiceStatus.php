@@ -507,15 +507,14 @@ function evaluatePanelDeliveryAlerts(
 
     if ($dataLimit > 0) {
         $usageRatio = $usedTraffic / $dataLimit;
-        if ($usageRatio >= 0.80 && empty($state['usage_80_sent_at'])) {
-            if (sendPanelDeliveryAlert($telegram, $renderer, $userId, 'usage_80', $serviceName, $servicePublicId)) {
-                $state['usage_80_sent_at'] = gmdate('Y-m-d H:i:s');
+        if ($usageRatio >= 0.95) {
+            if (empty($state['usage_95_sent_at']) && sendPanelDeliveryAlert($telegram, $renderer, $userId, 'usage_95', $serviceName, $servicePublicId)) {
+                $state['usage_95_sent_at'] = gmdate('Y-m-d H:i:s');
                 $sent++;
             }
-        }
-        if ($usageRatio >= 0.95 && empty($state['usage_95_sent_at'])) {
-            if (sendPanelDeliveryAlert($telegram, $renderer, $userId, 'usage_95', $serviceName, $servicePublicId)) {
-                $state['usage_95_sent_at'] = gmdate('Y-m-d H:i:s');
+        } elseif ($usageRatio >= 0.80) {
+            if (empty($state['usage_80_sent_at']) && sendPanelDeliveryAlert($telegram, $renderer, $userId, 'usage_80', $serviceName, $servicePublicId)) {
+                $state['usage_80_sent_at'] = gmdate('Y-m-d H:i:s');
                 $sent++;
             }
         }
@@ -523,15 +522,14 @@ function evaluatePanelDeliveryAlerts(
 
     if ($expireEpoch > $now) {
         $remaining = $expireEpoch - $now;
-        if ($remaining <= 86400 && empty($state['expire_24h_sent_at'])) {
-            if (sendPanelDeliveryAlert($telegram, $renderer, $userId, 'expire_24h', $serviceName, $servicePublicId)) {
-                $state['expire_24h_sent_at'] = gmdate('Y-m-d H:i:s');
+        if ($remaining <= 21600) {
+            if (empty($state['expire_6h_sent_at']) && sendPanelDeliveryAlert($telegram, $renderer, $userId, 'expire_6h', $serviceName, $servicePublicId)) {
+                $state['expire_6h_sent_at'] = gmdate('Y-m-d H:i:s');
                 $sent++;
             }
-        }
-        if ($remaining <= 21600 && empty($state['expire_6h_sent_at'])) {
-            if (sendPanelDeliveryAlert($telegram, $renderer, $userId, 'expire_6h', $serviceName, $servicePublicId)) {
-                $state['expire_6h_sent_at'] = gmdate('Y-m-d H:i:s');
+        } elseif ($remaining <= 86400) {
+            if (empty($state['expire_24h_sent_at']) && sendPanelDeliveryAlert($telegram, $renderer, $userId, 'expire_24h', $serviceName, $servicePublicId)) {
+                $state['expire_24h_sent_at'] = gmdate('Y-m-d H:i:s');
                 $sent++;
             }
         }
