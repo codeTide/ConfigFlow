@@ -7,6 +7,8 @@ use ConfigFlow\Bot\Config;
 use ConfigFlow\Bot\Database;
 use ConfigFlow\Bot\PGClient;
 use ConfigFlow\Bot\TelegramClient;
+use ConfigFlow\Bot\UiJsonCatalog;
+use ConfigFlow\Bot\UiMessageRenderer;
 
 require_once __DIR__ . '/../src/Bootstrap.php';
 require_once __DIR__ . '/../src/Config.php';
@@ -14,12 +16,15 @@ require_once __DIR__ . '/../src/WorkerApiStore.php';
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/PGClient.php';
 require_once __DIR__ . '/../src/TelegramClient.php';
+require_once __DIR__ . '/../src/UiJsonCatalog.php';
+require_once __DIR__ . '/../src/UiMessageRenderer.php';
 
 Bootstrap::loadEnv(dirname(__DIR__) . '/.env');
 
 $database = new Database();
 $telegramToken = Config::botToken();
 $telegram = $telegramToken !== '' ? new TelegramClient($telegramToken) : null;
+$renderer = new UiMessageRenderer(new UiJsonCatalog());
 $deliveries = listPanelDeliveriesForStatusSync($database);
 if ($deliveries === []) {
     fwrite(STDOUT, "No panel deliveries to sync.\n");
@@ -27,7 +32,7 @@ if ($deliveries === []) {
 }
 
 $groups = groupPanelDeliveriesByConnection($deliveries);
-$summary = syncPanelDeliveryStatuses($database, $groups, $telegram);
+$summary = syncPanelDeliveryStatuses($database, $groups, $telegram, $renderer);
 fwrite(STDOUT, json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
 
 /**
@@ -74,7 +79,7 @@ function groupPanelDeliveriesByConnection(array $deliveries): array
  * @param array<string,array{connection:array<string,string>,deliveries:array<int,array<string,mixed>>}> $groups
  * @return array<string,int>
  */
-function syncPanelDeliveryStatuses(Database $database, array $groups, ?TelegramClient $telegram): array
+function syncPanelDeliveryStatuses(Database $database, array $groups, ?TelegramClient $telegram, UiMessageRenderer $renderer): array
 {
     $summary = [
         'connections' => count($groups),
@@ -107,7 +112,7 @@ function syncPanelDeliveryStatuses(Database $database, array $groups, ?TelegramC
         }
 
         foreach ($rows as $delivery) {
-            if (applyPanelUserStatusToDelivery($database, $delivery, $userMap, $telegram)) {
+            if (applyPanelUserStatusToDelivery($database, $delivery, $userMap, $telegram, $renderer)) {
                 $summary['notifications_sent']++;
             }
             $summary['deliveries_synced']++;
@@ -121,7 +126,7 @@ function syncPanelDeliveryStatuses(Database $database, array $groups, ?TelegramC
  * @param array<string,mixed> $delivery
  * @param array<string,array<string,mixed>> $userMap
  */
-function applyPanelUserStatusToDelivery(Database $database, array $delivery, array $userMap, ?TelegramClient $telegram): bool
+function applyPanelUserStatusToDelivery(Database $database, array $delivery, array $userMap, ?TelegramClient $telegram, UiMessageRenderer $renderer): bool
 {
     $deliveryId = (int) ($delivery['delivery_id'] ?? 0);
     if ($deliveryId <= 0) {
@@ -135,6 +140,7 @@ function applyPanelUserStatusToDelivery(Database $database, array $delivery, arr
     $previousStatus = trim((string) ($delivery['lifecycle_status'] ?? 'active'));
     $userId = (int) ($delivery['user_id'] ?? 0);
     $serviceName = trim((string) ($delivery['service_name'] ?? 'سرویس'));
+    $isTest = ((int) ($delivery['is_test'] ?? 0)) === 1;
 
     $panelUser = $userMap[$servicePublicId] ?? null;
     if (!is_array($panelUser)) {
@@ -146,7 +152,7 @@ function applyPanelUserStatusToDelivery(Database $database, array $delivery, arr
             'panel_user_missing',
             ['panel_username' => $servicePublicId]
         );
-        return notifyOnStatusChange($telegram, $userId, $servicePublicId, $serviceName, $previousStatus, $nextStatus);
+        return notifyOnStatusChange($telegram, $renderer, $userId, $servicePublicId, $serviceName, $isTest, $previousStatus, $nextStatus);
     }
 
     $expireRaw = $panelUser['expire'] ?? null;
@@ -195,7 +201,7 @@ function applyPanelUserStatusToDelivery(Database $database, array $delivery, arr
         ],
         $nextSubLink
     );
-    return notifyOnStatusChange($telegram, $userId, $servicePublicId, $serviceName, $previousStatus, $status);
+    return notifyOnStatusChange($telegram, $renderer, $userId, $servicePublicId, $serviceName, $isTest, $previousStatus, $status);
 }
 
 /**
@@ -244,9 +250,11 @@ function isPanelDisabled(string $rawStatus): bool
 
 function notifyOnStatusChange(
     ?TelegramClient $telegram,
+    UiMessageRenderer $renderer,
     int $userId,
     string $servicePublicId,
     string $serviceName,
+    bool $isTest,
     string $previousStatus,
     string $nextStatus
 ): bool {
@@ -265,7 +273,7 @@ function notifyOnStatusChange(
         return false;
     }
 
-    $message = buildStatusChangeMessage($nextStatus, $servicePublicId, $serviceName);
+    $message = buildStatusChangeMessage($renderer, $nextStatus, $servicePublicId, $serviceName, $isTest);
     if ($message === '') {
         return false;
     }
@@ -274,16 +282,23 @@ function notifyOnStatusChange(
     return true;
 }
 
-function buildStatusChangeMessage(string $nextStatus, string $servicePublicId, string $serviceName): string
+function buildStatusChangeMessage(UiMessageRenderer $renderer, string $nextStatus, string $servicePublicId, string $serviceName, bool $isTest): string
 {
     $serviceName = $serviceName !== '' ? $serviceName : 'سرویس شما';
     $servicePublicId = $servicePublicId !== '' ? $servicePublicId : '-';
-
-    return match ($nextStatus) {
-        'depleted' => "📦 سرویس شما به دلیل اتمام حجم غیرفعال شده است.\n\n🧩 نام سرویس: {$serviceName}\n🆔 شناسه سرویس: <code>{$servicePublicId}</code>\n\n<blockquote>💡 برای فعال‌سازی دوباره، از بخش خرید/تمدید اقدام کنید.</blockquote>",
-        'expired' => "⏳ سرویس شما به دلیل اتمام زمان منقضی شده است.\n\n🧩 نام سرویس: {$serviceName}\n🆔 شناسه سرویس: <code>{$servicePublicId}</code>\n\n<blockquote>💡 برای ادامه استفاده، سرویس را تمدید کنید.</blockquote>",
-        'deleted' => "🗑 سرویس شما دیگر در پنل پیدا نشد.\n\n🧩 نام سرویس: {$serviceName}\n🆔 شناسه سرویس: <code>{$servicePublicId}</code>\n\n<blockquote>💡 در صورت نیاز با پشتیبانی ارتباط بگیرید تا وضعیت سرویس بررسی شود.</blockquote>",
-        'disabled' => "🚫 سرویس شما غیرفعال شده است.\n\n🧩 نام سرویس: {$serviceName}\n🆔 شناسه سرویس: <code>{$servicePublicId}</code>\n\n<blockquote>💡 برای بررسی علت غیرفعال‌سازی، با پشتیبانی در ارتباط باشید.</blockquote>",
+    $key = match ($nextStatus) {
+        'depleted' => $isTest ? 'messages.user.panel_sync_notifications.depleted_test' : 'messages.user.panel_sync_notifications.depleted',
+        'expired' => $isTest ? 'messages.user.panel_sync_notifications.expired_test' : 'messages.user.panel_sync_notifications.expired',
+        'deleted' => $isTest ? 'messages.user.panel_sync_notifications.deleted_test' : 'messages.user.panel_sync_notifications.deleted',
+        'disabled' => $isTest ? 'messages.user.panel_sync_notifications.disabled_test' : 'messages.user.panel_sync_notifications.disabled',
         default => '',
     };
+    if ($key === '') {
+        return '';
+    }
+
+    return $renderer->render($key, [
+        'service_name' => $serviceName,
+        'service_public_id' => $servicePublicId,
+    ], ['service_name', 'service_public_id']);
 }

@@ -255,6 +255,16 @@
           "overview": "✅ سرویس شما انتخاب شد\n\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n🧩 نام سرویس: {service_name}\n🔌 نوع تحویل: {source_type}\n🕒 زمان تحویل: {delivered_at}\n\n<blockquote>💡 در مرحله بعد می‌توانیم عملیات مدیریت این سرویس را روی همین شناسه اجرا کنیم.</blockquote>"
         }
       },
+      "panel_sync_notifications": {
+        "depleted": "📦 سرویس شما به دلیل اتمام حجم غیرفعال شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 برای ادامه استفاده از این سرویس، از بخش خرید یا تمدید یک سرویس جدید فعال کنید تا دسترسی شما دوباره برقرار شود.</blockquote>",
+        "expired": "⏳ سرویس شما به دلیل اتمام زمان منقضی شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 برای ادامه استفاده، از بخش خرید یا تمدید سرویس اقدام کنید تا دسترسی شما بدون قطعی دوباره فعال شود.</blockquote>",
+        "deleted": "🗑 سرویس شما دیگر در پنل پیدا نشد.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 اگر انتظار داشتید این سرویس فعال باشد، لطفاً با پشتیبانی ارتباط بگیرید تا وضعیت سرویس از سمت پنل دقیق بررسی شود.</blockquote>",
+        "disabled": "🚫 سرویس شما غیرفعال شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 برای بررسی علت غیرفعال شدن و راهکار فعال‌سازی مجدد، از مسیر پشتیبانی پیام بفرستید تا سریع‌تر راهنمایی شوید.</blockquote>",
+        "depleted_test": "🧪 سرویس تست شما به دلیل اتمام حجم پایان یافت.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و پس از پایان، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>",
+        "expired_test": "🧪 سرویس تست شما به دلیل اتمام زمان پایان یافت.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و پس از پایان، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>",
+        "deleted_test": "🧪 سرویس تست شما در پنل دیگر پیدا نشد و وضعیت آن بسته شد.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 این رفتار برای سرویس تست طبیعی است و بعد از پایان تست، وضعیت سرویس در ربات هم خودکار به‌روزرسانی می‌شود.</blockquote>",
+        "disabled_test": "🧪 سرویس تست شما غیرفعال شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و اگر زمان یا حجم آن تمام شده باشد، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>"
+      },
       "payment": {
         "errors": {
           "insufficient_balance": "❌ موجودی کیف پول کافی نیست.",

@@ -477,6 +477,7 @@ final class Database implements WorkerApiStore
                     d.user_id,
                     d.service_id,
                     d.service_public_id,
+                    d.is_test,
                     d.lifecycle_status,
                     d.is_manageable,
                     d.status_reason,
