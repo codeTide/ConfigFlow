@@ -1305,11 +1305,7 @@ final class MessageHandler
     {
         if (($claim['ok'] ?? false) !== true) {
             $errorCode = (string) ($claim['error_code'] ?? '');
-            $providerError = trim((string) ($claim['provider_error'] ?? ''));
             $errorDetails = $errorCode !== '' ? $errorCode : 'unknown_error';
-            if ($providerError !== '') {
-                $errorDetails .= ' | ' . $providerError;
-            }
             $errorRef = $this->logFreeTestClaimFailure($chatId, $claim);
             $messageKey = match ($errorCode) {
                 'service_not_found', 'service_inactive', 'free_test_disabled', 'invalid_service_mode' => 'messages.user.free_test.errors.service_invalid',
