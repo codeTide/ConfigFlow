@@ -705,7 +705,7 @@ final class MessageHandler
             $claim = $this->database->claimFreeTestForService($userId, $serviceId);
             $claimed = $this->sendFreeTestClaimResult($chatId, $claim);
             if ($claimed) {
-                $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+                $this->telegram->sendMessage($chatId, '​', $this->menus->mainMenuReplyKeyboard($userId));
             }
             return;
         }
@@ -5941,11 +5941,6 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.order_not_found'));
             return;
         }
-        if ((int) ($purchase['is_test'] ?? 0) === 1) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.test_not_renewable'));
-            return;
-        }
-
         $tariffs = $this->database->getActiveTariffsByType(0);
         if ($tariffs === []) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.no_tariff'));
