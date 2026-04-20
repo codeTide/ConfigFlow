@@ -133,34 +133,24 @@ final class MenuService
 
     public function myStockItemsText(int $userId): string
     {
-        $count = $this->database->countUserPurchases($userId);
-        if ($count === 0) {
-            return $this->messageRenderer->render('menus.messages.my_stock_items_empty');
+        $services = $this->database->listManageableUserServices($userId);
+        if ($services === []) {
+            return $this->messageRenderer->render('menus.messages.my_services_empty');
         }
 
-        $items = $this->database->listUserPurchasesSummary($userId, 8);
         $lines = [];
-        foreach ($items as $item) {
-            $tariffName = trim((string) ($item['tariff_name'] ?? '—'));
+        foreach ($services as $item) {
+            $servicePublicId = trim((string) ($item['service_public_id'] ?? $this->catalog->get('messages.generic.dash')));
             $serviceName = trim((string) ($item['service_name'] ?? '—'));
-            $amount = (int) ($item['amount'] ?? 0);
-            $createdAt = (string) ($item['created_at'] ?? '');
-            $isTest = ((int) ($item['is_test'] ?? 0)) === 1 ? $this->catalog->get('menus.my_stock_items.test_suffix') : '';
-            $lines[] = $this->catalog->get('menus.my_stock_items.order_row', [
-                'id' => (int) ($item['id'] ?? 0),
-                'tariff' => htmlspecialchars($tariffName),
+            $lines[] = $this->catalog->get('menus.my_stock_items.service_row', [
+                'service_public_id' => htmlspecialchars($servicePublicId),
                 'service' => htmlspecialchars($serviceName),
-                'amount' => $amount,
-                'test_suffix' => $isTest,
-                'created_at' => htmlspecialchars($createdAt !== '' ? $createdAt : $this->catalog->get('messages.generic.dash')),
             ]);
         }
 
-        // Guardrail: row-template + implode is intentionally allowed only for data-driven lists.
-        return $this->messageRenderer->render('menus.messages.my_stock_items_overview', [
-            'count' => $count,
-            'orders' => implode("\n", $lines),
-        ], ['orders']);
+        return $this->messageRenderer->render('menus.messages.my_services_overview', [
+            'services' => implode("\n", $lines),
+        ], ['services']);
     }
 
     public function referralText(int $userId): string

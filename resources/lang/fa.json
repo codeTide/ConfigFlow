@@ -57,7 +57,9 @@
       "support_link_desc_line": "\n📝 توضیح لینک: {description}",
       "referral_overview": "{title}\n\n📊 زیرمجموعه‌ها: <b>{total_referrals}</b>\n🛒 خریدهای زیرمجموعه: <b>{purchase_count}</b>\n💵 مجموع خرید زیرمجموعه: <b>{total_purchase_amount}</b> تومان\n🔗 لینک دعوت: \n\n<code>{ref_link}</code>\n\n<blockquote>💡 لینک دعوت را فقط برای مخاطب واقعی بفرستید؛ ثبت‌نام و خرید زیرمجموعه‌ها خودکار در آمار شما ثبت می‌شود.</blockquote>",
       "my_stock_items_empty": "📦 هنوز کانفیگی برای حساب شما ثبت نشده است.",
-      "my_stock_items_overview": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>\n\n🗂 آخرین سفارش‌ها: {orders}\n\n<blockquote>💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند.</blockquote>"
+      "my_stock_items_overview": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>\n\n🗂 آخرین سفارش‌ها: {orders}\n\n<blockquote>💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند.</blockquote>",
+      "my_services_empty": "📦 سرویس قابل مدیریت پیدا نشد\n\n🧭 در حال حاضر هیچ سرویس فعال و قابل مدیریتی برای این حساب ثبت نشده است.\n\n<blockquote>💡 بعد از تحویل سرویس جدید، از همین بخش می‌توانید سرویس مشخص خودتان را با شناسه اختصاصی انتخاب و مدیریت کنید.</blockquote>",
+      "my_services_overview": "📦 سرویس‌های فعال شما:\n\n🧩 لیست سرویس‌ها: {services}\n\n<blockquote>💡 یکی از سرویس‌های فعال خود را انتخاب کنید تا جزئیات همان سرویس با شناسه اختصاصی نمایش داده شود.</blockquote>"
     },
     "referral": {
       "default_intro": "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>",
@@ -65,6 +67,7 @@
     },
     "my_stock_items": {
       "order_row": "• #{id} | {tariff} | {service} | {amount} تومان{test_suffix}\n  ⏱ {created_at}",
+      "service_row": "• {service_public_id} | {service}",
       "test_suffix": " (تست)"
     }
   },
@@ -241,6 +244,26 @@
         },
         "tariff_button": "📦 پکیج {num}",
         "tariff_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان"
+      },
+      "my_services": {
+        "source_type_stock": "انباری",
+        "source_type_panel": "پنلی خودکار",
+        "select_service": {
+          "overview": "🧩 سرویس مورد نظر را جهت مدیریت انتخاب کنید:\n\n📋 از دکمه‌های همین صفحه، شناسه سرویس فعال خودتان را انتخاب کنید تا عملیات مدیریت دقیقاً روی همان سرویس اختصاصی انجام شود.\n\n<blockquote>💡 بعد از انتخاب، جزئیات کامل همان سرویس نمایش داده می‌شود و می‌توانید ادامه مدیریت را بدون ابهام از همان مسیر دنبال کنید.</blockquote>"
+        },
+        "selected_service": {
+          "overview": "✅ سرویس شما انتخاب شد\n\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n🧩 نام سرویس: {service_name}\n🔌 نوع تحویل: {source_type}\n🕒 زمان تحویل: {delivered_at}\n\n<blockquote>💡 در مرحله بعد می‌توانیم عملیات مدیریت این سرویس را روی همین شناسه اجرا کنیم.</blockquote>"
+        }
+      },
+      "panel_sync_notifications": {
+        "depleted": "📦 سرویس شما به دلیل اتمام حجم غیرفعال شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 برای ادامه استفاده از این سرویس، از بخش خرید یا تمدید یک سرویس جدید فعال کنید تا دسترسی شما دوباره برقرار شود.</blockquote>",
+        "expired": "⏳ سرویس شما به دلیل اتمام زمان منقضی شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 برای ادامه استفاده، از بخش خرید یا تمدید سرویس اقدام کنید تا دسترسی شما بدون قطعی دوباره فعال شود.</blockquote>",
+        "deleted": "🗑 سرویس شما دیگر در پنل پیدا نشد.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 اگر انتظار داشتید این سرویس فعال باشد، لطفاً با پشتیبانی ارتباط بگیرید تا وضعیت سرویس از سمت پنل دقیق بررسی شود.</blockquote>",
+        "disabled": "🚫 سرویس شما غیرفعال شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 برای بررسی علت غیرفعال شدن و راهکار فعال‌سازی مجدد، از مسیر پشتیبانی پیام بفرستید تا سریع‌تر راهنمایی شوید.</blockquote>",
+        "depleted_test": "🧪 سرویس تست شما به دلیل اتمام حجم پایان یافت.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و پس از پایان، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>",
+        "expired_test": "🧪 سرویس تست شما به دلیل اتمام زمان پایان یافت.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و پس از پایان، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>",
+        "deleted_test": "🧪 سرویس تست شما در پنل دیگر پیدا نشد و وضعیت آن بسته شد.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 این رفتار برای سرویس تست طبیعی است و بعد از پایان تست، وضعیت سرویس در ربات هم خودکار به‌روزرسانی می‌شود.</blockquote>",
+        "disabled_test": "🧪 سرویس تست شما غیرفعال شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و اگر زمان یا حجم آن تمام شده باشد، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>"
       },
       "payment": {
         "errors": {
