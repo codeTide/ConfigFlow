@@ -151,9 +151,11 @@ function applyPanelUserStatusToDelivery(
     $previousStatus = trim((string) ($delivery['lifecycle_status'] ?? 'active'));
     $userId = (int) ($delivery['user_id'] ?? 0);
     $serviceName = trim((string) ($delivery['service_name'] ?? 'سرویس'));
+    $sourceType = trim((string) ($delivery['source_type'] ?? ''));
     $isTest = ((int) ($delivery['is_test'] ?? 0)) === 1;
     $cleanupDueAt = trim((string) ($delivery['cleanup_due_at'] ?? ''));
     $cleanedUpAt = trim((string) ($delivery['cleaned_up_at'] ?? ''));
+    $alertsState = extractPanelAlertState((string) ($delivery['meta_json'] ?? ''));
 
     $panelUser = $userMap[$servicePublicId] ?? null;
     if (!is_array($panelUser)) {
@@ -290,8 +292,48 @@ function applyPanelUserStatusToDelivery(
         $nextCleanupReason,
         $nextCleanedUpAt
     );
+    $notifications = 0;
     $notified = notifyOnStatusChange($telegram, $renderer, $userId, $servicePublicId, $serviceName, $isTest, $previousStatus, $status);
-    return ['notifications' => $notified ? 1 : 0, 'cleanups' => 0];
+    if ($notified) {
+        $notifications++;
+    }
+
+    if ($status === 'active' && !$isTest && $sourceType === 'panel') {
+        $alertEval = evaluatePanelDeliveryAlerts(
+            $telegram,
+            $renderer,
+            $userId,
+            $serviceName,
+            $servicePublicId,
+            $usedTraffic,
+            $dataLimit,
+            $expireEpoch,
+            $alertsState
+        );
+        $notifications += (int) ($alertEval['notifications'] ?? 0);
+        $alertsState = is_array($alertEval['alerts']) ? $alertEval['alerts'] : $alertsState;
+        $database->applyPanelUserStatusToDelivery(
+            $deliveryId,
+            $status,
+            $isManageable,
+            $reason,
+            [
+                'panel_status' => $panelStatusRaw,
+                'panel_expire' => $expireRaw,
+                'panel_used_traffic' => $usedTraffic,
+                'panel_data_limit' => $dataLimit,
+                'panel_subscription_url' => $subscriptionUrl !== '' ? $subscriptionUrl : null,
+                'panel_username' => $servicePublicId,
+                'alerts' => $alertsState,
+            ],
+            $nextSubLink,
+            $nextCleanupDueAt,
+            $nextCleanupReason,
+            $nextCleanedUpAt
+        );
+    }
+
+    return ['notifications' => $notifications, 'cleanups' => 0];
 }
 
 /**
@@ -407,6 +449,113 @@ function notifyCleanupResult(
     $key = match ($type) {
         'test_removed' => 'messages.user.panel_sync_notifications.cleanup_test_removed',
         'normal_removed_after_grace' => 'messages.user.panel_sync_notifications.cleanup_after_grace',
+        default => '',
+    };
+    if ($key === '') {
+        return false;
+    }
+    $message = $renderer->render($key, [
+        'service_name' => $serviceName !== '' ? $serviceName : 'سرویس شما',
+        'service_public_id' => $servicePublicId !== '' ? $servicePublicId : '-',
+    ], ['service_name', 'service_public_id']);
+    $telegram->sendMessage($userId, $message);
+    return true;
+}
+
+/**
+ * @return array<string,string|null>
+ */
+function extractPanelAlertState(string $metaJson): array
+{
+    if (trim($metaJson) === '') {
+        return [];
+    }
+    $decoded = json_decode($metaJson, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+    $alerts = $decoded['alerts'] ?? null;
+    if (!is_array($alerts)) {
+        return [];
+    }
+    $state = [];
+    foreach (['usage_80_sent_at', 'usage_95_sent_at', 'expire_24h_sent_at', 'expire_6h_sent_at'] as $key) {
+        $val = $alerts[$key] ?? null;
+        $state[$key] = is_string($val) && trim($val) !== '' ? trim($val) : null;
+    }
+    return $state;
+}
+
+/**
+ * @param array<string,string|null> $alertsState
+ * @return array{notifications:int,alerts:array<string,string|null>}
+ */
+function evaluatePanelDeliveryAlerts(
+    ?TelegramClient $telegram,
+    UiMessageRenderer $renderer,
+    int $userId,
+    string $serviceName,
+    string $servicePublicId,
+    int $usedTraffic,
+    int $dataLimit,
+    int $expireEpoch,
+    array $alertsState
+): array {
+    $now = time();
+    $sent = 0;
+    $state = $alertsState;
+
+    if ($dataLimit > 0) {
+        $usageRatio = $usedTraffic / $dataLimit;
+        if ($usageRatio >= 0.80 && empty($state['usage_80_sent_at'])) {
+            if (sendPanelDeliveryAlert($telegram, $renderer, $userId, 'usage_80', $serviceName, $servicePublicId)) {
+                $state['usage_80_sent_at'] = gmdate('Y-m-d H:i:s');
+                $sent++;
+            }
+        }
+        if ($usageRatio >= 0.95 && empty($state['usage_95_sent_at'])) {
+            if (sendPanelDeliveryAlert($telegram, $renderer, $userId, 'usage_95', $serviceName, $servicePublicId)) {
+                $state['usage_95_sent_at'] = gmdate('Y-m-d H:i:s');
+                $sent++;
+            }
+        }
+    }
+
+    if ($expireEpoch > $now) {
+        $remaining = $expireEpoch - $now;
+        if ($remaining <= 86400 && empty($state['expire_24h_sent_at'])) {
+            if (sendPanelDeliveryAlert($telegram, $renderer, $userId, 'expire_24h', $serviceName, $servicePublicId)) {
+                $state['expire_24h_sent_at'] = gmdate('Y-m-d H:i:s');
+                $sent++;
+            }
+        }
+        if ($remaining <= 21600 && empty($state['expire_6h_sent_at'])) {
+            if (sendPanelDeliveryAlert($telegram, $renderer, $userId, 'expire_6h', $serviceName, $servicePublicId)) {
+                $state['expire_6h_sent_at'] = gmdate('Y-m-d H:i:s');
+                $sent++;
+            }
+        }
+    }
+
+    return ['notifications' => $sent, 'alerts' => $state];
+}
+
+function sendPanelDeliveryAlert(
+    ?TelegramClient $telegram,
+    UiMessageRenderer $renderer,
+    int $userId,
+    string $alertType,
+    string $serviceName,
+    string $servicePublicId
+): bool {
+    if ($telegram === null || $userId <= 0) {
+        return false;
+    }
+    $key = match ($alertType) {
+        'usage_80' => 'messages.user.panel_sync_notifications.alert_usage_80',
+        'usage_95' => 'messages.user.panel_sync_notifications.alert_usage_95',
+        'expire_24h' => 'messages.user.panel_sync_notifications.alert_expire_24h',
+        'expire_6h' => 'messages.user.panel_sync_notifications.alert_expire_6h',
         default => '',
     };
     if ($key === '') {
