@@ -6117,9 +6117,8 @@ final class MessageHandler
     private function showMyStockItemsWithReplyFlow(int $chatId, int $userId): void
     {
         $services = $this->database->listManageableUserServices($userId);
-        $this->telegram->sendMessage($chatId, $this->menus->myStockItemsText($userId));
-
         if ($services === []) {
+            $this->telegram->sendMessage($chatId, $this->menus->myStockItemsText($userId));
             return;
         }
 

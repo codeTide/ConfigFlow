@@ -470,6 +470,86 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
+    public function listPanelDeliveriesForStatusSync(): array
+    {
+        $stmt = $this->pdo->query(
+            "SELECT d.id AS delivery_id,
+                    d.service_id,
+                    d.service_public_id,
+                    d.lifecycle_status,
+                    d.is_manageable,
+                    d.status_reason,
+                    d.last_status_sync_at,
+                    d.sub_link,
+                    d.meta_json,
+                    s.sub_link_mode,
+                    s.sub_link_base_url,
+                    s.panel_base_url,
+                    s.panel_username,
+                    s.panel_password
+             FROM user_service_deliveries d
+             JOIN service s ON s.id = d.service_id
+             WHERE s.mode = 'panel_auto'
+               AND d.lifecycle_status NOT IN ('deleted', 'revoked')
+               AND COALESCE(s.panel_base_url, '') <> ''
+               AND COALESCE(s.panel_username, '') <> ''
+               AND COALESCE(s.panel_password, '') <> ''
+             ORDER BY d.id ASC"
+        );
+        return $stmt->fetchAll();
+    }
+
+    public function applyPanelUserStatusToDelivery(
+        int $deliveryId,
+        string $lifecycleStatus,
+        int $isManageable,
+        ?string $statusReason,
+        array $panelMeta,
+        ?string $resolvedSubLink = null
+    ): void {
+        $stmt = $this->pdo->prepare('SELECT meta_json, sub_link FROM user_service_deliveries WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $deliveryId]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return;
+        }
+
+        $existingMetaRaw = (string) ($row['meta_json'] ?? '');
+        $existingMeta = $existingMetaRaw !== '' ? json_decode($existingMetaRaw, true) : null;
+        if (!is_array($existingMeta)) {
+            $existingMeta = [];
+        }
+        $mergedMeta = array_merge($existingMeta, $panelMeta, [
+            'panel_last_seen_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $metaJson = json_encode($mergedMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $nextSubLink = trim((string) ($row['sub_link'] ?? ''));
+        if ($resolvedSubLink !== null && trim($resolvedSubLink) !== '') {
+            $nextSubLink = trim($resolvedSubLink);
+        }
+
+        $upd = $this->pdo->prepare(
+            'UPDATE user_service_deliveries
+             SET lifecycle_status = :lifecycle_status,
+                 is_manageable = :is_manageable,
+                 status_reason = :status_reason,
+                 last_status_sync_at = :last_status_sync_at,
+                 sub_link = :sub_link,
+                 meta_json = :meta_json
+             WHERE id = :id'
+        );
+        $upd->execute([
+            'lifecycle_status' => $lifecycleStatus,
+            'is_manageable' => $isManageable,
+            'status_reason' => $statusReason,
+            'last_status_sync_at' => gmdate('Y-m-d H:i:s'),
+            'sub_link' => $nextSubLink,
+            'meta_json' => $metaJson === false ? null : $metaJson,
+            'id' => $deliveryId,
+        ]);
+    }
+
     public function getUserPurchaseForRenewal(int $userId, int $purchaseId): ?array
     {
         $stmt = $this->pdo->prepare(
