@@ -222,6 +222,10 @@ final class MessageHandler
             $this->handleRenewPurchaseSelectionState($chatId, $userId, $text, $state);
             return;
         }
+        if ($state['state_name'] === 'my_services.await_service') {
+            $this->handleMyServicesSelectionState($chatId, $userId, $text, $state);
+            return;
+        }
 
         if ($state['state_name'] === 'await_renew_tariff_selection' || $state['state_name'] === 'renew.await_tariff') {
             $this->handleRenewTariffSelectionState($chatId, $userId, $text, $state);
@@ -6112,26 +6116,30 @@ final class MessageHandler
 
     private function showMyStockItemsWithReplyFlow(int $chatId, int $userId): void
     {
-        $items = $this->database->listUserPurchasesSummary($userId, 8);
-        $this->telegram->sendMessage($chatId, $this->menus->myStockItemsText($userId));
-
-        if ($this->settings->get('manual_renewal_enabled', '1') !== '1' || $items === []) {
+        $services = $this->database->listManageableUserServices($userId);
+        if ($services === []) {
+            $this->telegram->sendMessage($chatId, $this->menus->myStockItemsText($userId));
             return;
         }
 
         $lines = [];
         $optionMap = [];
         $buttons = [];
-        foreach (array_values($items) as $idx => $item) {
+        foreach (array_values($services) as $idx => $item) {
             $num = (string) ($idx + 1);
-            $purchaseId = (int) ($item['id'] ?? 0);
-            if ($purchaseId <= 0) {
+            $deliveryId = (int) ($item['delivery_id'] ?? 0);
+            if ($deliveryId <= 0) {
                 continue;
             }
             $service = trim((string) ($item['service_name'] ?? $this->catalog->get('messages.generic.dash')));
-            $lines[] = $this->catalog->get('messages.user.renew.order_option', ['num' => $num, 'purchase_id' => $purchaseId, 'service_name' => htmlspecialchars($service)]);
-            $optionMap[$num] = $purchaseId;
-            $buttons[] = [$this->catalog->get('messages.user.renew.option_button', ['num' => $num])];
+            $servicePublicId = trim((string) ($item['service_public_id'] ?? $this->catalog->get('messages.generic.dash')));
+            $lines[] = $this->catalog->get('messages.user.my_services.service_option', [
+                'num' => $num,
+                'service_public_id' => htmlspecialchars($servicePublicId),
+                'service_name' => htmlspecialchars($service),
+            ]);
+            $optionMap[$num] = $deliveryId;
+            $buttons[] = [$this->catalog->get('messages.user.my_services.option_button', ['num' => $num])];
         }
 
         if ($optionMap === []) {
@@ -6139,13 +6147,60 @@ final class MessageHandler
         }
 
         $buttons[] = [UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'renew.await_purchase', ['options' => $optionMap, 'stack' => [], 'purchase_id' => null, 'tariff_id' => null, 'payment_method' => null]);
+        $this->database->setUserState($userId, 'my_services.await_service', ['options' => $optionMap]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('messages.user.renew.select_order.overview', [
-                'orders' => implode("\n", $lines),
-            ], ['orders']),
+            $this->messageRenderer->render('messages.user.my_services.select_service.overview', [
+                'services' => implode("\n", $lines),
+            ], ['services']),
             $this->uiKeyboard->replyMenu($buttons)
+        );
+    }
+
+    private function handleMyServicesSelectionState(int $chatId, int $userId, string $text, array $state): void
+    {
+        if ($this->isMainMenuInput($text)) {
+            $this->database->clearUserState($userId);
+            $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            return;
+        }
+
+        $options = is_array($state['payload']['options'] ?? null) ? $state['payload']['options'] : [];
+        $selected = $this->extractOptionKey($text);
+        $deliveryId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+        if ($deliveryId <= 0) {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.common.invalid_option'));
+            return;
+        }
+
+        $services = $this->database->listManageableUserServices($userId);
+        $selectedService = null;
+        foreach ($services as $service) {
+            if ((int) ($service['delivery_id'] ?? 0) === $deliveryId) {
+                $selectedService = $service;
+                break;
+            }
+        }
+        if (!is_array($selectedService)) {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('menus.messages.my_services_empty'));
+            return;
+        }
+
+        $this->database->clearUserState($userId);
+        $rawSourceType = (string) ($selectedService['source_type'] ?? '');
+        $sourceTypeLabel = match ($rawSourceType) {
+            'stock' => $this->catalog->get('messages.user.my_services.source_type_stock'),
+            'panel' => $this->catalog->get('messages.user.my_services.source_type_panel'),
+            default => $this->catalog->get('messages.generic.dash'),
+        };
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->messageRenderer->render('messages.user.my_services.selected_service.overview', [
+                'service_public_id' => htmlspecialchars((string) ($selectedService['service_public_id'] ?? $this->catalog->get('messages.generic.dash'))),
+                'service_name' => htmlspecialchars((string) ($selectedService['service_name'] ?? $this->catalog->get('messages.generic.dash'))),
+                'source_type' => htmlspecialchars($sourceTypeLabel),
+                'delivered_at' => htmlspecialchars((string) ($selectedService['delivered_at'] ?? $this->catalog->get('messages.generic.dash'))),
+            ])
         );
     }
 
