@@ -57,7 +57,9 @@
       "support_link_desc_line": "\n📝 توضیح لینک: {description}",
       "referral_overview": "{title}\n\n📊 زیرمجموعه‌ها: <b>{total_referrals}</b>\n🛒 خریدهای زیرمجموعه: <b>{purchase_count}</b>\n💵 مجموع خرید زیرمجموعه: <b>{total_purchase_amount}</b> تومان\n🔗 لینک دعوت: \n\n<code>{ref_link}</code>\n\n<blockquote>💡 لینک دعوت را فقط برای مخاطب واقعی بفرستید؛ ثبت‌نام و خرید زیرمجموعه‌ها خودکار در آمار شما ثبت می‌شود.</blockquote>",
       "my_stock_items_empty": "📦 هنوز کانفیگی برای حساب شما ثبت نشده است.",
-      "my_stock_items_overview": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>\n\n🗂 آخرین سفارش‌ها: {orders}\n\n<blockquote>💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند.</blockquote>"
+      "my_stock_items_overview": "📦 <b>شما {count} کانفیگ خریداری کرده‌اید</b>\n\n🗂 آخرین سفارش‌ها: {orders}\n\n<blockquote>💡 برای تمدید یا پیگیری هر سرویس، از لیست سفارش‌های همین بخش گزینه مناسب را انتخاب کنید تا مراحل به‌صورت خودکار و بدون خطا ادامه پیدا کند.</blockquote>",
+      "my_services_empty": "📦 سرویس قابل مدیریت پیدا نشد\n\n🧭 در حال حاضر هیچ سرویس فعال و قابل مدیریتی برای این حساب ثبت نشده است.\n\n<blockquote>💡 بعد از تحویل سرویس جدید، از همین بخش می‌توانید سرویس مشخص خودتان را با شناسه اختصاصی انتخاب و مدیریت کنید.</blockquote>",
+      "my_services_overview": "📦 سرویس‌های فعال شما:\n\n🧩 لیست سرویس‌ها: {services}\n\n<blockquote>💡 یکی از سرویس‌های فعال خود را انتخاب کنید تا جزئیات همان سرویس با شناسه اختصاصی نمایش داده شود.</blockquote>"
     },
     "referral": {
       "default_intro": "💼 <b>زیرمجموعه‌گیری و دعوت دوستان</b>",
@@ -65,6 +67,7 @@
     },
     "my_stock_items": {
       "order_row": "• #{id} | {tariff} | {service} | {amount} تومان{test_suffix}\n  ⏱ {created_at}",
+      "service_row": "• {service_public_id} | {service}",
       "test_suffix": " (تست)"
     }
   },
@@ -241,6 +244,16 @@
         },
         "tariff_button": "📦 پکیج {num}",
         "tariff_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان"
+      },
+      "my_services": {
+        "source_type_stock": "انباری",
+        "source_type_panel": "پنلی خودکار",
+        "select_service": {
+          "overview": "🧩 سرویس مورد نظر را جهت مدیریت انتخاب کنید:\n\n📋 از دکمه‌های همین صفحه، شناسه سرویس فعال خودتان را انتخاب کنید تا عملیات مدیریت دقیقاً روی همان سرویس اختصاصی انجام شود.\n\n<blockquote>💡 بعد از انتخاب، جزئیات کامل همان سرویس نمایش داده می‌شود و می‌توانید ادامه مدیریت را بدون ابهام از همان مسیر دنبال کنید.</blockquote>"
+        },
+        "selected_service": {
+          "overview": "✅ سرویس شما انتخاب شد\n\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n🧩 نام سرویس: {service_name}\n🔌 نوع تحویل: {source_type}\n🕒 زمان تحویل: {delivered_at}\n\n<blockquote>💡 در مرحله بعد می‌توانیم عملیات مدیریت این سرویس را روی همین شناسه اجرا کنیم.</blockquote>"
+        }
       },
       "payment": {
         "errors": {
