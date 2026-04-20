@@ -6122,24 +6122,20 @@ final class MessageHandler
             return;
         }
 
-        $lines = [];
         $optionMap = [];
         $buttons = [];
         foreach (array_values($services) as $idx => $item) {
-            $num = (string) ($idx + 1);
+            unset($idx);
             $deliveryId = (int) ($item['delivery_id'] ?? 0);
             if ($deliveryId <= 0) {
                 continue;
             }
-            $service = trim((string) ($item['service_name'] ?? $this->catalog->get('messages.generic.dash')));
             $servicePublicId = trim((string) ($item['service_public_id'] ?? $this->catalog->get('messages.generic.dash')));
-            $lines[] = $this->catalog->get('messages.user.my_services.service_option', [
-                'num' => $num,
-                'service_public_id' => htmlspecialchars($servicePublicId),
-                'service_name' => htmlspecialchars($service),
-            ]);
-            $optionMap[$num] = $deliveryId;
-            $buttons[] = [$this->catalog->get('messages.user.my_services.option_button', ['num' => $num])];
+            if ($servicePublicId === '' || $servicePublicId === $this->catalog->get('messages.generic.dash')) {
+                continue;
+            }
+            $optionMap[$servicePublicId] = $deliveryId;
+            $buttons[] = [$this->toPersianDigits($servicePublicId)];
         }
 
         if ($optionMap === []) {
@@ -6150,9 +6146,7 @@ final class MessageHandler
         $this->database->setUserState($userId, 'my_services.await_service', ['options' => $optionMap]);
         $this->telegram->sendMessage(
             $chatId,
-            $this->messageRenderer->render('messages.user.my_services.select_service.overview', [
-                'services' => implode("\n", $lines),
-            ], ['services']),
+            $this->messageRenderer->render('messages.user.my_services.select_service.overview'),
             $this->uiKeyboard->replyMenu($buttons)
         );
     }

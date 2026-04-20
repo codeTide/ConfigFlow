@@ -246,12 +246,10 @@
         "tariff_row": "{name} | {volume_gb}GB | {duration_days} روز | {price} تومان"
       },
       "my_services": {
-        "option_button": "🧩 سرویس {num}",
-        "service_option": "{num}) {service_public_id} | {service_name}",
         "source_type_stock": "انباری",
         "source_type_panel": "پنلی خودکار",
         "select_service": {
-          "overview": "🧩 انتخاب سرویس فعال:\n\n📋 سرویس‌های قابل مدیریت: {services}\n\n<blockquote>💡 برای ادامه، یکی از سرویس‌های فعال خود را از دکمه‌های همین صفحه انتخاب کنید.</blockquote>"
+          "overview": "🧩 سرویس مورد نظر را جهت مدیریت انتخاب کنید:\n\n📋 از دکمه‌های همین صفحه، شناسه سرویس فعال خود را انتخاب کنید.\n\n<blockquote>💡 بعد از انتخاب، جزئیات همان سرویس اختصاصی نمایش داده می‌شود.</blockquote>"
         },
         "selected_service": {
           "overview": "✅ سرویس شما انتخاب شد\n\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n🧩 نام سرویس: {service_name}\n🔌 نوع تحویل: {source_type}\n🕒 زمان تحویل: {delivered_at}\n\n<blockquote>💡 در مرحله بعد می‌توانیم عملیات مدیریت این سرویس را روی همین شناسه اجرا کنیم.</blockquote>"
