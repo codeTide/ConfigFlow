@@ -31,7 +31,7 @@ final class MenuService
     public function mainMenuReplyKeyboard(int $userId): array
     {
         $isAdmin = $this->database->isAdminUser($userId);
-        $freeTestEnabled = $this->database->countAvailableFreeTestServices($userId) > 0;
+        $freeTestEnabled = $this->database->countEnabledFreeTestServices() > 0;
         $rows = [];
         if ($isAdmin) {
             $rows[] = [KeyboardBuilder::admin()];

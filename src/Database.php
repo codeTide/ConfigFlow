@@ -3090,6 +3090,11 @@ final class Database implements WorkerApiStore
         return count($this->listEnabledFreeTestServices(true, $userId));
     }
 
+    public function countEnabledFreeTestServices(): int
+    {
+        return count($this->listEnabledFreeTestServices(false, null));
+    }
+
     public function countFreeTestClaimsForService(int $serviceId): int
     {
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE service_id = :service_id');
