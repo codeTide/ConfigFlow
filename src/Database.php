@@ -60,17 +60,7 @@ final class Database implements WorkerApiStore
                 $this->pdo->exec("ALTER TABLE free_test_service_rules DROP COLUMN IF EXISTS default_duration_days");
             }
         }
-        $this->pdo->exec(
-            "CREATE TABLE IF NOT EXISTS free_test_service_claims (
-                id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                user_id BIGINT NOT NULL,
-                service_id BIGINT NOT NULL,
-                purchase_id BIGINT NOT NULL,
-                claimed_at DATETIME NOT NULL,
-                INDEX idx_free_test_service_claims_user_service (user_id, service_id),
-                INDEX idx_free_test_service_claims_service (service_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
-        );
+        $this->pdo->exec("DROP TABLE IF EXISTS free_test_service_claims");
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_claims");
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_tariff_rules");
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_requests");
@@ -84,6 +74,8 @@ final class Database implements WorkerApiStore
                 panel_base_url VARCHAR(255) NULL,
                 panel_username VARCHAR(191) NULL,
                 panel_password TEXT NULL,
+                sub_link_mode VARCHAR(16) NOT NULL DEFAULT 'proxy',
+                sub_link_base_url VARCHAR(255) NULL,
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
@@ -97,6 +89,8 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_base_url VARCHAR(255) NULL AFTER panel_provider");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_username VARCHAR(191) NULL AFTER panel_base_url");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_password TEXT NULL AFTER panel_username");
+            $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS sub_link_mode VARCHAR(16) NOT NULL DEFAULT 'proxy' AFTER panel_password");
+            $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS sub_link_base_url VARCHAR(255) NULL AFTER sub_link_mode");
             $this->pdo->exec("ALTER TABLE service DROP INDEX IF EXISTS idx_service_type");
             $this->pdo->exec("ALTER TABLE service DROP COLUMN IF EXISTS panel_ref");
             $this->pdo->exec("ALTER TABLE service DROP COLUMN IF EXISTS panel_id");
@@ -166,15 +160,15 @@ final class Database implements WorkerApiStore
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS user_service_deliveries (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
-                purchase_id BIGINT NOT NULL,
+                purchase_id BIGINT NULL,
                 user_id BIGINT NOT NULL,
                 service_id BIGINT NOT NULL,
                 tariff_id BIGINT NULL,
                 source_type ENUM('stock','panel') NOT NULL,
+                is_test TINYINT(1) NOT NULL DEFAULT 0,
                 stock_item_id BIGINT NULL,
+                subscription_token VARCHAR(64) NOT NULL,
                 sub_link TEXT NOT NULL,
-                access_url TEXT NULL,
-                stock_item_uuid VARCHAR(191) NULL,
                 volume_gb DECIMAL(10,2) NULL,
                 duration_days INT NULL,
                 delivered_at DATETIME NOT NULL,
@@ -182,11 +176,21 @@ final class Database implements WorkerApiStore
                 INDEX idx_deliveries_purchase (purchase_id),
                 INDEX idx_deliveries_user (user_id),
                 INDEX idx_deliveries_service (service_id, tariff_id),
-                INDEX idx_deliveries_source (source_type)
+                INDEX idx_deliveries_source (source_type),
+                UNIQUE KEY uq_deliveries_subscription_token (subscription_token)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         if ($this->tableExists('user_service_deliveries')) {
+            $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN purchase_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN tariff_id BIGINT NULL");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS is_test TINYINT(1) NOT NULL DEFAULT 0 AFTER source_type");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS subscription_token VARCHAR(64) NULL AFTER stock_item_id");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS access_url");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS stock_item_uuid");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS config_uuid");
+            $this->pdo->exec("UPDATE user_service_deliveries SET subscription_token = REPLACE(LOWER(UUID()), '-', '') WHERE subscription_token IS NULL OR subscription_token = ''");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN subscription_token VARCHAR(64) NOT NULL");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD UNIQUE INDEX IF NOT EXISTS uq_deliveries_subscription_token (subscription_token)");
         }
         if ($this->tableExists('payments')) {
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS service_id BIGINT NULL");
@@ -207,6 +211,7 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
             $this->pdo->exec("ALTER TABLE purchases ADD INDEX IF NOT EXISTS idx_purchases_service (service_id)");
             $this->pdo->exec("ALTER TABLE purchases ADD INDEX IF NOT EXISTS idx_purchases_tariff (tariff_id)");
+            $this->pdo->exec("ALTER TABLE purchases DROP COLUMN IF EXISTS is_test");
             $legacyTariffColumn = 'pack' . 'age_id';
             $legacyConfigColumn = 'con' . 'fig_id';
             $this->pdo->exec("ALTER TABLE purchases DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
@@ -404,7 +409,7 @@ final class Database implements WorkerApiStore
     {
         $limit = max(1, min($limit, 20));
         $stmt = $this->pdo->prepare(
-            'SELECT p.id, p.amount, p.created_at, p.is_test,
+            'SELECT p.id, p.amount, p.created_at,
                     CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS tariff_name,
                     s.name AS service_name
              FROM purchases p
@@ -421,7 +426,7 @@ final class Database implements WorkerApiStore
     public function getUserPurchaseForRenewal(int $userId, int $purchaseId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT p.id AS purchase_id, p.is_test, p.service_id, p.tariff_id,
+            'SELECT p.id AS purchase_id, p.service_id, p.tariff_id,
                     CONCAT(s.name, " / ", COALESCE(CAST(t.volume_gb AS CHAR), "dynamic")) AS tariff_name,
                     s.name AS service_name
              FROM purchases p
@@ -724,7 +729,7 @@ final class Database implements WorkerApiStore
     public function listServicesByType(int $typeId): array
     {
         $stmt = $this->pdo->query(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
              FROM service s
              ORDER BY s.id DESC'
         );
@@ -739,7 +744,7 @@ final class Database implements WorkerApiStore
     public function listActiveServicesByType(int $typeId): array
     {
         $stmt = $this->pdo->query(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
              FROM service s
              WHERE s.is_active = 1
              ORDER BY s.id DESC'
@@ -756,8 +761,8 @@ final class Database implements WorkerApiStore
     public function createService(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO service (service_code, name, mode, panel_provider, panel_base_url, panel_username, panel_password, is_active, created_at, updated_at)
-             VALUES (:service_code, :name, :mode, :panel_provider, :panel_base_url, :panel_username, :panel_password, :is_active, :created_at, :updated_at)'
+            'INSERT INTO service (service_code, name, mode, panel_provider, panel_base_url, panel_username, panel_password, sub_link_mode, sub_link_base_url, is_active, created_at, updated_at)
+             VALUES (:service_code, :name, :mode, :panel_provider, :panel_base_url, :panel_username, :panel_password, :sub_link_mode, :sub_link_base_url, :is_active, :created_at, :updated_at)'
         );
         $now = gmdate('Y-m-d H:i:s');
         $stmt->execute([
@@ -768,6 +773,8 @@ final class Database implements WorkerApiStore
             'panel_base_url' => isset($data['panel_base_url']) ? trim((string) $data['panel_base_url']) : null,
             'panel_username' => isset($data['panel_username']) ? trim((string) $data['panel_username']) : null,
             'panel_password' => isset($data['panel_password']) ? trim((string) $data['panel_password']) : null,
+            'sub_link_mode' => isset($data['sub_link_mode']) && (string) $data['sub_link_mode'] === 'direct' ? 'direct' : 'proxy',
+            'sub_link_base_url' => isset($data['sub_link_base_url']) ? trim((string) $data['sub_link_base_url']) : null,
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
             'created_at' => $now,
             'updated_at' => $now,
@@ -778,7 +785,7 @@ final class Database implements WorkerApiStore
     public function getService(int $serviceId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
              FROM service s
              WHERE s.id = :id
              LIMIT 1'
@@ -823,7 +830,7 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             'UPDATE service
-             SET name = :name, mode = :mode, panel_provider = :panel_provider, panel_base_url = :panel_base_url, panel_username = :panel_username, panel_password = :panel_password, is_active = :is_active, updated_at = :updated_at
+             SET name = :name, mode = :mode, panel_provider = :panel_provider, panel_base_url = :panel_base_url, panel_username = :panel_username, panel_password = :panel_password, sub_link_mode = :sub_link_mode, sub_link_base_url = :sub_link_base_url, is_active = :is_active, updated_at = :updated_at
              WHERE id = :id'
         );
         $stmt->execute([
@@ -833,6 +840,8 @@ final class Database implements WorkerApiStore
             'panel_base_url' => isset($data['panel_base_url']) ? trim((string) $data['panel_base_url']) : null,
             'panel_username' => isset($data['panel_username']) ? trim((string) $data['panel_username']) : null,
             'panel_password' => isset($data['panel_password']) ? trim((string) $data['panel_password']) : null,
+            'sub_link_mode' => isset($data['sub_link_mode']) && (string) $data['sub_link_mode'] === 'direct' ? 'direct' : 'proxy',
+            'sub_link_base_url' => isset($data['sub_link_base_url']) ? trim((string) $data['sub_link_base_url']) : null,
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
             'updated_at' => gmdate('Y-m-d H:i:s'),
             'id' => $serviceId,
@@ -1547,9 +1556,6 @@ final class Database implements WorkerApiStore
         if (!is_array($purchase)) {
             return ['ok' => false, 'error' => 'purchase_not_found'];
         }
-        if ((int) ($purchase['is_test'] ?? 0) === 1) {
-            return ['ok' => false, 'error' => 'test_not_renewable'];
-        }
         $serviceId = (int) ($purchase['service_id'] ?? 0);
         $tariffId = (int) ($purchase['tariff_id'] ?? 0);
         if ($serviceId <= 0 || $tariffId <= 0) {
@@ -2010,7 +2016,7 @@ final class Database implements WorkerApiStore
             $serviceId,
             $tariffId
         );
-        $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', null, $subscriptionUrl, null, null, $volumeGb, $durationDays, null);
+        $deliveryToken = $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', false, null, $subscriptionUrl, $volumeGb, $durationDays, null);
 
         $this->markOrderDelivered((int) ($order['id'] ?? 0), (int) ($order['payment_id'] ?? 0));
         $this->pdo->commit();
@@ -2019,7 +2025,7 @@ final class Database implements WorkerApiStore
             'user_id' => (int) ($order['user_id'] ?? 0),
             'raw_payload' => $subscriptionUrl,
             'service_name' => (string) ($service['name'] ?? ''),
-            'sub_link' => $subscriptionUrl,
+            'sub_link' => $this->buildPublicSubscriptionLink($deliveryToken, is_array($service) ? $service : null, $subscriptionUrl),
         ];
     }
 
@@ -2031,10 +2037,64 @@ final class Database implements WorkerApiStore
 
     private function buildProvisionUsername(int $userId, int $orderId): string
     {
-        $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
-        $base = 'ft_' . max(1, $userId) . '_' . max(1, $orderId) . '_' . $suffix;
-        $normalized = preg_replace('/[^a-zA-Z0-9_]+/', '_', $base) ?? 'ft_user_' . $suffix;
-        return substr($normalized, 0, 32);
+        unset($userId, $orderId);
+        return $this->randomAlphaNumeric(12);
+    }
+
+    private function randomAlphaNumeric(int $length): string
+    {
+        $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $maxIndex = strlen($alphabet) - 1;
+        $value = '';
+        for ($i = 0; $i < $length; $i++) {
+            $value .= $alphabet[random_int(0, $maxIndex)];
+        }
+        return $value;
+    }
+
+    private function buildPublicSubscriptionLink(string $token, ?array $service = null, ?string $fallbackDirectLink = null): string
+    {
+        $mode = is_array($service) ? trim((string) ($service['sub_link_mode'] ?? 'proxy')) : 'proxy';
+        if ($mode === 'direct' && $fallbackDirectLink !== null && trim($fallbackDirectLink) !== '') {
+            return trim($fallbackDirectLink);
+        }
+        $baseUrl = is_array($service) ? rtrim(trim((string) ($service['sub_link_base_url'] ?? '')), '/') : '';
+        if ($baseUrl === '') {
+            $baseUrl = rtrim((string) getenv('PUBLIC_BASE_URL'), '/');
+        }
+        if ($baseUrl === '') {
+            $baseUrl = rtrim((string) getenv('APP_BASE_URL'), '/');
+        }
+        if ($baseUrl === '' && isset($_SERVER['HTTP_HOST']) && is_string($_SERVER['HTTP_HOST'])) {
+            $scheme = (isset($_SERVER['HTTPS']) && (string) $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $baseUrl = $scheme . '://' . trim($_SERVER['HTTP_HOST']);
+        }
+        if ($baseUrl === '') {
+            return '/sub/' . rawurlencode($token);
+        }
+        return $baseUrl . '/sub/' . rawurlencode($token);
+    }
+
+    public function getDeliverySubLinkByToken(string $token): ?string
+    {
+        $cleanToken = trim($token);
+        if ($cleanToken === '') {
+            return null;
+        }
+        $stmt = $this->pdo->prepare(
+            'SELECT sub_link
+             FROM user_service_deliveries
+             WHERE subscription_token = :token
+             ORDER BY id DESC
+             LIMIT 1'
+        );
+        $stmt->execute(['token' => $cleanToken]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return null;
+        }
+        $subLink = trim((string) ($row['sub_link'] ?? ''));
+        return $subLink !== '' ? $subLink : null;
     }
 
     /** @param array<string,mixed> $serviceRow
@@ -2245,10 +2305,9 @@ final class Database implements WorkerApiStore
                 $serviceId,
                 $tariffId,
                 'stock',
+                false,
                 (int) $stock_item['id'],
                 (string) ($stock_item['sub_link'] ?? ''),
-                (string) ($stock_item['config_link'] ?? ''),
-                null,
                 isset($stock_item['volume_gb']) ? (float) $stock_item['volume_gb'] : null,
                 isset($stock_item['duration_days']) ? (int) $stock_item['duration_days'] : null,
                 $this->buildStockConfigText($stock_item)
@@ -2296,9 +2355,10 @@ final class Database implements WorkerApiStore
 
     private function createPurchase(int $userId, ?int $legacyTariffId, ?int $legacyStockItemId, int $amount, string $paymentMethod, bool $isTest = false, ?int $serviceId = null, ?int $tariffId = null): int
     {
+        unset($isTest);
         $purchaseStmt = $this->pdo->prepare(
-            'INSERT INTO purchases (user_id, service_id, tariff_id, amount, payment_method, created_at, is_test)
-             VALUES (:user_id, :service_id, :tariff_id, :amount, :payment_method, :created_at, :is_test)'
+            'INSERT INTO purchases (user_id, service_id, tariff_id, amount, payment_method, created_at)
+             VALUES (:user_id, :service_id, :tariff_id, :amount, :payment_method, :created_at)'
         );
         $purchaseStmt->execute([
             'user_id' => $userId,
@@ -2307,7 +2367,6 @@ final class Database implements WorkerApiStore
             'amount' => $amount,
             'payment_method' => $paymentMethod,
             'created_at' => gmdate('Y-m-d H:i:s'),
-            'is_test' => $isTest ? 1 : 0,
         ]);
         $purchaseId = (int) $this->pdo->lastInsertId();
 
@@ -2319,24 +2378,24 @@ final class Database implements WorkerApiStore
     }
 
     private function recordUserServiceDelivery(
-        int $purchaseId,
+        ?int $purchaseId,
         int $userId,
         int $serviceId,
         ?int $tariffId,
         string $sourceType,
+        bool $isTest,
         ?int $stockItemId,
         string $subLink,
-        ?string $accessUrl,
-        ?string $stock_itemUuid,
         ?float $volumeGb,
         ?int $durationDays,
         ?string $metaJson
-    ): void {
+    ): string {
+        $subscriptionToken = strtolower(bin2hex(random_bytes(16)));
         $stmt = $this->pdo->prepare(
             'INSERT INTO user_service_deliveries (
-                purchase_id, user_id, service_id, tariff_id, source_type, stock_item_id, sub_link, access_url, stock_item_uuid, volume_gb, duration_days, delivered_at, meta_json
+                purchase_id, user_id, service_id, tariff_id, source_type, is_test, stock_item_id, subscription_token, sub_link, volume_gb, duration_days, delivered_at, meta_json
              ) VALUES (
-                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :stock_item_id, :sub_link, :access_url, :stock_item_uuid, :volume_gb, :duration_days, :delivered_at, :meta_json
+                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :is_test, :stock_item_id, :subscription_token, :sub_link, :volume_gb, :duration_days, :delivered_at, :meta_json
              )'
         );
         $stmt->execute([
@@ -2345,15 +2404,16 @@ final class Database implements WorkerApiStore
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'source_type' => $sourceType === 'panel' ? 'panel' : 'stock',
+            'is_test' => $isTest ? 1 : 0,
             'stock_item_id' => $stockItemId,
+            'subscription_token' => $subscriptionToken,
             'sub_link' => $subLink,
-            'access_url' => $accessUrl,
-            'stock_item_uuid' => $stock_itemUuid,
             'volume_gb' => $volumeGb,
             'duration_days' => $durationDays,
             'delivered_at' => gmdate('Y-m-d H:i:s'),
             'meta_json' => $metaJson,
         ]);
+        return $subscriptionToken;
     }
 
     private function markOrderDelivered(int $orderId, int $paymentId): void
@@ -2712,7 +2772,7 @@ final class Database implements WorkerApiStore
         $stmt = $this->pdo->prepare(
             'SELECT DISTINCT r.referee_id
 '
-            . 'FROM referrals r JOIN purchases p ON p.user_id = r.referee_id AND p.is_test = 0
+            . 'FROM referrals r JOIN purchases p ON p.user_id = r.referee_id AND p.payment_method <> \'free_test\'
 '
             . 'WHERE r.referrer_id = :referrer_id AND r.purchase_reward_given = 0
 '
@@ -2788,10 +2848,9 @@ final class Database implements WorkerApiStore
             $serviceId,
             $tariffId,
             'stock',
+            false,
             $cfgId,
             (string) ($cfg['sub_link'] ?? ''),
-            (string) ($cfg['config_link'] ?? ''),
-            null,
             isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
             isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
             $this->buildStockConfigText($cfg)
@@ -2872,7 +2931,7 @@ final class Database implements WorkerApiStore
             "SELECT s.id AS service_id, s.name AS service_name, s.mode, s.is_active,
                     r.is_enabled, r.claim_mode, r.cooldown_days, r.max_claims, r.priority,
                     (SELECT COUNT(*) FROM service_stock_items c WHERE c.service_id = s.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0 AND c.inventory_bucket = 'free_test') AS available_stock,
-                    (SELECT COUNT(*) FROM free_test_service_claims fc WHERE fc.service_id = s.id) AS total_claims
+                    (SELECT COUNT(*) FROM user_service_deliveries d WHERE d.service_id = s.id AND d.is_test = 1) AS total_claims
              FROM free_test_service_rules r
              JOIN service s ON s.id = r.service_id
              WHERE r.is_enabled = 1
@@ -2967,36 +3026,23 @@ final class Database implements WorkerApiStore
             }
 
             $stockItemId = (int) ($cfg['id'] ?? 0);
-            $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, null);
             $updateCfg = $this->pdo->prepare('UPDATE service_stock_items SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
             $updateCfg->execute([
                 'sold_to' => $userId,
-                'purchase_id' => $purchaseId,
+                'purchase_id' => null,
                 'sold_at' => $now,
                 'id' => $stockItemId,
             ]);
-
-            $insertClaim = $this->pdo->prepare(
-                'INSERT INTO free_test_service_claims (user_id, service_id, purchase_id, claimed_at)
-                 VALUES (:user_id, :service_id, :purchase_id, :claimed_at)'
-            );
-            $insertClaim->execute([
-                'user_id' => $userId,
-                'service_id' => $serviceId,
-                'purchase_id' => $purchaseId,
-                'claimed_at' => $now,
-            ]);
             $configText = $this->buildStockConfigText($cfg);
-            $this->recordUserServiceDelivery(
-                $purchaseId,
+            $deliveryToken = $this->recordUserServiceDelivery(
+                null,
                 $userId,
                 $serviceId,
                 null,
                 'stock',
+                true,
                 $stockItemId,
                 (string) ($cfg['sub_link'] ?? ''),
-                (string) ($cfg['config_link'] ?? ''),
-                null,
                 isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
                 isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
                 $configText
@@ -3006,17 +3052,23 @@ final class Database implements WorkerApiStore
             return [
                 'ok' => true,
                 'service_id' => $serviceId,
-                'purchase_id' => $purchaseId,
+                'purchase_id' => null,
                 'service_name' => $serviceName,
                 'mode' => 'stock',
                 'raw_payload' => $configText,
-                'sub_link' => (string) ($cfg['sub_link'] ?? ''),
+                'sub_link' => $this->buildPublicSubscriptionLink($deliveryToken, $service, (string) ($cfg['sub_link'] ?? '')),
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
+            return [
+                'ok' => false,
+                'error_code' => 'free_test_claim_failed',
+                'provider_error' => 'stock_claim_exception: ' . $e->getMessage(),
+                'service_id' => $serviceId,
+                'purchase_id' => null,
+            ];
         }
     }
 
@@ -3039,8 +3091,7 @@ final class Database implements WorkerApiStore
 
         $this->pdo->beginTransaction();
         try {
-            $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, null);
-            $username = $this->buildProvisionUsername($userId, $purchaseId);
+            $username = $this->buildProvisionUsername($userId, $serviceId);
             $provider = new PasarGuardProvisioningProvider(
                 $baseUrl,
                 $panelUsername,
@@ -3060,18 +3111,6 @@ final class Database implements WorkerApiStore
                 return ['ok' => false, 'error_code' => 'free_test_delivery_failed'];
             }
 
-            $now = gmdate('Y-m-d H:i:s');
-            $insertClaim = $this->pdo->prepare(
-                'INSERT INTO free_test_service_claims (user_id, service_id, purchase_id, claimed_at)
-                 VALUES (:user_id, :service_id, :purchase_id, :claimed_at)'
-            );
-            $insertClaim->execute([
-                'user_id' => $userId,
-                'service_id' => $serviceId,
-                'purchase_id' => $purchaseId,
-                'claimed_at' => $now,
-            ]);
-
             $rawData = is_array($result['raw'] ?? null) ? $result['raw'] : [];
             $metaJson = json_encode([
                 'provider' => 'pasarguard',
@@ -3084,16 +3123,15 @@ final class Database implements WorkerApiStore
                 'subscription_url' => $subscriptionUrl,
                 'raw' => $rawData,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            $this->recordUserServiceDelivery(
-                $purchaseId,
+            $deliveryToken = $this->recordUserServiceDelivery(
+                null,
                 $userId,
                 $serviceId,
                 null,
                 'panel',
+                true,
                 null,
                 $subscriptionUrl,
-                null,
-                null,
                 $defaultVolumeGb,
                 $durationDays,
                 $metaJson === false ? null : $metaJson
@@ -3102,38 +3140,44 @@ final class Database implements WorkerApiStore
             return [
                 'ok' => true,
                 'service_id' => $serviceId,
-                'purchase_id' => $purchaseId,
+                'purchase_id' => null,
                 'service_name' => (string) ($service['name'] ?? ''),
                 'mode' => 'panel_auto',
                 'username' => $username,
                 'volume_gb' => $defaultVolumeGb,
                 'duration_days' => $durationDays,
                 'raw_payload' => $subscriptionUrl,
-                'sub_link' => $subscriptionUrl,
+                'sub_link' => $this->buildPublicSubscriptionLink($deliveryToken, $service, $subscriptionUrl),
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
+            return [
+                'ok' => false,
+                'error_code' => 'free_test_claim_failed',
+                'provider_error' => 'panel_claim_exception: ' . $e->getMessage(),
+                'service_id' => $serviceId,
+                'purchase_id' => null,
+            ];
         }
     }
 
     public function resetFreeTestQuotaForUser(int $userId, ?int $serviceId = null): void
     {
         if ($serviceId !== null && $serviceId > 0) {
-            $stmt = $this->pdo->prepare('DELETE FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
+            $stmt = $this->pdo->prepare('DELETE FROM user_service_deliveries WHERE user_id = :user_id AND service_id = :service_id AND is_test = 1');
             $stmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
             return;
         }
 
-        $stmt = $this->pdo->prepare('DELETE FROM free_test_service_claims WHERE user_id = :user_id');
+        $stmt = $this->pdo->prepare('DELETE FROM user_service_deliveries WHERE user_id = :user_id AND is_test = 1');
         $stmt->execute(['user_id' => $userId]);
     }
 
     public function resetFreeTestQuotaForService(int $serviceId): void
     {
-        $stmt = $this->pdo->prepare('DELETE FROM free_test_service_claims WHERE service_id = :service_id');
+        $stmt = $this->pdo->prepare('DELETE FROM user_service_deliveries WHERE service_id = :service_id AND is_test = 1');
         $stmt->execute(['service_id' => $serviceId]);
     }
 
@@ -3149,7 +3193,7 @@ final class Database implements WorkerApiStore
 
     public function countFreeTestClaimsForService(int $serviceId): int
     {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE service_id = :service_id');
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM user_service_deliveries WHERE service_id = :service_id AND is_test = 1');
         $stmt->execute(['service_id' => $serviceId]);
         return (int) $stmt->fetchColumn();
     }
@@ -3220,7 +3264,13 @@ final class Database implements WorkerApiStore
 
         $claimMode = (string) ($rule['claim_mode'] ?? 'once_until_reset');
         $maxClaims = max(1, (int) ($rule['max_claims'] ?? 1));
-        $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
+        $countStmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+             FROM user_service_deliveries
+             WHERE user_id = :user_id
+               AND service_id = :service_id
+               AND is_test = 1'
+        );
         $countStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
         $claimCount = (int) $countStmt->fetchColumn();
         if ($claimMode === 'once_until_reset') {
@@ -3237,9 +3287,11 @@ final class Database implements WorkerApiStore
         }
         $cooldownDays = max(1, (int) ($rule['cooldown_days'] ?? 0));
         $lastStmt = $this->pdo->prepare(
-            'SELECT claimed_at
-             FROM free_test_service_claims
-             WHERE user_id = :user_id AND service_id = :service_id
+            'SELECT delivered_at
+             FROM user_service_deliveries
+             WHERE user_id = :user_id
+               AND service_id = :service_id
+               AND is_test = 1
              ORDER BY id DESC LIMIT 1'
         );
         $lastStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
@@ -3264,7 +3316,7 @@ final class Database implements WorkerApiStore
     public function getServiceByCode(string $serviceCode): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
              FROM service s
              WHERE s.service_code = :code
              LIMIT 1'
@@ -3277,7 +3329,7 @@ final class Database implements WorkerApiStore
     public function listAllServices(): array
     {
         $stmt = $this->pdo->query(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
              FROM service s
              ORDER BY s.id DESC'
         );

@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS service (
     panel_base_url VARCHAR(255) NULL,
     panel_username VARCHAR(191) NULL,
     panel_password TEXT NULL,
+    sub_link_mode VARCHAR(16) NOT NULL DEFAULT 'proxy',
+    sub_link_base_url VARCHAR(255) NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
@@ -90,7 +92,6 @@ CREATE TABLE IF NOT EXISTS purchases (
     amount INT NOT NULL,
     payment_method VARCHAR(64) NOT NULL,
     created_at DATETIME NOT NULL,
-    is_test TINYINT(1) NOT NULL DEFAULT 0,
     INDEX idx_purchases_user (user_id),
     INDEX idx_purchases_service (service_id),
     INDEX idx_purchases_tariff (tariff_id)
@@ -121,16 +122,6 @@ CREATE TABLE IF NOT EXISTS free_test_service_rules (
     updated_at DATETIME NOT NULL,
     INDEX idx_free_test_service_enabled (is_enabled),
     INDEX idx_free_test_service_priority (priority)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS free_test_service_claims (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    service_id BIGINT NOT NULL,
-    purchase_id BIGINT NOT NULL,
-    claimed_at DATETIME NOT NULL,
-    INDEX idx_free_test_service_claims_user_service (user_id, service_id),
-    INDEX idx_free_test_service_claims_service (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS payments (
@@ -243,15 +234,15 @@ CREATE TABLE IF NOT EXISTS purchase_rule_acceptances (
 
 CREATE TABLE IF NOT EXISTS user_service_deliveries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    purchase_id BIGINT NOT NULL,
+    purchase_id BIGINT NULL,
     user_id BIGINT NOT NULL,
     service_id BIGINT NOT NULL,
     tariff_id BIGINT NULL,
     source_type ENUM('stock','panel') NOT NULL,
+    is_test TINYINT(1) NOT NULL DEFAULT 0,
     stock_item_id BIGINT NULL,
+    subscription_token VARCHAR(64) NOT NULL,
     sub_link TEXT NOT NULL,
-    access_url TEXT NULL,
-    stock_item_uuid VARCHAR(191) NULL,
     volume_gb DECIMAL(10,2) NULL,
     duration_days INT NULL,
     delivered_at DATETIME NOT NULL,
@@ -259,5 +250,6 @@ CREATE TABLE IF NOT EXISTS user_service_deliveries (
     INDEX idx_deliveries_purchase (purchase_id),
     INDEX idx_deliveries_user (user_id),
     INDEX idx_deliveries_service (service_id, tariff_id),
-    INDEX idx_deliveries_source (source_type)
+    INDEX idx_deliveries_source (source_type),
+    UNIQUE KEY uq_deliveries_subscription_token (subscription_token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

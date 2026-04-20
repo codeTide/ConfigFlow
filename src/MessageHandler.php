@@ -703,7 +703,10 @@ final class MessageHandler
             }
             $this->database->clearUserState($userId);
             $claim = $this->database->claimFreeTestForService($userId, $serviceId);
-            $this->sendFreeTestClaimResult($chatId, $claim);
+            $claimed = $this->sendFreeTestClaimResult($chatId, $claim);
+            if ($claimed) {
+                $this->telegram->sendMessage($chatId, '​', $this->menus->mainMenuReplyKeyboard($userId));
+            }
             return;
         }
 
@@ -1301,10 +1304,12 @@ final class MessageHandler
         return false;
     }
 
-    private function sendFreeTestClaimResult(int $chatId, array $claim): void
+    private function sendFreeTestClaimResult(int $chatId, array $claim): bool
     {
         if (($claim['ok'] ?? false) !== true) {
             $errorCode = (string) ($claim['error_code'] ?? '');
+            $errorDetails = $errorCode !== '' ? $errorCode : 'unknown_error';
+            $errorRef = $this->logFreeTestClaimFailure($chatId, $claim);
             $messageKey = match ($errorCode) {
                 'service_not_found', 'service_inactive', 'free_test_disabled', 'invalid_service_mode' => 'messages.user.free_test.errors.service_invalid',
                 'free_test_stock_empty' => 'messages.user.free_test.errors.stock_empty',
@@ -1324,24 +1329,28 @@ final class MessageHandler
                         'next_allowed_at' => $nextAllowedAt !== '' ? $nextAllowedAt : $this->catalog->get('messages.generic.dash'),
                     ])
                 );
-                return;
+                return false;
             }
-            $this->telegram->sendMessage($chatId, $this->catalog->get($messageKey));
-            return;
+            $this->telegram->sendMessage($chatId, $this->catalog->get($messageKey, [
+                'error_code' => htmlspecialchars($errorDetails),
+                'error_ref' => htmlspecialchars($errorRef),
+            ]));
+            return false;
         }
 
         $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? $this->catalog->get('messages.user.free_test.default_service')));
         $mode = (string) ($claim['mode'] ?? 'stock');
         if ($mode === 'panel_auto') {
+            $volumeText = htmlspecialchars($this->toPersianDigits((string) ($claim['volume_gb'] ?? $this->catalog->get('messages.generic.dash'))));
             $msg = $this->catalog->get('messages.user.free_test.ready_panel', [
                 'service_name' => $serviceName,
                 'username' => htmlspecialchars((string) ($claim['username'] ?? $this->catalog->get('messages.generic.dash'))),
-                'volume_gb' => htmlspecialchars((string) ($claim['volume_gb'] ?? $this->catalog->get('messages.generic.dash'))),
-                'duration_days' => (int) ($claim['duration_days'] ?? 0) > 0 ? (string) (int) ($claim['duration_days'] ?? 0) : 'نامحدود',
+                'volume_gb' => $volumeText,
+                'duration_days' => (int) ($claim['duration_days'] ?? 0) > 0 ? $this->toPersianDigits((string) (int) ($claim['duration_days'] ?? 0)) : 'نامحدود',
                 'subscription_url' => htmlspecialchars((string) ($claim['sub_link'] ?? '')),
             ]);
             $this->telegram->sendMessage($chatId, $msg);
-            return;
+            return true;
         }
         $stockItemText = htmlspecialchars((string) ($claim['raw_payload'] ?? ''));
         $inquiryLink = trim((string) ($claim['sub_link'] ?? ''));
@@ -1357,6 +1366,7 @@ final class MessageHandler
             ]);
         }
         $this->telegram->sendMessage($chatId, $msg);
+        return true;
     }
 
     /** @param array<int,array<string,mixed>> $visibleServices */
@@ -1372,23 +1382,28 @@ final class MessageHandler
                 continue;
             }
             $name = (string) ($service['service_name'] ?? '');
-            $mode = (string) ($service['mode'] ?? 'stock');
             $volume = isset($service['volume_gb']) && $service['volume_gb'] !== null ? trim((string) $service['volume_gb']) : '';
             $durationDays = isset($service['duration_days']) && $service['duration_days'] !== null ? (int) $service['duration_days'] : 0;
-            $duration = $durationDays > 0 ? ($durationDays . ' روز') : 'نامحدود';
-            $detail = $volume !== '' ? (' • ' . $volume . ' گیگ • ' . $duration) : '';
-            $lines[] = $this->catalog->get('messages.user.free_test.service_selection.row', ['num' => $num, 'name' => htmlspecialchars($name)]);
-            if ($detail !== '') {
-                $lines[] = '   ⚙️ ' . htmlspecialchars($mode) . $detail;
-            }
+            $buttonLabel = $this->catalog->get('messages.user.free_test.service_selection.button', ['name' => $name]);
+            $lines[] = $buttonLabel;
+            $duration = $durationDays > 0 ? ($this->toPersianDigits((string) $durationDays) . ' روز') : 'نامحدود';
+            $volumeText = $volume !== '' ? $this->toPersianDigits($volume) . ' گیگ' : 'نامشخص';
+            $claimMode = (string) ($service['claim_mode'] ?? 'cooldown');
+            $cooldownDays = max(0, (int) ($service['cooldown_days'] ?? 0));
+            $cooldownText = $claimMode === 'once_until_reset'
+                ? 'یک‌بار تا ریست'
+                : 'هر ' . $this->toPersianDigits((string) max(1, $cooldownDays)) . ' روز';
+            $lines[] = '   📦 ' . $volumeText . ' | ⏳ ' . $duration . ' | 🔁 ' . $cooldownText;
             $options[$num] = [
                 'service_id' => $serviceId,
                 'service_name' => $name,
-                'mode' => $mode,
+                'mode' => (string) ($service['mode'] ?? 'stock'),
                 'volume_gb' => $volume,
                 'duration_days' => $durationDays,
             ];
-            $buttons[] = [$this->catalog->get('messages.user.free_test.service_selection.button', ['num' => $num, 'name' => $name])];
+            $options[$buttonLabel] = $options[$num];
+            $options[$name] = $options[$num];
+            $buttons[] = [$buttonLabel];
         }
         if ($options === []) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.not_available'));
@@ -5925,11 +5940,6 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.order_not_found'));
             return;
         }
-        if ((int) ($purchase['is_test'] ?? 0) === 1) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.test_not_renewable'));
-            return;
-        }
-
         $tariffs = $this->database->getActiveTariffsByType(0);
         if ($tariffs === []) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.renew.no_tariff'));
@@ -7180,10 +7190,36 @@ final class MessageHandler
 
     private function extractOptionKey(string $text): string
     {
-        if (preg_match('/^\D*(\d+)/u', trim($text), $m) === 1) {
+        $normalized = strtr(trim($text), ['۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9']);
+        if (preg_match('/^\D*(\d+)/u', $normalized, $m) === 1) {
             return (string) $m[1];
         }
-        return trim($text);
+        return $normalized;
+    }
+
+    private function toPersianDigits(string $value): string
+    {
+        return strtr($value, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);
+    }
+
+    private function logFreeTestClaimFailure(int $chatId, array $claim): string
+    {
+        $ref = 'FT-' . gmdate('YmdHis') . '-' . str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $logDir = dirname(__DIR__) . '/storage/logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0775, true);
+        }
+        $entry = [
+            'ref' => $ref,
+            'at' => gmdate('c'),
+            'chat_id' => $chatId,
+            'error_code' => (string) ($claim['error_code'] ?? ''),
+            'provider_error' => (string) ($claim['provider_error'] ?? ''),
+            'service_id' => isset($claim['service_id']) ? (int) $claim['service_id'] : null,
+            'purchase_id' => isset($claim['purchase_id']) ? (int) $claim['purchase_id'] : null,
+        ];
+        @file_put_contents($logDir . '/free_test_claim_errors.log', json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+        return $ref;
     }
 
     private function replyKeyboard(array $rows): array
