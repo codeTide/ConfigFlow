@@ -703,10 +703,7 @@ final class MessageHandler
             }
             $this->database->clearUserState($userId);
             $claim = $this->database->claimFreeTestForService($userId, $serviceId);
-            $claimed = $this->sendFreeTestClaimResult($chatId, $claim);
-            if ($claimed) {
-                $this->telegram->sendMessage($chatId, '​', $this->menus->mainMenuReplyKeyboard($userId));
-            }
+            $this->sendFreeTestClaimResult($chatId, $userId, $claim);
             return;
         }
 
@@ -1304,7 +1301,7 @@ final class MessageHandler
         return false;
     }
 
-    private function sendFreeTestClaimResult(int $chatId, array $claim): bool
+    private function sendFreeTestClaimResult(int $chatId, int $userId, array $claim): bool
     {
         if (($claim['ok'] ?? false) !== true) {
             $errorCode = (string) ($claim['error_code'] ?? '');
@@ -1349,7 +1346,7 @@ final class MessageHandler
                 'duration_days' => (int) ($claim['duration_days'] ?? 0) > 0 ? $this->toPersianDigits((string) (int) ($claim['duration_days'] ?? 0)) : 'نامحدود',
                 'subscription_url' => htmlspecialchars((string) ($claim['sub_link'] ?? '')),
             ]);
-            $this->telegram->sendMessage($chatId, $msg);
+            $this->telegram->sendMessage($chatId, $msg, $this->menus->mainMenuReplyKeyboard($userId));
             return true;
         }
         $stockItemText = htmlspecialchars((string) ($claim['raw_payload'] ?? ''));
@@ -1365,7 +1362,7 @@ final class MessageHandler
                 'inquiry_link' => htmlspecialchars($inquiryLink),
             ]);
         }
-        $this->telegram->sendMessage($chatId, $msg);
+        $this->telegram->sendMessage($chatId, $msg, $this->menus->mainMenuReplyKeyboard($userId));
         return true;
     }
 
