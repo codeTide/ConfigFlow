@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS service_stock_items (
     INDEX idx_stock_service (service_id),
     INDEX idx_stock_tariff (tariff_id),
     INDEX idx_stock_bucket (inventory_bucket),
-    INDEX idx_stock_available (service_id, tariff_id, inventory_bucket, sold_to, reserved_payment_id, is_expired)
+    INDEX idx_stock_available (service_id, tariff_id, inventory_bucket, sold_to, reserved_payment_id, is_expired),
+    INDEX idx_stock_available_service (service_id, inventory_bucket, sold_to, reserved_payment_id, is_expired)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS purchases (
@@ -113,8 +114,8 @@ CREATE TABLE IF NOT EXISTS free_test_service_rules (
     claim_mode ENUM('cooldown','once_until_reset') NOT NULL DEFAULT 'once_until_reset',
     cooldown_days INT NULL,
     max_claims INT NOT NULL DEFAULT 1,
-    default_volume_gb DECIMAL(10,2) NULL,
-    default_duration_days INT NULL,
+    volume_gb DECIMAL(10,2) NULL,
+    duration_days INT NULL,
     priority INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
@@ -197,7 +198,7 @@ CREATE TABLE IF NOT EXISTS agency_service_prices (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     service_id BIGINT NOT NULL,
-    tariff_id BIGINT NOT NULL,
+    tariff_id BIGINT NULL,
     price INT NOT NULL,
     UNIQUE KEY uniq_agency_service_price (user_id, service_id, tariff_id),
     INDEX idx_agency_service_price_user (user_id),
@@ -245,7 +246,7 @@ CREATE TABLE IF NOT EXISTS user_service_deliveries (
     purchase_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     service_id BIGINT NOT NULL,
-    tariff_id BIGINT NOT NULL,
+    tariff_id BIGINT NULL,
     source_type ENUM('stock','panel') NOT NULL,
     stock_item_id BIGINT NULL,
     sub_link TEXT NOT NULL,
