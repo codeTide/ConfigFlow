@@ -39,8 +39,8 @@ final class Database implements WorkerApiStore
                 claim_mode ENUM('cooldown','once_until_reset') NOT NULL DEFAULT 'once_until_reset',
                 cooldown_days INT NULL,
                 max_claims INT NOT NULL DEFAULT 1,
-                default_volume_gb DECIMAL(10,2) NULL,
-                default_duration_days INT NULL,
+                volume_gb DECIMAL(10,2) NULL,
+                duration_days INT NULL,
                 priority INT NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
@@ -49,8 +49,16 @@ final class Database implements WorkerApiStore
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         if ($this->tableExists('free_test_service_rules')) {
-            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS default_volume_gb DECIMAL(10,2) NULL AFTER max_claims");
-            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS default_duration_days INT NULL AFTER default_volume_gb");
+            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS volume_gb DECIMAL(10,2) NULL AFTER max_claims");
+            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS duration_days INT NULL AFTER volume_gb");
+            if ($this->columnExists('free_test_service_rules', 'default_volume_gb')) {
+                $this->pdo->exec("UPDATE free_test_service_rules SET volume_gb = default_volume_gb WHERE volume_gb IS NULL AND default_volume_gb IS NOT NULL");
+                $this->pdo->exec("ALTER TABLE free_test_service_rules DROP COLUMN IF EXISTS default_volume_gb");
+            }
+            if ($this->columnExists('free_test_service_rules', 'default_duration_days')) {
+                $this->pdo->exec("UPDATE free_test_service_rules SET duration_days = default_duration_days WHERE duration_days IS NULL AND default_duration_days IS NOT NULL");
+                $this->pdo->exec("ALTER TABLE free_test_service_rules DROP COLUMN IF EXISTS default_duration_days");
+            }
         }
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS free_test_service_claims (
@@ -140,7 +148,8 @@ final class Database implements WorkerApiStore
                 INDEX idx_stock_service (service_id),
                 INDEX idx_stock_tariff (tariff_id),
                 INDEX idx_stock_bucket (inventory_bucket),
-                INDEX idx_stock_available (service_id, tariff_id, inventory_bucket, sold_to, reserved_payment_id, is_expired)
+                INDEX idx_stock_available (service_id, tariff_id, inventory_bucket, sold_to, reserved_payment_id, is_expired),
+                INDEX idx_stock_available_service (service_id, inventory_bucket, sold_to, reserved_payment_id, is_expired)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         if ($this->tableExists('service_stock_items')) {
@@ -152,6 +161,7 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE service_stock_items DROP COLUMN IF EXISTS config_uuid");
             $this->pdo->exec("ALTER TABLE service_stock_items DROP COLUMN IF EXISTS stock_item_uuid");
             $this->pdo->exec("ALTER TABLE service_stock_items DROP COLUMN IF EXISTS raw_payload");
+            $this->pdo->exec("ALTER TABLE service_stock_items ADD INDEX IF NOT EXISTS idx_stock_available_service (service_id, inventory_bucket, sold_to, reserved_payment_id, is_expired)");
         }
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS user_service_deliveries (
@@ -159,7 +169,7 @@ final class Database implements WorkerApiStore
                 purchase_id BIGINT NOT NULL,
                 user_id BIGINT NOT NULL,
                 service_id BIGINT NOT NULL,
-                tariff_id BIGINT NOT NULL,
+                tariff_id BIGINT NULL,
                 source_type ENUM('stock','panel') NOT NULL,
                 stock_item_id BIGINT NULL,
                 sub_link TEXT NOT NULL,
@@ -175,6 +185,9 @@ final class Database implements WorkerApiStore
                 INDEX idx_deliveries_source (source_type)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+        if ($this->tableExists('user_service_deliveries')) {
+            $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN tariff_id BIGINT NULL");
+        }
         if ($this->tableExists('payments')) {
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS service_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
@@ -2306,7 +2319,7 @@ final class Database implements WorkerApiStore
         int $purchaseId,
         int $userId,
         int $serviceId,
-        int $tariffId,
+        ?int $tariffId,
         string $sourceType,
         ?int $stockItemId,
         string $subLink,
@@ -2785,7 +2798,7 @@ final class Database implements WorkerApiStore
     public function getFreeTestRuleForService(int $serviceId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT service_id, is_enabled, claim_mode, cooldown_days, max_claims, default_volume_gb, default_duration_days, priority, created_at, updated_at
+            'SELECT service_id, is_enabled, claim_mode, cooldown_days, max_claims, volume_gb, duration_days, priority, created_at, updated_at
              FROM free_test_service_rules
              WHERE service_id = :service_id
              LIMIT 1'
@@ -2833,18 +2846,18 @@ final class Database implements WorkerApiStore
         }
         $now = gmdate('Y-m-d H:i:s');
         $stmt = $this->pdo->prepare(
-            'INSERT INTO free_test_service_rules (service_id, is_enabled, claim_mode, cooldown_days, max_claims, default_volume_gb, default_duration_days, priority, created_at, updated_at)
-             VALUES (:service_id, 0, :claim_mode, NULL, 1, :default_volume_gb, :default_duration_days, 0, :created_at, :updated_at)
+            'INSERT INTO free_test_service_rules (service_id, is_enabled, claim_mode, cooldown_days, max_claims, volume_gb, duration_days, priority, created_at, updated_at)
+             VALUES (:service_id, 0, :claim_mode, NULL, 1, :volume_gb, :duration_days, 0, :created_at, :updated_at)
              ON DUPLICATE KEY UPDATE
-                default_volume_gb = VALUES(default_volume_gb),
-                default_duration_days = VALUES(default_duration_days),
+                volume_gb = VALUES(volume_gb),
+                duration_days = VALUES(duration_days),
                 updated_at = VALUES(updated_at)'
         );
         $stmt->execute([
             'service_id' => $serviceId,
             'claim_mode' => 'once_until_reset',
-            'default_volume_gb' => $defaultVolumeGb,
-            'default_duration_days' => $defaultDurationDays,
+            'volume_gb' => $defaultVolumeGb,
+            'duration_days' => $defaultDurationDays,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -2887,11 +2900,23 @@ final class Database implements WorkerApiStore
             return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
         }
 
+        $service = $this->getService($serviceId);
+        $mode = (string) ($service['mode'] ?? 'stock');
+        if ($mode === 'panel_auto') {
+            return $this->claimFreeTestFromPanelService($userId, $serviceId, is_array($service) ? $service : [], is_array($rule) ? $rule : []);
+        }
+
+        return $this->claimFreeTestFromStockService($userId, $serviceId, is_array($service) ? $service : null);
+    }
+
+    private function claimFreeTestFromStockService(int $userId, int $serviceId, ?array $service = null): array
+    {
+        $serviceName = is_array($service) ? (string) ($service['name'] ?? '') : '';
         $now = gmdate('Y-m-d H:i:s');
         $this->pdo->beginTransaction();
         try {
             $cfgStmt = $this->pdo->prepare(
-                "SELECT id, service_id, tariff_id, sub_link, config_link, volume_gb, duration_days
+                "SELECT id, service_id, sub_link, config_link, volume_gb, duration_days
                  FROM service_stock_items
                  WHERE service_id = :service_id
                    AND sold_to IS NULL
@@ -2908,14 +2933,14 @@ final class Database implements WorkerApiStore
                 return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
             }
 
-            $stock_itemId = (int) ($cfg['id'] ?? 0);
-            $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, (int) ($cfg['tariff_id'] ?? 0));
+            $stockItemId = (int) ($cfg['id'] ?? 0);
+            $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, null);
             $updateCfg = $this->pdo->prepare('UPDATE service_stock_items SET sold_to = :sold_to, purchase_id = :purchase_id, sold_at = :sold_at WHERE id = :id');
             $updateCfg->execute([
                 'sold_to' => $userId,
                 'purchase_id' => $purchaseId,
                 'sold_at' => $now,
-                'id' => $stock_itemId,
+                'id' => $stockItemId,
             ]);
 
             $insertClaim = $this->pdo->prepare(
@@ -2928,19 +2953,20 @@ final class Database implements WorkerApiStore
                 'purchase_id' => $purchaseId,
                 'claimed_at' => $now,
             ]);
+            $configText = $this->buildStockConfigText($cfg);
             $this->recordUserServiceDelivery(
                 $purchaseId,
                 $userId,
                 $serviceId,
-                (int) ($cfg['tariff_id'] ?? 0),
+                null,
                 'stock',
-                $stock_itemId,
+                $stockItemId,
                 (string) ($cfg['sub_link'] ?? ''),
                 (string) ($cfg['config_link'] ?? ''),
                 null,
                 isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
                 isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
-                $this->buildStockConfigText($cfg)
+                $configText
             );
 
             $this->pdo->commit();
@@ -2948,9 +2974,90 @@ final class Database implements WorkerApiStore
                 'ok' => true,
                 'service_id' => $serviceId,
                 'purchase_id' => $purchaseId,
-                'service_name' => '',
-                'raw_payload' => $this->buildStockConfigText($cfg),
+                'service_name' => $serviceName,
+                'raw_payload' => $configText,
                 'sub_link' => (string) ($cfg['sub_link'] ?? ''),
+            ];
+        } catch (\Throwable) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error' => 'claim_failed'];
+        }
+    }
+
+    private function claimFreeTestFromPanelService(int $userId, int $serviceId, array $service, array $rule): array
+    {
+        $defaultVolumeGb = isset($rule['volume_gb']) ? (float) $rule['volume_gb'] : 0.0;
+        if ($defaultVolumeGb <= 0) {
+            return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
+        }
+        $durationDays = isset($rule['duration_days']) ? max(0, (int) $rule['duration_days']) : 0;
+        $baseUrl = trim((string) ($service['panel_base_url'] ?? ''));
+        $panelUsername = trim((string) ($service['panel_username'] ?? ''));
+        $panelPassword = trim((string) ($service['panel_password'] ?? ''));
+        $groupIds = $this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword);
+        if ($groupIds === []) {
+            return ['ok' => false, 'error' => 'panel_ref_invalid'];
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, null);
+            $username = $this->buildProvisionUsername($userId, $purchaseId);
+            $provider = new PasarGuardProvisioningProvider(
+                $baseUrl,
+                $panelUsername,
+                $panelPassword,
+                $groupIds
+            );
+            $dataLimitBytes = (int) max(1, round($defaultVolumeGb * 1024 * 1024 * 1024));
+            $expireAt = $durationDays > 0 ? (time() + ($durationDays * 86400)) : 0;
+            $result = $provider->provisionUser($username, $dataLimitBytes, $expireAt, $groupIds);
+            if (!($result['ok'] ?? false)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => (string) ($result['error'] ?? 'panel_provision_failed')];
+            }
+            $subscriptionUrl = trim((string) ($result['subscription_url'] ?? ''));
+            if ($subscriptionUrl === '') {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error' => 'subscription_missing'];
+            }
+
+            $now = gmdate('Y-m-d H:i:s');
+            $insertClaim = $this->pdo->prepare(
+                'INSERT INTO free_test_service_claims (user_id, service_id, purchase_id, claimed_at)
+                 VALUES (:user_id, :service_id, :purchase_id, :claimed_at)'
+            );
+            $insertClaim->execute([
+                'user_id' => $userId,
+                'service_id' => $serviceId,
+                'purchase_id' => $purchaseId,
+                'claimed_at' => $now,
+            ]);
+
+            $this->recordUserServiceDelivery(
+                $purchaseId,
+                $userId,
+                $serviceId,
+                null,
+                'panel',
+                null,
+                $subscriptionUrl,
+                null,
+                null,
+                $defaultVolumeGb,
+                $durationDays,
+                null
+            );
+            $this->pdo->commit();
+            return [
+                'ok' => true,
+                'service_id' => $serviceId,
+                'purchase_id' => $purchaseId,
+                'service_name' => (string) ($service['name'] ?? ''),
+                'raw_payload' => $subscriptionUrl,
+                'sub_link' => $subscriptionUrl,
             ];
         } catch (\Throwable) {
             if ($this->pdo->inTransaction()) {
@@ -3017,11 +3124,30 @@ final class Database implements WorkerApiStore
         }
 
         $service = $this->getService($serviceId);
-        if (!is_array($service) || (int) ($service['is_active'] ?? 0) !== 1 || (string) ($service['mode'] ?? '') !== 'stock') {
+        if (!is_array($service) || (int) ($service['is_active'] ?? 0) !== 1) {
             return false;
         }
 
-        if ($this->countAvailableFreeTestStockByService($serviceId) <= 0) {
+        $mode = (string) ($service['mode'] ?? 'stock');
+        if ($mode === 'stock') {
+            if ($this->countAvailableFreeTestStockByService($serviceId) <= 0) {
+                return false;
+            }
+        } elseif ($mode === 'panel_auto') {
+            $defaultVolumeGb = isset($rule['volume_gb']) ? (float) $rule['volume_gb'] : 0.0;
+            if ($defaultVolumeGb <= 0) {
+                return false;
+            }
+            $baseUrl = trim((string) ($service['panel_base_url'] ?? ''));
+            $panelUsername = trim((string) ($service['panel_username'] ?? ''));
+            $panelPassword = trim((string) ($service['panel_password'] ?? ''));
+            if ($baseUrl === '' || $panelUsername === '' || $panelPassword === '') {
+                return false;
+            }
+            if ($this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword) === []) {
+                return false;
+            }
+        } else {
             return false;
         }
 
