@@ -173,6 +173,7 @@ final class Database implements WorkerApiStore
                 source_type ENUM('stock','panel') NOT NULL,
                 is_test TINYINT(1) NOT NULL DEFAULT 0,
                 stock_item_id BIGINT NULL,
+                subscription_token VARCHAR(64) NOT NULL,
                 sub_link TEXT NOT NULL,
                 volume_gb DECIMAL(10,2) NULL,
                 duration_days INT NULL,
@@ -181,15 +182,20 @@ final class Database implements WorkerApiStore
                 INDEX idx_deliveries_purchase (purchase_id),
                 INDEX idx_deliveries_user (user_id),
                 INDEX idx_deliveries_service (service_id, tariff_id),
-                INDEX idx_deliveries_source (source_type)
+                INDEX idx_deliveries_source (source_type),
+                UNIQUE KEY uq_deliveries_subscription_token (subscription_token)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         if ($this->tableExists('user_service_deliveries')) {
             $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN tariff_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS is_test TINYINT(1) NOT NULL DEFAULT 0 AFTER source_type");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS subscription_token VARCHAR(64) NULL AFTER stock_item_id");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS access_url");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS stock_item_uuid");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS config_uuid");
+            $this->pdo->exec("UPDATE user_service_deliveries SET subscription_token = REPLACE(LOWER(UUID()), '-', '') WHERE subscription_token IS NULL OR subscription_token = ''");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN subscription_token VARCHAR(64) NOT NULL");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD UNIQUE INDEX IF NOT EXISTS uq_deliveries_subscription_token (subscription_token)");
             if ($this->columnExists('user_service_deliveries', 'is_test')) {
                 $this->pdo->exec(
                     "UPDATE user_service_deliveries d
@@ -2021,7 +2027,7 @@ final class Database implements WorkerApiStore
             $serviceId,
             $tariffId
         );
-        $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', false, null, $subscriptionUrl, $volumeGb, $durationDays, null);
+        $deliveryToken = $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', false, null, $subscriptionUrl, $volumeGb, $durationDays, null);
 
         $this->markOrderDelivered((int) ($order['id'] ?? 0), (int) ($order['payment_id'] ?? 0));
         $this->pdo->commit();
@@ -2030,7 +2036,7 @@ final class Database implements WorkerApiStore
             'user_id' => (int) ($order['user_id'] ?? 0),
             'raw_payload' => $subscriptionUrl,
             'service_name' => (string) ($service['name'] ?? ''),
-            'sub_link' => $subscriptionUrl,
+            'sub_link' => $this->buildPublicSubscriptionLink($deliveryToken),
         ];
     }
 
@@ -2055,6 +2061,40 @@ final class Database implements WorkerApiStore
             $value .= $alphabet[random_int(0, $maxIndex)];
         }
         return $value;
+    }
+
+    private function buildPublicSubscriptionLink(string $token): string
+    {
+        $baseUrl = rtrim((string) getenv('PUBLIC_BASE_URL'), '/');
+        if ($baseUrl === '') {
+            $baseUrl = rtrim((string) getenv('APP_BASE_URL'), '/');
+        }
+        if ($baseUrl === '') {
+            return '/sub/' . rawurlencode($token);
+        }
+        return $baseUrl . '/sub/' . rawurlencode($token);
+    }
+
+    public function getDeliverySubLinkByToken(string $token): ?string
+    {
+        $cleanToken = trim($token);
+        if ($cleanToken === '') {
+            return null;
+        }
+        $stmt = $this->pdo->prepare(
+            'SELECT sub_link
+             FROM user_service_deliveries
+             WHERE subscription_token = :token
+             ORDER BY id DESC
+             LIMIT 1'
+        );
+        $stmt->execute(['token' => $cleanToken]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return null;
+        }
+        $subLink = trim((string) ($row['sub_link'] ?? ''));
+        return $subLink !== '' ? $subLink : null;
     }
 
     /** @param array<string,mixed> $serviceRow
@@ -2349,12 +2389,13 @@ final class Database implements WorkerApiStore
         ?float $volumeGb,
         ?int $durationDays,
         ?string $metaJson
-    ): void {
+    ): string {
+        $subscriptionToken = strtolower(bin2hex(random_bytes(16)));
         $stmt = $this->pdo->prepare(
             'INSERT INTO user_service_deliveries (
-                purchase_id, user_id, service_id, tariff_id, source_type, is_test, stock_item_id, sub_link, volume_gb, duration_days, delivered_at, meta_json
+                purchase_id, user_id, service_id, tariff_id, source_type, is_test, stock_item_id, subscription_token, sub_link, volume_gb, duration_days, delivered_at, meta_json
              ) VALUES (
-                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :is_test, :stock_item_id, :sub_link, :volume_gb, :duration_days, :delivered_at, :meta_json
+                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :is_test, :stock_item_id, :subscription_token, :sub_link, :volume_gb, :duration_days, :delivered_at, :meta_json
              )'
         );
         $stmt->execute([
@@ -2365,12 +2406,14 @@ final class Database implements WorkerApiStore
             'source_type' => $sourceType === 'panel' ? 'panel' : 'stock',
             'is_test' => $isTest ? 1 : 0,
             'stock_item_id' => $stockItemId,
+            'subscription_token' => $subscriptionToken,
             'sub_link' => $subLink,
             'volume_gb' => $volumeGb,
             'duration_days' => $durationDays,
             'delivered_at' => gmdate('Y-m-d H:i:s'),
             'meta_json' => $metaJson,
         ]);
+        return $subscriptionToken;
     }
 
     private function markOrderDelivered(int $orderId, int $paymentId): void
@@ -3004,7 +3047,7 @@ final class Database implements WorkerApiStore
                 'claimed_at' => $now,
             ]);
             $configText = $this->buildStockConfigText($cfg);
-            $this->recordUserServiceDelivery(
+            $deliveryToken = $this->recordUserServiceDelivery(
                 $purchaseId,
                 $userId,
                 $serviceId,
@@ -3026,7 +3069,7 @@ final class Database implements WorkerApiStore
                 'service_name' => $serviceName,
                 'mode' => 'stock',
                 'raw_payload' => $configText,
-                'sub_link' => (string) ($cfg['sub_link'] ?? ''),
+                'sub_link' => $this->buildPublicSubscriptionLink($deliveryToken),
             ];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
@@ -3107,7 +3150,7 @@ final class Database implements WorkerApiStore
                 'subscription_url' => $subscriptionUrl,
                 'raw' => $rawData,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            $this->recordUserServiceDelivery(
+            $deliveryToken = $this->recordUserServiceDelivery(
                 $purchaseId,
                 $userId,
                 $serviceId,
@@ -3131,7 +3174,7 @@ final class Database implements WorkerApiStore
                 'volume_gb' => $defaultVolumeGb,
                 'duration_days' => $durationDays,
                 'raw_payload' => $subscriptionUrl,
-                'sub_link' => $subscriptionUrl,
+                'sub_link' => $this->buildPublicSubscriptionLink($deliveryToken),
             ];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {

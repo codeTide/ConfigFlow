@@ -703,7 +703,10 @@ final class MessageHandler
             }
             $this->database->clearUserState($userId);
             $claim = $this->database->claimFreeTestForService($userId, $serviceId);
-            $this->sendFreeTestClaimResult($chatId, $claim);
+            $claimed = $this->sendFreeTestClaimResult($chatId, $claim);
+            if ($claimed) {
+                $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
+            }
             return;
         }
 
@@ -1301,7 +1304,7 @@ final class MessageHandler
         return false;
     }
 
-    private function sendFreeTestClaimResult(int $chatId, array $claim): void
+    private function sendFreeTestClaimResult(int $chatId, array $claim): bool
     {
         if (($claim['ok'] ?? false) !== true) {
             $errorCode = (string) ($claim['error_code'] ?? '');
@@ -1326,27 +1329,28 @@ final class MessageHandler
                         'next_allowed_at' => $nextAllowedAt !== '' ? $nextAllowedAt : $this->catalog->get('messages.generic.dash'),
                     ])
                 );
-                return;
+                return false;
             }
             $this->telegram->sendMessage($chatId, $this->catalog->get($messageKey, [
                 'error_code' => htmlspecialchars($errorDetails),
                 'error_ref' => htmlspecialchars($errorRef),
             ]));
-            return;
+            return false;
         }
 
         $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? $this->catalog->get('messages.user.free_test.default_service')));
         $mode = (string) ($claim['mode'] ?? 'stock');
         if ($mode === 'panel_auto') {
+            $volumeText = htmlspecialchars($this->toPersianDigits((string) ($claim['volume_gb'] ?? $this->catalog->get('messages.generic.dash'))));
             $msg = $this->catalog->get('messages.user.free_test.ready_panel', [
                 'service_name' => $serviceName,
                 'username' => htmlspecialchars((string) ($claim['username'] ?? $this->catalog->get('messages.generic.dash'))),
-                'volume_gb' => htmlspecialchars((string) ($claim['volume_gb'] ?? $this->catalog->get('messages.generic.dash'))),
-                'duration_days' => (int) ($claim['duration_days'] ?? 0) > 0 ? (string) (int) ($claim['duration_days'] ?? 0) : 'نامحدود',
+                'volume_gb' => $volumeText,
+                'duration_days' => (int) ($claim['duration_days'] ?? 0) > 0 ? $this->toPersianDigits((string) (int) ($claim['duration_days'] ?? 0)) : 'نامحدود',
                 'subscription_url' => htmlspecialchars((string) ($claim['sub_link'] ?? '')),
             ]);
             $this->telegram->sendMessage($chatId, $msg);
-            return;
+            return true;
         }
         $stockItemText = htmlspecialchars((string) ($claim['raw_payload'] ?? ''));
         $inquiryLink = trim((string) ($claim['sub_link'] ?? ''));
@@ -1362,6 +1366,7 @@ final class MessageHandler
             ]);
         }
         $this->telegram->sendMessage($chatId, $msg);
+        return true;
     }
 
     /** @param array<int,array<string,mixed>> $visibleServices */

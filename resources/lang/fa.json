@@ -110,7 +110,7 @@
         "default_service": "سرویس تست",
         "ready_stock": "🎁 تست رایگان شما آماده شد\n\n🧩 سرویس: {service_name}\n🧪 نوع سفارش: تست رایگان\n🔐 اطلاعات اتصال:\n<code>{config_text}</code>\n\n<blockquote>💡 کانفیگ بالا مخصوص همین سرویس است؛ برای دریافت تست سرویس‌های دیگر دوباره از منوی تست رایگان اقدام کنید.</blockquote>",
         "ready_stock_with_inquiry": "🎁 تست رایگان شما آماده شد\n\n🧩 سرویس: {service_name}\n🧪 نوع سفارش: تست رایگان\n🔐 اطلاعات اتصال:\n<code>{config_text}</code>\n🌐 لینک اشتراک:\n{inquiry_link}\n\n<blockquote>💡 لینک اشتراک را نگه دارید تا هر زمان لازم بود تنظیمات را دوباره به‌روزرسانی کنید.</blockquote>",
-        "ready_panel": "🎁 تست رایگان شما از پنل ساخته شد\n\n🧩 سرویس: {service_name}\n🧪 نوع سفارش: تست رایگان\n👤 نام کاربری: {username}\n📦 حجم تست: {volume_gb} گیگ\n⏳ زمان تست: {duration_days}\n🌐 لینک اشتراک:\n{subscription_url}\n\n<blockquote>💡 لینک اشتراک را در کلاینت وارد کنید؛ اگر نیاز به تست سرویس دیگری دارید دوباره از همین منو انتخاب کنید.</blockquote>",
+        "ready_panel": "🎁 تست رایگان شما ایجاد شد.\n\n🧩 سرویس: {service_name}\n🧪 نوع سفارش: تست رایگان\n👤 شناسه سرویس: {username}\n📦 حجم تست: {volume_gb} گیگ\n⏳ زمان تست: {duration_days}\n🌐 لینک اشتراک:\n\n<code>{subscription_url}</code>\n\n<blockquote>💡 لینک اشتراک را در کلاینت وارد کنید؛ اگر نیاز به تست سرویس دیگری دارید دوباره از همین منو انتخاب کنید.</blockquote>",
         "service_selection": {
           "overview": "🎁 انتخاب سرویس تست رایگان\n\n🧩 سرویس‌های فعال:\n\n{services}\n\n<blockquote>💡 یک سرویس را انتخاب کنید؛ وضعیت سهمیه و امکان تحویل همان لحظه برای همان سرویس بررسی می‌شود.</blockquote>",
           "row": "{num}) {name}",
