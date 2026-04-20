@@ -21,7 +21,7 @@ $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '';
 $prefix = '/sub/';
 $token = '';
 if (str_starts_with($path, $prefix)) {
-    $token = substr($path, strlen($prefix));
+    $token = trim((string) substr($path, strlen($prefix)), '/');
 }
 if ($token === '' && isset($_GET['token'])) {
     $token = (string) $_GET['token'];

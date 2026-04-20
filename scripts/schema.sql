@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS service (
     panel_password TEXT NULL,
     sub_link_mode VARCHAR(16) NOT NULL DEFAULT 'proxy',
     sub_link_base_url VARCHAR(255) NULL,
+    panel_group_ids JSON NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,

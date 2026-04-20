@@ -76,6 +76,7 @@ final class Database implements WorkerApiStore
                 panel_password TEXT NULL,
                 sub_link_mode VARCHAR(16) NOT NULL DEFAULT 'proxy',
                 sub_link_base_url VARCHAR(255) NULL,
+                panel_group_ids JSON NULL,
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
@@ -91,6 +92,7 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_password TEXT NULL AFTER panel_username");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS sub_link_mode VARCHAR(16) NOT NULL DEFAULT 'proxy' AFTER panel_password");
             $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS sub_link_base_url VARCHAR(255) NULL AFTER sub_link_mode");
+            $this->pdo->exec("ALTER TABLE service ADD COLUMN IF NOT EXISTS panel_group_ids JSON NULL AFTER sub_link_base_url");
             $this->pdo->exec("ALTER TABLE service DROP INDEX IF EXISTS idx_service_type");
             $this->pdo->exec("ALTER TABLE service DROP COLUMN IF EXISTS panel_ref");
             $this->pdo->exec("ALTER TABLE service DROP COLUMN IF EXISTS panel_id");
@@ -729,7 +731,7 @@ final class Database implements WorkerApiStore
     public function listServicesByType(int $typeId): array
     {
         $stmt = $this->pdo->query(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.panel_group_ids, s.is_active
              FROM service s
              ORDER BY s.id DESC'
         );
@@ -744,7 +746,7 @@ final class Database implements WorkerApiStore
     public function listActiveServicesByType(int $typeId): array
     {
         $stmt = $this->pdo->query(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.panel_group_ids, s.is_active
              FROM service s
              WHERE s.is_active = 1
              ORDER BY s.id DESC'
@@ -761,8 +763,8 @@ final class Database implements WorkerApiStore
     public function createService(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO service (service_code, name, mode, panel_provider, panel_base_url, panel_username, panel_password, sub_link_mode, sub_link_base_url, is_active, created_at, updated_at)
-             VALUES (:service_code, :name, :mode, :panel_provider, :panel_base_url, :panel_username, :panel_password, :sub_link_mode, :sub_link_base_url, :is_active, :created_at, :updated_at)'
+            'INSERT INTO service (service_code, name, mode, panel_provider, panel_base_url, panel_username, panel_password, sub_link_mode, sub_link_base_url, panel_group_ids, is_active, created_at, updated_at)
+             VALUES (:service_code, :name, :mode, :panel_provider, :panel_base_url, :panel_username, :panel_password, :sub_link_mode, :sub_link_base_url, :panel_group_ids, :is_active, :created_at, :updated_at)'
         );
         $now = gmdate('Y-m-d H:i:s');
         $stmt->execute([
@@ -775,6 +777,7 @@ final class Database implements WorkerApiStore
             'panel_password' => isset($data['panel_password']) ? trim((string) $data['panel_password']) : null,
             'sub_link_mode' => isset($data['sub_link_mode']) && (string) $data['sub_link_mode'] === 'direct' ? 'direct' : 'proxy',
             'sub_link_base_url' => isset($data['sub_link_base_url']) ? trim((string) $data['sub_link_base_url']) : null,
+            'panel_group_ids' => $this->normalizePanelGroupIds($data['panel_group_ids'] ?? null),
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
             'created_at' => $now,
             'updated_at' => $now,
@@ -785,7 +788,7 @@ final class Database implements WorkerApiStore
     public function getService(int $serviceId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.panel_group_ids, s.is_active
              FROM service s
              WHERE s.id = :id
              LIMIT 1'
@@ -830,7 +833,7 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare(
             'UPDATE service
-             SET name = :name, mode = :mode, panel_provider = :panel_provider, panel_base_url = :panel_base_url, panel_username = :panel_username, panel_password = :panel_password, sub_link_mode = :sub_link_mode, sub_link_base_url = :sub_link_base_url, is_active = :is_active, updated_at = :updated_at
+             SET name = :name, mode = :mode, panel_provider = :panel_provider, panel_base_url = :panel_base_url, panel_username = :panel_username, panel_password = :panel_password, sub_link_mode = :sub_link_mode, sub_link_base_url = :sub_link_base_url, panel_group_ids = :panel_group_ids, is_active = :is_active, updated_at = :updated_at
              WHERE id = :id'
         );
         $stmt->execute([
@@ -842,6 +845,7 @@ final class Database implements WorkerApiStore
             'panel_password' => isset($data['panel_password']) ? trim((string) $data['panel_password']) : null,
             'sub_link_mode' => isset($data['sub_link_mode']) && (string) $data['sub_link_mode'] === 'direct' ? 'direct' : 'proxy',
             'sub_link_base_url' => isset($data['sub_link_base_url']) ? trim((string) $data['sub_link_base_url']) : null,
+            'panel_group_ids' => $this->normalizePanelGroupIds($data['panel_group_ids'] ?? null),
             'is_active' => ((int) ($data['is_active'] ?? 1)) === 1 ? 1 : 0,
             'updated_at' => gmdate('Y-m-d H:i:s'),
             'id' => $serviceId,
@@ -1959,7 +1963,7 @@ final class Database implements WorkerApiStore
             $this->pdo->rollBack();
             return ['ok' => false, 'error' => 'panel_not_found'];
         }
-        $groupIds = $this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword);
+        $groupIds = $this->parsePanelGroupIds($service['panel_group_ids'] ?? null);
         if ($groupIds === []) {
             $this->pdo->rollBack();
             return ['ok' => false, 'error' => 'panel_ref_invalid'];
@@ -2070,9 +2074,9 @@ final class Database implements WorkerApiStore
             $baseUrl = $scheme . '://' . trim($_SERVER['HTTP_HOST']);
         }
         if ($baseUrl === '') {
-            return '/sub/?token=' . rawurlencode($token);
+            return '/sub/' . rawurlencode($token);
         }
-        return $baseUrl . '/sub/?token=' . rawurlencode($token);
+        return $baseUrl . '/sub/' . rawurlencode($token);
     }
 
     public function getDeliverySubLinkByToken(string $token): ?string
@@ -2134,6 +2138,46 @@ final class Database implements WorkerApiStore
         return array_values(array_unique($ids));
     }
 
+    /** @param mixed $value
+     *  @return array<int>
+     */
+    private function parsePanelGroupIds($value): array
+    {
+        if (is_array($value)) {
+            $ids = [];
+            foreach ($value as $item) {
+                $id = (int) $item;
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+            return array_values(array_unique($ids));
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            return $this->parsePanelGroupIds($decoded);
+        }
+
+        return $this->parseGroupIds($raw);
+    }
+
+    /** @param mixed $value */
+    private function normalizePanelGroupIds($value): ?string
+    {
+        $ids = $this->parsePanelGroupIds($value);
+        if ($ids === []) {
+            return null;
+        }
+        $encoded = json_encode($ids, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return $encoded === false ? null : $encoded;
+    }
+
     private function generateServiceCode(int $length = 10): string
     {
         $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -2152,25 +2196,6 @@ final class Database implements WorkerApiStore
         }
 
         return 'SVC' . time() . substr(bin2hex(random_bytes(3)), 0, 6);
-    }
-
-    /** @return array<int> */
-    private function resolveDefaultGroupIds(string $baseUrl, string $username, string $password): array
-    {
-        $client = new PGClient($baseUrl, $username, $password);
-        $response = $client->getGroups(0, 50);
-        if (!(bool) ($response['success'] ?? false)) {
-            return [];
-        }
-        $groups = is_array($response['data'] ?? null) ? $response['data'] : [];
-        foreach ($groups as $group) {
-            $groupId = isset($group['id']) ? (int) $group['id'] : 0;
-            if ($groupId > 0) {
-                return [$groupId];
-            }
-        }
-
-        return [];
     }
 
     private function deliveryMode(): string
@@ -3085,7 +3110,7 @@ final class Database implements WorkerApiStore
         $panelPassword = trim((string) ($service['panel_password'] ?? ''));
         $groupIds = is_array($resolvedGroupIds) && $resolvedGroupIds !== []
             ? array_values(array_map('intval', $resolvedGroupIds))
-            : $this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword);
+            : $this->parsePanelGroupIds($service['panel_group_ids'] ?? null);
         if ($groupIds === []) {
             return ['ok' => false, 'error_code' => 'free_test_panel_group_missing'];
         }
@@ -3258,7 +3283,7 @@ final class Database implements WorkerApiStore
             if ($baseUrl === '' || $panelUsername === '' || $panelPassword === '') {
                 return ['ok' => false, 'error_code' => 'free_test_panel_config_invalid'];
             }
-            $groupIds = $this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword);
+            $groupIds = $this->parsePanelGroupIds($service['panel_group_ids'] ?? null);
             if ($groupIds === []) {
                 return ['ok' => false, 'error_code' => 'free_test_panel_group_missing'];
             }
@@ -3318,7 +3343,7 @@ final class Database implements WorkerApiStore
     public function getServiceByCode(string $serviceCode): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.panel_group_ids, s.is_active
              FROM service s
              WHERE s.service_code = :code
              LIMIT 1'
@@ -3331,7 +3356,7 @@ final class Database implements WorkerApiStore
     public function listAllServices(): array
     {
         $stmt = $this->pdo->query(
-            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.is_active
+            'SELECT s.id, s.service_code, s.name, s.mode, s.panel_provider, s.panel_base_url, s.panel_username, s.panel_password, s.sub_link_mode, s.sub_link_base_url, s.panel_group_ids, s.is_active
              FROM service s
              ORDER BY s.id DESC'
         );
