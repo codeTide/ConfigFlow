@@ -1622,6 +1622,7 @@ final class MessageHandler
                 'panel_base_url' => isset($data['panel_base_url']) ? (string) $data['panel_base_url'] : null,
                 'panel_username' => isset($data['panel_username']) ? (string) $data['panel_username'] : null,
                 'panel_password' => isset($data['panel_password']) ? (string) $data['panel_password'] : null,
+                'panel_group_ids' => isset($data['panel_group_ids']) && is_array($data['panel_group_ids']) ? $data['panel_group_ids'] : null,
                 'sub_link_mode' => (string) ($data['sub_link_mode'] ?? 'proxy'),
                 'sub_link_base_url' => isset($data['sub_link_base_url']) ? (string) $data['sub_link_base_url'] : null,
                 'is_active' => 1,
@@ -1652,6 +1653,7 @@ final class MessageHandler
                     'panel_base_url' => (string) ($service['panel_base_url'] ?? ''),
                     'panel_username' => (string) ($service['panel_username'] ?? ''),
                     'panel_password' => (string) ($service['panel_password'] ?? ''),
+                    'panel_group_ids' => $this->normalizePanelGroupIdsInput($service['panel_group_ids'] ?? null),
                     'sub_link_mode' => (string) ($service['sub_link_mode'] ?? 'proxy'),
                     'sub_link_base_url' => (string) ($service['sub_link_base_url'] ?? ''),
                 ];
@@ -1773,6 +1775,7 @@ final class MessageHandler
                 'panel_base_url' => isset($data['panel_base_url']) ? (string) $data['panel_base_url'] : null,
                 'panel_username' => isset($data['panel_username']) ? (string) $data['panel_username'] : null,
                 'panel_password' => isset($data['panel_password']) ? (string) $data['panel_password'] : null,
+                'panel_group_ids' => isset($data['panel_group_ids']) && is_array($data['panel_group_ids']) ? $data['panel_group_ids'] : null,
                 'sub_link_mode' => (string) ($data['sub_link_mode'] ?? 'proxy'),
                 'sub_link_base_url' => isset($data['sub_link_base_url']) ? (string) $data['sub_link_base_url'] : null,
                 'is_active' => 1,
@@ -2336,6 +2339,8 @@ final class MessageHandler
         if ($subLinkBaseUrl === '') {
             $subLinkBaseUrl = $this->catalog->get('admin.ui.open.service_view.panel_none');
         }
+        $panelGroupIds = $this->normalizePanelGroupIdsInput($service['panel_group_ids'] ?? null);
+        $panelGroupIdsText = $panelGroupIds === [] ? $this->catalog->get('admin.ui.open.service_view.panel_none') : implode(', ', $panelGroupIds);
         $tariffCount = $this->database->countTariffsByService($serviceId);
         $stockCount = $this->database->countAvailableStockItemsByService($serviceId);
 
@@ -2374,6 +2379,7 @@ final class MessageHandler
                 'status_text' => $statusText,
                 'sub_link_mode' => $subLinkMode,
                 'sub_link_base_url' => $subLinkBaseUrl,
+                'panel_group_ids' => $panelGroupIdsText,
                 'tariff_count' => $tariffCount,
                 'stock_count' => $stockCount,
             ]),
@@ -2473,11 +2479,15 @@ final class MessageHandler
         }
         if ($step === 'sub_link_mode') {
             if ((string) ($data['mode'] ?? 'stock') === 'panel_auto') {
-                $this->database->setUserState($userId, 'admin.service.create', ['step' => 'panel_password', 'data' => $data]);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_password'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->promptServicePanelGroupIdsInput($chatId, $userId, 'admin.service.create', $data);
                 return;
             }
             $this->promptServiceModeSelection($chatId, $userId, 0, 'admin.service.create', $data);
+            return;
+        }
+        if ($step === 'panel_group_ids') {
+            $this->database->setUserState($userId, 'admin.service.create', ['step' => 'panel_password', 'data' => $data]);
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_password'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return;
         }
         if ($step === 'sub_link_base_url') {
@@ -2523,11 +2533,15 @@ final class MessageHandler
         }
         if ($step === 'sub_link_mode') {
             if ((string) ($data['mode'] ?? 'stock') === 'panel_auto') {
-                $this->database->setUserState($userId, 'admin.service.edit', ['service_id' => $serviceId, 'step' => 'panel_password', 'data' => $data]);
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_password'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $this->promptServicePanelGroupIdsInput($chatId, $userId, 'admin.service.edit', $data, ['service_id' => $serviceId]);
                 return;
             }
             $this->promptServiceModeSelection($chatId, $userId, $typeId, 'admin.service.edit', $data, ['service_id' => $serviceId]);
+            return;
+        }
+        if ($step === 'panel_group_ids') {
+            $this->database->setUserState($userId, 'admin.service.edit', ['service_id' => $serviceId, 'step' => 'panel_password', 'data' => $data]);
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_password'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return;
         }
         if ($step === 'sub_link_base_url') {
@@ -2557,12 +2571,16 @@ final class MessageHandler
         array $extraPayload = []
     ): bool {
         $raw = trim($text);
-        if ($raw === '' || str_starts_with($raw, '/')) {
+        if (str_starts_with($raw, '/')) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_name_required'));
             return false;
         }
 
         if ($step === 'name') {
+            if ($raw === '') {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_name_required'));
+                return false;
+            }
             $excludeServiceId = isset($extraPayload['service_id']) ? (int) $extraPayload['service_id'] : null;
             if ($this->database->serviceNameExists($raw, $excludeServiceId)) {
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_name_duplicate'));
@@ -2591,6 +2609,7 @@ final class MessageHandler
                 $data['panel_base_url'] = null;
                 $data['panel_username'] = null;
                 $data['panel_password'] = null;
+                $data['panel_group_ids'] = null;
                 $this->promptServiceSubLinkModeSelection($chatId, $userId, $stateName, $data, $extraPayload);
                 return false;
             }
@@ -2617,6 +2636,16 @@ final class MessageHandler
         }
         if ($step === 'panel_password') {
             $data['panel_password'] = $raw;
+            $this->promptServicePanelGroupIdsInput($chatId, $userId, $stateName, $data, $extraPayload);
+            return false;
+        }
+        if ($step === 'panel_group_ids') {
+            $groupIds = $this->normalizePanelGroupIdsInput($raw);
+            if ($groupIds === []) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_panel_group_ids_invalid'));
+                return false;
+            }
+            $data['panel_group_ids'] = $groupIds;
             $this->promptServiceSubLinkModeSelection($chatId, $userId, $stateName, $data, $extraPayload);
             return false;
         }
@@ -2659,6 +2688,12 @@ final class MessageHandler
                     $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.errors.invalid_input'));
                     return false;
                 }
+                $groupIds = $this->normalizePanelGroupIdsInput($data['panel_group_ids'] ?? null);
+                if ($groupIds === []) {
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_panel_group_ids_required'));
+                    return false;
+                }
+                $data['panel_group_ids'] = $groupIds;
             }
             $subLinkMode = (string) ($data['sub_link_mode'] ?? 'proxy');
             if (!in_array($subLinkMode, ['proxy', 'direct'], true)) {
@@ -2720,6 +2755,22 @@ final class MessageHandler
     }
 
     /** @param array<string,mixed> $data */
+    private function promptServicePanelGroupIdsInput(
+        int $chatId,
+        int $userId,
+        string $stateName,
+        array $data,
+        array $extraPayload = []
+    ): void {
+        $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'panel_group_ids', 'data' => $data]));
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->catalog->get('admin.types_tariffs.prompts.service_wizard.panel_group_ids'),
+            $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+        );
+    }
+
+    /** @param array<string,mixed> $data */
     private function promptServiceSubLinkBaseUrlInput(
         int $chatId,
         int $userId,
@@ -2747,12 +2798,15 @@ final class MessageHandler
         $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
         if ($mode === 'panel_auto') {
             $panelName = (string) ($data['panel_base_url'] ?? $this->catalog->get('admin.ui.open.service_view.panel_none'));
+            $groupIds = $this->normalizePanelGroupIdsInput($data['panel_group_ids'] ?? null);
+            $panelGroupIdsText = $groupIds === [] ? $this->catalog->get('admin.ui.open.service_view.panel_none') : implode(', ', $groupIds);
             $this->telegram->sendMessage(
                 $chatId,
                 $this->messageRenderer->render('admin.types_tariffs.messages.service_wizard_preview_panel', [
                     'name' => (string) ($data['name'] ?? ''),
                     'mode' => $this->catalog->get('admin.types_tariffs.labels.mode_panel_auto_fa'),
                     'panel' => $panelName,
+                    'panel_group_ids' => $panelGroupIdsText,
                     'sub_link_mode' => $subLinkMode,
                     'sub_link_base_url' => $subLinkBaseUrlText,
                 ]),
@@ -2776,6 +2830,50 @@ final class MessageHandler
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
+    }
+
+    /** @param mixed $value
+     *  @return array<int>
+     */
+    private function normalizePanelGroupIdsInput($value): array
+    {
+        if (is_array($value)) {
+            $ids = [];
+            foreach ($value as $item) {
+                $id = (int) $item;
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+            return array_values(array_unique($ids));
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            return $this->normalizePanelGroupIdsInput($decoded);
+        }
+
+        $parts = preg_split('/,/', $raw) ?: [];
+        $ids = [];
+        foreach ($parts as $part) {
+            $item = trim($part);
+            if ($item === '') {
+                continue;
+            }
+            if (!preg_match('/^\d+$/', $item)) {
+                return [];
+            }
+            $id = (int) $item;
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        return array_values(array_unique($ids));
     }
 
     private function openAdminServiceTariffsView(int $chatId, int $userId, int $typeId, int $serviceId, ?string $notice = null): void
