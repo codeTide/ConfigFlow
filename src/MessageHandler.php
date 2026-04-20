@@ -1372,6 +1372,7 @@ final class MessageHandler
         $buttons = [];
         foreach (array_values($visibleServices) as $idx => $service) {
             $num = (string) ($idx + 1);
+            $numFa = $this->toPersianDigits($num);
             $serviceId = (int) ($service['service_id'] ?? 0);
             if ($serviceId <= 0) {
                 continue;
