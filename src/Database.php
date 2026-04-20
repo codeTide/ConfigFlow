@@ -474,6 +474,7 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->query(
             "SELECT d.id AS delivery_id,
+                    d.user_id,
                     d.service_id,
                     d.service_public_id,
                     d.lifecycle_status,
@@ -482,6 +483,7 @@ final class Database implements WorkerApiStore
                     d.last_status_sync_at,
                     d.sub_link,
                     d.meta_json,
+                    s.name AS service_name,
                     s.sub_link_mode,
                     s.sub_link_base_url,
                     s.panel_base_url,

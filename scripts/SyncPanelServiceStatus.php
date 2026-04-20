@@ -3,18 +3,23 @@
 declare(strict_types=1);
 
 use ConfigFlow\Bot\Bootstrap;
+use ConfigFlow\Bot\Config;
 use ConfigFlow\Bot\Database;
 use ConfigFlow\Bot\PGClient;
+use ConfigFlow\Bot\TelegramClient;
 
 require_once __DIR__ . '/../src/Bootstrap.php';
 require_once __DIR__ . '/../src/Config.php';
 require_once __DIR__ . '/../src/WorkerApiStore.php';
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/PGClient.php';
+require_once __DIR__ . '/../src/TelegramClient.php';
 
 Bootstrap::loadEnv(dirname(__DIR__) . '/.env');
 
 $database = new Database();
+$telegramToken = Config::botToken();
+$telegram = $telegramToken !== '' ? new TelegramClient($telegramToken) : null;
 $deliveries = listPanelDeliveriesForStatusSync($database);
 if ($deliveries === []) {
     fwrite(STDOUT, "No panel deliveries to sync.\n");
@@ -22,7 +27,7 @@ if ($deliveries === []) {
 }
 
 $groups = groupPanelDeliveriesByConnection($deliveries);
-$summary = syncPanelDeliveryStatuses($database, $groups);
+$summary = syncPanelDeliveryStatuses($database, $groups, $telegram);
 fwrite(STDOUT, json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
 
 /**
@@ -69,13 +74,14 @@ function groupPanelDeliveriesByConnection(array $deliveries): array
  * @param array<string,array{connection:array<string,string>,deliveries:array<int,array<string,mixed>>}> $groups
  * @return array<string,int>
  */
-function syncPanelDeliveryStatuses(Database $database, array $groups): array
+function syncPanelDeliveryStatuses(Database $database, array $groups, ?TelegramClient $telegram): array
 {
     $summary = [
         'connections' => count($groups),
         'deliveries_total' => 0,
         'deliveries_synced' => 0,
         'fetch_errors' => 0,
+        'notifications_sent' => 0,
     ];
 
     foreach ($groups as $group) {
@@ -84,7 +90,7 @@ function syncPanelDeliveryStatuses(Database $database, array $groups): array
         $summary['deliveries_total'] += count($rows);
 
         $client = new PGClient($conn['base_url'], $conn['username'], $conn['password']);
-        $res = $client->getUsers();
+        $res = $client->getUsers(1000);
         if (($res['success'] ?? false) !== true) {
             $summary['fetch_errors']++;
             continue;
@@ -101,7 +107,9 @@ function syncPanelDeliveryStatuses(Database $database, array $groups): array
         }
 
         foreach ($rows as $delivery) {
-            applyPanelUserStatusToDelivery($database, $delivery, $userMap);
+            if (applyPanelUserStatusToDelivery($database, $delivery, $userMap, $telegram)) {
+                $summary['notifications_sent']++;
+            }
             $summary['deliveries_synced']++;
         }
     }
@@ -113,28 +121,32 @@ function syncPanelDeliveryStatuses(Database $database, array $groups): array
  * @param array<string,mixed> $delivery
  * @param array<string,array<string,mixed>> $userMap
  */
-function applyPanelUserStatusToDelivery(Database $database, array $delivery, array $userMap): void
+function applyPanelUserStatusToDelivery(Database $database, array $delivery, array $userMap, ?TelegramClient $telegram): bool
 {
     $deliveryId = (int) ($delivery['delivery_id'] ?? 0);
     if ($deliveryId <= 0) {
-        return;
+        return false;
     }
 
     $servicePublicId = trim((string) ($delivery['service_public_id'] ?? ''));
     if ($servicePublicId === '') {
-        return;
+        return false;
     }
+    $previousStatus = trim((string) ($delivery['lifecycle_status'] ?? 'active'));
+    $userId = (int) ($delivery['user_id'] ?? 0);
+    $serviceName = trim((string) ($delivery['service_name'] ?? 'سرویس'));
 
     $panelUser = $userMap[$servicePublicId] ?? null;
     if (!is_array($panelUser)) {
+        $nextStatus = 'deleted';
         $database->applyPanelUserStatusToDelivery(
             $deliveryId,
-            'deleted',
+            $nextStatus,
             0,
             'panel_user_missing',
             ['panel_username' => $servicePublicId]
         );
-        return;
+        return notifyOnStatusChange($telegram, $userId, $servicePublicId, $serviceName, $previousStatus, $nextStatus);
     }
 
     $expireRaw = $panelUser['expire'] ?? null;
@@ -183,6 +195,7 @@ function applyPanelUserStatusToDelivery(Database $database, array $delivery, arr
         ],
         $nextSubLink
     );
+    return notifyOnStatusChange($telegram, $userId, $servicePublicId, $serviceName, $previousStatus, $status);
 }
 
 /**
@@ -227,4 +240,50 @@ function toInt(mixed $value): int
 function isPanelDisabled(string $rawStatus): bool
 {
     return in_array($rawStatus, ['disabled', 'inactive', 'off', '0', 'false'], true);
+}
+
+function notifyOnStatusChange(
+    ?TelegramClient $telegram,
+    int $userId,
+    string $servicePublicId,
+    string $serviceName,
+    string $previousStatus,
+    string $nextStatus
+): bool {
+    if ($telegram === null || $userId <= 0 || $previousStatus === $nextStatus) {
+        return false;
+    }
+
+    $shouldNotify = match ($nextStatus) {
+        'depleted' => $previousStatus !== 'depleted',
+        'expired' => $previousStatus !== 'expired',
+        'deleted' => $previousStatus !== 'deleted',
+        'disabled' => $previousStatus !== 'disabled',
+        default => false,
+    };
+    if (!$shouldNotify) {
+        return false;
+    }
+
+    $message = buildStatusChangeMessage($nextStatus, $servicePublicId, $serviceName);
+    if ($message === '') {
+        return false;
+    }
+
+    $telegram->sendMessage($userId, $message);
+    return true;
+}
+
+function buildStatusChangeMessage(string $nextStatus, string $servicePublicId, string $serviceName): string
+{
+    $serviceName = $serviceName !== '' ? $serviceName : 'سرویس شما';
+    $servicePublicId = $servicePublicId !== '' ? $servicePublicId : '-';
+
+    return match ($nextStatus) {
+        'depleted' => "📦 سرویس شما به دلیل اتمام حجم غیرفعال شده است.\n\n🧩 نام سرویس: {$serviceName}\n🆔 شناسه سرویس: <code>{$servicePublicId}</code>\n\n<blockquote>💡 برای فعال‌سازی دوباره، از بخش خرید/تمدید اقدام کنید.</blockquote>",
+        'expired' => "⏳ سرویس شما به دلیل اتمام زمان منقضی شده است.\n\n🧩 نام سرویس: {$serviceName}\n🆔 شناسه سرویس: <code>{$servicePublicId}</code>\n\n<blockquote>💡 برای ادامه استفاده، سرویس را تمدید کنید.</blockquote>",
+        'deleted' => "🗑 سرویس شما دیگر در پنل پیدا نشد.\n\n🧩 نام سرویس: {$serviceName}\n🆔 شناسه سرویس: <code>{$servicePublicId}</code>\n\n<blockquote>💡 در صورت نیاز با پشتیبانی ارتباط بگیرید تا وضعیت سرویس بررسی شود.</blockquote>",
+        'disabled' => "🚫 سرویس شما غیرفعال شده است.\n\n🧩 نام سرویس: {$serviceName}\n🆔 شناسه سرویس: <code>{$servicePublicId}</code>\n\n<blockquote>💡 برای بررسی علت غیرفعال‌سازی، با پشتیبانی در ارتباط باشید.</blockquote>",
+        default => '',
+    };
 }

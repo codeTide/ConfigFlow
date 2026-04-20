@@ -328,7 +328,7 @@ final class PGClient
         return $this->handleError($response, 'PG_DELETE_ERROR', 'Failed to delete user');
     }
 
-    public function getUsers(int $batchSize = 2000): array
+    public function getUsers(int $batchSize = 1000): array
     {
         $offset = 0;
         $allUsers = [];
