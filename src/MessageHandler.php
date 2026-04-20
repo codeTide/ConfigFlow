@@ -1621,8 +1621,13 @@ final class MessageHandler
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST)) {
                 $service = $this->database->getService($serviceId);
-                if (!is_array($service) || (string) ($service['mode'] ?? 'stock') !== 'stock') {
-                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.messages.inventory_bridge_not_stock'));
+                if (!is_array($service)) {
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
+                    return;
+                }
+                $mode = (string) ($service['mode'] ?? 'stock');
+                if (!in_array($mode, ['stock', 'panel_auto'], true)) {
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
                     return;
                 }
                 $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
@@ -1750,6 +1755,11 @@ final class MessageHandler
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)) {
+                $service = $this->database->getService($serviceId);
+                if (!is_array($service) || (string) ($service['mode'] ?? 'stock') !== 'stock') {
+                    $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
+                    return;
+                }
                 $defaultData = $this->buildFreeTestStockDefaultData($serviceId);
                 if ($defaultData !== null) {
                     $this->promptFreeTestStockWizardStep($chatId, $userId, $serviceId, 'sub_link', $defaultData);
@@ -1928,7 +1938,7 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->messageRenderer->render('admin.services.success.free_test_stock_added'),
-                $this->adminServiceFreeTestKeyboard()
+                $this->adminServiceFreeTestKeyboard(true)
             );
             return;
         }
@@ -2265,6 +2275,8 @@ final class MessageHandler
         ];
         if ($mode === 'stock') {
             $buttons[] = [$this->uiConst(self::ADMIN_SERVICE_INVENTORY), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST)];
+        } elseif ($mode === 'panel_auto') {
+            $buttons[] = [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST)];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
 
@@ -2296,7 +2308,8 @@ final class MessageHandler
     private function openAdminServiceFreeTestView(int $chatId, int $userId, int $serviceId, ?string $notice = null): void
     {
         $service = $this->database->getService($serviceId);
-        if (!is_array($service) || (string) ($service['mode'] ?? '') !== 'stock') {
+        $mode = (string) ($service['mode'] ?? '');
+        if (!is_array($service) || !in_array($mode, ['stock', 'panel_auto'], true)) {
             $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
             return;
         }
@@ -2307,9 +2320,13 @@ final class MessageHandler
             'max_claims' => 1,
         ];
         $claimCount = $this->database->countFreeTestClaimsForService($serviceId);
-        $stockCount = $this->database->countAvailableFreeTestStockByService($serviceId);
+        $stockCount = $mode === 'stock' ? $this->database->countAvailableFreeTestStockByService($serviceId) : 0;
         $isEnabledText = ((int) ($rule['is_enabled'] ?? 0)) === 1 ? '🟢 فعال' : '🔴 غیرفعال';
         $claimModeText = ((string) ($rule['claim_mode'] ?? 'once_until_reset')) === 'cooldown' ? '⏱️ دوره‌ای' : '1️⃣ یک‌بار تا ریست';
+        $deliveryModeText = $mode === 'panel_auto' ? 'ساخت خودکار از پنل' : 'انباری';
+        $stockSummary = $mode === 'panel_auto'
+            ? 'به صورت خودکار از پنل ساخته می‌شود'
+            : $this->toPersianNumber((string) $stockCount);
         $defaultVolume = isset($rule['default_volume_gb']) && $rule['default_volume_gb'] !== null ? trim((string) $rule['default_volume_gb']) : '';
         $defaultDurationDays = isset($rule['default_duration_days']) && $rule['default_duration_days'] !== null ? (int) $rule['default_duration_days'] : null;
         $defaultDuration = $defaultDurationDays === null ? '' : ($defaultDurationDays === 0 ? 'نامحدود' : (string) $defaultDurationDays);
@@ -2326,25 +2343,29 @@ final class MessageHandler
                 'cooldown_days' => $rule['cooldown_days'] !== null ? $this->toPersianNumber((string) $rule['cooldown_days']) : $this->catalog->get('messages.generic.dash'),
                 'max_claims' => $this->toPersianNumber((string) ((int) ($rule['max_claims'] ?? 1))),
                 'claim_count' => $this->toPersianNumber((string) $claimCount),
-                'stock_count' => $this->toPersianNumber((string) $stockCount),
+                'delivery_mode' => $deliveryModeText,
+                'stock_count' => $stockSummary,
                 'default_volume' => $defaultVolume !== '' ? htmlspecialchars($defaultVolume) : $this->catalog->get('messages.generic.dash'),
                 'default_duration' => $defaultDuration !== '' ? htmlspecialchars($defaultDuration) : $this->catalog->get('messages.generic.dash'),
             ])
             ,
-            $this->adminServiceFreeTestKeyboard()
+            $this->adminServiceFreeTestKeyboard($mode === 'stock')
         );
     }
 
-    private function adminServiceFreeTestKeyboard(): array
+    private function adminServiceFreeTestKeyboard(bool $isStockService = true): array
     {
-        return $this->uiKeyboard->replyMenu([
+        $rows = [
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)],
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)],
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_DEFAULT_CONFIG)],
-            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)],
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-        ]);
+        ];
+        if ($isStockService) {
+            array_splice($rows, 3, 0, [[$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_STOCK_ADD)]]);
+        }
+        return $this->uiKeyboard->replyMenu($rows);
     }
 
     /** @param array<string,mixed> $data */
