@@ -1625,6 +1625,8 @@ final class MessageHandler
                 'panel_base_url' => isset($data['panel_base_url']) ? (string) $data['panel_base_url'] : null,
                 'panel_username' => isset($data['panel_username']) ? (string) $data['panel_username'] : null,
                 'panel_password' => isset($data['panel_password']) ? (string) $data['panel_password'] : null,
+                'sub_link_mode' => (string) ($data['sub_link_mode'] ?? 'proxy'),
+                'sub_link_base_url' => isset($data['sub_link_base_url']) ? (string) $data['sub_link_base_url'] : null,
                 'is_active' => 1,
             ]);
             $created = $this->database->getService($serviceId);
@@ -1653,6 +1655,8 @@ final class MessageHandler
                     'panel_base_url' => (string) ($service['panel_base_url'] ?? ''),
                     'panel_username' => (string) ($service['panel_username'] ?? ''),
                     'panel_password' => (string) ($service['panel_password'] ?? ''),
+                    'sub_link_mode' => (string) ($service['sub_link_mode'] ?? 'proxy'),
+                    'sub_link_base_url' => (string) ($service['sub_link_base_url'] ?? ''),
                 ];
                 $this->database->setUserState($userId, 'admin.service.edit', ['service_id' => $serviceId, 'step' => 'name', 'data' => $data]);
                 $this->telegram->sendMessage(
@@ -1772,6 +1776,8 @@ final class MessageHandler
                 'panel_base_url' => isset($data['panel_base_url']) ? (string) $data['panel_base_url'] : null,
                 'panel_username' => isset($data['panel_username']) ? (string) $data['panel_username'] : null,
                 'panel_password' => isset($data['panel_password']) ? (string) $data['panel_password'] : null,
+                'sub_link_mode' => (string) ($data['sub_link_mode'] ?? 'proxy'),
+                'sub_link_base_url' => isset($data['sub_link_base_url']) ? (string) $data['sub_link_base_url'] : null,
                 'is_active' => 1,
             ]);
             $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId, $this->messageRenderer->render('admin.types_tariffs.success.service_updated'));
@@ -2326,6 +2332,13 @@ final class MessageHandler
         $statusText = ((int) ($service['is_active'] ?? 0)) === 1
             ? $this->catalog->get('admin.ui.open.service_view.status_active')
             : $this->catalog->get('admin.ui.open.service_view.status_inactive');
+        $subLinkMode = ((string) ($service['sub_link_mode'] ?? 'proxy')) === 'direct'
+            ? $this->catalog->get('admin.types_tariffs.labels.sub_link_mode_direct')
+            : $this->catalog->get('admin.types_tariffs.labels.sub_link_mode_proxy');
+        $subLinkBaseUrl = trim((string) ($service['sub_link_base_url'] ?? ''));
+        if ($subLinkBaseUrl === '') {
+            $subLinkBaseUrl = $this->catalog->get('admin.ui.open.service_view.panel_none');
+        }
         $tariffCount = $this->database->countTariffsByService($serviceId);
         $stockCount = $this->database->countAvailableStockItemsByService($serviceId);
 
@@ -2362,6 +2375,8 @@ final class MessageHandler
                 'mode_text' => $modeText,
                 'panel_name' => $panelName,
                 'status_text' => $statusText,
+                'sub_link_mode' => $subLinkMode,
+                'sub_link_base_url' => $subLinkBaseUrl,
                 'tariff_count' => $tariffCount,
                 'stock_count' => $stockCount,
             ]),
@@ -2459,13 +2474,25 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_username'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return;
         }
-        if ($step === 'confirm') {
+        if ($step === 'sub_link_mode') {
             if ((string) ($data['mode'] ?? 'stock') === 'panel_auto') {
                 $this->database->setUserState($userId, 'admin.service.create', ['step' => 'panel_password', 'data' => $data]);
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_password'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             $this->promptServiceModeSelection($chatId, $userId, 0, 'admin.service.create', $data);
+            return;
+        }
+        if ($step === 'sub_link_base_url') {
+            $this->promptServiceSubLinkModeSelection($chatId, $userId, 'admin.service.create', $data);
+            return;
+        }
+        if ($step === 'confirm') {
+            if ((string) ($data['sub_link_mode'] ?? 'proxy') === 'proxy') {
+                $this->promptServiceSubLinkBaseUrlInput($chatId, $userId, 'admin.service.create', $data);
+                return;
+            }
+            $this->promptServiceSubLinkModeSelection($chatId, $userId, 'admin.service.create', $data);
             return;
         }
         $this->openAdminServiceLanding($chatId, $userId);
@@ -2497,13 +2524,25 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_username'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
             return;
         }
-        if ($step === 'confirm') {
+        if ($step === 'sub_link_mode') {
             if ((string) ($data['mode'] ?? 'stock') === 'panel_auto') {
                 $this->database->setUserState($userId, 'admin.service.edit', ['service_id' => $serviceId, 'step' => 'panel_password', 'data' => $data]);
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.messages.wizard_step_password'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
                 return;
             }
             $this->promptServiceModeSelection($chatId, $userId, $typeId, 'admin.service.edit', $data, ['service_id' => $serviceId]);
+            return;
+        }
+        if ($step === 'sub_link_base_url') {
+            $this->promptServiceSubLinkModeSelection($chatId, $userId, 'admin.service.edit', $data, ['service_id' => $serviceId]);
+            return;
+        }
+        if ($step === 'confirm') {
+            if ((string) ($data['sub_link_mode'] ?? 'proxy') === 'proxy') {
+                $this->promptServiceSubLinkBaseUrlInput($chatId, $userId, 'admin.service.edit', $data, ['service_id' => $serviceId]);
+                return;
+            }
+            $this->promptServiceSubLinkModeSelection($chatId, $userId, 'admin.service.edit', $data, ['service_id' => $serviceId]);
             return;
         }
         $this->openAdminServiceView($chatId, $userId, $typeId, $serviceId);
@@ -2555,18 +2594,7 @@ final class MessageHandler
                 $data['panel_base_url'] = null;
                 $data['panel_username'] = null;
                 $data['panel_password'] = null;
-                $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
-                $this->telegram->sendMessage(
-                    $chatId,
-                    $this->messageRenderer->render('admin.types_tariffs.messages.service_wizard_preview_stock', [
-                        'name' => (string) ($data['name'] ?? ''),
-                        'mode' => $this->catalog->get('admin.types_tariffs.labels.mode_stock_fa'),
-                    ]),
-                    $this->uiKeyboard->replyMenu([
-                        [$this->catalog->get('buttons.confirm_yes')],
-                        [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-                    ])
-                );
+                $this->promptServiceSubLinkModeSelection($chatId, $userId, $stateName, $data, $extraPayload);
                 return false;
             }
             $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'panel_base_url', 'data' => $data]));
@@ -2592,20 +2620,33 @@ final class MessageHandler
         }
         if ($step === 'panel_password') {
             $data['panel_password'] = $raw;
-            $panelName = (string) ($data['panel_base_url'] ?? $this->catalog->get('admin.ui.open.service_view.panel_none'));
-            $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->messageRenderer->render('admin.types_tariffs.messages.service_wizard_preview_panel', [
-                    'name' => (string) ($data['name'] ?? ''),
-                    'mode' => $this->catalog->get('admin.types_tariffs.labels.mode_panel_auto_fa'),
-                    'panel' => $panelName,
-                ]),
-                $this->uiKeyboard->replyMenu([
-                    [$this->catalog->get('buttons.confirm_yes')],
-                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-                ])
-            );
+            $this->promptServiceSubLinkModeSelection($chatId, $userId, $stateName, $data, $extraPayload);
+            return false;
+        }
+        if ($step === 'sub_link_mode') {
+            $modeDirect = $this->catalog->get('admin.types_tariffs.prompts.service_wizard.sub_link_mode_direct');
+            $modeProxy = $this->catalog->get('admin.types_tariffs.prompts.service_wizard.sub_link_mode_proxy');
+            if ($raw === $modeDirect) {
+                $data['sub_link_mode'] = 'direct';
+                $data['sub_link_base_url'] = null;
+                $this->promptServiceWizardPreview($chatId, $userId, $stateName, $data, $extraPayload);
+                return false;
+            }
+            if ($raw !== $modeProxy) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_sub_link_mode_invalid'));
+                return false;
+            }
+            $data['sub_link_mode'] = 'proxy';
+            $this->promptServiceSubLinkBaseUrlInput($chatId, $userId, $stateName, $data, $extraPayload);
+            return false;
+        }
+        if ($step === 'sub_link_base_url') {
+            if ($raw === '' || (!str_starts_with($raw, 'https://') && !str_starts_with($raw, 'http://')) || filter_var($raw, FILTER_VALIDATE_URL) === false) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_sub_link_base_url_invalid'));
+                return false;
+            }
+            $data['sub_link_base_url'] = rtrim($raw, '/');
+            $this->promptServiceWizardPreview($chatId, $userId, $stateName, $data, $extraPayload);
             return false;
         }
         if ($step === 'confirm') {
@@ -2621,6 +2662,21 @@ final class MessageHandler
                     $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.panel_settings.errors.invalid_input'));
                     return false;
                 }
+            }
+            $subLinkMode = (string) ($data['sub_link_mode'] ?? 'proxy');
+            if (!in_array($subLinkMode, ['proxy', 'direct'], true)) {
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_sub_link_mode_invalid'));
+                return false;
+            }
+            if ($subLinkMode === 'proxy') {
+                $subLinkBaseUrl = trim((string) ($data['sub_link_base_url'] ?? ''));
+                if ($subLinkBaseUrl === '' || (!str_starts_with($subLinkBaseUrl, 'https://') && !str_starts_with($subLinkBaseUrl, 'http://')) || filter_var($subLinkBaseUrl, FILTER_VALIDATE_URL) === false) {
+                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.types_tariffs.errors.service_sub_link_base_url_invalid'));
+                    return false;
+                }
+                $data['sub_link_base_url'] = rtrim($subLinkBaseUrl, '/');
+            } else {
+                $data['sub_link_base_url'] = null;
             }
             return true;
         }
@@ -2642,6 +2698,84 @@ final class MessageHandler
             $this->catalog->get('admin.types_tariffs.prompts.service_wizard.mode'),
             $this->uiKeyboard->replyMenu([
                 [$this->catalog->get('admin.types_tariffs.prompts.service_wizard.mode_stock'), $this->catalog->get('admin.types_tariffs.prompts.service_wizard.mode_panel_auto')],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+            ])
+        );
+    }
+
+    /** @param array<string,mixed> $data */
+    private function promptServiceSubLinkModeSelection(
+        int $chatId,
+        int $userId,
+        string $stateName,
+        array $data,
+        array $extraPayload = []
+    ): void {
+        $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'sub_link_mode', 'data' => $data]));
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->catalog->get('admin.types_tariffs.prompts.service_wizard.sub_link_mode'),
+            $this->uiKeyboard->replyMenu([
+                [$this->catalog->get('admin.types_tariffs.prompts.service_wizard.sub_link_mode_direct'), $this->catalog->get('admin.types_tariffs.prompts.service_wizard.sub_link_mode_proxy')],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+            ])
+        );
+    }
+
+    /** @param array<string,mixed> $data */
+    private function promptServiceSubLinkBaseUrlInput(
+        int $chatId,
+        int $userId,
+        string $stateName,
+        array $data,
+        array $extraPayload = []
+    ): void {
+        $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'sub_link_base_url', 'data' => $data]));
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->catalog->get('admin.types_tariffs.prompts.service_wizard.sub_link_base_url'),
+            $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+        );
+    }
+
+    /** @param array<string,mixed> $data */
+    private function promptServiceWizardPreview(int $chatId, int $userId, string $stateName, array $data, array $extraPayload = []): void
+    {
+        $subLinkMode = ((string) ($data['sub_link_mode'] ?? 'proxy')) === 'direct'
+            ? $this->catalog->get('admin.types_tariffs.labels.sub_link_mode_direct')
+            : $this->catalog->get('admin.types_tariffs.labels.sub_link_mode_proxy');
+        $subLinkBaseUrl = trim((string) ($data['sub_link_base_url'] ?? ''));
+        $subLinkBaseUrlText = $subLinkBaseUrl !== '' ? $subLinkBaseUrl : $this->catalog->get('admin.ui.open.service_view.panel_none');
+        $mode = (string) ($data['mode'] ?? 'stock');
+        $this->database->setUserState($userId, $stateName, array_merge($extraPayload, ['step' => 'confirm', 'data' => $data]));
+        if ($mode === 'panel_auto') {
+            $panelName = (string) ($data['panel_base_url'] ?? $this->catalog->get('admin.ui.open.service_view.panel_none'));
+            $this->telegram->sendMessage(
+                $chatId,
+                $this->messageRenderer->render('admin.types_tariffs.messages.service_wizard_preview_panel', [
+                    'name' => (string) ($data['name'] ?? ''),
+                    'mode' => $this->catalog->get('admin.types_tariffs.labels.mode_panel_auto_fa'),
+                    'panel' => $panelName,
+                    'sub_link_mode' => $subLinkMode,
+                    'sub_link_base_url' => $subLinkBaseUrlText,
+                ]),
+                $this->uiKeyboard->replyMenu([
+                    [$this->catalog->get('buttons.confirm_yes')],
+                    [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+                ])
+            );
+            return;
+        }
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->messageRenderer->render('admin.types_tariffs.messages.service_wizard_preview_stock', [
+                'name' => (string) ($data['name'] ?? ''),
+                'mode' => $this->catalog->get('admin.types_tariffs.labels.mode_stock_fa'),
+                'sub_link_mode' => $subLinkMode,
+                'sub_link_base_url' => $subLinkBaseUrlText,
+            ]),
+            $this->uiKeyboard->replyMenu([
+                [$this->catalog->get('buttons.confirm_yes')],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
