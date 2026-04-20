@@ -2320,16 +2320,11 @@ final class MessageHandler
             'max_claims' => 1,
         ];
         $claimCount = $this->database->countFreeTestClaimsForService($serviceId);
-        $stockCount = $mode === 'stock' ? $this->database->countAvailableFreeTestStockByService($serviceId) : 0;
         $isEnabledText = ((int) ($rule['is_enabled'] ?? 0)) === 1 ? '🟢 فعال' : '🔴 غیرفعال';
         $claimModeText = ((string) ($rule['claim_mode'] ?? 'once_until_reset')) === 'cooldown' ? '⏱️ دوره‌ای' : '1️⃣ یک‌بار تا ریست';
-        $deliveryModeText = $mode === 'panel_auto' ? 'ساخت خودکار از پنل' : 'انباری';
-        $stockSummary = $mode === 'panel_auto'
-            ? 'به صورت خودکار از پنل ساخته می‌شود'
-            : $this->toPersianNumber((string) $stockCount);
-        $defaultVolume = isset($rule['default_volume_gb']) && $rule['default_volume_gb'] !== null ? trim((string) $rule['default_volume_gb']) : '';
-        $defaultDurationDays = isset($rule['default_duration_days']) && $rule['default_duration_days'] !== null ? (int) $rule['default_duration_days'] : null;
-        $defaultDuration = $defaultDurationDays === null ? '' : ($defaultDurationDays === 0 ? 'نامحدود' : (string) $defaultDurationDays);
+        $volume = isset($rule['volume_gb']) && $rule['volume_gb'] !== null ? trim((string) $rule['volume_gb']) : '';
+        $durationDays = isset($rule['duration_days']) && $rule['duration_days'] !== null ? (int) $rule['duration_days'] : null;
+        $duration = $durationDays === null ? '' : ($durationDays === 0 ? 'نامحدود' : (string) $durationDays);
         $this->database->setUserState($userId, 'admin.service.free_test.view', ['service_id' => $serviceId]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -2343,10 +2338,8 @@ final class MessageHandler
                 'cooldown_days' => $rule['cooldown_days'] !== null ? $this->toPersianNumber((string) $rule['cooldown_days']) : $this->catalog->get('messages.generic.dash'),
                 'max_claims' => $this->toPersianNumber((string) ((int) ($rule['max_claims'] ?? 1))),
                 'claim_count' => $this->toPersianNumber((string) $claimCount),
-                'delivery_mode' => $deliveryModeText,
-                'stock_count' => $stockSummary,
-                'default_volume' => $defaultVolume !== '' ? htmlspecialchars($defaultVolume) : $this->catalog->get('messages.generic.dash'),
-                'default_duration' => $defaultDuration !== '' ? htmlspecialchars($defaultDuration) : $this->catalog->get('messages.generic.dash'),
+                'volume' => $volume !== '' ? htmlspecialchars($volume) : $this->catalog->get('messages.generic.dash'),
+                'duration' => $duration !== '' ? htmlspecialchars($duration) : $this->catalog->get('messages.generic.dash'),
             ])
             ,
             $this->adminServiceFreeTestKeyboard($mode === 'stock')
@@ -2358,8 +2351,7 @@ final class MessageHandler
         $rows = [
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_TOGGLE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_REFRESH)],
             [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MAX), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_COOLDOWN)],
-            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_DEFAULT_CONFIG)],
-            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)],
+            [$this->uiConst(self::ADMIN_SERVICE_FREE_TEST_DEFAULT_CONFIG), $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_RESET)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
         ];
         if ($isStockService) {
@@ -3256,8 +3248,8 @@ final class MessageHandler
     private function buildFreeTestStockDefaultData(int $serviceId): ?array
     {
         $rule = $this->database->getFreeTestRuleForService($serviceId);
-        $volumeRaw = is_array($rule) && isset($rule['default_volume_gb']) && $rule['default_volume_gb'] !== null ? trim((string) $rule['default_volume_gb']) : '';
-        $durationRaw = is_array($rule) && isset($rule['default_duration_days']) && $rule['default_duration_days'] !== null ? trim((string) $rule['default_duration_days']) : '';
+        $volumeRaw = is_array($rule) && isset($rule['volume_gb']) && $rule['volume_gb'] !== null ? trim((string) $rule['volume_gb']) : '';
+        $durationRaw = is_array($rule) && isset($rule['duration_days']) && $rule['duration_days'] !== null ? trim((string) $rule['duration_days']) : '';
         if ($volumeRaw === '' || $durationRaw === '') {
             return null;
         }

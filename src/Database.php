@@ -39,8 +39,8 @@ final class Database implements WorkerApiStore
                 claim_mode ENUM('cooldown','once_until_reset') NOT NULL DEFAULT 'once_until_reset',
                 cooldown_days INT NULL,
                 max_claims INT NOT NULL DEFAULT 1,
-                default_volume_gb DECIMAL(10,2) NULL,
-                default_duration_days INT NULL,
+                volume_gb DECIMAL(10,2) NULL,
+                duration_days INT NULL,
                 priority INT NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
@@ -49,8 +49,16 @@ final class Database implements WorkerApiStore
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         if ($this->tableExists('free_test_service_rules')) {
-            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS default_volume_gb DECIMAL(10,2) NULL AFTER max_claims");
-            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS default_duration_days INT NULL AFTER default_volume_gb");
+            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS volume_gb DECIMAL(10,2) NULL AFTER max_claims");
+            $this->pdo->exec("ALTER TABLE free_test_service_rules ADD COLUMN IF NOT EXISTS duration_days INT NULL AFTER volume_gb");
+            if ($this->columnExists('free_test_service_rules', 'default_volume_gb')) {
+                $this->pdo->exec("UPDATE free_test_service_rules SET volume_gb = default_volume_gb WHERE volume_gb IS NULL AND default_volume_gb IS NOT NULL");
+                $this->pdo->exec("ALTER TABLE free_test_service_rules DROP COLUMN IF EXISTS default_volume_gb");
+            }
+            if ($this->columnExists('free_test_service_rules', 'default_duration_days')) {
+                $this->pdo->exec("UPDATE free_test_service_rules SET duration_days = default_duration_days WHERE duration_days IS NULL AND default_duration_days IS NOT NULL");
+                $this->pdo->exec("ALTER TABLE free_test_service_rules DROP COLUMN IF EXISTS default_duration_days");
+            }
         }
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS free_test_service_claims (
@@ -2790,7 +2798,7 @@ final class Database implements WorkerApiStore
     public function getFreeTestRuleForService(int $serviceId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT service_id, is_enabled, claim_mode, cooldown_days, max_claims, default_volume_gb, default_duration_days, priority, created_at, updated_at
+            'SELECT service_id, is_enabled, claim_mode, cooldown_days, max_claims, volume_gb, duration_days, priority, created_at, updated_at
              FROM free_test_service_rules
              WHERE service_id = :service_id
              LIMIT 1'
@@ -2838,18 +2846,18 @@ final class Database implements WorkerApiStore
         }
         $now = gmdate('Y-m-d H:i:s');
         $stmt = $this->pdo->prepare(
-            'INSERT INTO free_test_service_rules (service_id, is_enabled, claim_mode, cooldown_days, max_claims, default_volume_gb, default_duration_days, priority, created_at, updated_at)
-             VALUES (:service_id, 0, :claim_mode, NULL, 1, :default_volume_gb, :default_duration_days, 0, :created_at, :updated_at)
+            'INSERT INTO free_test_service_rules (service_id, is_enabled, claim_mode, cooldown_days, max_claims, volume_gb, duration_days, priority, created_at, updated_at)
+             VALUES (:service_id, 0, :claim_mode, NULL, 1, :volume_gb, :duration_days, 0, :created_at, :updated_at)
              ON DUPLICATE KEY UPDATE
-                default_volume_gb = VALUES(default_volume_gb),
-                default_duration_days = VALUES(default_duration_days),
+                volume_gb = VALUES(volume_gb),
+                duration_days = VALUES(duration_days),
                 updated_at = VALUES(updated_at)'
         );
         $stmt->execute([
             'service_id' => $serviceId,
             'claim_mode' => 'once_until_reset',
-            'default_volume_gb' => $defaultVolumeGb,
-            'default_duration_days' => $defaultDurationDays,
+            'volume_gb' => $defaultVolumeGb,
+            'duration_days' => $defaultDurationDays,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -2980,11 +2988,11 @@ final class Database implements WorkerApiStore
 
     private function claimFreeTestFromPanelService(int $userId, int $serviceId, array $service, array $rule): array
     {
-        $defaultVolumeGb = isset($rule['default_volume_gb']) ? (float) $rule['default_volume_gb'] : 0.0;
+        $defaultVolumeGb = isset($rule['volume_gb']) ? (float) $rule['volume_gb'] : 0.0;
         if ($defaultVolumeGb <= 0) {
             return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
         }
-        $durationDays = isset($rule['default_duration_days']) ? max(0, (int) $rule['default_duration_days']) : 0;
+        $durationDays = isset($rule['duration_days']) ? max(0, (int) $rule['duration_days']) : 0;
         $baseUrl = trim((string) ($service['panel_base_url'] ?? ''));
         $panelUsername = trim((string) ($service['panel_username'] ?? ''));
         $panelPassword = trim((string) ($service['panel_password'] ?? ''));
@@ -3126,7 +3134,7 @@ final class Database implements WorkerApiStore
                 return false;
             }
         } elseif ($mode === 'panel_auto') {
-            $defaultVolumeGb = isset($rule['default_volume_gb']) ? (float) $rule['default_volume_gb'] : 0.0;
+            $defaultVolumeGb = isset($rule['volume_gb']) ? (float) $rule['volume_gb'] : 0.0;
             if ($defaultVolumeGb <= 0) {
                 return false;
             }
