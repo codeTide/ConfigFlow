@@ -1621,8 +1621,13 @@ final class MessageHandler
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST)) {
                 $service = $this->database->getService($serviceId);
-                if (!is_array($service) || (string) ($service['mode'] ?? 'stock') !== 'stock') {
-                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.messages.inventory_bridge_not_stock'));
+                if (!is_array($service)) {
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
+                    return;
+                }
+                $mode = (string) ($service['mode'] ?? 'stock');
+                if (!in_array($mode, ['stock', 'panel_auto'], true)) {
+                    $this->openAdminServiceView($chatId, $userId, 0, $serviceId, $this->messageRenderer->render('admin.types_tariffs.errors.service_not_found'));
                     return;
                 }
                 $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId);
