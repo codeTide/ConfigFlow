@@ -695,9 +695,10 @@ final class MessageHandler
             $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
             $selected = $this->extractOptionKey($text);
-            $serviceId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+            $selectedOption = isset($options[$selected]) && is_array($options[$selected]) ? $options[$selected] : null;
+            $serviceId = is_array($selectedOption) ? (int) ($selectedOption['service_id'] ?? 0) : 0;
             if ($serviceId <= 0) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.common.invalid_option'));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.errors.invalid_selection'));
                 return;
             }
             $this->database->clearUserState($userId);
@@ -1285,20 +1286,15 @@ final class MessageHandler
         }
 
         if ($text === KeyboardBuilder::freeTest()) {
-            $eligibleServices = $this->database->listEnabledFreeTestServices(true, $userId);
-            if ($eligibleServices === []) {
+            $visibleServices = $this->database->listUserVisibleFreeTestServices($userId);
+            if ($visibleServices === []) {
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->catalog->get('messages.user.free_test.not_available')
                 );
                 return true;
             }
-            if (count($eligibleServices) === 1) {
-                $claim = $this->database->claimFreeTestForService($userId, (int) ($eligibleServices[0]['service_id'] ?? 0));
-                $this->sendFreeTestClaimResult($chatId, $claim);
-                return true;
-            }
-            $this->openUserFreeTestServiceSelection($chatId, $userId, $eligibleServices);
+            $this->openUserFreeTestServiceSelection($chatId, $userId, $visibleServices);
             return true;
         }
 
@@ -1308,43 +1304,95 @@ final class MessageHandler
     private function sendFreeTestClaimResult(int $chatId, array $claim): void
     {
         if (($claim['ok'] ?? false) !== true) {
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.not_available'));
+            $errorCode = (string) ($claim['error_code'] ?? '');
+            $messageKey = match ($errorCode) {
+                'service_not_found', 'service_inactive', 'free_test_disabled', 'invalid_service_mode' => 'messages.user.free_test.errors.service_invalid',
+                'free_test_stock_empty' => 'messages.user.free_test.errors.stock_empty',
+                'free_test_quota_exhausted' => 'messages.user.free_test.errors.quota_exhausted',
+                'free_test_panel_config_invalid', 'free_test_panel_group_missing' => 'messages.user.free_test.errors.panel_not_ready',
+                'free_test_panel_provision_failed' => 'messages.user.free_test.errors.panel_provision_failed',
+                'free_test_delivery_failed', 'free_test_claim_failed' => 'messages.user.free_test.errors.claim_failed',
+                default => 'messages.user.free_test.not_available',
+            };
+            if ($errorCode === 'free_test_cooldown_active') {
+                $remainingDays = (int) ($claim['remaining_days'] ?? 0);
+                $nextAllowedAt = htmlspecialchars((string) ($claim['next_allowed_at'] ?? ''));
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $this->catalog->get('messages.user.free_test.errors.cooldown_active', [
+                        'remaining_days' => max(1, $remainingDays),
+                        'next_allowed_at' => $nextAllowedAt !== '' ? $nextAllowedAt : $this->catalog->get('messages.generic.dash'),
+                    ])
+                );
+                return;
+            }
+            $this->telegram->sendMessage($chatId, $this->catalog->get($messageKey));
             return;
         }
 
-            $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? $this->catalog->get('messages.user.free_test.default_service')));
-            $stock_itemText = htmlspecialchars((string) ($claim['raw_payload'] ?? ''));
-            $inquiryLink = trim((string) ($claim['sub_link'] ?? ''));
-            $msg = $this->catalog->get('messages.user.free_test.ready', [
+        $serviceName = htmlspecialchars((string) ($claim['service_name'] ?? $this->catalog->get('messages.user.free_test.default_service')));
+        $mode = (string) ($claim['mode'] ?? 'stock');
+        if ($mode === 'panel_auto') {
+            $msg = $this->catalog->get('messages.user.free_test.ready_panel', [
                 'service_name' => $serviceName,
-                'config_text' => $stock_itemText,
+                'username' => htmlspecialchars((string) ($claim['username'] ?? $this->catalog->get('messages.generic.dash'))),
+                'volume_gb' => htmlspecialchars((string) ($claim['volume_gb'] ?? $this->catalog->get('messages.generic.dash'))),
+                'duration_days' => (int) ($claim['duration_days'] ?? 0) > 0 ? (string) (int) ($claim['duration_days'] ?? 0) : 'نامحدود',
+                'subscription_url' => htmlspecialchars((string) ($claim['sub_link'] ?? '')),
             ]);
-            if ($inquiryLink !== '') {
-                $msg = $this->catalog->get('messages.user.free_test.ready_with_inquiry', [
-                    'service_name' => $serviceName,
-                    'config_text' => $stock_itemText,
-                    'inquiry_link' => htmlspecialchars($inquiryLink),
-                ]);
-            }
+            $this->telegram->sendMessage($chatId, $msg);
+            return;
+        }
+        $stockItemText = htmlspecialchars((string) ($claim['raw_payload'] ?? ''));
+        $inquiryLink = trim((string) ($claim['sub_link'] ?? ''));
+        $msg = $this->catalog->get('messages.user.free_test.ready_stock', [
+            'service_name' => $serviceName,
+            'config_text' => $stockItemText,
+        ]);
+        if ($inquiryLink !== '') {
+            $msg = $this->catalog->get('messages.user.free_test.ready_stock_with_inquiry', [
+                'service_name' => $serviceName,
+                'config_text' => $stockItemText,
+                'inquiry_link' => htmlspecialchars($inquiryLink),
+            ]);
+        }
         $this->telegram->sendMessage($chatId, $msg);
     }
 
-    /** @param array<int,array<string,mixed>> $eligibleServices */
-    private function openUserFreeTestServiceSelection(int $chatId, int $userId, array $eligibleServices): void
+    /** @param array<int,array<string,mixed>> $visibleServices */
+    private function openUserFreeTestServiceSelection(int $chatId, int $userId, array $visibleServices): void
     {
         $lines = [];
         $options = [];
         $buttons = [];
-        foreach (array_values($eligibleServices) as $idx => $service) {
+        foreach (array_values($visibleServices) as $idx => $service) {
             $num = (string) ($idx + 1);
             $serviceId = (int) ($service['service_id'] ?? 0);
             if ($serviceId <= 0) {
                 continue;
             }
             $name = (string) ($service['service_name'] ?? '');
+            $mode = (string) ($service['mode'] ?? 'stock');
+            $volume = isset($service['volume_gb']) && $service['volume_gb'] !== null ? trim((string) $service['volume_gb']) : '';
+            $durationDays = isset($service['duration_days']) && $service['duration_days'] !== null ? (int) $service['duration_days'] : 0;
+            $duration = $durationDays > 0 ? ($durationDays . ' روز') : 'نامحدود';
+            $detail = $volume !== '' ? (' • ' . $volume . ' گیگ • ' . $duration) : '';
             $lines[] = $this->catalog->get('messages.user.free_test.service_selection.row', ['num' => $num, 'name' => htmlspecialchars($name)]);
-            $options[$num] = $serviceId;
+            if ($detail !== '') {
+                $lines[] = '   ⚙️ ' . htmlspecialchars($mode) . $detail;
+            }
+            $options[$num] = [
+                'service_id' => $serviceId,
+                'service_name' => $name,
+                'mode' => $mode,
+                'volume_gb' => $volume,
+                'duration_days' => $durationDays,
+            ];
             $buttons[] = [$this->catalog->get('messages.user.free_test.service_selection.button', ['num' => $num, 'name' => $name])];
+        }
+        if ($options === []) {
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.free_test.not_available'));
+            return;
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'user.free_test.await_service', ['options' => $options]);

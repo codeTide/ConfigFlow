@@ -2031,7 +2031,10 @@ final class Database implements WorkerApiStore
 
     private function buildProvisionUsername(int $userId, int $orderId): string
     {
-        return 'cf-' . $userId . '-' . $orderId . '-' . substr(bin2hex(random_bytes(4)), 0, 8);
+        $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
+        $base = 'ft_' . max(1, $userId) . '_' . max(1, $orderId) . '_' . $suffix;
+        $normalized = preg_replace('/[^a-zA-Z0-9_]+/', '_', $base) ?? 'ft_user_' . $suffix;
+        return substr($normalized, 0, 32);
     }
 
     /** @param array<string,mixed> $serviceRow
@@ -2893,17 +2896,47 @@ final class Database implements WorkerApiStore
         return $eligible;
     }
 
+    public function listUserVisibleFreeTestServices(int $userId): array
+    {
+        $stmt = $this->pdo->query(
+            "SELECT s.id AS service_id, s.name AS service_name, s.mode, s.is_active,
+                    r.is_enabled, r.claim_mode, r.cooldown_days, r.max_claims, r.volume_gb, r.duration_days, r.priority,
+                    (SELECT COUNT(*) FROM service_stock_items c WHERE c.service_id = s.id AND c.sold_to IS NULL AND c.reserved_payment_id IS NULL AND c.is_expired = 0 AND c.inventory_bucket = 'free_test') AS available_stock
+             FROM free_test_service_rules r
+             JOIN service s ON s.id = r.service_id
+             WHERE r.is_enabled = 1
+               AND s.is_active = 1
+               AND s.mode IN ('stock', 'panel_auto')
+             ORDER BY r.priority DESC, s.id ASC"
+        );
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$row) {
+            $serviceId = (int) ($row['service_id'] ?? 0);
+            $evaluation = $this->evaluateFreeTestClaimForService($userId, $serviceId, is_array($row) ? $row : null, null);
+            $row['maybe_claimable_for_user'] = ($evaluation['ok'] ?? false) === true ? 1 : 0;
+            $row['maybe_claim_block_reason'] = (string) ($evaluation['error_code'] ?? '');
+        }
+        unset($row);
+        return $rows;
+    }
+
     public function claimFreeTestForService(int $userId, int $serviceId): array
     {
-        $rule = $this->getFreeTestRuleForService($serviceId);
-        if (!$this->canUserClaimFreeTestForService($userId, $serviceId, $rule)) {
-            return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
+        $evaluation = $this->evaluateFreeTestClaimForService($userId, $serviceId);
+        if (($evaluation['ok'] ?? false) !== true) {
+            return $evaluation;
         }
-
-        $service = $this->getService($serviceId);
-        $mode = (string) ($service['mode'] ?? 'stock');
+        $service = is_array($evaluation['service'] ?? null) ? $evaluation['service'] : $this->getService($serviceId);
+        $rule = is_array($evaluation['rule'] ?? null) ? $evaluation['rule'] : $this->getFreeTestRuleForService($serviceId);
+        $mode = (string) ($evaluation['mode'] ?? ($service['mode'] ?? 'stock'));
         if ($mode === 'panel_auto') {
-            return $this->claimFreeTestFromPanelService($userId, $serviceId, is_array($service) ? $service : [], is_array($rule) ? $rule : []);
+            return $this->claimFreeTestFromPanelService(
+                $userId,
+                $serviceId,
+                is_array($service) ? $service : [],
+                is_array($rule) ? $rule : [],
+                isset($evaluation['group_ids']) && is_array($evaluation['group_ids']) ? $evaluation['group_ids'] : null
+            );
         }
 
         return $this->claimFreeTestFromStockService($userId, $serviceId, is_array($service) ? $service : null);
@@ -2930,7 +2963,7 @@ final class Database implements WorkerApiStore
             $cfg = $cfgStmt->fetch();
             if (!is_array($cfg)) {
                 $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'not_eligible_or_no_stock'];
+                return ['ok' => false, 'error_code' => 'free_test_stock_empty'];
             }
 
             $stockItemId = (int) ($cfg['id'] ?? 0);
@@ -2975,6 +3008,7 @@ final class Database implements WorkerApiStore
                 'service_id' => $serviceId,
                 'purchase_id' => $purchaseId,
                 'service_name' => $serviceName,
+                'mode' => 'stock',
                 'raw_payload' => $configText,
                 'sub_link' => (string) ($cfg['sub_link'] ?? ''),
             ];
@@ -2982,7 +3016,106 @@ final class Database implements WorkerApiStore
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            return ['ok' => false, 'error' => 'claim_failed'];
+            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
+        }
+    }
+
+    private function claimFreeTestFromPanelService(int $userId, int $serviceId, array $service, array $rule, ?array $resolvedGroupIds = null): array
+    {
+        $defaultVolumeGb = isset($rule['volume_gb']) ? (float) $rule['volume_gb'] : 0.0;
+        if ($defaultVolumeGb <= 0) {
+            return ['ok' => false, 'error_code' => 'free_test_panel_config_invalid'];
+        }
+        $durationDays = isset($rule['duration_days']) ? max(0, (int) $rule['duration_days']) : 0;
+        $baseUrl = trim((string) ($service['panel_base_url'] ?? ''));
+        $panelUsername = trim((string) ($service['panel_username'] ?? ''));
+        $panelPassword = trim((string) ($service['panel_password'] ?? ''));
+        $groupIds = is_array($resolvedGroupIds) && $resolvedGroupIds !== []
+            ? array_values(array_map('intval', $resolvedGroupIds))
+            : $this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword);
+        if ($groupIds === []) {
+            return ['ok' => false, 'error_code' => 'free_test_panel_group_missing'];
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, null);
+            $username = $this->buildProvisionUsername($userId, $purchaseId);
+            $provider = new PasarGuardProvisioningProvider(
+                $baseUrl,
+                $panelUsername,
+                $panelPassword,
+                $groupIds
+            );
+            $dataLimitBytes = (int) max(1, round($defaultVolumeGb * 1024 * 1024 * 1024));
+            $expireAt = $durationDays > 0 ? (time() + ($durationDays * 86400)) : 0;
+            $result = $provider->provisionUser($username, $dataLimitBytes, $expireAt, $groupIds);
+            if (!($result['ok'] ?? false)) {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error_code' => 'free_test_panel_provision_failed', 'provider_error' => (string) ($result['error'] ?? 'panel_provision_failed')];
+            }
+            $subscriptionUrl = trim((string) ($result['subscription_url'] ?? ''));
+            if ($subscriptionUrl === '') {
+                $this->pdo->rollBack();
+                return ['ok' => false, 'error_code' => 'free_test_delivery_failed'];
+            }
+
+            $now = gmdate('Y-m-d H:i:s');
+            $insertClaim = $this->pdo->prepare(
+                'INSERT INTO free_test_service_claims (user_id, service_id, purchase_id, claimed_at)
+                 VALUES (:user_id, :service_id, :purchase_id, :claimed_at)'
+            );
+            $insertClaim->execute([
+                'user_id' => $userId,
+                'service_id' => $serviceId,
+                'purchase_id' => $purchaseId,
+                'claimed_at' => $now,
+            ]);
+
+            $rawData = is_array($result['raw'] ?? null) ? $result['raw'] : [];
+            $metaJson = json_encode([
+                'provider' => 'pasarguard',
+                'username' => $username,
+                'created_user_id' => isset($rawData['id']) ? (int) $rawData['id'] : null,
+                'status' => (string) ($rawData['status'] ?? 'active'),
+                'expire' => $expireAt,
+                'data_limit' => $dataLimitBytes,
+                'group_ids' => $groupIds,
+                'subscription_url' => $subscriptionUrl,
+                'raw' => $rawData,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $this->recordUserServiceDelivery(
+                $purchaseId,
+                $userId,
+                $serviceId,
+                null,
+                'panel',
+                null,
+                $subscriptionUrl,
+                null,
+                null,
+                $defaultVolumeGb,
+                $durationDays,
+                $metaJson === false ? null : $metaJson
+            );
+            $this->pdo->commit();
+            return [
+                'ok' => true,
+                'service_id' => $serviceId,
+                'purchase_id' => $purchaseId,
+                'service_name' => (string) ($service['name'] ?? ''),
+                'mode' => 'panel_auto',
+                'username' => $username,
+                'volume_gb' => $defaultVolumeGb,
+                'duration_days' => $durationDays,
+                'raw_payload' => $subscriptionUrl,
+                'sub_link' => $subscriptionUrl,
+            ];
+        } catch (\Throwable) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
         }
     }
 
@@ -3119,41 +3252,51 @@ final class Database implements WorkerApiStore
 
     private function canUserClaimFreeTestForService(int $userId, int $serviceId, ?array $rule = null): bool
     {
-        if ($userId <= 0 || $serviceId <= 0) {
-            return false;
-        }
+        $evaluation = $this->evaluateFreeTestClaimForService($userId, $serviceId, $rule);
+        return ($evaluation['ok'] ?? false) === true;
+    }
 
+    public function evaluateFreeTestClaimForService(int $userId, int $serviceId, ?array $rule = null, ?array $service = null): array
+    {
+        if ($userId <= 0 || $serviceId <= 0) {
+            return ['ok' => false, 'error_code' => 'service_not_found'];
+        }
+        $service ??= $this->getService($serviceId);
+        if (!is_array($service)) {
+            return ['ok' => false, 'error_code' => 'service_not_found'];
+        }
+        if ((int) ($service['is_active'] ?? 0) !== 1) {
+            return ['ok' => false, 'error_code' => 'service_inactive'];
+        }
+        $mode = (string) ($service['mode'] ?? '');
+        if (!in_array($mode, ['stock', 'panel_auto'], true)) {
+            return ['ok' => false, 'error_code' => 'invalid_service_mode'];
+        }
         $rule ??= $this->getFreeTestRuleForService($serviceId);
         if (!is_array($rule) || (int) ($rule['is_enabled'] ?? 0) !== 1) {
-            return false;
+            return ['ok' => false, 'error_code' => 'free_test_disabled'];
         }
 
-        $service = $this->getService($serviceId);
-        if (!is_array($service) || (int) ($service['is_active'] ?? 0) !== 1) {
-            return false;
-        }
-
-        $mode = (string) ($service['mode'] ?? 'stock');
+        $groupIds = [];
         if ($mode === 'stock') {
             if ($this->countAvailableFreeTestStockByService($serviceId) <= 0) {
-                return false;
+                return ['ok' => false, 'error_code' => 'free_test_stock_empty'];
             }
-        } elseif ($mode === 'panel_auto') {
-            $defaultVolumeGb = isset($rule['volume_gb']) ? (float) $rule['volume_gb'] : 0.0;
-            if ($defaultVolumeGb <= 0) {
-                return false;
+        } else {
+            $volumeGb = isset($rule['volume_gb']) ? (float) $rule['volume_gb'] : 0.0;
+            if ($volumeGb <= 0) {
+                return ['ok' => false, 'error_code' => 'free_test_panel_config_invalid'];
             }
             $baseUrl = trim((string) ($service['panel_base_url'] ?? ''));
             $panelUsername = trim((string) ($service['panel_username'] ?? ''));
             $panelPassword = trim((string) ($service['panel_password'] ?? ''));
             if ($baseUrl === '' || $panelUsername === '' || $panelPassword === '') {
-                return false;
+                return ['ok' => false, 'error_code' => 'free_test_panel_config_invalid'];
             }
-            if ($this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword) === []) {
-                return false;
+            $groupIds = $this->resolveDefaultGroupIds($baseUrl, $panelUsername, $panelPassword);
+            if ($groupIds === []) {
+                return ['ok' => false, 'error_code' => 'free_test_panel_group_missing'];
             }
-        } else {
-            return false;
         }
 
         $claimMode = (string) ($rule['claim_mode'] ?? 'once_until_reset');
@@ -3161,24 +3304,19 @@ final class Database implements WorkerApiStore
         $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM free_test_service_claims WHERE user_id = :user_id AND service_id = :service_id');
         $countStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
         $claimCount = (int) $countStmt->fetchColumn();
-
         if ($claimMode === 'once_until_reset') {
-            return $claimCount < 1;
+            if ($claimCount >= 1) {
+                return ['ok' => false, 'error_code' => 'free_test_quota_exhausted'];
+            }
+            return ['ok' => true, 'mode' => $mode, 'service' => $service, 'rule' => $rule, 'group_ids' => $groupIds];
         }
-
         if ($claimMode !== 'cooldown') {
-            return false;
+            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
         }
-
         if ($claimCount >= $maxClaims) {
-            return false;
+            return ['ok' => false, 'error_code' => 'free_test_quota_exhausted'];
         }
-
         $cooldownDays = max(1, (int) ($rule['cooldown_days'] ?? 0));
-        if ($cooldownDays <= 0) {
-            return false;
-        }
-
         $lastStmt = $this->pdo->prepare(
             'SELECT claimed_at
              FROM free_test_service_claims
@@ -3187,17 +3325,21 @@ final class Database implements WorkerApiStore
         );
         $lastStmt->execute(['user_id' => $userId, 'service_id' => $serviceId]);
         $lastAt = (string) ($lastStmt->fetchColumn() ?: '');
-        if ($lastAt === '') {
-            return true;
+        if ($lastAt !== '') {
+            $lastTs = strtotime($lastAt);
+            $nextAllowed = $lastTs !== false ? strtotime('+' . $cooldownDays . ' days', $lastTs) : false;
+            if ($nextAllowed !== false && time() < $nextAllowed) {
+                $remaining = max(0, $nextAllowed - time());
+                return [
+                    'ok' => false,
+                    'error_code' => 'free_test_cooldown_active',
+                    'next_allowed_at' => gmdate('Y-m-d H:i:s', $nextAllowed),
+                    'remaining_seconds' => $remaining,
+                    'remaining_days' => (int) ceil($remaining / 86400),
+                ];
+            }
         }
-
-        $lastTs = strtotime($lastAt);
-        if ($lastTs === false) {
-            return true;
-        }
-
-        $nextAllowed = strtotime('+' . $cooldownDays . ' days', $lastTs);
-        return $nextAllowed !== false && time() >= $nextAllowed;
+        return ['ok' => true, 'mode' => $mode, 'service' => $service, 'rule' => $rule, 'group_ids' => $groupIds];
     }
 
     public function getServiceByCode(string $serviceCode): ?array
