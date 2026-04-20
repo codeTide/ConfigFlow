@@ -2070,9 +2070,9 @@ final class Database implements WorkerApiStore
             $baseUrl = $scheme . '://' . trim($_SERVER['HTTP_HOST']);
         }
         if ($baseUrl === '') {
-            return '/sub/' . rawurlencode($token);
+            return '/sub/?token=' . rawurlencode($token);
         }
-        return $baseUrl . '/sub/' . rawurlencode($token);
+        return $baseUrl . '/sub/?token=' . rawurlencode($token);
     }
 
     public function getDeliverySubLinkByToken(string $token): ?string
