@@ -2031,10 +2031,19 @@ final class Database implements WorkerApiStore
 
     private function buildProvisionUsername(int $userId, int $orderId): string
     {
-        $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
-        $base = 'ft_' . max(1, $userId) . '_' . max(1, $orderId) . '_' . $suffix;
-        $normalized = preg_replace('/[^a-zA-Z0-9_]+/', '_', $base) ?? 'ft_user_' . $suffix;
-        return substr($normalized, 0, 32);
+        unset($userId, $orderId);
+        return $this->randomAlphaNumeric(12);
+    }
+
+    private function randomAlphaNumeric(int $length): string
+    {
+        $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $maxIndex = strlen($alphabet) - 1;
+        $value = '';
+        for ($i = 0; $i < $length; $i++) {
+            $value .= $alphabet[random_int(0, $maxIndex)];
+        }
+        return $value;
     }
 
     /** @param array<string,mixed> $serviceRow
@@ -3012,11 +3021,16 @@ final class Database implements WorkerApiStore
                 'raw_payload' => $configText,
                 'sub_link' => (string) ($cfg['sub_link'] ?? ''),
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
+            return [
+                'ok' => false,
+                'error_code' => 'free_test_claim_failed',
+                'provider_error' => 'stock_claim_exception: ' . $e->getMessage(),
+                'service_id' => $serviceId,
+            ];
         }
     }
 
@@ -3111,11 +3125,16 @@ final class Database implements WorkerApiStore
                 'raw_payload' => $subscriptionUrl,
                 'sub_link' => $subscriptionUrl,
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
+            return [
+                'ok' => false,
+                'error_code' => 'free_test_claim_failed',
+                'provider_error' => 'panel_claim_exception: ' . $e->getMessage(),
+                'service_id' => $serviceId,
+            ];
         }
     }
 

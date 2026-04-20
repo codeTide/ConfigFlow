@@ -1385,7 +1385,15 @@ final class MessageHandler
             $volume = isset($service['volume_gb']) && $service['volume_gb'] !== null ? trim((string) $service['volume_gb']) : '';
             $durationDays = isset($service['duration_days']) && $service['duration_days'] !== null ? (int) $service['duration_days'] : 0;
             $buttonLabel = $this->catalog->get('messages.user.free_test.service_selection.button', ['name' => $name]);
-            $lines[] = $this->catalog->get('messages.user.free_test.service_selection.row', ['num' => $numFa, 'name' => htmlspecialchars($name)]);
+            $lines[] = $buttonLabel;
+            $duration = $durationDays > 0 ? ($this->toPersianDigits((string) $durationDays) . ' روز') : 'نامحدود';
+            $volumeText = $volume !== '' ? $this->toPersianDigits($volume) . ' گیگ' : 'نامشخص';
+            $claimMode = (string) ($service['claim_mode'] ?? 'cooldown');
+            $cooldownDays = max(0, (int) ($service['cooldown_days'] ?? 0));
+            $cooldownText = $claimMode === 'once_until_reset'
+                ? 'یک‌بار تا ریست'
+                : 'هر ' . $this->toPersianDigits((string) max(1, $cooldownDays)) . ' روز';
+            $lines[] = '   📦 ' . $volumeText . ' | ⏳ ' . $duration . ' | 🔁 ' . $cooldownText;
             $options[$num] = [
                 'service_id' => $serviceId,
                 'service_name' => $name,
