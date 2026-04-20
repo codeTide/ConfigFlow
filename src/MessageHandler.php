@@ -1731,7 +1731,7 @@ final class MessageHandler
                     (int) ($rule['max_claims'] ?? 1),
                     (int) ($rule['priority'] ?? 0)
                 );
-                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
+                $this->reopenAdminServiceFreeTestKeyboard($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
                 return;
             }
             if ($text === $this->uiConst(self::ADMIN_SERVICE_FREE_TEST_MODE)) {
@@ -1792,7 +1792,7 @@ final class MessageHandler
             }
             $rule = $this->database->getFreeTestRuleForService($serviceId);
             $this->database->saveFreeTestRuleForService($serviceId, ((int) ($rule['is_enabled'] ?? 0)) === 1, $mode, isset($rule['cooldown_days']) ? (int) $rule['cooldown_days'] : null, (int) ($rule['max_claims'] ?? 1), (int) ($rule['priority'] ?? 0));
-            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
+            $this->reopenAdminServiceFreeTestKeyboard($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
             return;
         }
 
@@ -1809,7 +1809,7 @@ final class MessageHandler
                     return;
                 }
                 $this->database->resetFreeTestQuotaForUser($targetUserId, $serviceId);
-                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_quota_reset', ['target_user_id' => $targetUserId]));
+                $this->reopenAdminServiceFreeTestKeyboard($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_quota_reset', ['target_user_id' => $targetUserId]));
                 return;
             }
             $value = (int) preg_replace('/\D+/', '', $text);
@@ -1828,7 +1828,7 @@ final class MessageHandler
                 $mode = 'cooldown';
             }
             $this->database->saveFreeTestRuleForService($serviceId, ((int) ($rule['is_enabled'] ?? 0)) === 1, $mode, $cooldownDays, $maxClaims, (int) ($rule['priority'] ?? 0));
-            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
+            $this->reopenAdminServiceFreeTestKeyboard($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_rule_saved'));
             return;
         }
 
@@ -1869,7 +1869,7 @@ final class MessageHandler
             }
             if ($raw === $this->catalog->get('admin.services.prompts.free_test_stock_duration_unlimited')) {
                 $this->database->saveFreeTestStockDefaultsForService($serviceId, $volume, 0);
-                $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_defaults_saved'));
+                $this->reopenAdminServiceFreeTestKeyboard($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_defaults_saved'));
                 return;
             }
             $days = (int) preg_replace('/\D+/', '', $raw);
@@ -1878,7 +1878,7 @@ final class MessageHandler
                 return;
             }
             $this->database->saveFreeTestStockDefaultsForService($serviceId, $volume, $days);
-            $this->openAdminServiceFreeTestView($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_defaults_saved'));
+            $this->reopenAdminServiceFreeTestKeyboard($chatId, $userId, $serviceId, $this->messageRenderer->render('admin.services.success.free_test_defaults_saved'));
             return;
         }
 
@@ -2320,8 +2320,8 @@ final class MessageHandler
             'max_claims' => 1,
         ];
         $claimCount = $this->database->countFreeTestClaimsForService($serviceId);
-        $isEnabledText = ((int) ($rule['is_enabled'] ?? 0)) === 1 ? '🟢 فعال' : '🔴 غیرفعال';
-        $claimModeText = ((string) ($rule['claim_mode'] ?? 'once_until_reset')) === 'cooldown' ? '⏱️ دوره‌ای' : '1️⃣ یک‌بار تا ریست';
+        $isEnabledText = ((int) ($rule['is_enabled'] ?? 0)) === 1 ? 'فعال' : 'غیرفعال';
+        $claimModeText = ((string) ($rule['claim_mode'] ?? 'once_until_reset')) === 'cooldown' ? 'دوره‌ای' : 'یک‌بار تا ریست';
         $volume = isset($rule['volume_gb']) && $rule['volume_gb'] !== null ? trim((string) $rule['volume_gb']) : '';
         $durationDays = isset($rule['duration_days']) && $rule['duration_days'] !== null ? (int) $rule['duration_days'] : null;
         $duration = $durationDays === null ? '' : ($durationDays === 0 ? 'نامحدود' : (string) $durationDays);
@@ -2338,12 +2338,21 @@ final class MessageHandler
                 'cooldown_days' => $rule['cooldown_days'] !== null ? $this->toPersianNumber((string) $rule['cooldown_days']) : $this->catalog->get('messages.generic.dash'),
                 'max_claims' => $this->toPersianNumber((string) ((int) ($rule['max_claims'] ?? 1))),
                 'claim_count' => $this->toPersianNumber((string) $claimCount),
-                'volume' => $volume !== '' ? htmlspecialchars($volume) : $this->catalog->get('messages.generic.dash'),
+                'volume' => $volume !== '' ? htmlspecialchars($volume) . ' گیگ' : $this->catalog->get('messages.generic.dash'),
                 'duration' => $duration !== '' ? htmlspecialchars($duration) : $this->catalog->get('messages.generic.dash'),
             ])
             ,
             $this->adminServiceFreeTestKeyboard($mode === 'stock')
         );
+    }
+
+    private function reopenAdminServiceFreeTestKeyboard(int $chatId, int $userId, int $serviceId, ?string $notice = null): void
+    {
+        $service = $this->database->getService($serviceId);
+        $mode = is_array($service) ? (string) ($service['mode'] ?? 'stock') : 'stock';
+        $this->database->setUserState($userId, 'admin.service.free_test.view', ['service_id' => $serviceId]);
+        $text = ($notice !== null && $notice !== '') ? $notice : '✅';
+        $this->telegram->sendMessage($chatId, $text, $this->adminServiceFreeTestKeyboard($mode === 'stock'));
     }
 
     private function adminServiceFreeTestKeyboard(bool $isStockService = true): array
