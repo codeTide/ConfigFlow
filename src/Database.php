@@ -3005,6 +3005,7 @@ final class Database implements WorkerApiStore
     {
         $serviceName = is_array($service) ? (string) ($service['name'] ?? '') : '';
         $now = gmdate('Y-m-d H:i:s');
+        $purchaseId = 0;
         $this->pdo->beginTransaction();
         try {
             $cfgStmt = $this->pdo->prepare(
@@ -3089,6 +3090,7 @@ final class Database implements WorkerApiStore
             return ['ok' => false, 'error_code' => 'free_test_panel_group_missing'];
         }
 
+        $purchaseId = 0;
         $this->pdo->beginTransaction();
         try {
             $username = $this->buildProvisionUsername($userId, $serviceId);
