@@ -2332,6 +2332,13 @@ final class MessageHandler
         $statusText = ((int) ($service['is_active'] ?? 0)) === 1
             ? $this->catalog->get('admin.ui.open.service_view.status_active')
             : $this->catalog->get('admin.ui.open.service_view.status_inactive');
+        $subLinkMode = ((string) ($service['sub_link_mode'] ?? 'proxy')) === 'direct'
+            ? $this->catalog->get('admin.types_tariffs.labels.sub_link_mode_direct')
+            : $this->catalog->get('admin.types_tariffs.labels.sub_link_mode_proxy');
+        $subLinkBaseUrl = trim((string) ($service['sub_link_base_url'] ?? ''));
+        if ($subLinkBaseUrl === '') {
+            $subLinkBaseUrl = $this->catalog->get('admin.ui.open.service_view.panel_none');
+        }
         $tariffCount = $this->database->countTariffsByService($serviceId);
         $stockCount = $this->database->countAvailableStockItemsByService($serviceId);
 
@@ -2368,6 +2375,8 @@ final class MessageHandler
                 'mode_text' => $modeText,
                 'panel_name' => $panelName,
                 'status_text' => $statusText,
+                'sub_link_mode' => $subLinkMode,
+                'sub_link_base_url' => $subLinkBaseUrl,
                 'tariff_count' => $tariffCount,
                 'stock_count' => $stockCount,
             ]),

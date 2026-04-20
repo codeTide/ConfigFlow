@@ -856,8 +856,8 @@
           "mode_panel_auto": "پنلی خودکار",
           "status_active": "فعال",
           "status_inactive": "غیرفعال",
-          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
-          "overview_stock": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
+          "overview": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔌 پنل: {panel_name}\n🔗 حالت لینک اشتراک: {sub_link_mode}\n🌐 آدرس پایه لینک اشتراک: {sub_link_base_url}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
+          "overview_stock": "🧩 <b>جزئیات سرویس</b>\n\n👤 نام: <b>{service_name}</b>\n🔖 شناسه: <code>{service_id}</code>\n⚙️ حالت: {mode_text}\n🔗 حالت لینک اشتراک: {sub_link_mode}\n🌐 آدرس پایه لینک اشتراک: {sub_link_base_url}\n📶 وضعیت: {status_text}\n\n<blockquote>💡 این صفحه برای مدیریت همین سرویس است؛ از دکمه‌های پایین برای تغییر وضعیت، ویرایش، تعرفه‌ها و موجودی استفاده کنید.</blockquote>",
           "panel_none": "تنظیم نشده"
         },
         "panels_list": {
