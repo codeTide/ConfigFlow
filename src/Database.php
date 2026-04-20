@@ -10,6 +10,7 @@ final class Database implements WorkerApiStore
 {
     private const DELIVERY_MODE_STOCK_ONLY = 'stock_only';
     private const DELIVERY_MODE_PANEL_ONLY = 'panel_only';
+    private const DELIVERY_LIFECYCLE_ACTIVE = 'active';
 
     private PDO $pdo;
 
@@ -169,6 +170,14 @@ final class Database implements WorkerApiStore
                 source_type ENUM('stock','panel') NOT NULL,
                 is_test TINYINT(1) NOT NULL DEFAULT 0,
                 stock_item_id BIGINT NULL,
+                service_public_id CHAR(12) NOT NULL,
+                lifecycle_status ENUM('active','expired','depleted','disabled','revoked','deleted') NOT NULL DEFAULT 'active',
+                is_manageable TINYINT(1) NOT NULL DEFAULT 1,
+                status_reason VARCHAR(191) NULL,
+                last_status_sync_at DATETIME NULL,
+                cleanup_due_at DATETIME NULL,
+                cleaned_up_at DATETIME NULL,
+                cleanup_reason VARCHAR(100) NULL,
                 subscription_token VARCHAR(64) NOT NULL,
                 sub_link TEXT NOT NULL,
                 volume_gb DECIMAL(10,2) NULL,
@@ -179,6 +188,8 @@ final class Database implements WorkerApiStore
                 INDEX idx_deliveries_user (user_id),
                 INDEX idx_deliveries_service (service_id, tariff_id),
                 INDEX idx_deliveries_source (source_type),
+                INDEX idx_deliveries_manageable (user_id, lifecycle_status, is_manageable),
+                UNIQUE KEY uq_deliveries_service_public_id (service_public_id),
                 UNIQUE KEY uq_deliveries_subscription_token (subscription_token)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
@@ -187,11 +198,25 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN tariff_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS is_test TINYINT(1) NOT NULL DEFAULT 0 AFTER source_type");
             $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS subscription_token VARCHAR(64) NULL AFTER stock_item_id");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS service_public_id CHAR(12) NULL AFTER stock_item_id");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS lifecycle_status ENUM('active','expired','depleted','disabled','revoked','deleted') NOT NULL DEFAULT 'active' AFTER service_public_id");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS is_manageable TINYINT(1) NOT NULL DEFAULT 1 AFTER lifecycle_status");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS status_reason VARCHAR(191) NULL AFTER is_manageable");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS last_status_sync_at DATETIME NULL AFTER status_reason");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS cleanup_due_at DATETIME NULL AFTER last_status_sync_at");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS cleaned_up_at DATETIME NULL AFTER cleanup_due_at");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS cleanup_reason VARCHAR(100) NULL AFTER cleaned_up_at");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS access_url");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS stock_item_uuid");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS config_uuid");
+            $this->pdo->exec("UPDATE user_service_deliveries SET lifecycle_status = 'active' WHERE lifecycle_status IS NULL OR lifecycle_status = ''");
+            $this->pdo->exec("UPDATE user_service_deliveries SET is_manageable = 1 WHERE is_manageable IS NULL");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD INDEX IF NOT EXISTS idx_deliveries_manageable (user_id, lifecycle_status, is_manageable)");
             $this->pdo->exec("UPDATE user_service_deliveries SET subscription_token = REPLACE(LOWER(UUID()), '-', '') WHERE subscription_token IS NULL OR subscription_token = ''");
             $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN subscription_token VARCHAR(64) NOT NULL");
+            $this->backfillServicePublicIds();
+            $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN service_public_id CHAR(12) NOT NULL");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD UNIQUE INDEX IF NOT EXISTS uq_deliveries_service_public_id (service_public_id)");
             $this->pdo->exec("ALTER TABLE user_service_deliveries ADD UNIQUE INDEX IF NOT EXISTS uq_deliveries_subscription_token (subscription_token)");
         }
         if ($this->tableExists('payments')) {
@@ -423,6 +448,128 @@ final class Database implements WorkerApiStore
         );
         $stmt->execute(['user_id' => $userId]);
         return $stmt->fetchAll();
+    }
+
+    public function listManageableUserServices(int $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT d.id AS delivery_id,
+                    d.purchase_id,
+                    d.service_id,
+                    s.name AS service_name,
+                    d.service_public_id,
+                    d.source_type,
+                    d.lifecycle_status,
+                    d.is_manageable,
+                    d.delivered_at
+             FROM user_service_deliveries d
+             JOIN service s ON s.id = d.service_id
+             WHERE d.user_id = :user_id
+               AND d.lifecycle_status = :status
+               AND d.is_manageable = 1
+             ORDER BY d.id DESC'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'status' => self::DELIVERY_LIFECYCLE_ACTIVE,
+        ]);
+        return $stmt->fetchAll();
+    }
+
+    public function listPanelDeliveriesForStatusSync(): array
+    {
+        $stmt = $this->pdo->query(
+            "SELECT d.id AS delivery_id,
+                    d.user_id,
+                    d.service_id,
+                    d.service_public_id,
+                    d.source_type,
+                    d.is_test,
+                    d.lifecycle_status,
+                    d.is_manageable,
+                    d.status_reason,
+                    d.last_status_sync_at,
+                    d.cleanup_due_at,
+                    d.cleaned_up_at,
+                    d.cleanup_reason,
+                    d.sub_link,
+                    d.meta_json,
+                    s.name AS service_name,
+                    s.sub_link_mode,
+                    s.sub_link_base_url,
+                    s.panel_base_url,
+                    s.panel_username,
+                    s.panel_password
+             FROM user_service_deliveries d
+             JOIN service s ON s.id = d.service_id
+             WHERE s.mode = 'panel_auto'
+               AND d.lifecycle_status NOT IN ('deleted', 'revoked')
+               AND COALESCE(s.panel_base_url, '') <> ''
+               AND COALESCE(s.panel_username, '') <> ''
+               AND COALESCE(s.panel_password, '') <> ''
+             ORDER BY d.id ASC"
+        );
+        return $stmt->fetchAll();
+    }
+
+    public function applyPanelUserStatusToDelivery(
+        int $deliveryId,
+        string $lifecycleStatus,
+        int $isManageable,
+        ?string $statusReason,
+        array $panelMeta,
+        ?string $resolvedSubLink = null,
+        ?string $cleanupDueAt = null,
+        ?string $cleanupReason = null,
+        ?string $cleanedUpAt = null
+    ): void {
+        $stmt = $this->pdo->prepare('SELECT meta_json, sub_link FROM user_service_deliveries WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $deliveryId]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return;
+        }
+
+        $existingMetaRaw = (string) ($row['meta_json'] ?? '');
+        $existingMeta = $existingMetaRaw !== '' ? json_decode($existingMetaRaw, true) : null;
+        if (!is_array($existingMeta)) {
+            $existingMeta = [];
+        }
+        $mergedMeta = array_merge($existingMeta, $panelMeta, [
+            'panel_last_seen_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $metaJson = json_encode($mergedMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $nextSubLink = trim((string) ($row['sub_link'] ?? ''));
+        if ($resolvedSubLink !== null && trim($resolvedSubLink) !== '') {
+            $nextSubLink = trim($resolvedSubLink);
+        }
+
+        $upd = $this->pdo->prepare(
+            'UPDATE user_service_deliveries
+             SET lifecycle_status = :lifecycle_status,
+                 is_manageable = :is_manageable,
+                 status_reason = :status_reason,
+                 last_status_sync_at = :last_status_sync_at,
+                 cleanup_due_at = :cleanup_due_at,
+                 cleaned_up_at = :cleaned_up_at,
+                 cleanup_reason = :cleanup_reason,
+                 sub_link = :sub_link,
+                 meta_json = :meta_json
+             WHERE id = :id'
+        );
+        $upd->execute([
+            'lifecycle_status' => $lifecycleStatus,
+            'is_manageable' => $isManageable,
+            'status_reason' => $statusReason,
+            'last_status_sync_at' => gmdate('Y-m-d H:i:s'),
+            'cleanup_due_at' => $cleanupDueAt,
+            'cleaned_up_at' => $cleanedUpAt,
+            'cleanup_reason' => $cleanupReason,
+            'sub_link' => $nextSubLink,
+            'meta_json' => $metaJson === false ? null : $metaJson,
+            'id' => $deliveryId,
+        ]);
     }
 
     public function getUserPurchaseForRenewal(int $userId, int $purchaseId): ?array
@@ -1969,7 +2116,8 @@ final class Database implements WorkerApiStore
             return ['ok' => false, 'error' => 'panel_ref_invalid'];
         }
 
-        $username = $this->buildProvisionUsername((int) ($order['user_id'] ?? 0), (int) ($order['id'] ?? 0));
+        $servicePublicId = $this->generateServicePublicId();
+        $username = $servicePublicId;
         $pricingMode = (string) ($tariff['pricing_mode'] ?? 'fixed');
         $volumeGb = $pricingMode === 'fixed'
             ? (float) ($tariff['volume_gb'] ?? 0)
@@ -2020,7 +2168,7 @@ final class Database implements WorkerApiStore
             $serviceId,
             $tariffId
         );
-        $deliveryToken = $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', false, null, $subscriptionUrl, $volumeGb, $durationDays, null);
+        $deliveryToken = $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', false, null, $subscriptionUrl, $volumeGb, $durationDays, null, $servicePublicId);
 
         $this->markOrderDelivered((int) ($order['id'] ?? 0), (int) ($order['payment_id'] ?? 0));
         $this->pdo->commit();
@@ -2039,16 +2187,15 @@ final class Database implements WorkerApiStore
         return ['ok' => false, 'error' => 'legacy_panel_mode_removed'];
     }
 
-    private function buildProvisionUsername(int $userId, int $orderId): string
+    private function generateServicePublicId(): string
     {
-        unset($userId, $orderId);
-        return $this->randomAlphaNumeric(12);
+        return $this->randomNumeric(3) . gmdate('ymd') . $this->randomNumeric(3);
     }
 
-    private function randomAlphaNumeric(int $length): string
+    private function randomNumeric(int $length): string
     {
-        $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        $maxIndex = strlen($alphabet) - 1;
+        $alphabet = '0123456789';
+        $maxIndex = 9;
         $value = '';
         for ($i = 0; $i < $length; $i++) {
             $value .= $alphabet[random_int(0, $maxIndex)];
@@ -2413,32 +2560,49 @@ final class Database implements WorkerApiStore
         string $subLink,
         ?float $volumeGb,
         ?int $durationDays,
-        ?string $metaJson
+        ?string $metaJson,
+        ?string $servicePublicId = null
     ): string {
-        $subscriptionToken = strtolower(bin2hex(random_bytes(16)));
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO user_service_deliveries (
-                purchase_id, user_id, service_id, tariff_id, source_type, is_test, stock_item_id, subscription_token, sub_link, volume_gb, duration_days, delivered_at, meta_json
-             ) VALUES (
-                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :is_test, :stock_item_id, :subscription_token, :sub_link, :volume_gb, :duration_days, :delivered_at, :meta_json
-             )'
-        );
-        $stmt->execute([
-            'purchase_id' => $purchaseId,
-            'user_id' => $userId,
-            'service_id' => $serviceId,
-            'tariff_id' => $tariffId,
-            'source_type' => $sourceType === 'panel' ? 'panel' : 'stock',
-            'is_test' => $isTest ? 1 : 0,
-            'stock_item_id' => $stockItemId,
-            'subscription_token' => $subscriptionToken,
-            'sub_link' => $subLink,
-            'volume_gb' => $volumeGb,
-            'duration_days' => $durationDays,
-            'delivered_at' => gmdate('Y-m-d H:i:s'),
-            'meta_json' => $metaJson,
-        ]);
-        return $subscriptionToken;
+        $maxAttempts = 7;
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $subscriptionToken = strtolower(bin2hex(random_bytes(16)));
+            $publicId = $servicePublicId !== null && $servicePublicId !== '' ? $servicePublicId : $this->generateServicePublicId();
+            $stmt = $this->pdo->prepare(
+                'INSERT INTO user_service_deliveries (
+                    purchase_id, user_id, service_id, tariff_id, source_type, is_test, stock_item_id, service_public_id, lifecycle_status, is_manageable, subscription_token, sub_link, volume_gb, duration_days, delivered_at, meta_json
+                 ) VALUES (
+                    :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :is_test, :stock_item_id, :service_public_id, :lifecycle_status, :is_manageable, :subscription_token, :sub_link, :volume_gb, :duration_days, :delivered_at, :meta_json
+                 )'
+            );
+            try {
+                $stmt->execute([
+                    'purchase_id' => $purchaseId,
+                    'user_id' => $userId,
+                    'service_id' => $serviceId,
+                    'tariff_id' => $tariffId,
+                    'source_type' => $sourceType === 'panel' ? 'panel' : 'stock',
+                    'is_test' => $isTest ? 1 : 0,
+                    'stock_item_id' => $stockItemId,
+                    'service_public_id' => $publicId,
+                    'lifecycle_status' => self::DELIVERY_LIFECYCLE_ACTIVE,
+                    'is_manageable' => 1,
+                    'subscription_token' => $subscriptionToken,
+                    'sub_link' => $subLink,
+                    'volume_gb' => $volumeGb,
+                    'duration_days' => $durationDays,
+                    'delivered_at' => gmdate('Y-m-d H:i:s'),
+                    'meta_json' => $metaJson,
+                ]);
+                return $subscriptionToken;
+            } catch (\PDOException $e) {
+                if ((int) $e->getCode() !== 23000 || $attempt >= ($maxAttempts - 1)) {
+                    throw $e;
+                }
+                $servicePublicId = null;
+            }
+        }
+
+        throw new \RuntimeException('Unable to generate unique delivery identifiers.');
     }
 
     private function markOrderDelivered(int $orderId, int $paymentId): void
@@ -3118,7 +3282,8 @@ final class Database implements WorkerApiStore
         $purchaseId = 0;
         $this->pdo->beginTransaction();
         try {
-            $username = $this->buildProvisionUsername($userId, $serviceId);
+            $servicePublicId = $this->generateServicePublicId();
+            $username = $servicePublicId;
             $provider = new PasarGuardProvisioningProvider(
                 $baseUrl,
                 $panelUsername,
@@ -3161,7 +3326,8 @@ final class Database implements WorkerApiStore
                 $subscriptionUrl,
                 $defaultVolumeGb,
                 $durationDays,
-                $metaJson === false ? null : $metaJson
+                $metaJson === false ? null : $metaJson,
+                $servicePublicId
             );
             $this->pdo->commit();
             return [
@@ -3372,6 +3538,47 @@ final class Database implements WorkerApiStore
             return $default;
         }
         return (string) $value;
+    }
+
+    private function backfillServicePublicIds(): void
+    {
+        if (!$this->columnExists('user_service_deliveries', 'service_public_id')) {
+            return;
+        }
+
+        $stmt = $this->pdo->query(
+            'SELECT id
+             FROM user_service_deliveries
+             WHERE service_public_id IS NULL OR service_public_id = ""
+             ORDER BY id ASC'
+        );
+        $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        if (!is_array($ids) || $ids === []) {
+            return;
+        }
+
+        $update = $this->pdo->prepare('UPDATE user_service_deliveries SET service_public_id = :service_public_id WHERE id = :id');
+        foreach ($ids as $id) {
+            $id = (int) $id;
+            if ($id <= 0) {
+                continue;
+            }
+            $attempts = 0;
+            while ($attempts < 7) {
+                try {
+                    $update->execute([
+                        'service_public_id' => $this->generateServicePublicId(),
+                        'id' => $id,
+                    ]);
+                    break;
+                } catch (\PDOException $e) {
+                    if ((int) $e->getCode() !== 23000) {
+                        throw $e;
+                    }
+                    $attempts++;
+                }
+            }
+        }
     }
 
 }
