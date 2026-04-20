@@ -87,6 +87,7 @@ function syncPanelDeliveryStatuses(Database $database, array $groups, ?TelegramC
         'deliveries_synced' => 0,
         'fetch_errors' => 0,
         'notifications_sent' => 0,
+        'cleanups_done' => 0,
     ];
 
     foreach ($groups as $group) {
@@ -112,9 +113,9 @@ function syncPanelDeliveryStatuses(Database $database, array $groups, ?TelegramC
         }
 
         foreach ($rows as $delivery) {
-            if (applyPanelUserStatusToDelivery($database, $delivery, $userMap, $telegram, $renderer)) {
-                $summary['notifications_sent']++;
-            }
+            $result = applyPanelUserStatusToDelivery($database, $delivery, $userMap, $client, $telegram, $renderer);
+            $summary['notifications_sent'] += (int) ($result['notifications'] ?? 0);
+            $summary['cleanups_done'] += (int) ($result['cleanups'] ?? 0);
             $summary['deliveries_synced']++;
         }
     }
@@ -126,21 +127,33 @@ function syncPanelDeliveryStatuses(Database $database, array $groups, ?TelegramC
  * @param array<string,mixed> $delivery
  * @param array<string,array<string,mixed>> $userMap
  */
-function applyPanelUserStatusToDelivery(Database $database, array $delivery, array $userMap, ?TelegramClient $telegram, UiMessageRenderer $renderer): bool
+/**
+ * @return array{notifications:int,cleanups:int}
+ */
+function applyPanelUserStatusToDelivery(
+    Database $database,
+    array $delivery,
+    array $userMap,
+    PGClient $client,
+    ?TelegramClient $telegram,
+    UiMessageRenderer $renderer
+): array
 {
     $deliveryId = (int) ($delivery['delivery_id'] ?? 0);
     if ($deliveryId <= 0) {
-        return false;
+        return ['notifications' => 0, 'cleanups' => 0];
     }
 
     $servicePublicId = trim((string) ($delivery['service_public_id'] ?? ''));
     if ($servicePublicId === '') {
-        return false;
+        return ['notifications' => 0, 'cleanups' => 0];
     }
     $previousStatus = trim((string) ($delivery['lifecycle_status'] ?? 'active'));
     $userId = (int) ($delivery['user_id'] ?? 0);
     $serviceName = trim((string) ($delivery['service_name'] ?? 'سرویس'));
     $isTest = ((int) ($delivery['is_test'] ?? 0)) === 1;
+    $cleanupDueAt = trim((string) ($delivery['cleanup_due_at'] ?? ''));
+    $cleanedUpAt = trim((string) ($delivery['cleaned_up_at'] ?? ''));
 
     $panelUser = $userMap[$servicePublicId] ?? null;
     if (!is_array($panelUser)) {
@@ -150,9 +163,14 @@ function applyPanelUserStatusToDelivery(Database $database, array $delivery, arr
             $nextStatus,
             0,
             'panel_user_missing',
-            ['panel_username' => $servicePublicId]
+            ['panel_username' => $servicePublicId],
+            null,
+            null,
+            null,
+            $cleanedUpAt !== '' ? $cleanedUpAt : gmdate('Y-m-d H:i:s')
         );
-        return notifyOnStatusChange($telegram, $renderer, $userId, $servicePublicId, $serviceName, $isTest, $previousStatus, $nextStatus);
+        $notified = notifyOnStatusChange($telegram, $renderer, $userId, $servicePublicId, $serviceName, $isTest, $previousStatus, $nextStatus);
+        return ['notifications' => $notified ? 1 : 0, 'cleanups' => 0];
     }
 
     $expireRaw = $panelUser['expire'] ?? null;
@@ -186,6 +204,74 @@ function applyPanelUserStatusToDelivery(Database $database, array $delivery, arr
         $nextSubLink = $subscriptionUrl;
     }
 
+    if ($isTest && in_array($status, ['expired', 'depleted'], true)) {
+        $deleteRes = $client->deleteUser($servicePublicId);
+        if (($deleteRes['success'] ?? false) === true) {
+            $cleanupReason = $status === 'expired'
+                ? 'test_auto_removed_after_expire'
+                : 'test_auto_removed_after_depleted';
+            $database->applyPanelUserStatusToDelivery(
+                $deliveryId,
+                'deleted',
+                0,
+                $cleanupReason,
+                [
+                    'panel_status' => $panelStatusRaw,
+                    'panel_expire' => $expireRaw,
+                    'panel_used_traffic' => $usedTraffic,
+                    'panel_data_limit' => $dataLimit,
+                    'panel_subscription_url' => $subscriptionUrl !== '' ? $subscriptionUrl : null,
+                    'panel_username' => $servicePublicId,
+                ],
+                $nextSubLink,
+                null,
+                $cleanupReason,
+                gmdate('Y-m-d H:i:s')
+            );
+            $notified = notifyCleanupResult($telegram, $renderer, $userId, $servicePublicId, $serviceName, 'test_removed');
+            return ['notifications' => $notified ? 1 : 0, 'cleanups' => 1];
+        }
+    }
+
+    $nextCleanupDueAt = null;
+    $nextCleanupReason = null;
+    $nextCleanedUpAt = null;
+    if ($status === 'active') {
+        $nextCleanupDueAt = null;
+        $nextCleanupReason = null;
+        $nextCleanedUpAt = null;
+    } elseif (!$isTest && in_array($status, ['expired', 'depleted'], true)) {
+        $nextCleanupDueAt = $cleanupDueAt !== '' ? $cleanupDueAt : gmdate('Y-m-d H:i:s', time() + (7 * 86400));
+        $nextCleanupReason = $status === 'expired' ? 'grace_period_expired' : 'grace_period_depleted';
+        $nextCleanedUpAt = null;
+
+        if ($cleanupDueAt !== '' && $cleanedUpAt === '' && strtotime($cleanupDueAt) !== false && strtotime($cleanupDueAt) <= time()) {
+            $deleteRes = $client->deleteUser($servicePublicId);
+            if (($deleteRes['success'] ?? false) === true) {
+                $database->applyPanelUserStatusToDelivery(
+                    $deliveryId,
+                    'deleted',
+                    0,
+                    'removed_after_7_day_grace',
+                    [
+                        'panel_status' => $panelStatusRaw,
+                        'panel_expire' => $expireRaw,
+                        'panel_used_traffic' => $usedTraffic,
+                        'panel_data_limit' => $dataLimit,
+                        'panel_subscription_url' => $subscriptionUrl !== '' ? $subscriptionUrl : null,
+                        'panel_username' => $servicePublicId,
+                    ],
+                    $nextSubLink,
+                    null,
+                    'removed_after_7_day_grace',
+                    gmdate('Y-m-d H:i:s')
+                );
+                $notified = notifyCleanupResult($telegram, $renderer, $userId, $servicePublicId, $serviceName, 'normal_removed_after_grace');
+                return ['notifications' => $notified ? 1 : 0, 'cleanups' => 1];
+            }
+        }
+    }
+
     $database->applyPanelUserStatusToDelivery(
         $deliveryId,
         $status,
@@ -199,9 +285,13 @@ function applyPanelUserStatusToDelivery(Database $database, array $delivery, arr
             'panel_subscription_url' => $subscriptionUrl !== '' ? $subscriptionUrl : null,
             'panel_username' => $servicePublicId,
         ],
-        $nextSubLink
+        $nextSubLink,
+        $nextCleanupDueAt,
+        $nextCleanupReason,
+        $nextCleanedUpAt
     );
-    return notifyOnStatusChange($telegram, $renderer, $userId, $servicePublicId, $serviceName, $isTest, $previousStatus, $status);
+    $notified = notifyOnStatusChange($telegram, $renderer, $userId, $servicePublicId, $serviceName, $isTest, $previousStatus, $status);
+    return ['notifications' => $notified ? 1 : 0, 'cleanups' => 0];
 }
 
 /**
@@ -301,4 +391,31 @@ function buildStatusChangeMessage(UiMessageRenderer $renderer, string $nextStatu
         'service_name' => $serviceName,
         'service_public_id' => $servicePublicId,
     ], ['service_name', 'service_public_id']);
+}
+
+function notifyCleanupResult(
+    ?TelegramClient $telegram,
+    UiMessageRenderer $renderer,
+    int $userId,
+    string $servicePublicId,
+    string $serviceName,
+    string $type
+): bool {
+    if ($telegram === null || $userId <= 0) {
+        return false;
+    }
+    $key = match ($type) {
+        'test_removed' => 'messages.user.panel_sync_notifications.cleanup_test_removed',
+        'normal_removed_after_grace' => 'messages.user.panel_sync_notifications.cleanup_after_grace',
+        default => '',
+    };
+    if ($key === '') {
+        return false;
+    }
+    $message = $renderer->render($key, [
+        'service_name' => $serviceName !== '' ? $serviceName : 'سرویس شما',
+        'service_public_id' => $servicePublicId !== '' ? $servicePublicId : '-',
+    ], ['service_name', 'service_public_id']);
+    $telegram->sendMessage($userId, $message);
+    return true;
 }

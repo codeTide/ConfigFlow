@@ -175,6 +175,9 @@ final class Database implements WorkerApiStore
                 is_manageable TINYINT(1) NOT NULL DEFAULT 1,
                 status_reason VARCHAR(191) NULL,
                 last_status_sync_at DATETIME NULL,
+                cleanup_due_at DATETIME NULL,
+                cleaned_up_at DATETIME NULL,
+                cleanup_reason VARCHAR(100) NULL,
                 subscription_token VARCHAR(64) NOT NULL,
                 sub_link TEXT NOT NULL,
                 volume_gb DECIMAL(10,2) NULL,
@@ -200,6 +203,9 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS is_manageable TINYINT(1) NOT NULL DEFAULT 1 AFTER lifecycle_status");
             $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS status_reason VARCHAR(191) NULL AFTER is_manageable");
             $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS last_status_sync_at DATETIME NULL AFTER status_reason");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS cleanup_due_at DATETIME NULL AFTER last_status_sync_at");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS cleaned_up_at DATETIME NULL AFTER cleanup_due_at");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS cleanup_reason VARCHAR(100) NULL AFTER cleaned_up_at");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS access_url");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS stock_item_uuid");
             $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS config_uuid");
@@ -482,6 +488,9 @@ final class Database implements WorkerApiStore
                     d.is_manageable,
                     d.status_reason,
                     d.last_status_sync_at,
+                    d.cleanup_due_at,
+                    d.cleaned_up_at,
+                    d.cleanup_reason,
                     d.sub_link,
                     d.meta_json,
                     s.name AS service_name,
@@ -508,7 +517,10 @@ final class Database implements WorkerApiStore
         int $isManageable,
         ?string $statusReason,
         array $panelMeta,
-        ?string $resolvedSubLink = null
+        ?string $resolvedSubLink = null,
+        ?string $cleanupDueAt = null,
+        ?string $cleanupReason = null,
+        ?string $cleanedUpAt = null
     ): void {
         $stmt = $this->pdo->prepare('SELECT meta_json, sub_link FROM user_service_deliveries WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $deliveryId]);
@@ -538,6 +550,9 @@ final class Database implements WorkerApiStore
                  is_manageable = :is_manageable,
                  status_reason = :status_reason,
                  last_status_sync_at = :last_status_sync_at,
+                 cleanup_due_at = :cleanup_due_at,
+                 cleaned_up_at = :cleaned_up_at,
+                 cleanup_reason = :cleanup_reason,
                  sub_link = :sub_link,
                  meta_json = :meta_json
              WHERE id = :id'
@@ -547,6 +562,9 @@ final class Database implements WorkerApiStore
             'is_manageable' => $isManageable,
             'status_reason' => $statusReason,
             'last_status_sync_at' => gmdate('Y-m-d H:i:s'),
+            'cleanup_due_at' => $cleanupDueAt,
+            'cleaned_up_at' => $cleanedUpAt,
+            'cleanup_reason' => $cleanupReason,
             'sub_link' => $nextSubLink,
             'meta_json' => $metaJson === false ? null : $metaJson,
             'id' => $deliveryId,

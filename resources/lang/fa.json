@@ -263,7 +263,9 @@
         "depleted_test": "🧪 سرویس تست شما به دلیل اتمام حجم پایان یافت.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و پس از پایان، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>",
         "expired_test": "🧪 سرویس تست شما به دلیل اتمام زمان پایان یافت.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و پس از پایان، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>",
         "deleted_test": "🧪 سرویس تست شما در پنل دیگر پیدا نشد و وضعیت آن بسته شد.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 این رفتار برای سرویس تست طبیعی است و بعد از پایان تست، وضعیت سرویس در ربات هم خودکار به‌روزرسانی می‌شود.</blockquote>",
-        "disabled_test": "🧪 سرویس تست شما غیرفعال شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و اگر زمان یا حجم آن تمام شده باشد، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>"
+        "disabled_test": "🧪 سرویس تست شما غیرفعال شده است.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست و اگر زمان یا حجم آن تمام شده باشد، به‌صورت خودکار از پنل و ربات جمع‌آوری می‌شود.</blockquote>",
+        "cleanup_test_removed": "🧪 سرویس تست شما پایان یافت و به‌صورت خودکار از پنل و ربات جمع‌آوری شد.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 سرویس تست قابل تمدید نیست؛ برای استفاده مجدد، از مسیر دریافت سرویس جدید اقدام کنید.</blockquote>",
+        "cleanup_after_grace": "🗂 مهلت ۷ روزه سرویس شما به پایان رسید و سرویس از پنل حذف شد.\n\n🧩 نام سرویس: {service_name}\n🆔 شناسه سرویس: <code>{service_public_id}</code>\n\n<blockquote>💡 برای ادامه استفاده، یک سرویس جدید تهیه کنید تا دسترسی شما دوباره فعال شود.</blockquote>"
       },
       "payment": {
         "errors": {
