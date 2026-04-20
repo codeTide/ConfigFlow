@@ -171,10 +171,9 @@ final class Database implements WorkerApiStore
                 service_id BIGINT NOT NULL,
                 tariff_id BIGINT NULL,
                 source_type ENUM('stock','panel') NOT NULL,
+                is_test TINYINT(1) NOT NULL DEFAULT 0,
                 stock_item_id BIGINT NULL,
                 sub_link TEXT NOT NULL,
-                access_url TEXT NULL,
-                stock_item_uuid VARCHAR(191) NULL,
                 volume_gb DECIMAL(10,2) NULL,
                 duration_days INT NULL,
                 delivered_at DATETIME NOT NULL,
@@ -187,6 +186,18 @@ final class Database implements WorkerApiStore
         );
         if ($this->tableExists('user_service_deliveries')) {
             $this->pdo->exec("ALTER TABLE user_service_deliveries MODIFY COLUMN tariff_id BIGINT NULL");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries ADD COLUMN IF NOT EXISTS is_test TINYINT(1) NOT NULL DEFAULT 0 AFTER source_type");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS access_url");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS stock_item_uuid");
+            $this->pdo->exec("ALTER TABLE user_service_deliveries DROP COLUMN IF EXISTS config_uuid");
+            if ($this->columnExists('user_service_deliveries', 'is_test')) {
+                $this->pdo->exec(
+                    "UPDATE user_service_deliveries d
+                     JOIN purchases p ON p.id = d.purchase_id
+                     SET d.is_test = p.is_test
+                     WHERE d.is_test = 0 AND p.is_test = 1"
+                );
+            }
         }
         if ($this->tableExists('payments')) {
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS service_id BIGINT NULL");
@@ -2010,7 +2021,7 @@ final class Database implements WorkerApiStore
             $serviceId,
             $tariffId
         );
-        $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', null, $subscriptionUrl, null, null, $volumeGb, $durationDays, null);
+        $this->recordUserServiceDelivery($purchaseId, (int) ($order['user_id'] ?? 0), $serviceId, $tariffId, 'panel', false, null, $subscriptionUrl, $volumeGb, $durationDays, null);
 
         $this->markOrderDelivered((int) ($order['id'] ?? 0), (int) ($order['payment_id'] ?? 0));
         $this->pdo->commit();
@@ -2031,10 +2042,19 @@ final class Database implements WorkerApiStore
 
     private function buildProvisionUsername(int $userId, int $orderId): string
     {
-        $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
-        $base = 'ft_' . max(1, $userId) . '_' . max(1, $orderId) . '_' . $suffix;
-        $normalized = preg_replace('/[^a-zA-Z0-9_]+/', '_', $base) ?? 'ft_user_' . $suffix;
-        return substr($normalized, 0, 32);
+        unset($userId, $orderId);
+        return $this->randomAlphaNumeric(12);
+    }
+
+    private function randomAlphaNumeric(int $length): string
+    {
+        $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $maxIndex = strlen($alphabet) - 1;
+        $value = '';
+        for ($i = 0; $i < $length; $i++) {
+            $value .= $alphabet[random_int(0, $maxIndex)];
+        }
+        return $value;
     }
 
     /** @param array<string,mixed> $serviceRow
@@ -2245,10 +2265,9 @@ final class Database implements WorkerApiStore
                 $serviceId,
                 $tariffId,
                 'stock',
+                false,
                 (int) $stock_item['id'],
                 (string) ($stock_item['sub_link'] ?? ''),
-                (string) ($stock_item['config_link'] ?? ''),
-                null,
                 isset($stock_item['volume_gb']) ? (float) $stock_item['volume_gb'] : null,
                 isset($stock_item['duration_days']) ? (int) $stock_item['duration_days'] : null,
                 $this->buildStockConfigText($stock_item)
@@ -2324,19 +2343,18 @@ final class Database implements WorkerApiStore
         int $serviceId,
         ?int $tariffId,
         string $sourceType,
+        bool $isTest,
         ?int $stockItemId,
         string $subLink,
-        ?string $accessUrl,
-        ?string $stock_itemUuid,
         ?float $volumeGb,
         ?int $durationDays,
         ?string $metaJson
     ): void {
         $stmt = $this->pdo->prepare(
             'INSERT INTO user_service_deliveries (
-                purchase_id, user_id, service_id, tariff_id, source_type, stock_item_id, sub_link, access_url, stock_item_uuid, volume_gb, duration_days, delivered_at, meta_json
+                purchase_id, user_id, service_id, tariff_id, source_type, is_test, stock_item_id, sub_link, volume_gb, duration_days, delivered_at, meta_json
              ) VALUES (
-                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :stock_item_id, :sub_link, :access_url, :stock_item_uuid, :volume_gb, :duration_days, :delivered_at, :meta_json
+                :purchase_id, :user_id, :service_id, :tariff_id, :source_type, :is_test, :stock_item_id, :sub_link, :volume_gb, :duration_days, :delivered_at, :meta_json
              )'
         );
         $stmt->execute([
@@ -2345,10 +2363,9 @@ final class Database implements WorkerApiStore
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
             'source_type' => $sourceType === 'panel' ? 'panel' : 'stock',
+            'is_test' => $isTest ? 1 : 0,
             'stock_item_id' => $stockItemId,
             'sub_link' => $subLink,
-            'access_url' => $accessUrl,
-            'stock_item_uuid' => $stock_itemUuid,
             'volume_gb' => $volumeGb,
             'duration_days' => $durationDays,
             'delivered_at' => gmdate('Y-m-d H:i:s'),
@@ -2788,10 +2805,9 @@ final class Database implements WorkerApiStore
             $serviceId,
             $tariffId,
             'stock',
+            false,
             $cfgId,
             (string) ($cfg['sub_link'] ?? ''),
-            (string) ($cfg['config_link'] ?? ''),
-            null,
             isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
             isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
             $this->buildStockConfigText($cfg)
@@ -2946,6 +2962,7 @@ final class Database implements WorkerApiStore
     {
         $serviceName = is_array($service) ? (string) ($service['name'] ?? '') : '';
         $now = gmdate('Y-m-d H:i:s');
+        $purchaseId = 0;
         $this->pdo->beginTransaction();
         try {
             $cfgStmt = $this->pdo->prepare(
@@ -2993,10 +3010,9 @@ final class Database implements WorkerApiStore
                 $serviceId,
                 null,
                 'stock',
+                true,
                 $stockItemId,
                 (string) ($cfg['sub_link'] ?? ''),
-                (string) ($cfg['config_link'] ?? ''),
-                null,
                 isset($cfg['volume_gb']) ? (float) $cfg['volume_gb'] : null,
                 isset($cfg['duration_days']) ? (int) $cfg['duration_days'] : null,
                 $configText
@@ -3012,11 +3028,17 @@ final class Database implements WorkerApiStore
                 'raw_payload' => $configText,
                 'sub_link' => (string) ($cfg['sub_link'] ?? ''),
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
+            return [
+                'ok' => false,
+                'error_code' => 'free_test_claim_failed',
+                'provider_error' => 'stock_claim_exception: ' . $e->getMessage(),
+                'service_id' => $serviceId,
+                'purchase_id' => $purchaseId > 0 ? $purchaseId : null,
+            ];
         }
     }
 
@@ -3037,6 +3059,7 @@ final class Database implements WorkerApiStore
             return ['ok' => false, 'error_code' => 'free_test_panel_group_missing'];
         }
 
+        $purchaseId = 0;
         $this->pdo->beginTransaction();
         try {
             $purchaseId = $this->createPurchase($userId, null, null, 0, 'free_test', true, $serviceId, null);
@@ -3090,10 +3113,9 @@ final class Database implements WorkerApiStore
                 $serviceId,
                 null,
                 'panel',
+                true,
                 null,
                 $subscriptionUrl,
-                null,
-                null,
                 $defaultVolumeGb,
                 $durationDays,
                 $metaJson === false ? null : $metaJson
@@ -3111,11 +3133,17 @@ final class Database implements WorkerApiStore
                 'raw_payload' => $subscriptionUrl,
                 'sub_link' => $subscriptionUrl,
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            return ['ok' => false, 'error_code' => 'free_test_claim_failed'];
+            return [
+                'ok' => false,
+                'error_code' => 'free_test_claim_failed',
+                'provider_error' => 'panel_claim_exception: ' . $e->getMessage(),
+                'service_id' => $serviceId,
+                'purchase_id' => $purchaseId > 0 ? $purchaseId : null,
+            ];
         }
     }
 
