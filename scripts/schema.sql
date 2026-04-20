@@ -242,6 +242,14 @@ CREATE TABLE IF NOT EXISTS user_service_deliveries (
     source_type ENUM('stock','panel') NOT NULL,
     is_test TINYINT(1) NOT NULL DEFAULT 0,
     stock_item_id BIGINT NULL,
+    service_public_id CHAR(12) NOT NULL,
+    lifecycle_status ENUM('active','expired','depleted','disabled','revoked','deleted') NOT NULL DEFAULT 'active',
+    is_manageable TINYINT(1) NOT NULL DEFAULT 1,
+    status_reason VARCHAR(191) NULL,
+    last_status_sync_at DATETIME NULL,
+    cleanup_due_at DATETIME NULL,
+    cleaned_up_at DATETIME NULL,
+    cleanup_reason VARCHAR(100) NULL,
     subscription_token VARCHAR(64) NOT NULL,
     sub_link TEXT NOT NULL,
     volume_gb DECIMAL(10,2) NULL,
@@ -252,5 +260,7 @@ CREATE TABLE IF NOT EXISTS user_service_deliveries (
     INDEX idx_deliveries_user (user_id),
     INDEX idx_deliveries_service (service_id, tariff_id),
     INDEX idx_deliveries_source (source_type),
+    INDEX idx_deliveries_manageable (user_id, lifecycle_status, is_manageable),
+    UNIQUE KEY uq_deliveries_service_public_id (service_public_id),
     UNIQUE KEY uq_deliveries_subscription_token (subscription_token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
