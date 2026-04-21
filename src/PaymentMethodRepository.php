@@ -264,23 +264,6 @@ final class PaymentMethodRepository
                 'api_key' => ['type' => 'string'],
                 'callback_url' => ['type' => 'string'],
             ],
-            'crypto_tron' => [
-                'network' => ['type' => 'string'],
-                'coin' => ['type' => 'string'],
-                'wallet_address' => ['type' => 'string'],
-                'confirm_blocks' => ['type' => 'int'],
-                'tolerance_percent' => ['type' => 'decimal'],
-                'pricing_mode' => ['type' => 'enum', 'values' => ['manual', 'market']],
-                'timeout_seconds' => ['type' => 'int'],
-            ],
-            'tronpays_rial' => [
-                'base_url' => ['type' => 'string'],
-                'merchant_key' => ['type' => 'string'],
-                'callback_url' => ['type' => 'string'],
-                'mode' => ['type' => 'enum', 'values' => ['sandbox', 'live']],
-                'verify_mode' => ['type' => 'enum', 'values' => ['manual', 'auto']],
-                'timeout_seconds' => ['type' => 'int'],
-            ],
         ];
     }
 }

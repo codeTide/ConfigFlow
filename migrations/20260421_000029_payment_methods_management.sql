@@ -27,19 +27,12 @@ CREATE TABLE IF NOT EXISTS payment_methods (
 INSERT INTO payment_methods
     (code, category, is_active, sort_order, min_amount, max_amount, auto_verify, requires_receipt, visible_to_user, created_at, updated_at)
 VALUES
-    ('crypto_tron', 'crypto', 1, 20, 10000, 0, 0, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
-    ('tetrapay', 'gateway', 1, 30, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
-    ('tronpays_rial', 'rial', 0, 50, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+    ('tetrapay', 'gateway', 1, 30, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())
 ON DUPLICATE KEY UPDATE
     category = VALUES(category),
     sort_order = VALUES(sort_order),
     updated_at = VALUES(updated_at);
 
-UPDATE payment_methods pm
-JOIN settings s ON s.`key` = 'gw_crypto_enabled'
-SET pm.is_active = CASE WHEN s.`value` = '1' THEN 1 ELSE 0 END,
-    pm.updated_at = UTC_TIMESTAMP()
-WHERE pm.code = 'crypto_tron';
 
 UPDATE payment_methods pm
 JOIN settings s ON s.`key` = 'gw_tetrapay_enabled'
@@ -47,11 +40,6 @@ SET pm.is_active = CASE WHEN s.`value` = '1' THEN 1 ELSE 0 END,
     pm.updated_at = UTC_TIMESTAMP()
 WHERE pm.code = 'tetrapay';
 
-UPDATE payment_methods pm
-JOIN settings s ON s.`key` = 'gw_tronpays_rial_enabled'
-SET pm.is_active = CASE WHEN s.`value` = '1' THEN 1 ELSE 0 END,
-    pm.updated_at = UTC_TIMESTAMP()
-WHERE pm.code = 'tronpays_rial';
 
 DELETE FROM settings WHERE `key` = 'gw_card_enabled';
 DELETE FROM settings WHERE `key` = 'payment_card';

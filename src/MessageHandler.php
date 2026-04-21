@@ -6897,7 +6897,6 @@ final class MessageHandler
         $hashId = is_array($providerPayload) ? (string) ($providerPayload['hash_id'] ?? '') : '';
         $verify = match ($gateway) {
             'tetrapay' => $this->gateways->verifyTetrapay($gatewayRef, $hashId),
-            'tronpays_rial' => $this->gateways->checkTronpaysRialInvoice($gatewayRef),
             default => ['ok' => false, 'paid' => false],
         };
         if (!($verify['ok'] ?? false)) {
