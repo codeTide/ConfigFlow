@@ -6570,10 +6570,10 @@ final class MessageHandler
     private function gatewayInvoiceInlineKeyboard(int $paymentId, string $payUrl): array
     {
         $row = [];
+        $row[] = ['text' => $this->catalog->get('buttons.pay.verify'), 'callback_data' => 'pv:' . $paymentId];
         if ($payUrl !== '') {
             $row[] = ['text' => $this->catalog->get('buttons.pay.gateway_pay'), 'url' => $payUrl];
         }
-        $row[] = ['text' => $this->catalog->get('buttons.pay.verify'), 'callback_data' => 'pv:' . $paymentId];
         return ['inline_keyboard' => [$row]];
     }
 
