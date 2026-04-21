@@ -2621,7 +2621,7 @@ final class Database implements WorkerApiStore
 
     public function getPaymentById(int $paymentId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, user_id, service_id, tariff_id, amount, payment_method, gateway_ref, tx_hash, crypto_amount_claimed, status, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, kind, user_id, service_id, tariff_id, amount, payment_method, gateway_ref, tx_hash, crypto_amount_claimed, provider_payload, status, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $paymentId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
@@ -2681,6 +2681,49 @@ final class Database implements WorkerApiStore
             'provider_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
             'id' => $paymentId,
         ]);
+    }
+
+    public function markWalletTopupPaidIfWaitingGateway(int $paymentId): bool
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, user_id, amount, kind, status
+                 FROM payments
+                 WHERE id = :id
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $stmt->execute(['id' => $paymentId]);
+            $payment = $stmt->fetch();
+            if (!is_array($payment)) {
+                $this->pdo->rollBack();
+                return false;
+            }
+            if (($payment['kind'] ?? '') !== 'wallet_topup' || ($payment['status'] ?? '') !== 'waiting_gateway') {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            $updatePayment = $this->pdo->prepare("UPDATE payments SET status = 'paid', verified_at = :verified_at WHERE id = :id");
+            $updatePayment->execute([
+                'verified_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $paymentId,
+            ]);
+            $updateBalance = $this->pdo->prepare('UPDATE users SET balance = balance + :amount WHERE user_id = :user_id');
+            $updateBalance->execute([
+                'amount' => (int) ($payment['amount'] ?? 0),
+                'user_id' => (int) ($payment['user_id'] ?? 0),
+            ]);
+
+            $this->pdo->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return false;
+        }
     }
 
     public function registerVerifyAttempt(int $paymentId, int $cooldownSeconds = 20, int $maxAttempts = 15): array
