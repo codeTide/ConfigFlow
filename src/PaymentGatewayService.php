@@ -16,60 +16,84 @@ final class PaymentGatewayService
     {
     }
 
-    public function createTetrapayOrder(int $amount, string $orderRef): array
+    public function createTetrapayOrder(
+        int $amount,
+        string $hashSeed,
+        string $description,
+        string $callbackUrl,
+        array $customer = []
+    ): array
     {
         $config = $this->paymentMethods?->getMethodConfig('tetrapay') ?? [];
-        $apiKey = trim((string) ($config['secret_key'] ?? $this->settings->get('tetrapay_api_key', '')));
+        $apiKey = trim((string) ($config['api_key'] ?? $this->settings->get('tetrapay_api_key', '')));
         if ($apiKey === '') {
             return ['ok' => false, 'error' => 'tetrapay_api_key_missing'];
         }
 
+        if (trim($callbackUrl) === '') {
+            return ['ok' => false, 'error' => 'tetrapay_callback_missing'];
+        }
+        $hashId = substr(hash('sha256', $hashSeed), 0, 40);
         $payload = [
-            'api_key' => $apiKey,
-            'amount' => $amount,
-            'factorNumber' => $orderRef,
-            'description' => 'ConfigFlow order ' . $orderRef,
+            'ApiKey' => $apiKey,
+            'Hash_id' => $hashId,
+            'Amount' => $amount,
+            'Description' => $description,
+            'CallbackURL' => $callbackUrl,
         ];
+        $email = trim((string) ($customer['email'] ?? ''));
+        if ($email !== '') {
+            $payload['Email'] = $email;
+        }
+        $mobile = trim((string) ($customer['mobile'] ?? ''));
+        if ($mobile !== '') {
+            $payload['Mobile'] = $mobile;
+        }
 
-        $createUrl = trim((string) ($config['create_url'] ?? self::TETRAPAY_CREATE_URL));
+        $createUrl = self::TETRAPAY_CREATE_URL;
         $response = $this->postJson($createUrl, $payload);
         if (!($response['ok'] ?? false)) {
             return ['ok' => false, 'error' => 'request_failed'];
         }
 
         $data = $response['data'] ?? [];
-        $payUrl = (string) ($data['paymentUrl'] ?? $data['url'] ?? '');
-        $authority = (string) ($data['authority'] ?? $data['token'] ?? '');
+        $payUrl = (string) ($data['payment_url_web'] ?? $data['payment_url_bot'] ?? '');
+        $authority = (string) ($data['Authority'] ?? '');
+        $trackingId = (string) ($data['tracking_id'] ?? '');
 
         if ($payUrl === '') {
             return ['ok' => false, 'error' => 'invalid_response'];
         }
 
-        return ['ok' => true, 'pay_url' => $payUrl, 'authority' => $authority];
+        return ['ok' => true, 'pay_url' => $payUrl, 'authority' => $authority, 'tracking_id' => $trackingId, 'hash_id' => $hashId, 'raw' => $data];
     }
 
-    public function verifyTetrapay(string $authority): array
+    public function verifyTetrapay(string $authority, string $hashId = ''): array
     {
         $config = $this->paymentMethods?->getMethodConfig('tetrapay') ?? [];
-        $apiKey = trim((string) ($config['secret_key'] ?? $this->settings->get('tetrapay_api_key', '')));
+        $apiKey = trim((string) ($config['api_key'] ?? $this->settings->get('tetrapay_api_key', '')));
         if ($apiKey === '' || $authority === '') {
             return ['ok' => false, 'error' => 'missing_data'];
         }
 
-        $verifyUrl = trim((string) ($config['verify_url'] ?? self::TETRAPAY_VERIFY_URL));
-        $response = $this->postJson($verifyUrl, [
-            'api_key' => $apiKey,
-            'authority' => $authority,
-        ]);
+        $payload = [
+            'ApiKey' => $apiKey,
+            'Authority' => $authority,
+        ];
+        if ($hashId !== '') {
+            $payload['Hash_id'] = $hashId;
+        }
+        $response = $this->postJson(self::TETRAPAY_VERIFY_URL, $payload);
 
         if (!($response['ok'] ?? false)) {
             return ['ok' => false, 'error' => 'request_failed'];
         }
 
         $data = $response['data'] ?? [];
-        $isPaid = (bool) ($data['paid'] ?? $data['success'] ?? false);
+        $statusCode = (int) ($data['status'] ?? 0);
+        $isPaid = $statusCode === 100;
 
-        return ['ok' => true, 'paid' => $isPaid, 'raw' => $data];
+        return ['ok' => true, 'paid' => $isPaid, 'status' => $statusCode, 'raw' => $data];
     }
 
     public function createSwapwalletCryptoInvoice(int $amount, string $orderId, string $network = 'TRON', string $description = 'Payment'): array
