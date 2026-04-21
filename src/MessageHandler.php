@@ -32,7 +32,6 @@ final class MessageHandler
     private const ADMIN_SERVICE_INVENTORY_REFRESH = '[legacy] admin.types_tariffs.actions.service_inventory_refresh';
     private const ADMIN_USERS_REFRESH = '[legacy] admin.users_stock.actions.users_refresh';
     private const ADMIN_USER_TOGGLE_STATUS = '[legacy] admin.users_stock.actions.user_toggle_status';
-    private const ADMIN_USER_TOGGLE_AGENT = '[legacy] admin.users_stock.actions.user_toggle_agent';
     private const ADMIN_USER_BALANCE_ADD = '[legacy] admin.users_stock.actions.user_balance_add';
     private const ADMIN_USER_BALANCE_SUB = '[legacy] admin.users_stock.actions.user_balance_sub';
     private const ADMIN_STOCK_REFRESH = '[legacy] admin.users_stock.actions.stock_refresh';
@@ -41,15 +40,8 @@ final class MessageHandler
     private const ADMIN_STOCK_SEARCH_CLEAR = '[legacy] admin.users_stock.actions.stock_search_clear';
     private const ADMIN_STOCK_EXPIRE_TOGGLE = '[legacy] admin.users_stock.actions.stock_expire_toggle';
     private const ADMIN_STOCK_DELETE_CONFIG = '[legacy] admin.users_stock.actions.stock_delete_config';
-    private const ADMIN_REQUESTS_AGENCY = '[legacy] admin.payments_requests.actions.requests_agency';
-    private const ADMIN_REQUESTS_PENDING = '[legacy] admin.ui.open.requests.list.filter_pending';
-    private const ADMIN_REQUESTS_APPROVED = '[legacy] admin.ui.open.requests.list.filter_approved';
-    private const ADMIN_REQUESTS_REJECTED = '[legacy] admin.ui.open.requests.list.filter_rejected';
-    private const ADMIN_REQUEST_APPROVE = '[legacy] admin.payments_requests.actions.request_approve';
-    private const ADMIN_REQUEST_REJECT = '[legacy] admin.payments_requests.actions.request_reject';
     private const ADMIN_SETTINGS_REFRESH = '[legacy] admin.settings_admins_pins.actions.settings_refresh';
     private const ADMIN_SETTINGS_TOGGLE_BOT = '[legacy] admin.settings_admins_pins.actions.settings_toggle_bot';
-    private const ADMIN_SETTINGS_TOGGLE_AGENCY = '[legacy] admin.settings_admins_pins.actions.settings_toggle_agency';
     private const ADMIN_SETTINGS_SET_CHANNEL = '[legacy] admin.settings_admins_pins.actions.settings_set_channel';
     private const ADMIN_SETTINGS_PAYMENT_METHODS = 'admin.settings_admins_pins.actions.payment_methods_manage';
     private const ADMIN_ADMINS_ADD = '[legacy] admin.settings_admins_pins.actions.admins_add';
@@ -58,8 +50,6 @@ final class MessageHandler
     private const ADMIN_PIN_SEND_ALL = '[legacy] admin.settings_admins_pins.actions.pin_send_all';
     private const ADMIN_PIN_EDIT = '[legacy] admin.settings_admins_pins.actions.pin_edit';
     private const ADMIN_PIN_DELETE = '[legacy] admin.settings_admins_pins.actions.pin_delete';
-    private const ADMIN_AGENTS_REFRESH = '[legacy] admin.final_modules.actions.agents_refresh';
-    private const ADMIN_AGENT_SET_PRICE = '[legacy] admin.final_modules.actions.agent_set_price';
     private const ADMIN_PANELS_REFRESH = '[legacy] admin.final_modules.actions.panels_refresh';
     private const ADMIN_PANELS_ADD = '[legacy] admin.final_modules.actions.panels_add';
     private const ADMIN_PANEL_TOGGLE = '[legacy] admin.final_modules.actions.panel_toggle';
@@ -67,7 +57,6 @@ final class MessageHandler
     private const ADMIN_PANEL_PKG_ADD = '[legacy] admin.final_modules.actions.panel_pkg_add';
     private const ADMIN_BROADCAST_SCOPE_ALL = '[legacy] admin.final_modules.actions.broadcast_scope_all';
     private const ADMIN_BROADCAST_SCOPE_USERS = '[legacy] admin.final_modules.actions.broadcast_scope_users';
-    private const ADMIN_BROADCAST_SCOPE_AGENTS = '[legacy] admin.final_modules.actions.broadcast_scope_agents';
     private const ADMIN_BROADCAST_SCOPE_ADMINS = '[legacy] admin.final_modules.actions.broadcast_scope_admins';
     private const ADMIN_BROADCAST_SEND = '[legacy] admin.final_modules.actions.broadcast_send';
     private const ADMIN_DELIVERIES_REFRESH = '[legacy] admin.final_modules.actions.deliveries_refresh';
@@ -297,14 +286,6 @@ final class MessageHandler
             return;
         }
 
-        if (
-            $state['state_name'] === 'admin.requests.list'
-            || $state['state_name'] === 'admin.request.view'
-            || $state['state_name'] === 'admin.request.review'
-        ) {
-            $this->handleAdminPaymentsRequestsState($chatId, $userId, $text, $state);
-            return;
-        }
 
         if (
             $state['state_name'] === 'admin.settings.view'
@@ -332,10 +313,7 @@ final class MessageHandler
         }
 
         if (
-            $state['state_name'] === 'admin.agents.list'
-            || $state['state_name'] === 'admin.agent.view'
-            || $state['state_name'] === 'admin.agent.edit'
-            || $state['state_name'] === 'admin.broadcast.compose'
+            $state['state_name'] === 'admin.broadcast.compose'
             || $state['state_name'] === 'admin.broadcast.confirm'
             || $state['state_name'] === 'admin.deliveries.list'
             || $state['state_name'] === 'admin.delivery.view'
@@ -381,40 +359,6 @@ final class MessageHandler
 
 
 
-        if ($state['state_name'] === 'await_agency_request') {
-            if ($this->isBotMenuButton($text)) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_as_text'));
-                return;
-            }
-            if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.agency.note_required'));
-                return;
-            }
-
-            $this->database->clearUserState($userId);
-            $requestId = $this->database->createAgencyRequest($userId, $text);
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->catalog->get('messages.user.agency.request_submitted', ['request_id' => $requestId])
-            );
-
-            foreach (Config::adminIds() as $adminId) {
-                $this->telegram->sendMessage(
-                    (int) $adminId,
-                    $this->catalog->get('admin.requests.new_agency_request', [
-                        'request_id' => $requestId,
-                        'user_id' => $userId,
-                        'note' => htmlspecialchars($text),
-                    ]),
-                    $this->replyKeyboard([
-                        [$this->catalog->get('admin.requests.actions.open_agency', ['request_id' => $requestId])],
-                        [$this->catalog->get('buttons.admin.requests')],
-                        [KeyboardBuilder::admin()],
-                    ])
-                );
-            }
-            return;
-        }
 
         if ($state['state_name'] === 'user.free_test.await_service') {
             if ($this->isMainMenuInput($text)) {
@@ -442,74 +386,6 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_admin_request_note') {
-            if (!in_array($userId, Config::adminIds(), true)) {
-                $this->database->clearUserState($userId);
-                return;
-            }
-            if ($this->isMainMenuInput($text)) {
-                $this->openAdminRoot($chatId, $userId);
-                return;
-            }
-
-            $payload = $state['payload'] ?? [];
-            $requestKind = (string) ($payload['request_kind'] ?? '');
-            $requestId = (int) ($payload['request_id'] ?? 0);
-            $approve = ((int) ($payload['approve'] ?? 0)) === 1;
-            if ($text === UiLabels::back($this->catalog)) {
-                if ($requestKind === 'agency') {
-                    $this->openAdminRequestView($chatId, $userId, $requestKind, $requestId, 'pending', $this->messageRenderer->render('admin.legacy.info.request_note_legacy_redirect'));
-                } else {
-                    $this->openAdminRequestsList($chatId, $userId, 'agency', 'pending', $this->messageRenderer->render('admin.legacy.info.request_note_legacy_redirect'));
-                }
-                return;
-            }
-            if ($requestId <= 0 || $requestKind !== 'agency') {
-                $this->database->clearUserState($userId);
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_request_info'));
-                return;
-            }
-            if ($text === '' || str_starts_with($text, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.admin_note_required'));
-                return;
-            }
-            $adminNote = trim($text) === '-' ? null : trim($text);
-
-            $result = $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
-            if (!($result['ok'] ?? false)) {
-                $msg = (($result['error'] ?? '') === 'already_reviewed')
-                    ? $this->catalog->get('admin.legacy.errors.request_already_reviewed')
-                    : $this->catalog->get('admin.legacy.errors.request_review_failed');
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.ui.audit.error_prefix', ['msg' => $msg]));
-                $this->openAdminRequestsList($chatId, $userId, $requestKind, 'pending');
-                return;
-            }
-
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->messageRenderer->render('admin.payments_requests.success.request_reviewed', [
-                    'request_label' => $this->catalog->get('admin.payments_requests.labels.request_agency'),
-                    'request_id' => $requestId,
-                    'status_text' => $approve
-                        ? $this->catalog->get('admin.payments_requests.labels.status_approved')
-                        : $this->catalog->get('admin.payments_requests.labels.status_rejected'),
-                ])
-            );
-
-            $userNotice = $approve
-                ? $this->catalog->get('admin.legacy.user_notice.agency_approved')
-                : $this->catalog->get('admin.legacy.user_notice.agency_rejected');
-            $noteLine = $adminNote !== null && $adminNote !== ''
-                ? $this->catalog->get('admin.legacy.user_notice.admin_note', ['note' => htmlspecialchars($adminNote)])
-                : '';
-            $userNotice = $this->messageRenderer->render('admin.common.notice_with_optional_note', [
-                'notice' => $userNotice,
-                'note_line' => $noteLine,
-            ], ['notice', 'note_line']);
-            $this->telegram->sendMessage((int) ($result['user_id'] ?? 0), $userNotice);
-            $this->openAdminRequestsList($chatId, $userId, $requestKind, 'pending', $this->messageRenderer->render('admin.legacy.info.legacy_path_not_canonical'));
-            return;
-        }
 
         if ($state['state_name'] === 'await_admin_service_name') {
             if (!in_array($userId, Config::adminIds(), true)) {
@@ -674,30 +550,11 @@ final class MessageHandler
                 'users' => true,
                 'settings' => true,
                 'payments' => true,
-                'requests' => true,
             ]);
             $this->openAdminAdminView($chatId, $userId, $targetUid, $this->messageRenderer->render('admin.legacy.info.add_admin_legacy_redirect'));
             return;
         }
 
-        if ($state['state_name'] === 'await_agent_price') {
-            if (!$this->database->isAdminUser($userId)) {
-                $this->database->clearUserState($userId);
-                return;
-            }
-            $payload = $state['payload'] ?? [];
-            $agentId = (int) ($payload['agent_id'] ?? 0);
-            $tariffId = (int) ($payload['tariff_id'] ?? 0);
-            $price = (int) preg_replace('/\D+/', '', $text);
-            if ($agentId <= 0 || $tariffId <= 0 || $price <= 0) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.valid_price_required'));
-                return;
-            }
-            $this->database->setAgencyPrice($agentId, $tariffId, $price);
-            $this->database->clearUserState($userId);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.agent_price_saved', ['agent_id' => $agentId, 'tariff_id' => $tariffId, 'price' => $price]));
-            return;
-        }
 
         if ($state['state_name'] === 'await_panel_add' || $state['state_name'] === 'await_panel_pkg_add') {
             if (!$this->database->isAdminUser($userId)) {
@@ -1190,9 +1047,7 @@ final class MessageHandler
                 $this->catalog->get('buttons.admin.admins') => 'admin:admins',
                 $this->catalog->get('buttons.admin.broadcast') => 'admin:broadcast',
                 $this->catalog->get('buttons.admin.pins') => 'admin:pins',
-                $this->catalog->get('buttons.admin.agencies') => 'admin:agents',
                 $this->catalog->get('buttons.admin.delivery') => 'admin:deliveries',
-                $this->catalog->get('buttons.admin.requests') => 'admin:requests',
                 $this->catalog->get('buttons.admin.backup_topics') => 'admin:groupops',
                 $this->catalog->get('buttons.admin.payment_methods') => 'admin:payment_methods',
             ];
@@ -1210,10 +1065,6 @@ final class MessageHandler
                     $this->openAdminStockTypesView($chatId, $userId);
                     return;
                 }
-                if ($route === 'admin:requests') {
-                    $this->openAdminRequestsList($chatId, $userId);
-                    return;
-                }
                 if ($route === 'admin:settings') {
                     $this->openAdminSettingsView($chatId, $userId);
                     return;
@@ -1224,10 +1075,6 @@ final class MessageHandler
                 }
                 if ($route === 'admin:pins') {
                     $this->openAdminPinsList($chatId, $userId);
-                    return;
-                }
-                if ($route === 'admin:agents') {
-                    $this->openAdminAgentsList($chatId, $userId);
                     return;
                 }
                 if ($route === 'admin:broadcast') {
@@ -3426,17 +3273,6 @@ final class MessageHandler
                 $this->openAdminUserView($chatId, $userId, $targetUid, $this->messageRenderer->render('admin.users_stock.success.user_status_updated'));
                 return;
             }
-            if ($text === $this->uiConst(self::ADMIN_USER_TOGGLE_AGENT)) {
-                $target = $this->database->getUser($targetUid);
-                if ($target === null) {
-                    $this->openAdminUsersList($chatId, $userId, $this->messageRenderer->render('admin.users_stock.errors.user_not_found'));
-                    return;
-                }
-                $isAgent = ((int) ($target['is_agent'] ?? 0)) === 1;
-                $this->database->setUserAgent($targetUid, !$isAgent);
-                $this->openAdminUserView($chatId, $userId, $targetUid, $this->messageRenderer->render('admin.users_stock.success.agent_status_updated'));
-                return;
-            }
             if ($text === $this->uiConst(self::ADMIN_USER_BALANCE_ADD) || $text === $this->uiConst(self::ADMIN_USER_BALANCE_SUB)) {
                 $mode = $text === $this->uiConst(self::ADMIN_USER_BALANCE_SUB) ? 'sub' : 'add';
                 $this->database->setUserState($userId, 'admin.user.action', [
@@ -3693,10 +3529,6 @@ final class MessageHandler
         $statusText = $status === 'restricted'
             ? $this->catalog->get('admin.ui.open.user_view.status_restricted')
             : $this->catalog->get('admin.ui.open.user_view.status_active');
-        $isAgent = ((int) ($target['is_agent'] ?? 0)) === 1;
-        $agentText = $isAgent
-            ? $this->catalog->get('admin.ui.open.user_view.agent_yes')
-            : $this->catalog->get('admin.ui.open.user_view.agent_no');
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
@@ -3708,10 +3540,9 @@ final class MessageHandler
                 'name' => (string) ($target['full_name'] ?? $this->catalog->get('messages.generic.dash')),
                 'balance' => (int) ($target['balance'] ?? 0),
                 'status_text' => $statusText,
-                'agent_text' => $agentText,
             ]),
             $this->uiKeyboard->replyMenu([
-                [$this->uiConst(self::ADMIN_USER_TOGGLE_STATUS), $this->uiConst(self::ADMIN_USER_TOGGLE_AGENT)],
+                [$this->uiConst(self::ADMIN_USER_TOGGLE_STATUS)],
                 [$this->uiConst(self::ADMIN_USER_BALANCE_ADD), $this->uiConst(self::ADMIN_USER_BALANCE_SUB)],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
@@ -3859,240 +3690,6 @@ final class MessageHandler
         return null;
     }
 
-    private function handleAdminPaymentsRequestsState(int $chatId, int $userId, string $text, array $state): void
-    {
-        if ($this->isMainMenuInput($text)) {
-            $this->openAdminRoot($chatId, $userId);
-            return;
-        }
-
-        $stateName = (string) ($state['state_name'] ?? '');
-        $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
-        $requestsAgencyLabel = $this->catalog->get('admin.payments_requests.actions.requests_agency');
-        $requestsPendingLabel = $this->catalog->get('admin.payments_requests.actions.requests_pending');
-        $requestsApprovedLabel = $this->catalog->get('admin.payments_requests.actions.requests_approved');
-        $requestsRejectedLabel = $this->catalog->get('admin.payments_requests.actions.requests_rejected');
-        $requestApproveLabel = $this->catalog->get('admin.payments_requests.actions.request_approve');
-        $requestRejectLabel = $this->catalog->get('admin.payments_requests.actions.request_reject');
-        if ($stateName === 'admin.requests.list') {
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminRoot($chatId, $userId);
-                return;
-            }
-
-            $kind = (string) ($payload['kind'] ?? '');
-            $status = (string) ($payload['status'] ?? 'pending');
-            if ($kind === '') {
-                if ($text === $requestsAgencyLabel || $text === $this->uiConst(self::ADMIN_REQUESTS_AGENCY)) {
-                    $this->openAdminRequestsList($chatId, $userId, 'agency', 'pending');
-                    return;
-                }
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.payments_requests.errors.invalid_request_kind_option'));
-                return;
-            }
-
-            if ($text === $requestsPendingLabel || $text === $this->uiConst(self::ADMIN_REQUESTS_PENDING)) {
-                $this->openAdminRequestsList($chatId, $userId, $kind, 'pending');
-                return;
-            }
-            if ($text === $requestsApprovedLabel || $text === $this->uiConst(self::ADMIN_REQUESTS_APPROVED)) {
-                $this->openAdminRequestsList($chatId, $userId, $kind, 'approved');
-                return;
-            }
-            if ($text === $requestsRejectedLabel || $text === $this->uiConst(self::ADMIN_REQUESTS_REJECTED)) {
-                $this->openAdminRequestsList($chatId, $userId, $kind, 'rejected');
-                return;
-            }
-
-            $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
-            $selected = $this->extractOptionKey($text);
-            $requestId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-            if ($requestId > 0) {
-                $this->openAdminRequestView($chatId, $userId, $kind, $requestId, $status);
-                return;
-            }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.payments_requests.errors.invalid_request_option'));
-            return;
-        }
-
-        if ($stateName === 'admin.request.view') {
-            $kind = (string) ($payload['kind'] ?? '');
-            $requestId = (int) ($payload['request_id'] ?? 0);
-            $status = (string) ($payload['status'] ?? 'pending');
-            if ($kind === '' || $requestId <= 0) {
-                $this->openAdminRequestsList($chatId, $userId, '', 'pending', $this->messageRenderer->render('admin.payments_requests.errors.invalid_request_info'));
-                return;
-            }
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminRequestsList($chatId, $userId, $kind, $status);
-                return;
-            }
-            if (
-                $text === $requestApproveLabel
-                || $text === $this->uiConst(self::ADMIN_REQUEST_APPROVE)
-                || $text === $requestRejectLabel
-                || $text === $this->uiConst(self::ADMIN_REQUEST_REJECT)
-            ) {
-                $action = ($text === $requestApproveLabel || $text === $this->uiConst(self::ADMIN_REQUEST_APPROVE)) ? 'approve' : 'reject';
-                $this->database->setUserState($userId, 'admin.request.review', [
-                    'kind' => $kind,
-                    'request_id' => $requestId,
-                    'status' => $status,
-                    'action' => $action,
-                    'stack' => ['admin.request.view', 'admin.requests.list', 'admin.root'],
-                ]);
-                $actionText = $this->catalog->get($action === 'approve' ? 'admin.payments_requests.labels.action_approve' : 'admin.payments_requests.labels.action_reject');
-                $this->telegram->sendMessage(
-                    $chatId,
-                    $this->messageRenderer->render('admin.payments_requests.prompts.request_review_note_overview', [
-                        'action_text' => $actionText,
-                        'request_id' => $requestId,
-                    ]),
-                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
-                );
-                return;
-            }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.payments_requests.errors.invalid_request_review_action'));
-            return;
-        }
-
-        if ($stateName === 'admin.request.review') {
-            $kind = (string) ($payload['kind'] ?? '');
-            $requestId = (int) ($payload['request_id'] ?? 0);
-            $status = (string) ($payload['status'] ?? 'pending');
-            $action = (string) ($payload['action'] ?? '');
-            if ($kind !== 'agency' || $requestId <= 0 || ($action !== 'approve' && $action !== 'reject')) {
-                $this->openAdminRequestsList($chatId, $userId, 'agency', 'pending', $this->messageRenderer->render('admin.payments_requests.errors.invalid_request_review_info'));
-                return;
-            }
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminRequestView($chatId, $userId, $kind, $requestId, $status);
-                return;
-            }
-
-            $adminNote = trim($text) === '-' ? null : trim($text);
-            $approve = $action === 'approve';
-            $result = $this->database->reviewAgencyRequest($requestId, $approve, $adminNote);
-            if (!($result['ok'] ?? false)) {
-                $msg = (($result['error'] ?? '') === 'already_reviewed')
-                    ? $this->catalog->get('admin.payments_requests.errors.request_already_reviewed')
-                    : $this->catalog->get('admin.payments_requests.errors.request_review_failed');
-                $this->telegram->sendMessage($chatId, $msg);
-                $this->openAdminRequestsList($chatId, $userId, $kind, 'pending');
-                return;
-            }
-
-            $label = $this->catalog->get('admin.payments_requests.labels.request_agency');
-            $statusText = $approve
-                ? $this->catalog->get('admin.payments_requests.labels.status_approved')
-                : $this->catalog->get('admin.payments_requests.labels.status_rejected');
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.payments_requests.success.request_reviewed', [
-                'request_label' => $label,
-                'request_id' => $requestId,
-                'status_text' => $statusText,
-            ]));
-            $userNotice = $approve
-                ? $this->catalog->get('admin.payments_requests.user_notice.agency_approved')
-                : $this->catalog->get('admin.payments_requests.user_notice.agency_rejected');
-            $noteLine = $adminNote !== null && $adminNote !== ''
-                ? $this->catalog->get('admin.payments_requests.user_notice.admin_note', [
-                    'note' => htmlspecialchars($adminNote),
-                ])
-                : '';
-            $userNotice = $this->messageRenderer->render('admin.common.notice_with_optional_note', [
-                'notice' => $userNotice,
-                'note_line' => $noteLine,
-            ], ['notice', 'note_line']);
-            $this->telegram->sendMessage((int) ($result['user_id'] ?? 0), $userNotice);
-            $this->openAdminRequestsList($chatId, $userId, $kind, 'pending');
-            return;
-        }
-    }
-    private function openAdminRequestsList(int $chatId, int $userId, string $kind = 'agency', string $status = 'pending', ?string $notice = null): void
-    {
-        if ($notice !== null && $notice !== '') {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $kind = 'agency';
-
-        $items = $this->database->listAgencyRequestsByStatus($status, 20, 0);
-        $options = [];
-        $lines = [];
-        $buttons = [[
-            $this->catalog->get('admin.ui.open.requests.list.filter_pending'),
-            $this->catalog->get('admin.ui.open.requests.list.filter_approved'),
-            $this->catalog->get('admin.ui.open.requests.list.filter_rejected'),
-        ]];
-        foreach (array_values($items) as $idx => $item) {
-            $num = (string) ($idx + 1);
-            $requestId = (int) ($item['id'] ?? 0);
-            if ($requestId <= 0) {
-                continue;
-            }
-            $uid = (int) ($item['user_id'] ?? 0);
-            $created = (string) ($item['created_at'] ?? $this->catalog->get('messages.generic.dash'));
-            $lines[] = $this->catalog->get('admin.ui.open.requests.list.row', ['num' => $num, 'request_id' => $requestId, 'uid' => $uid, 'created_at' => $created]);
-            $options[$num] = $requestId;
-            $buttons[] = [$this->catalog->get('admin.ui.open.requests.list.button', ['num' => $num, 'request_id' => $requestId])];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.requests.list', [
-            'kind' => $kind,
-            'status' => $status,
-            'options' => $options,
-            'stack' => ['admin.root'],
-        ]);
-        $kindTitle = $this->catalog->get('admin.ui.open.requests.list.kind_agency');
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('admin.ui.open.requests.list.overview', [
-                'kind_title' => $kindTitle,
-                'status' => $status,
-                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.requests.list.empty'),
-            ], ['list']),
-            $this->uiKeyboard->replyMenu($buttons)
-        );
-    }
-
-    private function openAdminRequestView(int $chatId, int $userId, string $kind, int $requestId, string $backStatus = 'pending', ?string $notice = null): void
-    {
-        $request = $this->database->getAgencyRequestById($requestId);
-        if ($request === null) {
-            $this->openAdminRequestsList($chatId, $userId, $kind, $backStatus, $this->messageRenderer->render('admin.ui.open.requests.view.not_found'));
-            return;
-        }
-        if ($notice !== null && $notice !== '') {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $status = (string) ($request['status'] ?? 'pending');
-        $statusText = $status === 'approved'
-            ? $this->catalog->get('admin.ui.open.requests.view.status_approved')
-            : ($status === 'rejected' ? $this->catalog->get('admin.ui.open.requests.view.status_rejected') : $this->catalog->get('admin.ui.open.requests.view.status_pending'));
-        $kindTitle = $this->catalog->get('admin.ui.open.requests.view.kind_agency');
-        $buttons = [];
-        if ($status === 'pending') {
-            $buttons[] = [$this->uiConst(self::ADMIN_REQUEST_APPROVE), $this->uiConst(self::ADMIN_REQUEST_REJECT)];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.request.view', [
-            'kind' => $kind,
-            'request_id' => $requestId,
-            'status' => $backStatus,
-            'stack' => ['admin.requests.list', 'admin.root'],
-        ]);
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('admin.ui.open.requests.view.overview', [
-                'kind_title' => $kindTitle,
-                'request_id' => $requestId,
-                'user_id' => (int) ($request['user_id'] ?? 0),
-                'status_text' => $statusText,
-                'created_at' => (string) ($request['created_at'] ?? $this->catalog->get('messages.generic.dash')),
-                'note' => (string) ($request['note'] ?? ''),
-            ]),
-            $this->uiKeyboard->replyMenu($buttons)
-        );
-    }
 
     private function handleAdminSettingsAdminsPinsState(int $chatId, int $userId, string $text, array $state): void
     {
@@ -4104,7 +3701,6 @@ final class MessageHandler
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
         $settingsRefreshLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_refresh');
         $settingsToggleBotLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_bot');
-        $settingsToggleAgencyLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_agency');
         $settingsSetChannelLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_channel');
         $adminsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.admins_add');
         $adminDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.admin_delete');
@@ -4121,8 +3717,6 @@ final class MessageHandler
                 return;
             }
             $toggleMap = [
-                $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY) => 'agency_request_enabled',
-                $settingsToggleAgencyLabel => 'agency_request_enabled',
             ];
             if ($text === $settingsRefreshLabel || $text === $this->uiConst(self::ADMIN_SETTINGS_REFRESH)) {
                 $this->openAdminSettingsView($chatId, $userId);
@@ -4546,7 +4140,7 @@ final class MessageHandler
                 return;
             }
             $this->database->upsertAdminUser($targetUid, $userId, [
-                'types' => true, 'stock' => true, 'users' => true, 'settings' => true, 'payments' => true, 'requests' => true, 'broadcast' => false, 'agents' => false, 'panels' => false,
+                'types' => true, 'stock' => true, 'users' => true, 'settings' => true, 'payments' => true, 'broadcast' => false, 'panels' => false,
             ]);
             $this->openAdminAdminView($chatId, $userId, $targetUid, $this->messageRenderer->render('admin.settings_admins_pins.success.admin_created'));
             return;
@@ -4729,7 +4323,6 @@ final class MessageHandler
     {
         $vals = [
             'bot_status' => $this->settings->get('bot_status', 'on'),
-            'agency_request_enabled' => $this->settings->get('agency_request_enabled', '1'),
             'channel_id' => trim($this->settings->get('channel_id', '')),
         ];
         if ($notice !== null && $notice !== '') {
@@ -4738,7 +4331,6 @@ final class MessageHandler
         $this->database->setUserState($userId, 'admin.settings.view', ['stack' => ['admin.root']]);
         $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.ui.open.settings_admins_pins.settings.overview', [
             'bot_status' => $this->catalog->get('admin.settings_admins_pins.labels.bot_status_' . $vals['bot_status']),
-            'agency_request_enabled' => $vals['agency_request_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'channel_id' => $vals['channel_id'] !== '' ? $vals['channel_id'] : $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_unset'),
         ]), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_SETTINGS_REFRESH)],
@@ -5016,7 +4608,7 @@ final class MessageHandler
             return;
         }
         $perms = $this->database->getAdminPermissions($targetUid);
-        $permKeys = ['types', 'stock', 'users', 'settings', 'payments', 'requests', 'broadcast', 'agents', 'panels'];
+        $permKeys = ['types', 'stock', 'users', 'settings', 'payments', 'broadcast', 'panels'];
         $rows = [];
         $permLabels = [];
         $lines = [];
@@ -5103,14 +4695,12 @@ final class MessageHandler
         }
         $stateName = (string) ($state['state_name'] ?? '');
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
-        $agentsRefreshLabel = $this->catalog->get('admin.final_modules.actions.agents_refresh');
         $panelsSettingsLabel = $this->catalog->get('admin.final_modules.actions.panels_refresh');
         $panelToggleLabel = $this->catalog->get('admin.final_modules.actions.panel_toggle');
         $panelDeleteLabel = $this->catalog->get('admin.final_modules.actions.panel_delete');
         $panelPkgAddLabel = $this->catalog->get('admin.final_modules.actions.panel_pkg_add');
         $broadcastScopeAllLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_all');
         $broadcastScopeUsersLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_users');
-        $broadcastScopeAgentsLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_agents');
         $broadcastScopeAdminsLabel = $this->catalog->get('admin.final_modules.actions.broadcast_scope_admins');
         $broadcastSendLabel = $this->catalog->get('admin.final_modules.actions.broadcast_send');
         $deliveriesRefreshLabel = $this->catalog->get('admin.final_modules.actions.deliveries_refresh');
@@ -5120,60 +4710,6 @@ final class MessageHandler
         $deleteConfirmWord = $this->catalog->get('admin.final_modules.keywords.delete_confirm');
         $deliverConfirmWord = $this->catalog->get('admin.final_modules.keywords.deliver_confirm');
 
-        if ($stateName === 'admin.agents.list') {
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminRoot($chatId, $userId);
-                return;
-            }
-            if ($text === $agentsRefreshLabel || $text === $this->uiConst(self::ADMIN_AGENTS_REFRESH)) {
-                $this->openAdminAgentsList($chatId, $userId);
-                return;
-            }
-            $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
-            $selected = $this->extractOptionKey($text);
-            $agentId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-            if ($agentId > 0) {
-                $this->openAdminAgentView($chatId, $userId, $agentId);
-                return;
-            }
-        }
-        if ($stateName === 'admin.agent.view') {
-            $agentId = (int) ($payload['agent_id'] ?? 0);
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminAgentsList($chatId, $userId);
-                return;
-            }
-            $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
-            $selected = $this->extractOptionKey($text);
-                $pkgId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-                if ($pkgId > 0) {
-                    $this->database->setUserState($userId, 'admin.agent.edit', ['agent_id' => $agentId, 'tariff_id' => $pkgId]);
-                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.prompts.agent_price_input'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
-                    return;
-                }
-            }
-        if ($stateName === 'admin.agent.edit') {
-            $agentId = (int) ($payload['agent_id'] ?? 0);
-            $pkgId = (int) ($payload['tariff_id'] ?? 0);
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminAgentView($chatId, $userId, $agentId);
-                return;
-            }
-            $raw = trim($text);
-            if ($raw === '-' || $raw === '—') {
-                $this->database->clearAgencyPrice($agentId, $pkgId);
-                $this->openAdminAgentView($chatId, $userId, $agentId, $this->messageRenderer->render('admin.final_modules.success.agent_price_deleted'));
-                return;
-            }
-            $price = (int) preg_replace('/\D+/', '', $raw);
-            if ($price <= 0) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.final_modules.errors.valid_price_required'));
-                return;
-            }
-            $this->database->setAgencyPrice($agentId, $pkgId, $price);
-            $this->openAdminAgentView($chatId, $userId, $agentId, $this->messageRenderer->render('admin.final_modules.success.agent_price_saved'));
-            return;
-        }
 
         if ($stateName === 'admin.panels.list') {
             if ($text === UiLabels::back($this->catalog)) {
@@ -5470,7 +5006,7 @@ final class MessageHandler
                 'message_preview' => $text,
             ]), $this->uiKeyboard->replyMenu([
                 [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_ALL), $this->uiConst(self::ADMIN_BROADCAST_SCOPE_USERS)],
-                [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_AGENTS), $this->uiConst(self::ADMIN_BROADCAST_SCOPE_ADMINS)],
+                [$this->uiConst(self::ADMIN_BROADCAST_SCOPE_ADMINS)],
                 [$this->uiConst(self::ADMIN_BROADCAST_SEND)],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ]));
@@ -5484,11 +5020,9 @@ final class MessageHandler
             $scopeMap = [
                 $this->uiConst(self::ADMIN_BROADCAST_SCOPE_ALL) => 'all',
                 $this->uiConst(self::ADMIN_BROADCAST_SCOPE_USERS) => 'users',
-                $this->uiConst(self::ADMIN_BROADCAST_SCOPE_AGENTS) => 'agents',
                 $this->uiConst(self::ADMIN_BROADCAST_SCOPE_ADMINS) => 'admins',
                 $broadcastScopeAllLabel => 'all',
                 $broadcastScopeUsersLabel => 'users',
-                $broadcastScopeAgentsLabel => 'agents',
                 $broadcastScopeAdminsLabel => 'admins',
             ];
             $scope = (string) ($payload['scope'] ?? 'all');
@@ -7409,7 +6943,6 @@ final class MessageHandler
             KeyboardBuilder::wallet(),
             KeyboardBuilder::support(),
             KeyboardBuilder::referralButton(),
-            KeyboardBuilder::agency(),
             KeyboardBuilder::admin(),
             KeyboardBuilder::backMain(),
             KeyboardBuilder::backAccount(),
@@ -7423,7 +6956,6 @@ final class MessageHandler
             KeyboardBuilder::wallet(),
             KeyboardBuilder::support(),
             KeyboardBuilder::referralButton(),
-            KeyboardBuilder::agency(),
             KeyboardBuilder::admin(),
             KeyboardBuilder::backMain(),
             KeyboardBuilder::backAccount(),

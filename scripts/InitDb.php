@@ -54,20 +54,6 @@ $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS verified_at DATETIME N
 $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS verify_attempts INT NOT NULL DEFAULT 0");
 $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS last_verify_at DATETIME NULL");
 
-// Request tracking table for agency workflows
-$pdo->exec(
-    "CREATE TABLE IF NOT EXISTS agency_requests (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        user_id BIGINT NOT NULL,
-        note TEXT NOT NULL,
-        status VARCHAR(32) NOT NULL DEFAULT 'pending',
-        admin_note TEXT NULL,
-        created_at DATETIME NOT NULL,
-        reviewed_at DATETIME NULL,
-        INDEX idx_agency_user (user_id),
-        INDEX idx_agency_status (status)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
-);
 $pdo->exec("DROP TABLE IF EXISTS free_test_requests");
 $pdo->exec("DROP TABLE IF EXISTS free_test_package_rules");
 $pdo->exec("DROP TABLE IF EXISTS free_test_claims");
