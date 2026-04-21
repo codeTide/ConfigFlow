@@ -1210,16 +1210,14 @@
     },
     "payment_methods": {
       "actions": {
-        "toggle_active": "🔄 فعال و غیرفعال",
+        "toggle_active": "🔄 فعال / غیرفعال",
         "edit_min_amount": "💰 حداقل مبلغ",
         "edit_max_amount": "💵 حداکثر مبلغ",
         "edit_sort_order": "🔢 ترتیب نمایش",
         "toggle_visible": "👁 نمایش / عدم نمایش",
-        "toggle_purchase": "🛍 خرید جدید",
-        "toggle_renewal": "♻️ تمدید",
-        "toggle_bonus": "🎁 پاداش",
-        "toggle_fee": "💸 کارمزد",
-        "edit_config_json": "🧩 تنظیمات اختصاصی",
+        "bonus_settings": "🎁 پاداش",
+        "fee_settings": "💸 کارمزد",
+        "provider_settings": "🧩 تنظیمات اختصاصی",
         "print_status": "📋 وضعیت روش"
       },
       "labels": {
@@ -1229,18 +1227,19 @@
         "status_hidden": "پنهان"
       },
       "list": {
-        "overview": "💳 روش پرداخت موردنظر را از فهرست زیر انتخاب کنید:\n\n🧭 با انتخاب هر روش، وارد تنظیمات همان درگاه می‌شوید.\n\n<blockquote>💡 در این بخش وضعیت روش، محدودیت مبلغ، پاداش و کارمزد را مدیریت کنید و قبل از هر تغییر، اثر آن را در خرید و تمدید بررسی کنید.</blockquote>",
+        "overview": "💳 روش پرداخت موردنظر را از فهرست زیر انتخاب کنید\n\n🧭 با انتخاب هر روش، وارد تنظیمات مدیریتی همان درگاه می‌شوید\n\n<blockquote>💡 از این بخش می‌توانید وضعیت کلی، محدودیت مبلغ، نمایش به کاربر، تنظیمات پاداش، تنظیمات کارمزد و تنظیمات اختصاصی هر روش را مرحله‌به‌مرحله مدیریت کنید.</blockquote>",
         "row": "{title} | {status}",
         "button": "{title}",
         "empty": "📭 در حال حاضر روش پرداختی ثبت نشده است."
       },
       "view": {
-        "overview": "💳 تنظیمات روش پرداخت\n\n🧾 نام روش: {label}\n📶 وضعیت: {status}\n💰 حداقل مبلغ: {min_amount} تومان\n💵 حداکثر مبلغ: {max_amount} تومان\n🎁 پاداش: {bonus_status}\n💸 کارمزد: {fee_status}\n🛍 امکان خرید: {purchase_status}\n♻️ امکان تمدید: {renewal_status}\n👁 وضعیت نمایش: {visibility_status}\n\n<blockquote>💡 این بخش برای مدیریت وضعیت، مبلغ، پاداش، کارمزد و نمایش همین روش پرداخت است.</blockquote>"
+        "overview": "💳 تنظیمات روش پرداخت\n\n🧾 نام روش: {label}\n📶 وضعیت: {status}\n💰 حداقل مبلغ: {min_amount} تومان\n💵 حداکثر مبلغ: {max_amount} تومان\n🎁 وضعیت پاداش: {bonus_status}\n💸 وضعیت کارمزد: {fee_status}\n👁 وضعیت نمایش: {visibility_status}\n\n<blockquote>💡 از این بخش می‌توانید وضعیت کلی این روش، محدودیت مبلغ، نمایش به کاربر، تنظیمات پاداش، تنظیمات کارمزد و تنظیمات اختصاصی آن را به‌صورت مرحله‌ای مدیریت کنید.</blockquote>"
       },
       "prompts": {
         "send_value": "📝 مقدار جدید را با دقت ارسال کنید:",
         "sort_order_row": "• {label}: {sort_order}",
-        "sort_order_value": "🔢 مقدار ترتیب نمایش جدید را ارسال کنید:\n\n🧾 وضعیت فعلی ترتیب روش‌ها:\n{rows}\n\n<blockquote>💡 عدد کمتر یعنی نمایش زودتر در فهرست روش‌های پرداخت. اگر این عدد را با یک روش دیگر برابر بگذارید، ترتیب روش‌ها به‌صورت خودکار جابه‌جا می‌شود تا تداخل عددی باقی نماند.</blockquote>"
+        "sort_order_value": "🔢 مقدار ترتیب نمایش جدید را ارسال کنید:\n\n🧾 وضعیت فعلی ترتیب روش‌ها:\n{rows}\n\n<blockquote>💡 عدد کمتر یعنی نمایش زودتر در فهرست روش‌های پرداخت. اگر این عدد را با یک روش دیگر برابر بگذارید، ترتیب روش‌ها به‌صورت خودکار جابه‌جا می‌شود تا تداخل عددی باقی نماند.</blockquote>",
+        "send_nullable_amount": "📝 مقدار جدید را ارسال کنید:\n\n🔢 مبلغ را به تومان و فقط عددی وارد کنید\n⏭ اگر نمی‌خواهید محدودیتی باشد، دکمه «رد شدن» را بزنید"
       },
       "errors": {
         "method_not_found": "❌ روش پرداخت پیدا نشد.",
@@ -1250,14 +1249,14 @@
         "method_updated": "✅ تغییرات روش پرداخت با موفقیت اعمال شد.",
         "toggled_active": "✅ وضعیت فعال بودن روش پرداخت تغییر کرد.",
         "toggled_visible": "✅ وضعیت نمایش روش پرداخت تغییر کرد.",
-        "toggled_purchase": "✅ امکان خرید جدید برای این روش به‌روزرسانی شد.",
-        "toggled_renewal": "✅ امکان تمدید برای این روش به‌روزرسانی شد.",
         "toggled_bonus": "✅ وضعیت پاداش این روش به‌روزرسانی شد.",
         "toggled_fee": "✅ وضعیت کارمزد این روش به‌روزرسانی شد.",
         "updated_min_amount": "✅ حداقل مبلغ این روش به‌روزرسانی شد.",
         "updated_max_amount": "✅ حداکثر مبلغ این روش به‌روزرسانی شد.",
         "updated_sort_order": "✅ ترتیب نمایش این روش به‌روزرسانی شد.",
-        "updated_config": "✅ تنظیمات اختصاصی این روش به‌روزرسانی شد."
+        "updated_config": "✅ تنظیمات اختصاصی این روش به‌روزرسانی شد.",
+        "updated_bonus_type": "✅ نوع پاداش این روش به‌روزرسانی شد.",
+        "updated_fee_type": "✅ نوع کارمزد این روش به‌روزرسانی شد."
       },
       "methods": {
         "crypto_tron": {
@@ -1276,6 +1275,116 @@
           "label": "🧾 پرداخت ترون‌پیز",
           "intro": "پرداخت ریالی از طریق ترون‌پیز"
         }
+      },
+      "bonus": {
+        "overview": "🎁 تنظیمات پاداش\n\n📶 وضعیت پاداش: {status}\n🧮 نوع پاداش: {bonus_type}\n💰 مقدار پاداش: {bonus_value}\n📉 حداقل مبلغ برای پاداش: {bonus_min_amount} تومان\n🛑 سقف پاداش: {bonus_cap_amount} تومان\n\n<blockquote>💡 از این بخش می‌توانید قواعد پاداش این روش پرداخت را مدیریت کنید تا مقدار هدیه به‌صورت دقیق و کنترل‌شده روی تراکنش‌ها اعمال شود.</blockquote>",
+        "actions": {
+          "show_status": "📋 وضعیت",
+          "toggle_status": "📶 روشن / خاموش",
+          "toggle_type": "🧮 تغییر نوع پاداش",
+          "edit_value": "💰 مقدار پاداش",
+          "edit_min_amount": "📉 حداقل مبلغ",
+          "edit_cap_amount": "🛑 سقف پاداش"
+        }
+      },
+      "fee": {
+        "overview": "💸 تنظیمات کارمزد\n\n📶 وضعیت کارمزد: {status}\n🧮 نوع کارمزد: {fee_type}\n💰 مقدار کارمزد: {fee_value}\n\n<blockquote>💡 از این بخش می‌توانید نحوه محاسبه کارمزد این روش پرداخت را تنظیم کنید تا مبلغ نهایی پرداخت با منطق دلخواه شما هماهنگ باشد.</blockquote>",
+        "actions": {
+          "show_status": "📋 وضعیت",
+          "toggle_status": "📶 روشن / خاموش",
+          "toggle_type": "🧮 تغییر نوع کارمزد",
+          "edit_value": "💰 مقدار کارمزد"
+        }
+      },
+      "provider": {
+        "overview": "🧩 تنظیمات اختصاصی روش پرداخت\n\n{rows}\n\n<blockquote>💡 برای هر مورد، روی همان دکمه بزنید و مقدار جدید را ارسال کنید تا تنظیمات اختصاصی این درگاه به‌صورت ساختاریافته ذخیره شود.</blockquote>",
+        "no_config": "ℹ️ برای این روش پرداخت هنوز تنظیمات اختصاصی تعریف نشده است.",
+        "fields": {
+          "tetrapay": {
+            "create_url": "🌐 آدرس ایجاد سفارش",
+            "verify_url": "🔎 آدرس بررسی پرداخت",
+            "merchant_id": "🪪 شناسه پذیرنده",
+            "secret_key": "🔑 کلید یا توکن",
+            "mode": "🧪 حالت اجرا",
+            "success_redirect": "✅ آدرس بازگشت موفق",
+            "fail_redirect": "❌ آدرس بازگشت ناموفق",
+            "timeout_seconds": "⏱ زمان انتظار",
+            "admin_note": "📝 توضیح داخلی"
+          },
+          "crypto_tron": {
+            "network": "🌐 شبکه",
+            "coin": "🪙 نوع ارز",
+            "wallet_address": "🏦 آدرس کیف پول",
+            "confirm_blocks": "🔒 تعداد تایید لازم",
+            "tolerance_percent": "🎯 درصد خطای مجاز",
+            "pricing_mode": "💹 حالت قیمت‌گذاری",
+            "timeout_seconds": "⏱ مدت انتظار"
+          },
+          "swapwallet_crypto": {
+            "base_url": "🌐 Base URL",
+            "merchant_key": "🔑 Merchant Key",
+            "username": "👤 نام کاربری مرچنت",
+            "network": "🌉 Network",
+            "asset": "🪙 Asset",
+            "callback_url": "🔁 Callback URL",
+            "pricing_mode": "💹 Pricing Mode",
+            "timeout_seconds": "⏱ Timeout"
+          },
+          "tronpays_rial": {
+            "base_url": "🌐 Base URL",
+            "merchant_key": "🔑 Merchant Key",
+            "callback_url": "🔁 Callback URL",
+            "mode": "🧪 Mode",
+            "verify_mode": "🔎 Verify Setting",
+            "timeout_seconds": "⏱ Timeout"
+          }
+        },
+        "actions": {
+          "show_status": "📋 وضعیت"
+        },
+        "buttons": {
+          "tetrapay": {
+            "create_url": "🌐 ایجاد سفارش",
+            "verify_url": "🔎 بررسی پرداخت",
+            "merchant_id": "🪪 شناسه",
+            "secret_key": "🔑 کلید",
+            "mode": "🧪 حالت اجرا",
+            "success_redirect": "✅ بازگشت موفق",
+            "fail_redirect": "❌ بازگشت ناموفق",
+            "timeout_seconds": "⏱ زمان انتظار",
+            "admin_note": "📝 توضیح داخلی"
+          },
+          "crypto_tron": {
+            "network": "🌐 شبکه",
+            "coin": "🪙 ارز",
+            "wallet_address": "🏦 کیف پول",
+            "confirm_blocks": "🔒 تایید لازم",
+            "tolerance_percent": "🎯 خطای مجاز",
+            "pricing_mode": "💹 قیمت‌گذاری",
+            "timeout_seconds": "⏱ انتظار"
+          },
+          "swapwallet_crypto": {
+            "base_url": "🌐 Base URL",
+            "merchant_key": "🔑 API Key",
+            "username": "👤 Username",
+            "network": "🌉 Network",
+            "asset": "🪙 Asset",
+            "callback_url": "🔁 Callback",
+            "pricing_mode": "💹 Pricing",
+            "timeout_seconds": "⏱ Timeout"
+          },
+          "tronpays_rial": {
+            "base_url": "🌐 Base URL",
+            "merchant_key": "🔑 API Key",
+            "callback_url": "🔁 Callback",
+            "mode": "🧪 Mode",
+            "verify_mode": "🔎 Verify",
+            "timeout_seconds": "⏱ Timeout"
+          }
+        }
+      },
+      "common": {
+        "skip": "⏭ رد شدن"
       }
     }
   }
