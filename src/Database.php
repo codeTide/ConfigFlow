@@ -65,6 +65,10 @@ final class Database implements WorkerApiStore
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_claims");
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_tariff_rules");
         $this->pdo->exec("DROP TABLE IF EXISTS free_test_requests");
+        $this->pdo->exec("DROP TABLE IF EXISTS agency_requests");
+        $this->pdo->exec("DROP TABLE IF EXISTS agency_service_prices");
+        $this->pdo->exec("DROP TABLE IF EXISTS agency_price_config");
+        $this->pdo->exec("DROP TABLE IF EXISTS agency_service_discount");
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS service (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -101,6 +105,11 @@ final class Database implements WorkerApiStore
             $this->pdo->exec("ALTER TABLE service ADD UNIQUE INDEX IF NOT EXISTS uniq_service_code (service_code)");
             $this->pdo->exec("UPDATE service SET service_code = CONCAT('SVC', id) WHERE service_code IS NULL OR TRIM(service_code) = ''");
         }
+        if ($this->columnExists('users', 'is_agent')) {
+            $this->pdo->exec("ALTER TABLE users DROP COLUMN IF EXISTS is_agent");
+        }
+        $this->pdo->prepare("DELETE FROM settings WHERE `key` = :key")->execute(['key' => 'agency_request_enabled']);
+
         $this->pdo->exec("DROP TABLE IF EXISTS panel");
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS service_tariff (
