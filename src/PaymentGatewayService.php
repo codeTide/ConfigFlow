@@ -230,7 +230,6 @@ final class PaymentGatewayService
         $apiKey = trim((string) ($config['api_key'] ?? ''));
         $ipnSecret = trim((string) ($config['ipn_secret'] ?? ''));
         $callbackUrl = trim((string) ($config['callback_url'] ?? ''));
-        $priceCurrency = strtolower(trim((string) ($config['price_currency'] ?? 'usd')));
 
         if ($apiKey === '' || $ipnSecret === '' || $callbackUrl === '') {
             $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_required_config_missing', 'NOWPayments required config missing', [
@@ -244,33 +243,15 @@ final class PaymentGatewayService
             ], ErrorRef::make('NP'));
             return AppError::make('nowpayments_required_config_missing', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'config_validation', [], false, $errorRef);
         }
-        if ($priceCurrency === '') {
-            $priceCurrency = 'usd';
-        }
-        if ($priceCurrency !== 'usd') {
-            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_invalid_price_currency', 'NOWPayments invalid price currency', [
-                'gateway' => 'nowpayments',
-                'stage' => 'config_validation',
-                'provider_error' => $priceCurrency,
-            ], ErrorRef::make('NP'));
-            return AppError::make('nowpayments_invalid_price_currency', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'config_validation', [], false, $errorRef);
-        }
-
         $payload = [
             'price_amount' => $amount,
-            'price_currency' => $priceCurrency,
+            'price_currency' => 'usd',
             'order_id' => $orderId,
             'order_description' => $description,
             'ipn_callback_url' => $callbackUrl,
             'is_fixed_rate' => ((int) ($config['is_fixed_rate'] ?? 0)) === 1,
             'is_fee_paid_by_user' => ((int) ($config['is_fee_paid_by_user'] ?? 0)) === 1,
         ];
-        foreach (['success_url', 'cancel_url', 'partially_paid_url', 'pay_currency'] as $field) {
-            $value = trim((string) ($options[$field] ?? $config[$field] ?? ''));
-            if ($value !== '') {
-                $payload[$field] = $value;
-            }
-        }
 
         $response = $this->postJsonHeaders(self::NOWPAYMENTS_CREATE_URL, $payload, [
             'x-api-key: ' . $apiKey,

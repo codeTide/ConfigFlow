@@ -285,14 +285,8 @@ final class PaymentMethodRepository
                 'api_key' => ['type' => 'string'],
                 'ipn_secret' => ['type' => 'string'],
                 'callback_url' => ['type' => 'url'],
-                'price_currency' => ['type' => 'enum', 'values' => ['usd']],
-                'pay_currency' => ['type' => 'string'],
-                'success_url' => ['type' => 'url'],
-                'cancel_url' => ['type' => 'url'],
-                'partially_paid_url' => ['type' => 'url'],
                 'is_fixed_rate' => ['type' => 'bool'],
                 'is_fee_paid_by_user' => ['type' => 'bool'],
-                'order_description_template' => ['type' => 'string'],
             ],
         ];
     }

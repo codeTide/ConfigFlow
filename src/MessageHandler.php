@@ -4028,10 +4028,20 @@ final class MessageHandler
             }
             $fieldMap = $this->providerFieldButtons($code);
             if (isset($fieldMap[$text])) {
+                $schema = $this->paymentMethods->configSchema()[$code] ?? [];
+                $field = $fieldMap[$text];
+                $rules = is_array($schema[$field] ?? null) ? $schema[$field] : [];
+                if ((string) ($rules['type'] ?? '') === 'bool') {
+                    $config = $this->paymentMethods->getMethodConfig($code);
+                    $current = ((int) ($config[$field] ?? 0)) === 1 ? 1 : 0;
+                    $this->paymentMethods->setMethodConfigValue($code, $field, $current === 1 ? 0 : 1);
+                    $this->openAdminPaymentMethodProviderMenu($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.updated_config'));
+                    return;
+                }
                 $this->database->setUserState($userId, 'admin.payment_methods.edit_provider_config', [
                     'method_id' => $methodId,
                     'code' => $code,
-                    'field' => $fieldMap[$text],
+                    'field' => $field,
                     'stack' => ['admin.payment_methods.provider', 'admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root'],
                 ]);
                 $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.prompts.send_value'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
@@ -4471,11 +4481,29 @@ final class MessageHandler
     private function providerFieldButtons(string $code): array
     {
         $schema = $this->paymentMethods->configSchema()[$code] ?? [];
+        $config = $this->paymentMethods->getMethodConfig($code);
         $map = [];
         foreach ($schema as $key => $_rules) {
-            $map[$this->catalog->get('admin.payment_methods.provider.buttons.' . $code . '.' . $key)] = $key;
+            $map[$this->providerFieldButtonLabel($code, $key, $config)] = $key;
         }
         return $map;
+    }
+
+    /** @param array<string,mixed> $config */
+    private function providerFieldButtonLabel(string $code, string $key, array $config): string
+    {
+        if ($code === 'nowpayments' && $key === 'is_fixed_rate') {
+            return ((int) ($config['is_fixed_rate'] ?? 0)) === 1
+                ? '📌 تغییر به نرخ متغیر'
+                : '📌 تغییر به نرخ ثابت';
+        }
+        if ($code === 'nowpayments' && $key === 'is_fee_paid_by_user') {
+            return ((int) ($config['is_fee_paid_by_user'] ?? 0)) === 1
+                ? '💸 کارمزد با فروشگاه'
+                : '💸 کارمزد با کاربر';
+        }
+
+        return $this->catalog->get('admin.payment_methods.provider.buttons.' . $code . '.' . $key);
     }
 
     private function renderProviderConfigValue(string $code, string $field, mixed $value, array $rules): string
@@ -4487,7 +4515,13 @@ final class MessageHandler
         if ($raw === '') {
             return $this->catalog->get('messages.generic.dash');
         }
-        $technicalFields = ['callback_url', 'base_url', 'merchant_key', 'username', 'wallet_address', 'email', 'mobile', 'hash_id', 'success_url', 'cancel_url', 'partially_paid_url'];
+        if ($code === 'nowpayments' && $field === 'is_fixed_rate') {
+            return ((int) $raw) === 1 ? 'نرخ ثابت' : 'نرخ متغیر';
+        }
+        if ($code === 'nowpayments' && $field === 'is_fee_paid_by_user') {
+            return ((int) $raw) === 1 ? 'بر عهده کاربر' : 'بر عهده فروشگاه';
+        }
+        $technicalFields = ['callback_url', 'base_url', 'merchant_key', 'username', 'wallet_address', 'email', 'mobile', 'hash_id'];
         if (in_array($field, ['api_key', 'ipn_secret'], true)) {
             $len = strlen($raw);
             if ($len <= 4) {
@@ -6646,7 +6680,7 @@ final class MessageHandler
     {
         $creator = match ($gateway) {
             'tetrapay' => fn (int $paymentId): array => $this->createTetrapayInvoiceForPayment($userId, $amount, $paymentId, 'wallet_topup', (string) $paymentId),
-            'nowpayments' => fn (int $paymentId): array => $this->createNowpaymentsInvoiceForPayment($amount, $paymentId, 'wallet_topup', (string) $paymentId),
+            'nowpayments' => fn (int $paymentId): array => $this->createNowpaymentsInvoiceForPayment($amount, $paymentId),
             default => null,
         };
         if ($creator === null) {
@@ -6683,7 +6717,7 @@ final class MessageHandler
     {
         return match ($gatewayCode) {
             'tetrapay' => $this->createTetrapayInvoiceForPayment($userId, $amount, $paymentId, $purpose, $reference),
-            'nowpayments' => $this->createNowpaymentsInvoiceForPayment($amount, $paymentId, $purpose, $reference),
+            'nowpayments' => $this->createNowpaymentsInvoiceForPayment($amount, $paymentId),
             default => ['ok' => false, 'error' => 'gateway_not_supported', 'code' => 'gateway_not_supported'],
         };
     }
@@ -6719,22 +6753,10 @@ final class MessageHandler
         }
     }
 
-    private function createNowpaymentsInvoiceForPayment(int $amount, int $paymentId, string $purpose, string $reference): array
+    private function createNowpaymentsInvoiceForPayment(int $amount, int $paymentId): array
     {
-        $config = $this->paymentMethods->getMethodConfig('nowpayments');
-        $template = trim((string) ($config['order_description_template'] ?? ''));
         $orderId = 'cf-pay:' . $paymentId;
-        $description = $template !== ''
-            ? strtr($template, [
-                '{purpose}' => $purpose,
-                '{payment_id}' => (string) $paymentId,
-                '{reference}' => $reference,
-            ])
-            : $this->catalog->get('messages.user.payment.gateway.nowpayments_description', [
-                'purpose' => $purpose,
-                'payment_id' => $paymentId,
-                'reference' => $reference,
-            ]);
+        $description = $orderId;
         return $this->gateways->createNowpaymentsInvoice($amount, $orderId, $description, []);
     }
 
