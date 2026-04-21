@@ -97,6 +97,65 @@ final class PaymentMethodRepository
         return true;
     }
 
+    public function updateSortOrderWithRebalance(int $id, int $newSortOrder): bool
+    {
+        $method = $this->findById($id);
+        if ($method === null) {
+            return false;
+        }
+        $currentSortOrder = (int) ($method['sort_order'] ?? 0);
+        if ($newSortOrder < 0) {
+            $newSortOrder = 0;
+        }
+        if ($newSortOrder === $currentSortOrder) {
+            return true;
+        }
+
+        $pdo = $this->database->pdo();
+        $pdo->beginTransaction();
+        try {
+            if ($newSortOrder < $currentSortOrder) {
+                $shift = $pdo->prepare(
+                    'UPDATE payment_methods
+                     SET sort_order = sort_order + 1, updated_at = :updated_at
+                     WHERE id <> :id AND sort_order >= :new_sort_order AND sort_order < :current_sort_order'
+                );
+                $shift->execute([
+                    'updated_at' => gmdate('Y-m-d H:i:s'),
+                    'id' => $id,
+                    'new_sort_order' => $newSortOrder,
+                    'current_sort_order' => $currentSortOrder,
+                ]);
+            } else {
+                $shift = $pdo->prepare(
+                    'UPDATE payment_methods
+                     SET sort_order = sort_order - 1, updated_at = :updated_at
+                     WHERE id <> :id AND sort_order <= :new_sort_order AND sort_order > :current_sort_order'
+                );
+                $shift->execute([
+                    'updated_at' => gmdate('Y-m-d H:i:s'),
+                    'id' => $id,
+                    'new_sort_order' => $newSortOrder,
+                    'current_sort_order' => $currentSortOrder,
+                ]);
+            }
+
+            $update = $pdo->prepare('UPDATE payment_methods SET sort_order = :sort_order, updated_at = :updated_at WHERE id = :id');
+            $update->execute([
+                'sort_order' => $newSortOrder,
+                'updated_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $id,
+            ]);
+            $pdo->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     private function getActiveByFlow(string $flowColumn): array
     {
         $stmt = $this->database->pdo()->query(

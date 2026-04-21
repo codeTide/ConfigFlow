@@ -4604,13 +4604,6 @@ final class MessageHandler
                 $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
                 return;
             }
-            $value = trim($text);
-            if ($value === '-' || $value === '—') {
-                $value = '';
-            }
-            $this->settings->set('channel_id', $value);
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.success.lock_channel_updated'));
-            return;
         }
 
         if ($stateName === 'admin.payment_methods.view') {
@@ -4629,6 +4622,10 @@ final class MessageHandler
                     $this->paymentMethods->updateMethodSettings($methodId, ['is_active' => ((int) ($method['is_active'] ?? 0) === 1) ? 0 : 1]);
                 }
                 $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.success.toggled_active'));
+                return;
+            }
+            if ($text === $this->catalog->get('admin.payment_methods.actions.print_status')) {
+                $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
                 return;
             }
             $toggleActions = [
@@ -4689,6 +4686,13 @@ final class MessageHandler
                 );
                 return;
             }
+            $value = trim($text);
+            if ($value === '-' || $value === '—') {
+                $value = '';
+            }
+            $this->settings->set('channel_id', $value);
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.success.lock_channel_updated'));
+            return;
         }
 
         if ($stateName === 'admin.payment_methods.edit') {
@@ -4717,7 +4721,11 @@ final class MessageHandler
                 }
                 $value = $num;
             }
-            $this->paymentMethods->updateMethodSettings($methodId, [$field => $value]);
+            if ($field === 'sort_order') {
+                $this->paymentMethods->updateSortOrderWithRebalance($methodId, (int) $value);
+            } else {
+                $this->paymentMethods->updateMethodSettings($methodId, [$field => $value]);
+            }
             $this->database->setUserState($userId, 'admin.payment_methods.view', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.list', 'admin.root']]);
             $successMap = [
                 'min_amount' => 'admin.payment_methods.success.updated_min_amount',
@@ -5038,7 +5046,8 @@ final class MessageHandler
                 'description' => trim((string) ($method['user_description'] ?? '')) !== '' ? (string) $method['user_description'] : $this->catalog->get('messages.generic.dash'),
             ]),
             $this->uiKeyboard->replyMenu([
-                [$this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible'), $this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
+                [$this->catalog->get('admin.payment_methods.actions.print_status'), $this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
                 [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount')],
                 [$this->catalog->get('admin.payment_methods.actions.toggle_bonus'), $this->catalog->get('admin.payment_methods.actions.toggle_fee'), $this->catalog->get('admin.payment_methods.actions.toggle_purchase')],
                 [$this->catalog->get('admin.payment_methods.actions.toggle_renewal'), $this->catalog->get('admin.payment_methods.actions.edit_description')],
