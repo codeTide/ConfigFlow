@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS payment_methods (
     fee_enabled TINYINT(1) NOT NULL DEFAULT 0,
     fee_type ENUM('none','percent','fixed') NULL,
     fee_value DECIMAL(18,4) NULL,
-    auto_verify TINYINT(1) NOT NULL DEFAULT 0,
-    requires_receipt TINYINT(1) NOT NULL DEFAULT 0,
     visible_to_user TINYINT(1) NOT NULL DEFAULT 1,
     config_json JSON NULL,
     created_at DATETIME NOT NULL,
@@ -25,9 +23,9 @@ CREATE TABLE IF NOT EXISTS payment_methods (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO payment_methods
-    (code, category, is_active, sort_order, min_amount, max_amount, auto_verify, requires_receipt, visible_to_user, created_at, updated_at)
+    (code, category, is_active, sort_order, min_amount, max_amount, visible_to_user, created_at, updated_at)
 VALUES
-    ('tetrapay', 'gateway', 1, 30, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+    ('tetrapay', 'gateway', 1, 30, 10000, 0, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())
 ON DUPLICATE KEY UPDATE
     category = VALUES(category),
     sort_order = VALUES(sort_order),
