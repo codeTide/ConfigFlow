@@ -4335,7 +4335,6 @@ final class MessageHandler
         ]), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_SETTINGS_REFRESH)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
-            [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
         ]));
     }

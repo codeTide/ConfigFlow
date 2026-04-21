@@ -259,7 +259,6 @@ final class Database implements WorkerApiStore
         $legacyStockTable = 'con' . 'figs';
         $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyTariffTable}`");
         $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyStockTable}`");
-        $this->pdo->exec("DROP TABLE IF EXISTS agency_prices");
     }
 
     private function tableExists(string $table): bool

@@ -59,7 +59,6 @@ $pdo->exec("DROP TABLE IF EXISTS free_test_package_rules");
 $pdo->exec("DROP TABLE IF EXISTS free_test_claims");
 $pdo->exec("DROP TABLE IF EXISTS packages");
 $pdo->exec("DROP TABLE IF EXISTS configs");
-$pdo->exec("DROP TABLE IF EXISTS agency_prices");
 $pdo->exec("DROP TABLE IF EXISTS provisioning_services");
 $migrator = new \ConfigFlow\Bot\MigrationRunner($pdo, __DIR__ . '/../migrations');
 $migrator->applyAll();

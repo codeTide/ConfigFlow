@@ -95,37 +95,11 @@ WHERE p.service_id IS NOT NULL
   AND p.tariff_id > 0
   AND d.id IS NULL;
 
-CREATE TABLE IF NOT EXISTS agency_service_prices (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    service_id BIGINT NOT NULL,
-    tariff_id BIGINT NOT NULL,
-    price INT NOT NULL,
-    UNIQUE KEY uniq_agency_service_price (user_id, service_id, tariff_id),
-    INDEX idx_agency_service_price_user (user_id),
-    INDEX idx_agency_service_price_service (service_id, tariff_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-INSERT INTO agency_service_prices (user_id, service_id, tariff_id, price)
-SELECT ap.user_id, p.service_id, p.tariff_id, ap.price
-FROM agency_prices ap
-JOIN purchases p ON p.package_id = ap.package_id
-LEFT JOIN agency_service_prices asp
-    ON asp.user_id = ap.user_id
-   AND asp.service_id = p.service_id
-   AND asp.tariff_id = p.tariff_id
-WHERE p.service_id IS NOT NULL
-  AND p.service_id > 0
-  AND p.tariff_id IS NOT NULL
-  AND p.tariff_id > 0
-  AND asp.id IS NULL;
-
 ALTER TABLE purchases DROP COLUMN IF EXISTS package_id;
 ALTER TABLE purchases DROP COLUMN IF EXISTS config_id;
 ALTER TABLE payments DROP COLUMN IF EXISTS package_id;
 ALTER TABLE pending_orders DROP COLUMN IF EXISTS package_id;
 
-DROP TABLE IF EXISTS agency_prices;
 DROP TABLE IF EXISTS provisioning_services;
 DROP TABLE IF EXISTS configs;
 DROP TABLE IF EXISTS packages;
