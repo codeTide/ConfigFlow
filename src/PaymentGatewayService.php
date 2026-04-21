@@ -13,6 +13,7 @@ final class PaymentGatewayService
 {
     private const TETRAPAY_CREATE_URL = 'https://tetra98.com/api/create_order';
     private const TETRAPAY_VERIFY_URL = 'https://tetra98.com/api/verify';
+    private const NOWPAYMENTS_CREATE_URL = 'https://api.nowpayments.io/v1/invoice';
 
     public function __construct(
         private SettingsRepository $settings,
@@ -219,6 +220,101 @@ final class PaymentGatewayService
         }
 
         return ['ok' => true, 'paid' => $isPaid, 'status' => $statusCode, 'code' => $isPaid ? 'tetrapay_paid' : 'tetrapay_status_not_paid', 'raw' => $data];
+    }
+
+
+
+    public function createNowpaymentsInvoice(int $amount, string $orderId, string $description, array $options = []): array
+    {
+        $config = $this->paymentMethods?->getMethodConfig('nowpayments') ?? [];
+        $apiKey = trim((string) ($config['api_key'] ?? ''));
+        $ipnSecret = trim((string) ($config['ipn_secret'] ?? ''));
+        $callbackUrl = trim((string) ($config['callback_url'] ?? ''));
+
+        if ($apiKey === '' || $ipnSecret === '' || $callbackUrl === '') {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_required_config_missing', 'NOWPayments required config missing', [
+                'gateway' => 'nowpayments',
+                'stage' => 'config_validation',
+                'request_payload' => [
+                    'has_api_key' => $apiKey !== '',
+                    'has_ipn_secret' => $ipnSecret !== '',
+                    'has_callback_url' => $callbackUrl !== '',
+                ],
+            ], ErrorRef::make('NP'));
+            return AppError::make('nowpayments_required_config_missing', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'config_validation', [], false, $errorRef);
+        }
+        $payload = [
+            'price_amount' => $amount,
+            'price_currency' => 'usd',
+            'order_id' => $orderId,
+            'order_description' => $description,
+            'ipn_callback_url' => $callbackUrl,
+            'is_fixed_rate' => ((int) ($config['is_fixed_rate'] ?? 0)) === 1,
+            'is_fee_paid_by_user' => ((int) ($config['is_fee_paid_by_user'] ?? 0)) === 1,
+        ];
+
+        $response = $this->postJsonHeaders(self::NOWPAYMENTS_CREATE_URL, $payload, [
+            'x-api-key: ' . $apiKey,
+        ]);
+
+        if (!(bool) ($response['transport_ok'] ?? false)) {
+            $isTimeout = ((int) ($response['curl_errno'] ?? 0)) === 28;
+            $code = $isTimeout ? 'nowpayments_timeout' : 'nowpayments_transport_error';
+            $errorRef = $this->logger->log('error', 'nowpayments', $code, 'NOWPayments create invoice transport failure', [
+                'gateway' => 'nowpayments',
+                'stage' => 'create_invoice',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'provider_error' => (string) ($response['curl_error'] ?? ''),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('NP'));
+            return AppError::make($code, 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'create_invoice', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'curl_errno' => (int) ($response['curl_errno'] ?? 0),
+            ], true, $errorRef);
+        }
+        if (!(bool) ($response['decoded_ok'] ?? false)) {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_invalid_json', 'NOWPayments create invoice invalid JSON', [
+                'gateway' => 'nowpayments',
+                'stage' => 'create_invoice',
+                'provider_error' => (string) ($response['decode_error'] ?? ''),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('NP'));
+            return AppError::make('nowpayments_invalid_json', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'create_invoice', [], false, $errorRef);
+        }
+        if ((int) ($response['http_status'] ?? 0) < 200 || (int) ($response['http_status'] ?? 0) >= 300) {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_http_error', 'NOWPayments create invoice HTTP error', [
+                'gateway' => 'nowpayments',
+                'stage' => 'create_invoice',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'response_payload' => (array) ($response['decoded_body'] ?? []),
+            ], ErrorRef::make('NP'));
+            return AppError::make('nowpayments_http_error', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'create_invoice', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+            ], true, $errorRef);
+        }
+
+        $data = is_array($response['decoded_body'] ?? null) ? $response['decoded_body'] : [];
+        $invoiceId = (string) ($data['id'] ?? '');
+        $payUrl = trim((string) ($data['invoice_url'] ?? ''));
+        if ($invoiceId === '' || $payUrl === '') {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_invalid_response', 'NOWPayments create invoice missing id/url', [
+                'gateway' => 'nowpayments',
+                'stage' => 'create_invoice',
+                'response_payload' => $data,
+            ], ErrorRef::make('NP'));
+            return AppError::make('nowpayments_invalid_response', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'create_invoice', [], false, $errorRef);
+        }
+
+        return [
+            'ok' => true,
+            'pay_url' => $payUrl,
+            'invoice_id' => $invoiceId,
+            'order_id' => $orderId,
+            'raw' => $data,
+        ];
     }
 
     public function verifyCryptoTransaction(string $coin, string $txHash): array

@@ -220,10 +220,20 @@ final class Database
             $this->pdo->exec("ALTER TABLE user_service_deliveries ADD UNIQUE INDEX IF NOT EXISTS uq_deliveries_subscription_token (subscription_token)");
         }
         if ($this->tableExists('payments')) {
+            $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS tracking_code VARCHAR(32) NULL AFTER id");
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS service_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
+            $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS fee_amount INT NOT NULL DEFAULT 0 AFTER amount");
+            $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS bonus_amount INT NOT NULL DEFAULT 0 AFTER fee_amount");
+            $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS paid_amount INT NULL AFTER bonus_amount");
+            $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS status_reason VARCHAR(128) NULL AFTER status");
+            $this->pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS bonus_applied_at DATETIME NULL AFTER verified_at");
+            $this->pdo->exec("UPDATE payments SET paid_amount = amount WHERE paid_amount IS NULL");
             $this->pdo->exec("ALTER TABLE payments ADD INDEX IF NOT EXISTS idx_payments_service (service_id)");
             $this->pdo->exec("ALTER TABLE payments ADD INDEX IF NOT EXISTS idx_payments_tariff (tariff_id)");
+            $this->pdo->exec("UPDATE payments SET tracking_code = CONCAT('9', LPAD(id, 11, '0')) WHERE tracking_code IS NULL OR tracking_code = ''");
+            $this->pdo->exec("ALTER TABLE payments MODIFY COLUMN tracking_code VARCHAR(32) NOT NULL");
+            $this->pdo->exec("ALTER TABLE payments ADD UNIQUE INDEX IF NOT EXISTS uq_payments_tracking_code (tracking_code)");
             $legacyTariffColumn = 'pack' . 'age_id';
             $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
         }
@@ -1350,22 +1360,44 @@ final class Database
 
     public function createPayment(array $data): int
     {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO payments (kind, user_id, service_id, tariff_id, amount, payment_method, gateway_ref, status, created_at)
-             VALUES (:kind, :user_id, :service_id, :tariff_id, :amount, :payment_method, :gateway_ref, :status, :created_at)'
-        );
-        $stmt->execute([
-            'kind' => $data['kind'],
-            'user_id' => $data['user_id'],
-            'service_id' => $data['service_id'] ?? null,
-            'tariff_id' => $data['tariff_id'] ?? null,
-            'amount' => $data['amount'],
-            'payment_method' => $data['payment_method'],
-            'gateway_ref' => $data['gateway_ref'] ?? null,
-            'status' => $data['status'],
-            'created_at' => $data['created_at'],
-        ]);
-        return (int) $this->pdo->lastInsertId();
+        $amount = (int) ($data['amount'] ?? 0);
+        $method = (string) ($data['payment_method'] ?? '');
+        $financials = $this->calculatePaymentFinancials($method, $amount);
+        $attempts = 0;
+        while ($attempts < 10) {
+            $attempts++;
+            $trackingCode = $this->generatePaymentTrackingCode();
+            try {
+                $stmt = $this->pdo->prepare(
+                    'INSERT INTO payments (tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, status, status_reason, created_at)
+                     VALUES (:tracking_code, :kind, :user_id, :service_id, :tariff_id, :amount, :fee_amount, :bonus_amount, :paid_amount, :payment_method, :gateway_ref, :status, :status_reason, :created_at)'
+                );
+                $stmt->execute([
+                    'tracking_code' => $trackingCode,
+                    'kind' => $data['kind'],
+                    'user_id' => $data['user_id'],
+                    'service_id' => $data['service_id'] ?? null,
+                    'tariff_id' => $data['tariff_id'] ?? null,
+                    'amount' => $amount,
+                    'fee_amount' => $financials['fee_amount'],
+                    'bonus_amount' => $financials['bonus_amount'],
+                    'paid_amount' => $financials['paid_amount'],
+                    'payment_method' => $method,
+                    'gateway_ref' => $data['gateway_ref'] ?? null,
+                    'status' => $data['status'],
+                    'status_reason' => $data['status_reason'] ?? null,
+                    'created_at' => $data['created_at'],
+                ]);
+                return (int) $this->pdo->lastInsertId();
+            } catch (\PDOException $e) {
+                if ((int) $e->getCode() === 23000) {
+                    continue;
+                }
+                throw $e;
+            }
+        }
+
+        throw new \RuntimeException('Unable to generate unique payment tracking code.');
     }
 
     public function walletPayTariff(int $userId, int $tariffId): array
@@ -2286,7 +2318,7 @@ final class Database
 
     public function getPaymentById(int $paymentId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, kind, user_id, service_id, tariff_id, amount, payment_method, gateway_ref, tx_hash, crypto_amount_claimed, provider_payload, status, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, tx_hash, crypto_amount_claimed, provider_payload, status, status_reason, approved_at, verified_at, bonus_applied_at, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $paymentId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
@@ -2298,7 +2330,7 @@ final class Database
         if ($gatewayRef === '') {
             return null;
         }
-        $sql = 'SELECT id, kind, user_id, amount, payment_method, gateway_ref, provider_payload, status FROM payments WHERE gateway_ref = :gateway_ref';
+        $sql = 'SELECT id, tracking_code, kind, user_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, provider_payload, status, status_reason, verified_at FROM payments WHERE gateway_ref = :gateway_ref';
         $params = ['gateway_ref' => $gatewayRef];
         if ($method !== null && $method !== '') {
             $sql .= ' AND payment_method = :payment_method';
@@ -2324,7 +2356,7 @@ final class Database
     {
         $this->pdo->beginTransaction();
         try {
-            $rowStmt = $this->pdo->prepare('SELECT status FROM payments WHERE id = :id LIMIT 1 FOR UPDATE');
+            $rowStmt = $this->pdo->prepare('SELECT status, user_id, bonus_amount FROM payments WHERE id = :id LIMIT 1 FOR UPDATE');
             $rowStmt->execute(['id' => $paymentId]);
             $row = $rowStmt->fetch();
             if (!is_array($row)) {
@@ -2336,11 +2368,24 @@ final class Database
                 return false;
             }
 
-            $payStmt = $this->pdo->prepare("UPDATE payments SET status = 'paid', verified_at = :verified_at WHERE id = :id");
-            $payStmt->execute(['verified_at' => gmdate('Y-m-d H:i:s'), 'id' => $paymentId]);
+            $bonusAmount = max(0, (int) ($row['bonus_amount'] ?? 0));
+            $verifiedAt = gmdate('Y-m-d H:i:s');
+            $payStmt = $this->pdo->prepare("UPDATE payments SET status = 'paid', verified_at = :verified_at, status_reason = NULL, bonus_applied_at = :bonus_applied_at WHERE id = :id");
+            $payStmt->execute([
+                'verified_at' => $verifiedAt,
+                'bonus_applied_at' => $bonusAmount > 0 ? $verifiedAt : null,
+                'id' => $paymentId,
+            ]);
 
             $orderStmt = $this->pdo->prepare("UPDATE pending_orders SET status = 'paid_waiting_delivery' WHERE payment_id = :payment_id");
             $orderStmt->execute(['payment_id' => $paymentId]);
+            if ($bonusAmount > 0) {
+                $walletStmt = $this->pdo->prepare('UPDATE users SET balance = balance + :bonus WHERE user_id = :user_id');
+                $walletStmt->execute([
+                    'bonus' => $bonusAmount,
+                    'user_id' => (int) ($row['user_id'] ?? 0),
+                ]);
+            }
 
             $this->pdo->commit();
             return true;
@@ -2372,7 +2417,7 @@ final class Database
         $this->pdo->beginTransaction();
         try {
             $stmt = $this->pdo->prepare(
-                "SELECT id, user_id, amount, kind, status
+                "SELECT id, user_id, amount, bonus_amount, kind, status
                  FROM payments
                  WHERE id = :id
                  LIMIT 1
@@ -2389,16 +2434,66 @@ final class Database
                 return false;
             }
 
-            $updatePayment = $this->pdo->prepare("UPDATE payments SET status = 'paid', verified_at = :verified_at WHERE id = :id");
+            $bonusAmount = max(0, (int) ($payment['bonus_amount'] ?? 0));
+            $creditAmount = (int) ($payment['amount'] ?? 0) + $bonusAmount;
+            $verifiedAt = gmdate('Y-m-d H:i:s');
+            $updatePayment = $this->pdo->prepare("UPDATE payments SET status = 'paid', verified_at = :verified_at, status_reason = NULL, bonus_applied_at = :bonus_applied_at WHERE id = :id");
             $updatePayment->execute([
-                'verified_at' => gmdate('Y-m-d H:i:s'),
+                'verified_at' => $verifiedAt,
+                'bonus_applied_at' => $bonusAmount > 0 ? $verifiedAt : null,
                 'id' => $paymentId,
             ]);
             $updateBalance = $this->pdo->prepare('UPDATE users SET balance = balance + :amount WHERE user_id = :user_id');
             $updateBalance->execute([
-                'amount' => (int) ($payment['amount'] ?? 0),
+                'amount' => $creditAmount,
                 'user_id' => (int) ($payment['user_id'] ?? 0),
             ]);
+
+            $this->pdo->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return false;
+        }
+    }
+
+
+
+    public function markPaymentFailedIfWaitingGateway(int $paymentId, string $reason = 'gateway_failed'): bool
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, kind, status FROM payments WHERE id = :id LIMIT 1 FOR UPDATE"
+            );
+            $stmt->execute(['id' => $paymentId]);
+            $payment = $stmt->fetch();
+            if (!is_array($payment) || ($payment['status'] ?? '') !== 'waiting_gateway') {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            $update = $this->pdo->prepare(
+                "UPDATE payments
+                 SET status = 'gateway_error',
+                     admin_note = :reason,
+                     status_reason = :status_reason,
+                     verified_at = :verified_at
+                 WHERE id = :id"
+            );
+            $update->execute([
+                'reason' => $reason,
+                'status_reason' => $reason,
+                'verified_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $paymentId,
+            ]);
+
+            if (($payment['kind'] ?? '') !== 'wallet_topup') {
+                $pending = $this->pdo->prepare("UPDATE pending_orders SET status = 'cancelled' WHERE payment_id = :payment_id AND status = 'waiting_payment'");
+                $pending->execute(['payment_id' => $paymentId]);
+            }
 
             $this->pdo->commit();
             return true;
@@ -2417,11 +2512,13 @@ final class Database
             $update = $this->pdo->prepare(
                 "UPDATE payments
                  SET status = 'gateway_error',
-                     admin_note = :reason
+                     admin_note = :reason,
+                     status_reason = :status_reason
                  WHERE id = :id AND status = 'waiting_gateway'"
             );
             $update->execute([
                 'reason' => $reason,
+                'status_reason' => $reason,
                 'id' => $paymentId,
             ]);
             $pending = $this->pdo->prepare("UPDATE pending_orders SET status = 'cancelled' WHERE payment_id = :payment_id AND status = 'waiting_payment'");
@@ -2432,6 +2529,71 @@ final class Database
                 $this->pdo->rollBack();
             }
         }
+    }
+
+    /** @return array{fee_amount:int,bonus_amount:int,paid_amount:int} */
+    private function calculatePaymentFinancials(string $methodCode, int $amount): array
+    {
+        $feeAmount = 0;
+        $bonusAmount = 0;
+        if ($amount <= 0 || $methodCode === '') {
+            return ['fee_amount' => 0, 'bonus_amount' => 0, 'paid_amount' => max(0, $amount)];
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT fee_enabled, fee_type, fee_value, bonus_enabled, bonus_type, bonus_value, bonus_min_amount, bonus_cap_amount
+             FROM payment_methods WHERE code = :code LIMIT 1"
+        );
+        $stmt->execute(['code' => $methodCode]);
+        $method = $stmt->fetch();
+        if (!is_array($method)) {
+            return ['fee_amount' => 0, 'bonus_amount' => 0, 'paid_amount' => $amount];
+        }
+
+        if ((int) ($method['fee_enabled'] ?? 0) === 1) {
+            $feeType = (string) ($method['fee_type'] ?? '');
+            $feeValue = (float) ($method['fee_value'] ?? 0);
+            if ($feeType === 'percent' && $feeValue > 0) {
+                $feeAmount = (int) floor($amount * $feeValue / 100);
+            } elseif ($feeType === 'fixed' && $feeValue > 0) {
+                $feeAmount = (int) floor($feeValue);
+            }
+            if ($feeAmount < 0) {
+                $feeAmount = 0;
+            }
+        }
+
+        if ((int) ($method['bonus_enabled'] ?? 0) === 1) {
+            $minAmount = isset($method['bonus_min_amount']) ? (int) $method['bonus_min_amount'] : 0;
+            if ($amount >= $minAmount) {
+                $bonusType = (string) ($method['bonus_type'] ?? '');
+                $bonusValue = (float) ($method['bonus_value'] ?? 0);
+                if ($bonusType === 'percent' && $bonusValue > 0) {
+                    $bonusAmount = (int) floor($amount * $bonusValue / 100);
+                } elseif ($bonusType === 'fixed' && $bonusValue > 0) {
+                    $bonusAmount = (int) floor($bonusValue);
+                }
+                $cap = $method['bonus_cap_amount'] ?? null;
+                if ($cap !== null) {
+                    $bonusAmount = min($bonusAmount, max(0, (int) $cap));
+                }
+                if ($bonusAmount < 0) {
+                    $bonusAmount = 0;
+                }
+            }
+        }
+
+        return [
+            'fee_amount' => $feeAmount,
+            'bonus_amount' => $bonusAmount,
+            'paid_amount' => $amount + $feeAmount,
+        ];
+    }
+
+    private function generatePaymentTrackingCode(): string
+    {
+        $datePart = gmdate('dmy');
+        return (string) random_int(100, 999) . $datePart . (string) random_int(100, 999);
     }
 
     /** @param array<string,mixed> $details */
