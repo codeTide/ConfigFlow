@@ -2410,6 +2410,50 @@ final class Database
         }
     }
 
+
+
+    public function markPaymentFailedIfWaitingGateway(int $paymentId, string $reason = 'gateway_failed'): bool
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, kind, status FROM payments WHERE id = :id LIMIT 1 FOR UPDATE"
+            );
+            $stmt->execute(['id' => $paymentId]);
+            $payment = $stmt->fetch();
+            if (!is_array($payment) || ($payment['status'] ?? '') !== 'waiting_gateway') {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            $update = $this->pdo->prepare(
+                "UPDATE payments
+                 SET status = 'gateway_error',
+                     admin_note = :reason,
+                     verified_at = :verified_at
+                 WHERE id = :id"
+            );
+            $update->execute([
+                'reason' => $reason,
+                'verified_at' => gmdate('Y-m-d H:i:s'),
+                'id' => $paymentId,
+            ]);
+
+            if (($payment['kind'] ?? '') !== 'wallet_topup') {
+                $pending = $this->pdo->prepare("UPDATE pending_orders SET status = 'cancelled' WHERE payment_id = :payment_id AND status = 'waiting_payment'");
+                $pending->execute(['payment_id' => $paymentId]);
+            }
+
+            $this->pdo->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return false;
+        }
+    }
+
     public function markPaymentGatewayError(int $paymentId, string $reason): void
     {
         $this->pdo->beginTransaction();
