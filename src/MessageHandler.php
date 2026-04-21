@@ -5875,7 +5875,7 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->catalog->get('messages.user.payment.wallet_purchase_success', [
-                    'payment_id' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
+                    'tracking_code' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
                     'amount' => (int) $result['price'],
                     'new_balance' => (int) $result['new_balance'],
                 ])
@@ -6015,7 +6015,7 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->catalog->get('messages.user.payment.wallet_purchase_success', [
-                    'payment_id' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
+                    'tracking_code' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
                     'amount' => (int) ($result['amount'] ?? 0),
                     'new_balance' => (int) ($result['new_balance'] ?? 0),
                 ])
@@ -6107,7 +6107,7 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->catalog->get('messages.user.payment.wallet_purchase_success', [
-                    'payment_id' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
+                    'tracking_code' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
                     'amount' => (int) ($result['amount'] ?? $computedAmount),
                     'new_balance' => (int) $result['new_balance'],
                 ])
@@ -6548,7 +6548,7 @@ final class MessageHandler
     {
         $text = $this->messageRenderer->render('payments.created.overview_with_tip', [
             'title' => trim($title),
-            'payment_id' => $trackingCode,
+            'tracking_code' => $trackingCode,
             'amount' => $amount,
             'tip' => $this->catalog->get('messages.user.payment.gateway_intro_tip'),
         ]);

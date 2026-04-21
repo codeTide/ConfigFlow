@@ -272,7 +272,7 @@
           "service_mismatch": "❌ پکیج انتخابی برای این سرویس معتبر نیست.",
           "renewal_failed": "❌ پرداخت تمدید انجام نشد."
         },
-        "wallet_purchase_success": "✅ خرید با کیف پول ثبت شد.\n\nشناسه پرداخت: <code>{payment_id}</code>\nمبلغ: <b>{amount}</b> تومان\nموجودی جدید: <b>{new_balance}</b> تومان\n\nسفارش شما در صف تحویل قرار گرفت.",
+        "wallet_purchase_success": "✅ خرید با کیف پول ثبت شد.\n\nشناسه پرداخت: <code>{tracking_code}</code>\nمبلغ: <b>{amount}</b> تومان\nموجودی جدید: <b>{new_balance}</b> تومان\n\nسفارش شما در صف تحویل قرار گرفت.",
         "wallet_renew_success": "✅ <b>پرداخت تمدید با کیف پول انجام شد.</b>\n\nسفارش شما در صف تحویل قرار گرفت.\nشماره سفارش: <code>{pending_order_id}</code>",
         "bank_line": "بانک: {bank}\n",
         "owner_line": "به نام: {owner}\n",
@@ -323,8 +323,8 @@
   },
   "payments": {
     "created": {
-      "overview": "💳 <b>{title}</b>\n\n🧾 شناسه سفارش: <code>{payment_id}</code>\n💰 مبلغ: <b>{amount}</b> تومان",
-      "overview_with_tip": "💳 <b>{title}</b>\n\n🧾 شناسه سفارش: <code>{payment_id}</code>\n💰 مبلغ: <b>{amount}</b> تومان\n\n<blockquote>{tip}</blockquote>"
+      "overview": "💳 <b>{title}</b>\n\n🧾 شناسه سفارش: <code>{tracking_code}</code>\n💰 مبلغ: <b>{amount}</b> تومان",
+      "overview_with_tip": "💳 <b>{title}</b>\n\n🧾 شناسه سفارش: <code>{tracking_code}</code>\n💰 مبلغ: <b>{amount}</b> تومان\n\n<blockquote>{tip}</blockquote>"
     }
   },
   "validation": {
