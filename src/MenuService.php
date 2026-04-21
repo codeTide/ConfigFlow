@@ -67,7 +67,7 @@ final class MenuService
     {
         return $this->uiKeyboard->replyMenu([
             [$this->catalog->get('buttons.admin.types_tariffs'), $this->catalog->get('buttons.admin.inventory'), $this->catalog->get('buttons.admin.users')],
-            [$this->catalog->get('buttons.admin.settings')],
+            [$this->catalog->get('buttons.admin.settings'), $this->catalog->get('buttons.admin.payment_methods')],
             [$this->catalog->get('buttons.admin.admins'), $this->catalog->get('buttons.admin.broadcast'), $this->catalog->get('buttons.admin.pins')],
             [$this->catalog->get('buttons.admin.agencies')],
             [$this->catalog->get('buttons.admin.charges'), $this->catalog->get('buttons.admin.delivery'), $this->catalog->get('buttons.admin.requests')],
