@@ -5351,8 +5351,10 @@ final class MessageHandler
     {
         return [
             [$this->catalog->get('admin.payment_methods.fee.actions.show_status')],
-            [$this->catalog->get('admin.payment_methods.fee.actions.toggle_status')],
-            [$this->catalog->get('admin.payment_methods.fee.actions.toggle_type')],
+            [
+                $this->catalog->get('admin.payment_methods.fee.actions.toggle_status'),
+                $this->catalog->get('admin.payment_methods.fee.actions.toggle_type'),
+            ],
             [$this->catalog->get('admin.payment_methods.fee.actions.edit_value')],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
         ];
