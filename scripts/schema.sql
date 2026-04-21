@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS payment_methods (
     auto_verify TINYINT(1) NOT NULL DEFAULT 0,
     requires_receipt TINYINT(1) NOT NULL DEFAULT 0,
     visible_to_user TINYINT(1) NOT NULL DEFAULT 1,
+    allow_wallet_topup TINYINT(1) NOT NULL DEFAULT 0,
+    wallet_amount_input_mode ENUM('none','user_input') NOT NULL DEFAULT 'user_input',
     config_json JSON NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,

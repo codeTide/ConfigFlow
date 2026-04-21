@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace ConfigFlow\Bot;
 
+use ConfigFlow\Bot\Support\AppLogger;
+use ConfigFlow\Bot\Support\ErrorRef;
+
 final class PGClient
 {
     private string $baseUrl;
@@ -17,12 +20,14 @@ final class PGClient
 
     /** @var array<string,array{expires:int,data:array<int,mixed>}> */
     private static array $groupCache = [];
+    private AppLogger $logger;
 
     public function __construct(string $baseUrl, string $username, string $password)
     {
         $this->baseUrl = rtrim($baseUrl, '/');
         $this->username = $username;
         $this->password = $password;
+        $this->logger = new AppLogger();
 
         $this->restoreTokenOrAuthenticate();
     }
@@ -128,11 +133,19 @@ final class PGClient
             }
         }
 
+        $ref = ErrorRef::make('PANEL');
+        $this->logger->log('error', 'panel', strtolower($defaultCode), 'PGClient handled error', [
+            'stage' => 'pgclient_handle_error',
+            'http_status' => $httpCode,
+            'provider_error' => $message,
+            'response_payload' => $response,
+        ], $ref);
         return [
             'success' => false,
             'httpCode' => $httpCode,
             'errorCode' => $defaultCode . '_' . $httpCode,
             'message' => $message,
+            'error_ref' => $ref,
         ];
     }
 
@@ -196,11 +209,19 @@ final class PGClient
             $error = curl_error($ch);
             curl_close($ch);
             $this->logPerformance($endpoint, $method, $httpCode, $durationMs, false, $error);
+            $ref = ErrorRef::make('PANEL');
+            $this->logger->log('error', 'panel', 'pgclient_curl_error', 'PGClient cURL error', [
+                'stage' => 'panel_request',
+                'http_status' => $httpCode,
+                'provider_error' => $error,
+                'request_payload' => ['endpoint' => $endpoint, 'method' => $method],
+            ], $ref);
             return [
                 'success' => false,
                 'httpCode' => $httpCode,
                 'errorCode' => 'PG_CURL_ERROR',
                 'message' => $error,
+                'error_ref' => $ref,
             ];
         }
 
@@ -232,26 +253,23 @@ final class PGClient
 
     private function logPerformance(string $endpoint, string $method, int $httpCode, int $durationMs, bool $ok, ?string $error = null): void
     {
-        $logDir = dirname(__DIR__) . '/storage/logs';
-        if (!is_dir($logDir)) {
-            @mkdir($logDir, 0775, true);
-        }
-
-        $line = [
-            'ts' => gmdate('c'),
-            'baseUrl' => $this->baseUrl,
-            'endpoint' => $endpoint,
-            'method' => $method,
-            'httpCode' => $httpCode,
-            'durationMs' => $durationMs,
-            'ok' => $ok,
-            'error' => $error,
-        ];
-
-        @file_put_contents(
-            $logDir . '/pgclient_perf.log',
-            json_encode($line, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL,
-            FILE_APPEND | LOCK_EX
+        $this->logger->log(
+            $ok ? 'info' : 'warning',
+            'panel',
+            $ok ? 'pgclient_perf_ok' : 'pgclient_perf_fail',
+            'PGClient request telemetry',
+            [
+                'stage' => 'panel_request',
+                'http_status' => $httpCode,
+                'provider_error' => $error,
+                'request_payload' => [
+                    'base_url' => $this->baseUrl,
+                    'endpoint' => $endpoint,
+                    'method' => $method,
+                    'duration_ms' => $durationMs,
+                ],
+            ],
+            ErrorRef::make('PANEL')
         );
     }
 
