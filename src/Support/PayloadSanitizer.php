@@ -9,29 +9,33 @@ final class PayloadSanitizer
     /** @return array<string,mixed> */
     public static function sanitize(array $payload): array
     {
-        $out = [];
-        foreach ($payload as $k => $v) {
-            $key = (string) $k;
-            if (is_array($v)) {
-                $out[$key] = self::sanitize($v);
-                continue;
+        try {
+            $out = [];
+            foreach ($payload as $k => $v) {
+                $key = (string) $k;
+                if (is_array($v)) {
+                    $out[$key] = self::sanitize($v);
+                    continue;
+                }
+                $raw = (string) $v;
+                if (self::isSecretKey($key)) {
+                    $out[$key] = self::maskToken($raw);
+                    continue;
+                }
+                if (str_contains(strtolower($key), 'email')) {
+                    $out[$key] = self::maskEmail($raw);
+                    continue;
+                }
+                if (str_contains(strtolower($key), 'mobile') || str_contains(strtolower($key), 'phone')) {
+                    $out[$key] = self::maskPhone($raw);
+                    continue;
+                }
+                $out[$key] = $v;
             }
-            $raw = (string) $v;
-            if (self::isSecretKey($key)) {
-                $out[$key] = self::maskToken($raw);
-                continue;
-            }
-            if (str_contains(strtolower($key), 'email')) {
-                $out[$key] = self::maskEmail($raw);
-                continue;
-            }
-            if (str_contains(strtolower($key), 'mobile') || str_contains(strtolower($key), 'phone')) {
-                $out[$key] = self::maskPhone($raw);
-                continue;
-            }
-            $out[$key] = $v;
+            return $out;
+        } catch (\Throwable $e) {
+            return ['sanitizer_error' => true];
         }
-        return $out;
     }
 
     private static function isSecretKey(string $key): bool
@@ -47,11 +51,11 @@ final class PayloadSanitizer
 
     private static function maskToken(string $value): string
     {
-        $len = mb_strlen($value);
+        $len = self::strLen($value);
         if ($len <= 8) {
             return str_repeat('*', max(4, $len));
         }
-        return mb_substr($value, 0, 4) . str_repeat('*', $len - 8) . mb_substr($value, -4);
+        return self::strSub($value, 0, 4) . str_repeat('*', $len - 8) . self::strSub($value, -4);
     }
 
     private static function maskEmail(string $value): string
@@ -60,7 +64,7 @@ final class PayloadSanitizer
             return $value;
         }
         [$name, $domain] = explode('@', $value, 2);
-        $nameMasked = mb_substr($name, 0, 2) . '***';
+        $nameMasked = self::strSub($name, 0, 2) . '***';
         return $nameMasked . '@' . $domain;
     }
 
@@ -72,5 +76,21 @@ final class PayloadSanitizer
         }
         $tail = substr($digits, -3);
         return '***' . $tail;
+    }
+
+    private static function strLen(string $value): int
+    {
+        if (function_exists('mb_strlen')) {
+            return (int) mb_strlen($value);
+        }
+        return strlen($value);
+    }
+
+    private static function strSub(string $value, int $start, ?int $length = null): string
+    {
+        if (function_exists('mb_substr')) {
+            return $length === null ? (string) mb_substr($value, $start) : (string) mb_substr($value, $start, $length);
+        }
+        return $length === null ? (string) substr($value, $start) : (string) substr($value, $start, $length);
     }
 }

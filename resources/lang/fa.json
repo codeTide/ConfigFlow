@@ -341,6 +341,9 @@
           "saved_renew": "✅ TX Hash تمدید ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>"
         }
       }
+    },
+    "system": {
+      "unexpected_error": "⚠️ یک خطای موقت رخ داد.\n\n<blockquote>🧷 کد پیگیری: <code>{error_ref}</code>\nاگر مشکل ادامه داشت، این کد را برای پشتیبانی ارسال کنید.</blockquote>"
     }
   },
   "payments": {

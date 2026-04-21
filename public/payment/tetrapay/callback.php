@@ -9,6 +9,8 @@ use ConfigFlow\Bot\PaymentMethodRepository;
 use ConfigFlow\Bot\Payments\Tetrapay\TetrapayCallbackHandler;
 use ConfigFlow\Bot\Payments\Tetrapay\TetrapayGateway;
 use ConfigFlow\Bot\SettingsRepository;
+use ConfigFlow\Bot\Support\AppLogger;
+use ConfigFlow\Bot\Support\ErrorRef;
 
 require_once __DIR__ . '/../../../src/Bootstrap.php';
 require_once __DIR__ . '/../../../src/Config.php';
@@ -37,7 +39,19 @@ $methods = new PaymentMethodRepository($database);
 $gatewayService = new PaymentGatewayService($settings, $methods);
 $gateway = new TetrapayGateway($gatewayService);
 $handler = new TetrapayCallbackHandler($database, $gateway);
-
-$result = $handler->handle(is_array($request) ? $request : []);
-http_response_code(($result['ok'] ?? false) ? 200 : 400);
-echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$logger = new AppLogger();
+try {
+    $result = $handler->handle(is_array($request) ? $request : []);
+    http_response_code(($result['ok'] ?? false) ? 200 : 400);
+    echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+} catch (\Throwable $e) {
+    $ref = $logger->log('critical', 'callback', 'tetrapay_callback_unhandled_exception', 'Unhandled exception in Tetrapay callback', [
+        'gateway' => 'tetrapay',
+        'stage' => 'callback_entrypoint',
+        'exception_class' => $e::class,
+        'exception_message' => $e->getMessage(),
+        'request_payload' => is_array($request) ? $request : [],
+    ], ErrorRef::make('CB'));
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'internal_error', 'error_ref' => $ref], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+}

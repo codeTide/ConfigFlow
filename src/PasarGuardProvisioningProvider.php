@@ -65,9 +65,16 @@ final class PasarGuardProvisioningProvider implements ProvisioningProviderInterf
     {
         $res = $this->client->updateUser($username, $payload);
         if (($res['success'] ?? false) !== true) {
+            $ref = $this->logger->log('error', 'panel', 'panel_update_failed', 'Panel update user failed', [
+                'stage' => 'provision_update_user',
+                'provider_error' => (string) ($res['message'] ?? $res['errorCode'] ?? 'pasarguard_update_failed'),
+                'request_payload' => ['username' => $username, 'payload' => $payload],
+                'response_payload' => $res,
+            ], ErrorRef::make('PANEL'));
             return [
                 'ok' => false,
                 'error' => (string) ($res['message'] ?? $res['errorCode'] ?? 'pasarguard_update_failed'),
+                'error_ref' => $ref,
             ];
         }
 
@@ -81,9 +88,16 @@ final class PasarGuardProvisioningProvider implements ProvisioningProviderInterf
     {
         $res = $this->client->deleteUser($username);
         if (($res['success'] ?? false) !== true) {
+            $ref = $this->logger->log('error', 'panel', 'panel_delete_failed', 'Panel delete user failed', [
+                'stage' => 'provision_delete_user',
+                'provider_error' => (string) ($res['message'] ?? $res['errorCode'] ?? 'pasarguard_delete_failed'),
+                'request_payload' => ['username' => $username],
+                'response_payload' => $res,
+            ], ErrorRef::make('PANEL'));
             return [
                 'ok' => false,
                 'error' => (string) ($res['message'] ?? $res['errorCode'] ?? 'pasarguard_delete_failed'),
+                'error_ref' => $ref,
             ];
         }
 

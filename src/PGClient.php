@@ -133,11 +133,19 @@ final class PGClient
             }
         }
 
+        $ref = ErrorRef::make('PANEL');
+        $this->logger->log('error', 'panel', strtolower($defaultCode), 'PGClient handled error', [
+            'stage' => 'pgclient_handle_error',
+            'http_status' => $httpCode,
+            'provider_error' => $message,
+            'response_payload' => $response,
+        ], $ref);
         return [
             'success' => false,
             'httpCode' => $httpCode,
             'errorCode' => $defaultCode . '_' . $httpCode,
             'message' => $message,
+            'error_ref' => $ref,
         ];
     }
 
@@ -201,11 +209,19 @@ final class PGClient
             $error = curl_error($ch);
             curl_close($ch);
             $this->logPerformance($endpoint, $method, $httpCode, $durationMs, false, $error);
+            $ref = ErrorRef::make('PANEL');
+            $this->logger->log('error', 'panel', 'pgclient_curl_error', 'PGClient cURL error', [
+                'stage' => 'panel_request',
+                'http_status' => $httpCode,
+                'provider_error' => $error,
+                'request_payload' => ['endpoint' => $endpoint, 'method' => $method],
+            ], $ref);
             return [
                 'success' => false,
                 'httpCode' => $httpCode,
                 'errorCode' => 'PG_CURL_ERROR',
                 'message' => $error,
+                'error_ref' => $ref,
             ];
         }
 

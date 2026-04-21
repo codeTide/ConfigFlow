@@ -7598,6 +7598,11 @@ final class MessageHandler
             $changed = (string) ($payment['kind'] ?? '') === 'wallet_topup'
                 ? $this->database->markWalletTopupPaidIfWaitingGateway($paymentId)
                 : $this->database->markPaymentAndPendingPaidIfWaitingGateway($paymentId);
+            if (!$changed && in_array((string) ($payment['status'] ?? ''), ['paid', 'completed'], true)) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $okText);
+                return;
+            }
             if ($changed) {
                 if ((string) ($payment['kind'] ?? '') === 'purchase') {
                     $this->database->setUserState($userId, 'buy.done', [

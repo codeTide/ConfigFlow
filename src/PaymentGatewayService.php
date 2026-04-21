@@ -34,11 +34,19 @@ final class PaymentGatewayService
         $config = $this->paymentMethods?->getMethodConfig('tetrapay') ?? [];
         $apiKey = trim((string) ($config['api_key'] ?? $this->settings->get('tetrapay_api_key', '')));
         if ($apiKey === '') {
-            return ['ok' => false, 'error' => 'tetrapay_api_key_missing'];
+            $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_api_key_missing', 'Tetrapay api key missing', [
+                'gateway' => 'tetrapay',
+                'stage' => 'config_validation',
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_api_key_missing', 'messages.user.payment.gateway.tetrapay_invoice_error', 'tetrapay', 'config_validation', [], false, $errorRef);
         }
 
         if (trim($callbackUrl) === '') {
-            return ['ok' => false, 'error' => 'tetrapay_callback_missing'];
+            $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_callback_missing', 'Tetrapay callback missing', [
+                'gateway' => 'tetrapay',
+                'stage' => 'config_validation',
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_callback_missing', 'messages.user.payment.gateway.tetrapay_invoice_error', 'tetrapay', 'config_validation', [], false, $errorRef);
         }
         $hashId = substr(hash('sha256', $hashSeed), 0, 40);
         $payload = [
@@ -156,6 +164,8 @@ final class PaymentGatewayService
         }
         $response = $this->postJson(self::TETRAPAY_VERIFY_URL, $payload);
         if (!(bool) ($response['transport_ok'] ?? false)) {
+            $isTimeout = ((int) ($response['curl_errno'] ?? 0)) === 28;
+            $errCode = $isTimeout ? 'tetrapay_timeout' : 'tetrapay_transport_error';
             $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_transport_error', 'Tetrapay verify transport failure', [
                 'gateway' => 'tetrapay',
                 'stage' => 'verify',
@@ -164,7 +174,7 @@ final class PaymentGatewayService
                 'request_payload' => PayloadSanitizer::sanitize($payload),
                 'raw_response' => (string) ($response['raw_body'] ?? ''),
             ], ErrorRef::make('TP'));
-            return AppError::make('tetrapay_transport_error', 'messages.user.payment.not_confirmed', 'tetrapay', 'verify', [
+            return AppError::make($errCode, 'messages.user.payment.not_confirmed', 'tetrapay', 'verify', [
                 'http_status' => (int) ($response['http_status'] ?? 0),
                 'curl_error' => (string) ($response['curl_error'] ?? ''),
             ], true, $errorRef);
@@ -178,10 +188,37 @@ final class PaymentGatewayService
             return AppError::make('tetrapay_invalid_json', 'messages.user.payment.not_confirmed', 'tetrapay', 'verify', [], false, $errorRef);
         }
         $data = is_array($response['decoded_body'] ?? null) ? $response['decoded_body'] : [];
+        if (!array_key_exists('status', $data)) {
+            $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_invalid_response', 'Tetrapay verify missing status', [
+                'gateway' => 'tetrapay',
+                'stage' => 'verify',
+                'response_payload' => $data,
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_invalid_response', 'messages.user.payment.not_confirmed', 'tetrapay', 'verify', [], false, $errorRef);
+        }
         $statusCode = (int) ($data['status'] ?? 0);
+        $returnedAuthority = trim((string) ($data['Authority'] ?? ''));
+        if ($returnedAuthority !== '' && $returnedAuthority !== $authority) {
+            $errorRef = $this->logger->log('warning', 'tetrapay', 'tetrapay_authority_mismatch', 'Tetrapay verify authority mismatch', [
+                'gateway' => 'tetrapay',
+                'stage' => 'verify',
+                'response_payload' => $data,
+                'provider_error' => 'authority_mismatch',
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_authority_mismatch', 'messages.user.payment.not_confirmed', 'tetrapay', 'verify', [], false, $errorRef);
+        }
         $isPaid = $statusCode === 100;
 
-        return ['ok' => true, 'paid' => $isPaid, 'status' => $statusCode, 'raw' => $data];
+        if (!$isPaid) {
+            $this->logger->log('info', 'tetrapay', 'tetrapay_status_not_paid', 'Tetrapay verify status is not paid', [
+                'gateway' => 'tetrapay',
+                'stage' => 'verify',
+                'response_payload' => $data,
+                'provider_error' => (string) $statusCode,
+            ], ErrorRef::make('TP'));
+        }
+
+        return ['ok' => true, 'paid' => $isPaid, 'status' => $statusCode, 'code' => $isPaid ? 'tetrapay_paid' : 'tetrapay_status_not_paid', 'raw' => $data];
     }
 
     public function createSwapwalletCryptoInvoice(int $amount, string $orderId, string $network = 'TRON', string $description = 'Payment'): array
