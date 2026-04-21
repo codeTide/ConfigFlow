@@ -6570,10 +6570,10 @@ final class MessageHandler
     private function gatewayInvoiceInlineKeyboard(int $paymentId, string $payUrl): array
     {
         $row = [];
-        $row[] = ['text' => $this->catalog->get('buttons.pay.verify'), 'callback_data' => 'pv:' . $paymentId];
         if ($payUrl !== '') {
             $row[] = ['text' => $this->catalog->get('buttons.pay.gateway_pay'), 'url' => $payUrl];
         }
+        $row[] = ['text' => $this->catalog->get('buttons.pay.verify'), 'callback_data' => 'pv:' . $paymentId];
         return ['inline_keyboard' => [$row]];
     }
 
@@ -6785,8 +6785,9 @@ final class MessageHandler
 
     private function createNowpaymentsInvoiceForPayment(int $amount, int $paymentId): array
     {
-        $orderId = 'cf-pay:' . $paymentId;
-        $description = $this->buildGatewayPaymentDescription($paymentId);
+        $trackingCode = $this->buildGatewayPaymentDescription($paymentId);
+        $orderId = $trackingCode;
+        $description = $trackingCode;
         return $this->gateways->createNowpaymentsInvoice($amount, $orderId, $description, []);
     }
 
