@@ -314,20 +314,7 @@
         "not_confirmed": "پرداخت هنوز تایید نشده است.",
         "bonus_applied": "🎁 پاداش این تراکنش: <b>{bonus_amount}</b> تومان (به کیف پول شما اضافه شد).",
         "gateway_intro_tip": "💡 بعد از تکمیل پرداخت، وضعیت تراکنش را از طریق دکمه بررسی پرداخت پیگیری کنید تا سرویس شما سریع‌تر نهایی شود.",
-        "verify_prompt": "برای بررسی پرداخت از دکمه زیر استفاده کنید.",
-        "receipt": {
-          "missing_purchase": "⚠️ لطفاً رسید را به‌صورت عکس/فایل یا متن ارسال کنید.",
-          "saved_purchase": "✅ رسید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>",
-          "missing_renew": "⚠️ لطفاً رسید تمدید را به‌صورت عکس/فایل یا متن ارسال کنید.",
-          "saved_renew": "✅ رسید تمدید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>"
-        },
-        "tx": {
-          "invalid": "⚠️ لطفاً TX Hash معتبر ارسال کنید.",
-          "invalid_length": "⚠️ طول TX Hash معتبر نیست.",
-          "submit_failed": "❌ ثبت TX Hash انجام نشد. لطفاً دوباره تلاش کنید.",
-          "saved_purchase": "✅ TX Hash ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>",
-          "saved_renew": "✅ TX Hash تمدید ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>"
-        }
+        "verify_prompt": "برای بررسی پرداخت از دکمه زیر استفاده کنید."
       }
     },
     "system": {
@@ -436,9 +423,6 @@
         "approve": "✅ تایید #{payment_id}",
         "reject": "❌ رد #{payment_id}"
       },
-      "renew_receipt_new": "♻️ <b>رسید تمدید جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\n{note_line}",
-      "tx_new": "💎 <b>TX Hash جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nTX: <code>{tx_hash}</code>\n{amount_line}",
-      "tx_renew_new": "♻️ <b>TX Hash تمدید جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nTX: <code>{tx_hash}</code>\n{amount_line}",
       "amount_line": "Amount: <b>{amount}</b>\n"
     },
     "payments_requests": {
@@ -984,7 +968,6 @@
           "max_attempts": "🚫 سقف دفعات بررسی این پرداخت تکمیل شده است.",
           "unavailable": "بررسی این پرداخت فعلاً ممکن نیست.",
           "payment_not_found": "پرداخت یافت نشد.",
-          "tx_hash_missing": "TX Hash ثبت نشده است.",
           "tx_not_confirmed_or_invalid": "تراکنش تایید نشد یا مقدار اعلامی معتبر نیست.",
           "request_not_processable": "این درخواست قابل پردازش نیست.",
           "request_status": "درخواست <code>{payment_id}</code> {status_text}."

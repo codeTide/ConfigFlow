@@ -43,11 +43,7 @@ $executeSqlBatch($pdo, $schema);
 
 // Lightweight forward-compatible column migrations for existing installations
 $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_ref VARCHAR(191) NULL");
-$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS tx_hash VARCHAR(255) NULL");
-$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS crypto_amount_claimed DECIMAL(24,8) NULL");
 $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS provider_payload TEXT NULL");
-$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS receipt_file_id VARCHAR(255) NULL");
-$pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS receipt_text TEXT NULL");
 $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS admin_note TEXT NULL");
 $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS verified_at DATETIME NULL");
 $pdo->exec("ALTER TABLE payments ADD COLUMN IF NOT EXISTS verify_attempts INT NOT NULL DEFAULT 0");

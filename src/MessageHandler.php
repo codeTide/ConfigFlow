@@ -5875,7 +5875,7 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->catalog->get('messages.user.payment.wallet_purchase_success', [
-                    'payment_id' => (int) $result['payment_id'],
+                    'payment_id' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
                     'amount' => (int) $result['price'],
                     'new_balance' => (int) $result['new_balance'],
                 ])
@@ -6015,7 +6015,7 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->catalog->get('messages.user.payment.wallet_purchase_success', [
-                    'payment_id' => (int) $result['payment_id'],
+                    'payment_id' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
                     'amount' => (int) ($result['amount'] ?? 0),
                     'new_balance' => (int) ($result['new_balance'] ?? 0),
                 ])
@@ -6107,7 +6107,7 @@ final class MessageHandler
             $this->telegram->sendMessage(
                 $chatId,
                 $this->catalog->get('messages.user.payment.wallet_purchase_success', [
-                    'payment_id' => (int) $result['payment_id'],
+                    'payment_id' => (string) ($result['tracking_code'] ?? (string) ((int) ($result['payment_id'] ?? 0))),
                     'amount' => (int) ($result['amount'] ?? $computedAmount),
                     'new_balance' => (int) $result['new_balance'],
                 ])
@@ -6447,20 +6447,6 @@ final class MessageHandler
                 $this->telegram->sendMessage($chatId, $okText . $this->bonusSuccessLine($payment));
                 return;
             }
-        }
-        if ($gateway === 'nowpayments') {
-            $providerStatus = is_array($providerPayload) ? (string) ($providerPayload['last_provider_status'] ?? '') : '';
-            if ($providerStatus === 'partially_paid') {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_partially_paid'));
-                return;
-            }
-            if (in_array((string) ($payment['status'] ?? ''), ['gateway_error'], true)) {
-                $this->database->clearUserState($userId);
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_failed_terminal'));
-                return;
-            }
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_waiting_confirmation'));
-            return;
         }
         if ($gateway === 'nowpayments') {
             $providerStatus = is_array($providerPayload) ? (string) ($providerPayload['last_provider_status'] ?? '') : '';

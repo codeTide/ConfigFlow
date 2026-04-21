@@ -234,6 +234,10 @@ final class Database
             $this->pdo->exec("UPDATE payments SET tracking_code = CONCAT('9', LPAD(id, 11, '0')) WHERE tracking_code IS NULL OR tracking_code = ''");
             $this->pdo->exec("ALTER TABLE payments MODIFY COLUMN tracking_code VARCHAR(32) NOT NULL");
             $this->pdo->exec("ALTER TABLE payments ADD UNIQUE INDEX IF NOT EXISTS uq_payments_tracking_code (tracking_code)");
+            $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS tx_hash");
+            $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS crypto_amount_claimed");
+            $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS receipt_file_id");
+            $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS receipt_text");
             $legacyTariffColumn = 'pack' . 'age_id';
             $this->pdo->exec("ALTER TABLE payments DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
         }
@@ -1453,9 +1457,11 @@ final class Database
             ]);
 
             $this->pdo->commit();
+            $trackingCode = $this->paymentTrackingCodeById($paymentId);
             return [
                 'ok' => true,
                 'payment_id' => $paymentId,
+                'tracking_code' => $trackingCode,
                 'pending_order_id' => $pendingId,
                 'amount' => $amount,
                 'new_balance' => $newBalance,
@@ -1540,9 +1546,11 @@ final class Database
             ]);
 
             $this->pdo->commit();
+            $trackingCode = $this->paymentTrackingCodeById($paymentId);
             return [
                 'ok' => true,
                 'payment_id' => $paymentId,
+                'tracking_code' => $trackingCode,
                 'pending_order_id' => $pendingId,
                 'amount' => $amount,
                 'new_balance' => $newBalance,
@@ -1609,7 +1617,14 @@ final class Database
                 'status' => 'paid_waiting_delivery',
             ]);
             $this->pdo->commit();
-            return ['ok' => true, 'payment_id' => $paymentId, 'pending_order_id' => $pendingId, 'price' => $price, 'new_balance' => $newBalance];
+            return [
+                'ok' => true,
+                'payment_id' => $paymentId,
+                'tracking_code' => $this->paymentTrackingCodeById($paymentId),
+                'pending_order_id' => $pendingId,
+                'price' => $price,
+                'new_balance' => $newBalance,
+            ];
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -2318,7 +2333,7 @@ final class Database
 
     public function getPaymentById(int $paymentId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, tx_hash, crypto_amount_claimed, provider_payload, status, status_reason, approved_at, verified_at, bonus_applied_at, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, provider_payload, status, status_reason, approved_at, verified_at, bonus_applied_at, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $paymentId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
@@ -2594,6 +2609,16 @@ final class Database
     {
         $datePart = gmdate('dmy');
         return (string) random_int(100, 999) . $datePart . (string) random_int(100, 999);
+    }
+
+    private function paymentTrackingCodeById(int $paymentId): string
+    {
+        $payment = $this->getPaymentById($paymentId);
+        if (!is_array($payment)) {
+            return (string) $paymentId;
+        }
+        $tracking = trim((string) ($payment['tracking_code'] ?? ''));
+        return $tracking !== '' ? $tracking : (string) $paymentId;
     }
 
     /** @param array<string,mixed> $details */
