@@ -59,8 +59,8 @@ if (!is_array($update)) {
 $database = new Database();
 $telegram = new TelegramClient($token);
 $settings = new SettingsRepository($database);
-$gateways = new PaymentGatewayService($settings);
 $paymentMethods = new PaymentMethodRepository($database);
+$gateways = new PaymentGatewayService($settings, $paymentMethods);
 $uiKeyboard = new UiKeyboardFactory();
 $menus = new MenuService($settings, $database, $uiKeyboard);
 $startHandler = new StartHandler($database, $telegram, $settings, $menus);

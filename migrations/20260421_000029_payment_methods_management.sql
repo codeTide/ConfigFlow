@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS payment_methods (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     code VARCHAR(64) NOT NULL,
-    title VARCHAR(191) NOT NULL,
     category VARCHAR(32) NOT NULL DEFAULT 'gateway',
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     sort_order INT NOT NULL DEFAULT 100,
@@ -17,28 +16,22 @@ CREATE TABLE IF NOT EXISTS payment_methods (
     fee_value DECIMAL(18,4) NULL,
     auto_verify TINYINT(1) NOT NULL DEFAULT 0,
     requires_receipt TINYINT(1) NOT NULL DEFAULT 0,
-    supports_purchase TINYINT(1) NOT NULL DEFAULT 1,
-    supports_renewal TINYINT(1) NOT NULL DEFAULT 1,
     visible_to_user TINYINT(1) NOT NULL DEFAULT 1,
-    admin_note TEXT NULL,
-    user_description TEXT NULL,
     config_json JSON NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uq_payment_methods_code (code),
-    KEY idx_payment_methods_active (is_active, sort_order),
-    KEY idx_payment_methods_supports (supports_purchase, supports_renewal)
+    KEY idx_payment_methods_active (is_active, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO payment_methods
-    (code, title, category, is_active, sort_order, min_amount, max_amount, auto_verify, requires_receipt, supports_purchase, supports_renewal, visible_to_user, created_at, updated_at)
+    (code, category, is_active, sort_order, min_amount, max_amount, auto_verify, requires_receipt, visible_to_user, created_at, updated_at)
 VALUES
-    ('crypto_tron', 'پرداخت کریپتو', 'crypto', 1, 20, 10000, 0, 0, 1, 1, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
-    ('tetrapay', 'پرداخت تتراپی', 'gateway', 1, 30, 10000, 0, 1, 0, 1, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
-    ('swapwallet_crypto', 'پرداخت سواپ‌ولت', 'crypto', 0, 40, 10000, 0, 1, 0, 1, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
-    ('tronpays_rial', 'پرداخت ترون‌پیز', 'rial', 0, 50, 10000, 0, 1, 0, 1, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+    ('crypto_tron', 'crypto', 1, 20, 10000, 0, 0, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+    ('tetrapay', 'gateway', 1, 30, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+    ('swapwallet_crypto', 'crypto', 0, 40, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+    ('tronpays_rial', 'rial', 0, 50, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())
 ON DUPLICATE KEY UPDATE
-    title = VALUES(title),
     category = VALUES(category),
     sort_order = VALUES(sort_order),
     updated_at = VALUES(updated_at);
@@ -71,4 +64,3 @@ DELETE FROM settings WHERE `key` = 'gw_card_enabled';
 DELETE FROM settings WHERE `key` = 'payment_card';
 DELETE FROM settings WHERE `key` = 'payment_bank';
 DELETE FROM settings WHERE `key` = 'payment_owner';
-

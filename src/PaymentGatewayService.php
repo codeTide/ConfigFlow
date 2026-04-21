@@ -9,13 +9,17 @@ final class PaymentGatewayService
     private const TETRAPAY_CREATE_URL = 'https://tetra98.com/api/create_order';
     private const TETRAPAY_VERIFY_URL = 'https://tetra98.com/api/verify';
 
-    public function __construct(private SettingsRepository $settings)
+    public function __construct(
+        private SettingsRepository $settings,
+        private ?PaymentMethodRepository $paymentMethods = null
+    )
     {
     }
 
     public function createTetrapayOrder(int $amount, string $orderRef): array
     {
-        $apiKey = trim($this->settings->get('tetrapay_api_key', ''));
+        $config = $this->paymentMethods?->getMethodConfig('tetrapay') ?? [];
+        $apiKey = trim((string) ($config['secret_key'] ?? $this->settings->get('tetrapay_api_key', '')));
         if ($apiKey === '') {
             return ['ok' => false, 'error' => 'tetrapay_api_key_missing'];
         }
@@ -27,7 +31,8 @@ final class PaymentGatewayService
             'description' => 'ConfigFlow order ' . $orderRef,
         ];
 
-        $response = $this->postJson(self::TETRAPAY_CREATE_URL, $payload);
+        $createUrl = trim((string) ($config['create_url'] ?? self::TETRAPAY_CREATE_URL));
+        $response = $this->postJson($createUrl, $payload);
         if (!($response['ok'] ?? false)) {
             return ['ok' => false, 'error' => 'request_failed'];
         }
@@ -45,12 +50,14 @@ final class PaymentGatewayService
 
     public function verifyTetrapay(string $authority): array
     {
-        $apiKey = trim($this->settings->get('tetrapay_api_key', ''));
+        $config = $this->paymentMethods?->getMethodConfig('tetrapay') ?? [];
+        $apiKey = trim((string) ($config['secret_key'] ?? $this->settings->get('tetrapay_api_key', '')));
         if ($apiKey === '' || $authority === '') {
             return ['ok' => false, 'error' => 'missing_data'];
         }
 
-        $response = $this->postJson(self::TETRAPAY_VERIFY_URL, [
+        $verifyUrl = trim((string) ($config['verify_url'] ?? self::TETRAPAY_VERIFY_URL));
+        $response = $this->postJson($verifyUrl, [
             'api_key' => $apiKey,
             'authority' => $authority,
         ]);
@@ -67,8 +74,9 @@ final class PaymentGatewayService
 
     public function createSwapwalletCryptoInvoice(int $amount, string $orderId, string $network = 'TRON', string $description = 'Payment'): array
     {
-        $apiKey = trim($this->settings->get('swapwallet_crypto_api_key', ''));
-        $username = ltrim(trim($this->settings->get('swapwallet_crypto_username', '')), '@');
+        $config = $this->paymentMethods?->getMethodConfig('swapwallet_crypto') ?? [];
+        $apiKey = trim((string) ($config['merchant_key'] ?? $this->settings->get('swapwallet_crypto_api_key', '')));
+        $username = ltrim(trim((string) ($config['username'] ?? $this->settings->get('swapwallet_crypto_username', ''))), '@');
         if ($apiKey === '' || $username === '') {
             return ['ok' => false, 'error' => 'swapwallet_credentials_missing'];
         }
@@ -76,7 +84,8 @@ final class PaymentGatewayService
             $apiKey = trim(substr($apiKey, 7));
         }
 
-        $allowedToken = strtoupper($network) === 'TON' ? 'TON' : 'USDT';
+        $network = (string) ($config['network'] ?? $network);
+        $allowedToken = strtoupper((string) ($config['asset'] ?? (strtoupper($network) === 'TON' ? 'TON' : 'USDT')));
         $payload = [
             'amount' => ['number' => (string) $amount, 'unit' => 'IRT'],
             'network' => strtoupper($network),
@@ -85,7 +94,8 @@ final class PaymentGatewayService
             'orderId' => (string) $orderId,
             'description' => $description,
         ];
-        $url = rtrim(Config::swapwalletBaseUrl(), '/') . '/v2/payment/' . rawurlencode($username) . '/invoices/temporary-wallet';
+        $baseUrl = trim((string) ($config['base_url'] ?? Config::swapwalletBaseUrl()));
+        $url = rtrim($baseUrl, '/') . '/v2/payment/' . rawurlencode($username) . '/invoices/temporary-wallet';
         $res = $this->postJsonHeaders($url, $payload, [
             'Authorization: Bearer ' . $apiKey,
             'Accept: application/json',
@@ -118,15 +128,17 @@ final class PaymentGatewayService
 
     public function checkSwapwalletCryptoInvoice(string $invoiceId): array
     {
-        $apiKey = trim($this->settings->get('swapwallet_crypto_api_key', ''));
-        $username = ltrim(trim($this->settings->get('swapwallet_crypto_username', '')), '@');
+        $config = $this->paymentMethods?->getMethodConfig('swapwallet_crypto') ?? [];
+        $apiKey = trim((string) ($config['merchant_key'] ?? $this->settings->get('swapwallet_crypto_api_key', '')));
+        $username = ltrim(trim((string) ($config['username'] ?? $this->settings->get('swapwallet_crypto_username', ''))), '@');
         if ($apiKey === '' || $username === '' || trim($invoiceId) === '') {
             return ['ok' => false, 'error' => 'missing_data'];
         }
         if (str_starts_with(strtolower($apiKey), 'bearer ')) {
             $apiKey = trim(substr($apiKey, 7));
         }
-        $url = rtrim(Config::swapwalletBaseUrl(), '/') . '/v2/payment/' . rawurlencode($username) . '/invoices/' . rawurlencode($invoiceId);
+        $baseUrl = trim((string) ($config['base_url'] ?? Config::swapwalletBaseUrl()));
+        $url = rtrim($baseUrl, '/') . '/v2/payment/' . rawurlencode($username) . '/invoices/' . rawurlencode($invoiceId);
         $res = $this->getJsonHeaders($url, [
             'Authorization: Bearer ' . $apiKey,
             'Accept: application/json',
@@ -143,8 +155,9 @@ final class PaymentGatewayService
 
     public function createTronpaysRialInvoice(int $amount, string $hashId): array
     {
-        $apiKey = trim($this->settings->get('tronpays_rial_api_key', ''));
-        $callback = trim($this->settings->get('tronpays_rial_callback_url', ''));
+        $config = $this->paymentMethods?->getMethodConfig('tronpays_rial') ?? [];
+        $apiKey = trim((string) ($config['merchant_key'] ?? $this->settings->get('tronpays_rial_api_key', '')));
+        $callback = trim((string) ($config['callback_url'] ?? $this->settings->get('tronpays_rial_callback_url', '')));
         if ($apiKey === '') {
             return ['ok' => false, 'error' => 'tronpays_api_key_missing'];
         }
@@ -154,7 +167,8 @@ final class PaymentGatewayService
             'amount' => $amount,
             'callback_url' => $callback !== '' ? $callback : 'https://example.com/',
         ];
-        $url = rtrim(Config::tronpaysBaseUrl(), '/') . '/api/invoice/create';
+        $baseUrl = trim((string) ($config['base_url'] ?? Config::tronpaysBaseUrl()));
+        $url = rtrim($baseUrl, '/') . '/api/invoice/create';
         $res = $this->postJsonHeaders($url, $payload, ['Accept: application/json']);
         if (!($res['ok'] ?? false)) {
             return ['ok' => false, 'error' => 'request_failed'];
@@ -170,11 +184,13 @@ final class PaymentGatewayService
 
     public function checkTronpaysRialInvoice(string $invoiceId): array
     {
-        $apiKey = trim($this->settings->get('tronpays_rial_api_key', ''));
+        $config = $this->paymentMethods?->getMethodConfig('tronpays_rial') ?? [];
+        $apiKey = trim((string) ($config['merchant_key'] ?? $this->settings->get('tronpays_rial_api_key', '')));
         if ($apiKey === '' || trim($invoiceId) === '') {
             return ['ok' => false, 'error' => 'missing_data'];
         }
-        $url = rtrim(Config::tronpaysBaseUrl(), '/') . '/api/invoice/check';
+        $baseUrl = trim((string) ($config['base_url'] ?? Config::tronpaysBaseUrl()));
+        $url = rtrim($baseUrl, '/') . '/api/invoice/check';
         $res = $this->postJsonHeaders($url, [
             'api_key' => $apiKey,
             'invoice_id' => $invoiceId,
@@ -190,7 +206,8 @@ final class PaymentGatewayService
 
     public function cryptoAddress(string $coin): string
     {
-        return trim($this->settings->get('crypto_wallet_' . $coin, ''));
+        $config = $this->paymentMethods?->getMethodConfig('crypto_tron') ?? [];
+        return trim((string) ($config['wallet_address'] ?? $this->settings->get('crypto_wallet_' . $coin, '')));
     }
 
     public function verifyCryptoTransaction(string $coin, string $txHash): array
