@@ -6226,7 +6226,7 @@ final class MessageHandler
         $this->updatePaymentFromGatewayInvoice($paymentId, $gatewayCode, $invoice);
         $payUrl = (string) ($invoice['pay_url'] ?? '');
         $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gatewayCode, 'ok_text' => $this->catalog->get('messages.user.payment.ok.' . $gatewayCode . '_purchase'), 'tariff_id' => $tariffId, 'payment_method' => $gatewayCode]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gatewayCode . '_purchase'), $pendingId, $amount, $payUrl);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gatewayCode . '_purchase'), $this->paymentTrackingCode($paymentId), $amount, $payUrl);
     }
 
     private function createPanelPurchasePaymentByMethod(int $chatId, int $userId, int $serviceId, float $selectedVolumeGb, int $amount, string $gatewayCode): void
@@ -6271,7 +6271,7 @@ final class MessageHandler
         $this->updatePaymentFromGatewayInvoice($paymentId, $gatewayCode, $invoice);
         $payUrl = (string) ($invoice['pay_url'] ?? '');
         $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gatewayCode, 'ok_text' => $this->catalog->get('messages.user.payment.ok.' . $gatewayCode . '_purchase'), 'service_id' => $serviceId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => $gatewayCode]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gatewayCode . '_purchase'), $pendingId, $amount, $payUrl);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gatewayCode . '_purchase'), $this->paymentTrackingCode($paymentId), $amount, $payUrl);
     }
 
     private function createServicePurchasePaymentByMethod(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb, string $gatewayCode): void
@@ -6327,7 +6327,7 @@ final class MessageHandler
         $this->updatePaymentFromGatewayInvoice($paymentId, $gatewayCode, $invoice);
         $payUrl = (string) ($invoice['pay_url'] ?? '');
         $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gatewayCode, 'ok_text' => $this->catalog->get('messages.user.payment.ok.' . $gatewayCode . '_purchase'), 'service_id' => $serviceId, 'tariff_id' => $tariffId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => $gatewayCode]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gatewayCode . '_purchase'), $pendingId, $amount, $payUrl);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gatewayCode . '_purchase'), $this->paymentTrackingCode($paymentId), $amount, $payUrl);
     }
 
     private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $tariffId, string $gatewayCode): void
@@ -6369,7 +6369,7 @@ final class MessageHandler
         $this->updatePaymentFromGatewayInvoice($paymentId, $gatewayCode, $invoice);
         $payUrl = (string) ($invoice['pay_url'] ?? '');
         $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gatewayCode, 'ok_text' => $this->catalog->get('messages.user.payment.ok.' . $gatewayCode . '_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'payment_method' => $gatewayCode]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gatewayCode . '_renew'), $pendingId, $amount, $payUrl);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gatewayCode . '_renew'), $this->paymentTrackingCode($paymentId), $amount, $payUrl);
     }
     private function handleGatewayVerifyState(int $chatId, int $userId, string $text, array $state): void
     {
@@ -6422,7 +6422,7 @@ final class MessageHandler
                 : $this->database->markPaymentAndPendingPaidIfWaitingGateway($paymentId);
             if (!$changed && in_array((string) ($payment['status'] ?? ''), ['paid', 'completed'], true)) {
                 $this->database->clearUserState($userId);
-                $this->telegram->sendMessage($chatId, $okText);
+                $this->telegram->sendMessage($chatId, $okText . $this->bonusSuccessLine($payment));
                 return;
             }
             if ($changed) {
@@ -6444,9 +6444,23 @@ final class MessageHandler
                 } else {
                     $this->database->clearUserState($userId);
                 }
-                $this->telegram->sendMessage($chatId, $okText);
+                $this->telegram->sendMessage($chatId, $okText . $this->bonusSuccessLine($payment));
                 return;
             }
+        }
+        if ($gateway === 'nowpayments') {
+            $providerStatus = is_array($providerPayload) ? (string) ($providerPayload['last_provider_status'] ?? '') : '';
+            if ($providerStatus === 'partially_paid') {
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_partially_paid'));
+                return;
+            }
+            if (in_array((string) ($payment['status'] ?? ''), ['gateway_error'], true)) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_failed_terminal'));
+                return;
+            }
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_waiting_confirmation'));
+            return;
         }
         if ($gateway === 'nowpayments') {
             $providerStatus = is_array($providerPayload) ? (string) ($providerPayload['last_provider_status'] ?? '') : '';
@@ -6544,11 +6558,11 @@ final class MessageHandler
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
 
-    private function sendGatewayPaymentIntro(int $chatId, string $title, int $pendingId, int $amount, string $payUrl): void
+    private function sendGatewayPaymentIntro(int $chatId, string $title, string $trackingCode, int $amount, string $payUrl): void
     {
         $text = $this->messageRenderer->render('payments.created.overview_with_tip', [
             'title' => trim($title),
-            'payment_id' => $pendingId,
+            'payment_id' => $trackingCode,
             'amount' => $amount,
             'tip' => $this->catalog->get('messages.user.payment.gateway_intro_tip'),
         ]);
@@ -6710,7 +6724,24 @@ final class MessageHandler
             'ok_text' => $this->catalog->get('messages.user.payment.ok.wallet_topup'),
             'payment_method' => $gateway,
         ]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gateway . '_wallet_topup'), $paymentId, $amount, $payUrl);
+        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.' . $gateway . '_wallet_topup'), $this->paymentTrackingCode($paymentId), $amount, $payUrl);
+    }
+
+    private function paymentTrackingCode(int $paymentId): string
+    {
+        $payment = $this->database->getPaymentById($paymentId);
+        $tracking = is_array($payment) ? trim((string) ($payment['tracking_code'] ?? '')) : '';
+        return $tracking !== '' ? $tracking : (string) $paymentId;
+    }
+
+    private function bonusSuccessLine(array $payment): string
+    {
+        $bonusAmount = max(0, (int) ($payment['bonus_amount'] ?? 0));
+        if ($bonusAmount <= 0) {
+            return '';
+        }
+
+        return "\n\n" . $this->catalog->get('messages.user.payment.bonus_applied', ['bonus_amount' => $bonusAmount]);
     }
 
     private function createGatewayInvoiceForPayment(string $gatewayCode, int $userId, int $amount, int $paymentId, string $purpose, string $reference): array
