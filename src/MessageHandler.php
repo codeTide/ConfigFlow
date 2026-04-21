@@ -4721,12 +4721,21 @@ final class MessageHandler
                 return;
             }
             $raw = trim($text);
-            if ($raw === '') {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.errors.invalid_value'));
-                return;
+            $isNullableAmountField = in_array($field, ['bonus_min_amount', 'bonus_cap_amount'], true);
+            if ($isNullableAmountField && $raw === $this->catalog->get('admin.payment_methods.common.skip')) {
+                $raw = '';
             }
-            $value = $raw;
-            if (in_array($field, ['min_amount', 'max_amount', 'sort_order', 'bonus_min_amount', 'bonus_cap_amount'], true)) {
+            if ($raw === '') {
+                if ($isNullableAmountField) {
+                    $value = null;
+                } else {
+                    $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.errors.invalid_value'));
+                    return;
+                }
+            } else {
+                $value = $raw;
+            }
+            if ($value !== null && in_array($field, ['min_amount', 'max_amount', 'sort_order', 'bonus_min_amount', 'bonus_cap_amount'], true)) {
                 $num = (int) preg_replace('/\D+/', '', $raw);
                 if ($num < 0) {
                     $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.errors.invalid_value'));
@@ -4734,7 +4743,7 @@ final class MessageHandler
                 }
                 $value = $num;
             }
-            if (in_array($field, ['bonus_value', 'fee_value'], true)) {
+            if ($value !== null && in_array($field, ['bonus_value', 'fee_value'], true)) {
                 $num = (float) str_replace(',', '.', preg_replace('/[^\d\.,]+/u', '', $raw));
                 if ($num < 0) {
                     $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.errors.invalid_value'));
@@ -4754,9 +4763,11 @@ final class MessageHandler
             ];
             $successMessage = $this->catalog->get($successMap[$field] ?? 'admin.payment_methods.success.method_updated');
             if ($backTarget === 'admin.payment_methods.bonus') {
-                $this->openAdminPaymentMethodBonusMenu($chatId, $userId, $methodId, $successMessage);
+                $this->database->setUserState($userId, 'admin.payment_methods.bonus', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root']]);
+                $this->telegram->sendMessage($chatId, $successMessage, $this->uiKeyboard->replyMenu($this->paymentMethodBonusKeyboard()));
             } elseif ($backTarget === 'admin.payment_methods.fee') {
-                $this->openAdminPaymentMethodFeeMenu($chatId, $userId, $methodId, $successMessage);
+                $this->database->setUserState($userId, 'admin.payment_methods.fee', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root']]);
+                $this->telegram->sendMessage($chatId, $successMessage, $this->uiKeyboard->replyMenu($this->paymentMethodFeeKeyboard()));
             } else {
                 $this->database->setUserState($userId, 'admin.payment_methods.view', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.list', 'admin.root']]);
                 $this->telegram->sendMessage($chatId, $successMessage);
@@ -4775,18 +4786,22 @@ final class MessageHandler
                 $this->openAdminPaymentMethodsList($chatId, $userId);
                 return;
             }
-            if ($text === $this->catalog->get('admin.payment_methods.bonus.actions.toggle_status')) {
-                $this->paymentMethods->updateMethodSettings($methodId, ['bonus_enabled' => ((int) ($method['bonus_enabled'] ?? 0) === 1) ? 0 : 1]);
-                $this->openAdminPaymentMethodBonusMenu($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.toggled_bonus'));
+            if ($text === $this->catalog->get('admin.payment_methods.bonus.actions.show_status')) {
+                $this->openAdminPaymentMethodBonusMenu($chatId, $userId, $methodId);
                 return;
             }
-            $enumActions = [
-                $this->catalog->get('admin.payment_methods.bonus.actions.set_type_percent') => 'percent',
-                $this->catalog->get('admin.payment_methods.bonus.actions.set_type_fixed') => 'fixed',
-            ];
-            if (isset($enumActions[$text])) {
-                $this->paymentMethods->updateMethodSettings($methodId, ['bonus_type' => $enumActions[$text]]);
-                $this->openAdminPaymentMethodBonusMenu($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.updated_bonus_type'));
+            if ($text === $this->catalog->get('admin.payment_methods.bonus.actions.toggle_status')) {
+                $this->paymentMethods->updateMethodSettings($methodId, ['bonus_enabled' => ((int) ($method['bonus_enabled'] ?? 0) === 1) ? 0 : 1]);
+                $this->database->setUserState($userId, 'admin.payment_methods.bonus', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root']]);
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.success.toggled_bonus'), $this->uiKeyboard->replyMenu($this->paymentMethodBonusKeyboard()));
+                return;
+            }
+            if ($text === $this->catalog->get('admin.payment_methods.bonus.actions.toggle_type')) {
+                $currentType = (string) ($method['bonus_type'] ?? 'percent');
+                $nextType = $currentType === 'fixed' ? 'percent' : 'fixed';
+                $this->paymentMethods->updateMethodSettings($methodId, ['bonus_type' => $nextType]);
+                $this->database->setUserState($userId, 'admin.payment_methods.bonus', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root']]);
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.success.updated_bonus_type'), $this->uiKeyboard->replyMenu($this->paymentMethodBonusKeyboard()));
                 return;
             }
             $valueActions = [
@@ -4795,12 +4810,19 @@ final class MessageHandler
                 $this->catalog->get('admin.payment_methods.bonus.actions.edit_cap_amount') => 'bonus_cap_amount',
             ];
             if (isset($valueActions[$text])) {
+                $field = $valueActions[$text];
                 $this->database->setUserState($userId, 'admin.payment_methods.edit', [
                     'method_id' => $methodId,
-                    'field' => $valueActions[$text],
+                    'field' => $field,
                     'stack' => ['admin.payment_methods.bonus', 'admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root'],
                 ]);
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.prompts.send_value'), $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]));
+                $promptKey = in_array($field, ['bonus_min_amount', 'bonus_cap_amount'], true)
+                    ? 'admin.payment_methods.prompts.send_nullable_amount'
+                    : 'admin.payment_methods.prompts.send_value';
+                $rows = in_array($field, ['bonus_min_amount', 'bonus_cap_amount'], true)
+                    ? [[$this->catalog->get('admin.payment_methods.common.skip')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]]
+                    : [[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]];
+                $this->telegram->sendMessage($chatId, $this->catalog->get($promptKey), $this->uiKeyboard->replyMenu($rows));
                 return;
             }
             return;
@@ -4817,18 +4839,22 @@ final class MessageHandler
                 $this->openAdminPaymentMethodsList($chatId, $userId);
                 return;
             }
-            if ($text === $this->catalog->get('admin.payment_methods.fee.actions.toggle_status')) {
-                $this->paymentMethods->updateMethodSettings($methodId, ['fee_enabled' => ((int) ($method['fee_enabled'] ?? 0) === 1) ? 0 : 1]);
-                $this->openAdminPaymentMethodFeeMenu($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.toggled_fee'));
+            if ($text === $this->catalog->get('admin.payment_methods.fee.actions.show_status')) {
+                $this->openAdminPaymentMethodFeeMenu($chatId, $userId, $methodId);
                 return;
             }
-            $enumActions = [
-                $this->catalog->get('admin.payment_methods.fee.actions.set_type_percent') => 'percent',
-                $this->catalog->get('admin.payment_methods.fee.actions.set_type_fixed') => 'fixed',
-            ];
-            if (isset($enumActions[$text])) {
-                $this->paymentMethods->updateMethodSettings($methodId, ['fee_type' => $enumActions[$text]]);
-                $this->openAdminPaymentMethodFeeMenu($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.updated_fee_type'));
+            if ($text === $this->catalog->get('admin.payment_methods.fee.actions.toggle_status')) {
+                $this->paymentMethods->updateMethodSettings($methodId, ['fee_enabled' => ((int) ($method['fee_enabled'] ?? 0) === 1) ? 0 : 1]);
+                $this->database->setUserState($userId, 'admin.payment_methods.fee', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root']]);
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.success.toggled_fee'), $this->uiKeyboard->replyMenu($this->paymentMethodFeeKeyboard()));
+                return;
+            }
+            if ($text === $this->catalog->get('admin.payment_methods.fee.actions.toggle_type')) {
+                $currentType = (string) ($method['fee_type'] ?? 'percent');
+                $nextType = $currentType === 'fixed' ? 'percent' : 'fixed';
+                $this->paymentMethods->updateMethodSettings($methodId, ['fee_type' => $nextType]);
+                $this->database->setUserState($userId, 'admin.payment_methods.fee', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root']]);
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.success.updated_fee_type'), $this->uiKeyboard->replyMenu($this->paymentMethodFeeKeyboard()));
                 return;
             }
             if ($text === $this->catalog->get('admin.payment_methods.fee.actions.edit_value')) {
@@ -4855,6 +4881,10 @@ final class MessageHandler
                 return;
             }
             $code = (string) ($method['code'] ?? '');
+            if ($text === $this->catalog->get('admin.payment_methods.provider.actions.show_status')) {
+                $this->openAdminPaymentMethodProviderMenu($chatId, $userId, $methodId);
+                return;
+            }
             $fieldMap = $this->providerFieldButtons($code);
             if (isset($fieldMap[$text])) {
                 $this->database->setUserState($userId, 'admin.payment_methods.edit_provider_config', [
@@ -4902,7 +4932,8 @@ final class MessageHandler
                 $typedValue = $value;
             }
             $this->paymentMethods->setMethodConfigValue($code, $field, $typedValue);
-            $this->openAdminPaymentMethodProviderMenu($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.updated_config'));
+            $this->database->setUserState($userId, 'admin.payment_methods.provider', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root']]);
+            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.success.updated_config'), $this->uiKeyboard->replyMenu($this->paymentMethodProviderKeyboard($code)));
             return;
         }
 
@@ -5233,15 +5264,9 @@ final class MessageHandler
             'status' => (int) ($method['bonus_enabled'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off'),
             'bonus_type' => (string) ($method['bonus_type'] ?? '-') === 'fixed' ? 'مبلغ ثابت' : 'درصدی',
             'bonus_value' => $this->toPersianDigits((string) ($method['bonus_value'] ?? 0)),
-            'bonus_min_amount' => $this->toPersianDigits((string) (int) ($method['bonus_min_amount'] ?? 0)),
-            'bonus_cap_amount' => $this->toPersianDigits((string) (int) ($method['bonus_cap_amount'] ?? 0)),
-        ]), $this->uiKeyboard->replyMenu([
-            [$this->catalog->get('admin.payment_methods.bonus.actions.toggle_status')],
-            [$this->catalog->get('admin.payment_methods.bonus.actions.set_type_percent'), $this->catalog->get('admin.payment_methods.bonus.actions.set_type_fixed')],
-            [$this->catalog->get('admin.payment_methods.bonus.actions.edit_value'), $this->catalog->get('admin.payment_methods.bonus.actions.edit_min_amount')],
-            [$this->catalog->get('admin.payment_methods.bonus.actions.edit_cap_amount')],
-            [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-        ]));
+            'bonus_min_amount' => ($method['bonus_min_amount'] ?? null) === null ? 'نامحدود' : $this->toPersianDigits((string) (int) ($method['bonus_min_amount'] ?? 0)),
+            'bonus_cap_amount' => ($method['bonus_cap_amount'] ?? null) === null ? 'نامحدود' : $this->toPersianDigits((string) (int) ($method['bonus_cap_amount'] ?? 0)),
+        ]), $this->uiKeyboard->replyMenu($this->paymentMethodBonusKeyboard()));
     }
 
     private function openAdminPaymentMethodFeeMenu(int $chatId, int $userId, int $methodId, ?string $notice = null): void
@@ -5259,12 +5284,7 @@ final class MessageHandler
             'status' => (int) ($method['fee_enabled'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off'),
             'fee_type' => (string) ($method['fee_type'] ?? '-') === 'fixed' ? 'مبلغ ثابت' : 'درصدی',
             'fee_value' => $this->toPersianDigits((string) ($method['fee_value'] ?? 0)),
-        ]), $this->uiKeyboard->replyMenu([
-            [$this->catalog->get('admin.payment_methods.fee.actions.toggle_status')],
-            [$this->catalog->get('admin.payment_methods.fee.actions.set_type_percent'), $this->catalog->get('admin.payment_methods.fee.actions.set_type_fixed')],
-            [$this->catalog->get('admin.payment_methods.fee.actions.edit_value')],
-            [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-        ]));
+        ]), $this->uiKeyboard->replyMenu($this->paymentMethodFeeKeyboard()));
     }
 
     private function openAdminPaymentMethodProviderMenu(int $chatId, int $userId, int $methodId, ?string $notice = null): void
@@ -5287,17 +5307,14 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $rows = [];
-        $buttons = [];
         foreach ($schema as $key => $rules) {
             $label = $this->catalog->get('admin.payment_methods.provider.fields.' . $code . '.' . $key);
             $value = (string) ($config[$key] ?? '-');
             $rows[] = "• {$label}: " . $this->toPersianDigits($value);
-            $buttons[] = [$label];
         }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.provider.overview', [
             'rows' => implode("\n", $rows),
-        ]), $this->uiKeyboard->replyMenu($buttons));
+        ]), $this->uiKeyboard->replyMenu($this->paymentMethodProviderKeyboard($code)));
     }
 
     /** @return array<string,string> */
@@ -5306,9 +5323,48 @@ final class MessageHandler
         $schema = $this->paymentMethods->configSchema()[$code] ?? [];
         $map = [];
         foreach ($schema as $key => $_rules) {
-            $map[$this->catalog->get('admin.payment_methods.provider.fields.' . $code . '.' . $key)] = $key;
+            $map[$this->catalog->get('admin.payment_methods.provider.buttons.' . $code . '.' . $key)] = $key;
         }
         return $map;
+    }
+
+    /** @return array<int,array<int,string>> */
+    private function paymentMethodBonusKeyboard(): array
+    {
+        return [
+            [$this->catalog->get('admin.payment_methods.bonus.actions.show_status')],
+            [$this->catalog->get('admin.payment_methods.bonus.actions.toggle_status')],
+            [$this->catalog->get('admin.payment_methods.bonus.actions.toggle_type')],
+            [$this->catalog->get('admin.payment_methods.bonus.actions.edit_value'), $this->catalog->get('admin.payment_methods.bonus.actions.edit_min_amount')],
+            [$this->catalog->get('admin.payment_methods.bonus.actions.edit_cap_amount')],
+            [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+        ];
+    }
+
+    /** @return array<int,array<int,string>> */
+    private function paymentMethodFeeKeyboard(): array
+    {
+        return [
+            [$this->catalog->get('admin.payment_methods.fee.actions.show_status')],
+            [$this->catalog->get('admin.payment_methods.fee.actions.toggle_status')],
+            [$this->catalog->get('admin.payment_methods.fee.actions.toggle_type')],
+            [$this->catalog->get('admin.payment_methods.fee.actions.edit_value')],
+            [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+        ];
+    }
+
+    /** @return array<int,array<int,string>> */
+    private function paymentMethodProviderKeyboard(string $code): array
+    {
+        $rows = [[$this->catalog->get('admin.payment_methods.provider.actions.show_status')]];
+        $buttons = array_keys($this->providerFieldButtons($code));
+        while ($buttons !== []) {
+            $chunkSize = count($rows) === 1 ? 3 : 2;
+            $rows[] = array_slice($buttons, 0, $chunkSize);
+            $buttons = array_slice($buttons, $chunkSize);
+        }
+        $rows[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        return $rows;
     }
 
     private function openAdminAdminsList(int $chatId, int $userId, ?string $notice = null): void
