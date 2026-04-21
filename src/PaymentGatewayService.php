@@ -13,6 +13,7 @@ final class PaymentGatewayService
 {
     private const TETRAPAY_CREATE_URL = 'https://tetra98.com/api/create_order';
     private const TETRAPAY_VERIFY_URL = 'https://tetra98.com/api/verify';
+    private const NOWPAYMENTS_CREATE_URL = 'https://api.nowpayments.io/v1/invoice';
 
     public function __construct(
         private SettingsRepository $settings,
@@ -221,150 +222,99 @@ final class PaymentGatewayService
         return ['ok' => true, 'paid' => $isPaid, 'status' => $statusCode, 'code' => $isPaid ? 'tetrapay_paid' : 'tetrapay_status_not_paid', 'raw' => $data];
     }
 
-    public function verifyCryptoTransaction(string $coin, string $txHash): array
+
+
+    public function createNowpaymentsInvoice(int $amount, string $orderId, string $description, array $options = []): array
     {
-        $coin = strtolower(trim($coin));
-        $txHash = trim($txHash);
-        if ($txHash === '') {
-            return ['ok' => false, 'error' => 'missing_tx_hash'];
+        $config = $this->paymentMethods?->getMethodConfig('nowpayments') ?? [];
+        $apiKey = trim((string) ($config['api_key'] ?? ''));
+        $ipnSecret = trim((string) ($config['ipn_secret'] ?? ''));
+        $callbackUrl = trim((string) ($config['callback_url'] ?? ''));
+
+        if ($apiKey === '' || $ipnSecret === '' || $callbackUrl === '') {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_required_config_missing', 'NOWPayments required config missing', [
+                'gateway' => 'nowpayments',
+                'stage' => 'config_validation',
+                'request_payload' => [
+                    'has_api_key' => $apiKey !== '',
+                    'has_ipn_secret' => $ipnSecret !== '',
+                    'has_callback_url' => $callbackUrl !== '',
+                ],
+            ], ErrorRef::make('NP'));
+            return AppError::make('nowpayments_required_config_missing', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'config_validation', [], false, $errorRef);
+        }
+        $payload = [
+            'price_amount' => $amount,
+            'price_currency' => 'usd',
+            'order_id' => $orderId,
+            'order_description' => $description,
+            'ipn_callback_url' => $callbackUrl,
+            'is_fixed_rate' => ((int) ($config['is_fixed_rate'] ?? 0)) === 1,
+            'is_fee_paid_by_user' => ((int) ($config['is_fee_paid_by_user'] ?? 0)) === 1,
+        ];
+
+        $response = $this->postJsonHeaders(self::NOWPAYMENTS_CREATE_URL, $payload, [
+            'x-api-key: ' . $apiKey,
+        ]);
+
+        if (!(bool) ($response['transport_ok'] ?? false)) {
+            $isTimeout = ((int) ($response['curl_errno'] ?? 0)) === 28;
+            $code = $isTimeout ? 'nowpayments_timeout' : 'nowpayments_transport_error';
+            $errorRef = $this->logger->log('error', 'nowpayments', $code, 'NOWPayments create invoice transport failure', [
+                'gateway' => 'nowpayments',
+                'stage' => 'create_invoice',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'provider_error' => (string) ($response['curl_error'] ?? ''),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('NP'));
+            return AppError::make($code, 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'create_invoice', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'curl_errno' => (int) ($response['curl_errno'] ?? 0),
+            ], true, $errorRef);
+        }
+        if (!(bool) ($response['decoded_ok'] ?? false)) {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_invalid_json', 'NOWPayments create invoice invalid JSON', [
+                'gateway' => 'nowpayments',
+                'stage' => 'create_invoice',
+                'provider_error' => (string) ($response['decode_error'] ?? ''),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('NP'));
+            return AppError::make('nowpayments_invalid_json', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'create_invoice', [], false, $errorRef);
+        }
+        if ((int) ($response['http_status'] ?? 0) < 200 || (int) ($response['http_status'] ?? 0) >= 300) {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_http_error', 'NOWPayments create invoice HTTP error', [
+                'gateway' => 'nowpayments',
+                'stage' => 'create_invoice',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'response_payload' => (array) ($response['decoded_body'] ?? []),
+            ], ErrorRef::make('NP'));
+            return AppError::make('nowpayments_http_error', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'create_invoice', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+            ], true, $errorRef);
         }
 
-        if ($coin === 'ltc') {
-            $url = 'https://api.blockcypher.com/v1/ltc/main/txs/' . rawurlencode($txHash);
-            $res = $this->getJson($url);
-            if (!($res['ok'] ?? false)) {
-                return ['ok' => false, 'error' => 'request_failed'];
-            }
-            $data = $res['data'] ?? [];
-            $confirmed = ((int) ($data['confirmations'] ?? 0)) > 0;
-            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data];
+        $data = is_array($response['decoded_body'] ?? null) ? $response['decoded_body'] : [];
+        $invoiceId = (string) ($data['id'] ?? '');
+        $payUrl = trim((string) ($data['invoice_url'] ?? ''));
+        if ($invoiceId === '' || $payUrl === '') {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_invalid_response', 'NOWPayments create invoice missing id/url', [
+                'gateway' => 'nowpayments',
+                'stage' => 'create_invoice',
+                'response_payload' => $data,
+            ], ErrorRef::make('NP'));
+            return AppError::make('nowpayments_invalid_response', 'messages.user.payment.gateway.nowpayments_invoice_error', 'nowpayments', 'create_invoice', [], false, $errorRef);
         }
-
-        if ($coin === 'tron') {
-            $url = 'https://apilist.tronscanapi.com/api/transaction-info?hash=' . rawurlencode($txHash);
-            $res = $this->getJson($url);
-            if (!($res['ok'] ?? false)) {
-                return ['ok' => false, 'error' => 'request_failed'];
-            }
-            $data = $res['data'] ?? [];
-            $confirmed = (bool) ($data['confirmed'] ?? false);
-            $amount = null;
-            if (isset($data['contractData']) && is_array($data['contractData'])) {
-                $sunAmount = (float) ($data['contractData']['amount'] ?? 0);
-                if ($sunAmount > 0) {
-                    $amount = $sunAmount / 1000000.0;
-                }
-            }
-            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data, 'transfer_amount' => $amount];
-        }
-
-        if ($coin === 'ton') {
-            $url = 'https://tonapi.io/v2/blockchain/transactions/' . rawurlencode($txHash);
-            $res = $this->getJson($url);
-            if (!($res['ok'] ?? false)) {
-                return ['ok' => false, 'error' => 'request_failed'];
-            }
-            $data = $res['data'] ?? [];
-            $confirmed = (bool) ($data['success'] ?? false);
-            $amount = null;
-            $inMsg = $data['in_msg'] ?? [];
-            if (is_array($inMsg)) {
-                $nano = (float) ($inMsg['value'] ?? 0);
-                if ($nano > 0) {
-                    $amount = $nano / 1000000000.0;
-                }
-            }
-            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data, 'transfer_amount' => $amount];
-        }
-
-        if ($coin === 'usdt_bep20' || $coin === 'usdc_bep20') {
-            $apiKey = trim($this->settings->get('bscscan_api_key', ''));
-            $query = http_build_query([
-                'module' => 'proxy',
-                'action' => 'eth_getTransactionReceipt',
-                'txhash' => $txHash,
-                'apikey' => $apiKey,
-            ]);
-            $url = 'https://api.bscscan.com/api?' . $query;
-            $res = $this->getJson($url);
-            if (!($res['ok'] ?? false)) {
-                return ['ok' => false, 'error' => 'request_failed'];
-            }
-            $data = $res['data'] ?? [];
-            $receipt = $data['result'] ?? [];
-            $confirmed = is_array($receipt) && (($receipt['status'] ?? '') === '0x1');
-            $transferAmount = null;
-            $tokenQuery = http_build_query([
-                'module' => 'account',
-                'action' => 'tokentx',
-                'txhash' => $txHash,
-                'page' => 1,
-                'offset' => 1,
-                'sort' => 'desc',
-                'apikey' => $apiKey,
-            ]);
-            $tokenRes = $this->getJson('https://api.bscscan.com/api?' . $tokenQuery);
-            if (($tokenRes['ok'] ?? false) && is_array($tokenRes['data'] ?? null)) {
-                $rows = $tokenRes['data']['result'] ?? [];
-                if (is_array($rows) && isset($rows[0]) && is_array($rows[0])) {
-                    $row = $rows[0];
-                    $valueRaw = (string) ($row['value'] ?? '0');
-                    $decimals = (int) ($row['tokenDecimal'] ?? 18);
-                    if ($valueRaw !== '' && ctype_digit($valueRaw) && $decimals >= 0 && $decimals <= 36) {
-                        $transferAmount = ((float) $valueRaw) / (10 ** $decimals);
-                    }
-                }
-            }
-            return ['ok' => true, 'confirmed' => $confirmed, 'raw' => $data, 'transfer_amount' => $transferAmount];
-        }
-
-        return ['ok' => false, 'error' => 'coin_not_supported_yet'];
-    }
-
-    public function validateClaimedAmount(string $coin, int $amountToman, ?float $claimedAmountCoin): array
-    {
-        if ($claimedAmountCoin === null || $claimedAmountCoin <= 0) {
-            return ['ok' => false, 'error' => 'claimed_amount_missing'];
-        }
-
-        $usdtToman = (int) ($this->settings->get('crypto_usdt_toman_rate', '90000') ?: '90000');
-        if ($usdtToman <= 0) {
-            return ['ok' => false, 'error' => 'invalid_usdt_rate'];
-        }
-
-        $priceUsdt = $this->coinPriceUsdt($coin);
-        if ($priceUsdt <= 0) {
-            return ['ok' => false, 'error' => 'price_unavailable'];
-        }
-
-        $expectedCoin = ($amountToman / $usdtToman) / $priceUsdt;
-        $tolerance = max($expectedCoin * 0.05, 0.000001); // 5%
-        $delta = abs($claimedAmountCoin - $expectedCoin);
 
         return [
             'ok' => true,
-            'expected_coin' => $expectedCoin,
-            'claimed_coin' => $claimedAmountCoin,
-            'delta' => $delta,
-            'amount_match' => $delta <= $tolerance,
+            'pay_url' => $payUrl,
+            'invoice_id' => $invoiceId,
+            'order_id' => $orderId,
+            'raw' => $data,
         ];
-    }
-
-    public function resolveEffectivePaidAmount(array $verifyResult, ?float $claimedAmountCoin): ?float
-    {
-        $onChain = $verifyResult['transfer_amount'] ?? null;
-        if (is_numeric($onChain)) {
-            $value = (float) $onChain;
-            if ($value > 0) {
-                return $value;
-            }
-        }
-
-        if ($claimedAmountCoin !== null && $claimedAmountCoin > 0) {
-            return $claimedAmountCoin;
-        }
-
-        return null;
     }
 
     private function postJson(string $url, array $payload): array
@@ -430,88 +380,4 @@ final class PaymentGatewayService
         ];
     }
 
-    private function getJsonHeaders(string $url, array $headers): array
-    {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 20,
-            CURLOPT_HTTPHEADER => $headers,
-        ]);
-        $raw = curl_exec($ch);
-        $err = curl_error($ch);
-        $errno = curl_errno($ch);
-        $httpStatus = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        $decoded = is_string($raw) ? json_decode($raw, true) : null;
-        return [
-            'ok' => ($raw !== false && $err === '' && is_array($decoded)),
-            'transport_ok' => ($raw !== false && $err === ''),
-            'provider_ok' => $httpStatus >= 200 && $httpStatus < 300,
-            'http_status' => $httpStatus,
-            'curl_error' => $err,
-            'curl_errno' => $errno,
-            'raw_body' => is_string($raw) ? $raw : '',
-            'decoded_ok' => is_array($decoded),
-            'decoded_body' => is_array($decoded) ? $decoded : null,
-            'decode_error' => is_array($decoded) ? '' : json_last_error_msg(),
-            'data' => is_array($decoded) ? $decoded : [],
-        ];
-    }
-
-    private function getJson(string $url): array
-    {
-        $lastErr = '';
-        for ($i = 0; $i < 3; $i++) {
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 15,
-            ]);
-            $raw = curl_exec($ch);
-            $err = curl_error($ch);
-            curl_close($ch);
-
-            if ($raw !== false && $err === '') {
-                $decoded = json_decode((string) $raw, true);
-                if (is_array($decoded)) {
-                    return ['ok' => true, 'data' => $decoded];
-                }
-                $lastErr = 'decode_error';
-            } else {
-                $lastErr = $err;
-            }
-
-            usleep(250000); // 250ms retry backoff
-        }
-
-        return ['ok' => false, 'error' => $lastErr];
-    }
-
-    private function coinPriceUsdt(string $coin): float
-    {
-        $map = [
-            'tron' => 'TRXUSDT',
-            'ton' => 'TONUSDT',
-            'ltc' => 'LTCUSDT',
-            'usdt_bep20' => 'USDTUSDT',
-            'usdc_bep20' => 'USDCUSDT',
-        ];
-        $symbol = $map[strtolower($coin)] ?? '';
-        if ($symbol === '') {
-            return 0.0;
-        }
-        if ($symbol === 'USDTUSDT') {
-            return 1.0;
-        }
-        if ($symbol === 'USDCUSDT') {
-            return 1.0;
-        }
-
-        $res = $this->getJson('https://api.binance.com/api/v3/ticker/price?symbol=' . rawurlencode($symbol));
-        if (!($res['ok'] ?? false)) {
-            return 0.0;
-        }
-        return (float) (($res['data']['price'] ?? 0));
-    }
 }
