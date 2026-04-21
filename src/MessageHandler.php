@@ -7,7 +7,6 @@ namespace ConfigFlow\Bot;
 final class MessageHandler
 {
     private const PAY_WALLET = '[legacy] buttons.pay.wallet';
-    private const PAY_CARD = '[legacy] buttons.pay.card';
     private const PAY_CRYPTO = '[legacy] buttons.pay.crypto';
     private const PAY_TETRAPAY = '[legacy] buttons.pay.tetrapay';
     private const PAY_SWAPWALLET = '[legacy] buttons.pay.swapwallet';
@@ -58,10 +57,8 @@ final class MessageHandler
     private const ADMIN_SETTINGS_REFRESH = '[legacy] admin.settings_admins_pins.actions.settings_refresh';
     private const ADMIN_SETTINGS_TOGGLE_BOT = '[legacy] admin.settings_admins_pins.actions.settings_toggle_bot';
     private const ADMIN_SETTINGS_TOGGLE_AGENCY = '[legacy] admin.settings_admins_pins.actions.settings_toggle_agency';
-    private const ADMIN_SETTINGS_TOGGLE_GW_CARD = '[legacy] admin.settings_admins_pins.actions.settings_toggle_gw_card';
-    private const ADMIN_SETTINGS_TOGGLE_GW_CRYPTO = '[legacy] admin.settings_admins_pins.actions.settings_toggle_gw_crypto';
-    private const ADMIN_SETTINGS_TOGGLE_GW_TETRA = '[legacy] admin.settings_admins_pins.actions.settings_toggle_gw_tetra';
     private const ADMIN_SETTINGS_SET_CHANNEL = '[legacy] admin.settings_admins_pins.actions.settings_set_channel';
+    private const ADMIN_SETTINGS_PAYMENT_METHODS = 'admin.settings_admins_pins.actions.payment_methods_manage';
     private const ADMIN_ADMINS_ADD = '[legacy] admin.settings_admins_pins.actions.admins_add';
     private const ADMIN_ADMIN_DELETE = '[legacy] admin.settings_admins_pins.actions.admin_delete';
     private const ADMIN_PINS_ADD = '[legacy] admin.settings_admins_pins.actions.pins_add';
@@ -91,6 +88,7 @@ final class MessageHandler
         private SettingsRepository $settings,
         private MenuService $menus,
         private PaymentGatewayService $gateways,
+        private ?PaymentMethodRepository $paymentMethods = null,
         private ?UiKeyboardFactoryInterface $uiKeyboard = null,
         private ?UiJsonCatalog $catalog = null,
         private ?UiMessageRenderer $messageRenderer = null,
@@ -98,6 +96,7 @@ final class MessageHandler
         $this->uiKeyboard ??= new UiKeyboardFactory();
         $this->catalog ??= new UiJsonCatalog();
         $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
+        $this->paymentMethods ??= new PaymentMethodRepository($this->database);
     }
 
 
@@ -320,6 +319,9 @@ final class MessageHandler
         if (
             $state['state_name'] === 'admin.settings.view'
             || $state['state_name'] === 'admin.settings.channel'
+            || $state['state_name'] === 'admin.payment_methods.list'
+            || $state['state_name'] === 'admin.payment_methods.view'
+            || $state['state_name'] === 'admin.payment_methods.edit'
             || $state['state_name'] === 'admin.admins.list'
             || $state['state_name'] === 'admin.admin.view'
             || $state['state_name'] === 'admin.admin.create'
@@ -398,7 +400,7 @@ final class MessageHandler
                 'user_id' => $userId,
                 'tariff_id' => null,
                 'amount' => $amount,
-                'payment_method' => 'card',
+                'payment_method' => 'manual_charge',
                 'status' => 'waiting_admin',
                 'created_at' => gmdate('Y-m-d H:i:s'),
             ]);
@@ -426,107 +428,6 @@ final class MessageHandler
                         'payment_id' => $paymentId,
                         'user_id' => $userId,
                         'amount' => $amount,
-                    ]),
-                    $adminKeyboard
-                );
-            }
-            return;
-        }
-
-        if ($state['state_name'] === 'await_card_receipt') {
-            $payload = $state['payload'] ?? [];
-            $paymentId = (int) ($payload['payment_id'] ?? 0);
-            if ($paymentId <= 0) {
-                $this->database->clearUserState($userId);
-                return;
-            }
-
-            $fileId = null;
-            if (isset($message['photo']) && is_array($message['photo']) && $message['photo'] !== []) {
-                $last = end($message['photo']);
-                $fileId = is_array($last) ? (string) ($last['file_id'] ?? '') : null;
-            } elseif (isset($message['document']) && is_array($message['document'])) {
-                $fileId = (string) ($message['document']['file_id'] ?? '');
-            }
-            $caption = trim((string) ($message['caption'] ?? ''));
-            $receiptText = $caption !== '' ? $caption : ($text !== '' ? $text : null);
-
-            if (($fileId === null || $fileId === '') && ($receiptText === null || $receiptText === '')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.receipt.missing_purchase'));
-                return;
-            }
-
-            $this->database->attachPaymentReceipt($paymentId, $fileId ?: null, $receiptText);
-            $this->database->clearUserState($userId);
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->catalog->get('messages.user.payment.receipt.saved_purchase', ['payment_id' => $paymentId])
-            );
-
-            $adminKeyboard = $this->replyKeyboard([
-                [
-                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
-                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
-                ],
-                [KeyboardBuilder::admin()],
-            ]);
-            foreach (Config::adminIds() as $adminId) {
-                $this->telegram->sendMessage(
-                    (int) $adminId,
-                    $this->catalog->get('admin.payments.card_receipt_new', [
-                        'payment_id' => $paymentId,
-                        'user_id' => $userId,
-                        'note_line' => $receiptText ? $this->catalog->get('admin.common.note_line', ['note' => htmlspecialchars($receiptText)]) : '',
-                    ]),
-                    $adminKeyboard
-                );
-            }
-        }
-
-        if ($state['state_name'] === 'await_renewal_receipt') {
-            $payload = $state['payload'] ?? [];
-            $paymentId = (int) ($payload['payment_id'] ?? 0);
-            if ($paymentId <= 0) {
-                $this->database->clearUserState($userId);
-                return;
-            }
-
-            $fileId = null;
-            if (isset($message['photo']) && is_array($message['photo']) && $message['photo'] !== []) {
-                $last = end($message['photo']);
-                $fileId = is_array($last) ? (string) ($last['file_id'] ?? '') : null;
-            } elseif (isset($message['document']) && is_array($message['document'])) {
-                $fileId = (string) ($message['document']['file_id'] ?? '');
-            }
-            $caption = trim((string) ($message['caption'] ?? ''));
-            $receiptText = $caption !== '' ? $caption : ($text !== '' ? $text : null);
-
-            if (($fileId === null || $fileId === '') && ($receiptText === null || $receiptText === '')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.receipt.missing_renew'));
-                return;
-            }
-
-            $this->database->attachPaymentReceipt($paymentId, $fileId ?: null, $receiptText);
-            $this->database->clearUserState($userId);
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->catalog->get('messages.user.payment.receipt.saved_renew', ['payment_id' => $paymentId])
-            );
-
-            $adminKeyboard = $this->replyKeyboard([
-                [
-                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
-                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
-                ],
-                [KeyboardBuilder::admin()],
-            ]);
-            foreach (Config::adminIds() as $adminId) {
-                $this->telegram->sendMessage(
-                    (int) $adminId,
-                    $this->catalog->get('admin.payments.renew_receipt_new', [
-                        'payment_id' => $paymentId,
-                        'user_id' => $userId,
-                        'note_line' => $receiptText ? $this->catalog->get('admin.common.note_line', ['note' => htmlspecialchars($receiptText)]) : '',
                     ]),
                     $adminKeyboard
                 );
@@ -4616,10 +4517,8 @@ final class MessageHandler
         $settingsRefreshLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_refresh');
         $settingsToggleBotLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_bot');
         $settingsToggleAgencyLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_agency');
-        $settingsToggleGwCardLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_card');
-        $settingsToggleGwCryptoLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_crypto');
-        $settingsToggleGwTetraLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_tetra');
         $settingsSetChannelLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_channel');
+        $paymentMethodsManageLabel = $this->catalog->get('admin.settings_admins_pins.actions.payment_methods_manage');
         $adminsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.admins_add');
         $adminDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.admin_delete');
         $pinsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.pins_add');
@@ -4636,13 +4535,7 @@ final class MessageHandler
             }
             $toggleMap = [
                 $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY) => 'agency_request_enabled',
-                $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CARD) => 'gw_card_enabled',
-                $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CRYPTO) => 'gw_crypto_enabled',
-                $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_TETRA) => 'gw_tetrapay_enabled',
                 $settingsToggleAgencyLabel => 'agency_request_enabled',
-                $settingsToggleGwCardLabel => 'gw_card_enabled',
-                $settingsToggleGwCryptoLabel => 'gw_crypto_enabled',
-                $settingsToggleGwTetraLabel => 'gw_tetrapay_enabled',
             ];
             if ($text === $settingsRefreshLabel || $text === $this->uiConst(self::ADMIN_SETTINGS_REFRESH)) {
                 $this->openAdminSettingsView($chatId, $userId);
@@ -4675,6 +4568,10 @@ final class MessageHandler
                 );
                 return;
             }
+            if ($text === $paymentMethodsManageLabel || $text === $this->uiConst(self::ADMIN_SETTINGS_PAYMENT_METHODS)) {
+                $this->openAdminPaymentMethodsList($chatId, $userId);
+                return;
+            }
         }
 
         if ($stateName === 'admin.settings.channel') {
@@ -4692,6 +4589,87 @@ final class MessageHandler
             }
             $this->settings->set('channel_id', $value);
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.success.lock_channel_updated'));
+            return;
+        }
+
+        if ($stateName === 'admin.payment_methods.list') {
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminSettingsView($chatId, $userId);
+                return;
+            }
+            $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
+            $selected = $this->extractOptionKey($text);
+            $methodId = isset($options[$selected]) ? (int) $options[$selected] : 0;
+            if ($methodId > 0) {
+                $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
+                return;
+            }
+        }
+
+        if ($stateName === 'admin.payment_methods.view') {
+            $methodId = (int) ($payload['method_id'] ?? 0);
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminPaymentMethodsList($chatId, $userId);
+                return;
+            }
+            if ($methodId <= 0) {
+                $this->openAdminPaymentMethodsList($chatId, $userId);
+                return;
+            }
+            if ($text === $this->catalog->get('admin.payment_methods.actions.toggle_active')) {
+                $method = $this->paymentMethods->findById($methodId);
+                if ($method !== null) {
+                    $this->paymentMethods->updateMethodSettings($methodId, ['is_active' => ((int) ($method['is_active'] ?? 0) === 1) ? 0 : 1]);
+                }
+                $this->openAdminPaymentMethodView($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.method_updated'));
+                return;
+            }
+            $editable = [
+                $this->catalog->get('admin.payment_methods.actions.edit_min_amount') => 'min_amount',
+                $this->catalog->get('admin.payment_methods.actions.edit_max_amount') => 'max_amount',
+                $this->catalog->get('admin.payment_methods.actions.edit_sort_order') => 'sort_order',
+                $this->catalog->get('admin.payment_methods.actions.edit_title') => 'title',
+                $this->catalog->get('admin.payment_methods.actions.edit_description') => 'user_description',
+            ];
+            if (isset($editable[$text])) {
+                $this->database->setUserState($userId, 'admin.payment_methods.edit', [
+                    'method_id' => $methodId,
+                    'field' => $editable[$text],
+                    'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.settings.view', 'admin.root'],
+                ]);
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.prompts.send_value'));
+                return;
+            }
+        }
+
+        if ($stateName === 'admin.payment_methods.edit') {
+            $methodId = (int) ($payload['method_id'] ?? 0);
+            $field = (string) ($payload['field'] ?? '');
+            if ($text === UiLabels::back($this->catalog)) {
+                $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
+                return;
+            }
+            $method = $this->paymentMethods->findById($methodId);
+            if ($method === null || $field === '') {
+                $this->openAdminPaymentMethodsList($chatId, $userId);
+                return;
+            }
+            $raw = trim($text);
+            if ($raw === '') {
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.errors.invalid_value'));
+                return;
+            }
+            $value = $raw;
+            if (in_array($field, ['min_amount', 'max_amount', 'sort_order'], true)) {
+                $num = (int) preg_replace('/\D+/', '', $raw);
+                if ($num < 0) {
+                    $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.errors.invalid_value'));
+                    return;
+                }
+                $value = $num;
+            }
+            $this->paymentMethods->updateMethodSettings($methodId, [$field => $value]);
+            $this->openAdminPaymentMethodView($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.method_updated'));
             return;
         }
 
@@ -4909,9 +4887,6 @@ final class MessageHandler
         $vals = [
             'bot_status' => $this->settings->get('bot_status', 'on'),
             'agency_request_enabled' => $this->settings->get('agency_request_enabled', '1'),
-            'gw_card_enabled' => $this->settings->get('gw_card_enabled', '0'),
-            'gw_crypto_enabled' => $this->settings->get('gw_crypto_enabled', '0'),
-            'gw_tetrapay_enabled' => $this->settings->get('gw_tetrapay_enabled', '0'),
             'channel_id' => trim($this->settings->get('channel_id', '')),
         ];
         if ($notice !== null && $notice !== '') {
@@ -4921,17 +4896,79 @@ final class MessageHandler
         $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.ui.open.settings_admins_pins.settings.overview', [
             'bot_status' => $this->catalog->get('admin.settings_admins_pins.labels.bot_status_' . $vals['bot_status']),
             'agency_request_enabled' => $vals['agency_request_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
-            'gw_card_enabled' => $vals['gw_card_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
-            'gw_crypto_enabled' => $vals['gw_crypto_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
-            'gw_tetrapay_enabled' => $vals['gw_tetrapay_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'channel_id' => $vals['channel_id'] !== '' ? $vals['channel_id'] : $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_unset'),
         ]), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_SETTINGS_REFRESH)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
+            [$this->uiConst(self::ADMIN_SETTINGS_PAYMENT_METHODS)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY)],
-            [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CARD), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CRYPTO), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_TETRA)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
         ]));
+    }
+
+    private function openAdminPaymentMethodsList(int $chatId, int $userId, ?string $notice = null): void
+    {
+        $items = $this->paymentMethods->getAll();
+        $lines = [];
+        $options = [];
+        $buttons = [];
+        foreach (array_values($items) as $idx => $item) {
+            $num = (string) ($idx + 1);
+            $id = (int) ($item['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $status = (int) ($item['is_active'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
+            $title = (string) ($item['title'] ?? $this->catalog->get('messages.generic.dash'));
+            $lines[] = $this->catalog->get('admin.payment_methods.list.row', ['num' => $this->toPersianDigits($num), 'title' => $title, 'status' => $status]);
+            $options[$num] = $id;
+            $buttons[] = [$this->catalog->get('admin.payment_methods.list.button', ['num' => $this->toPersianDigits($num), 'title' => $title])];
+        }
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $this->database->setUserState($userId, 'admin.payment_methods.list', ['options' => $options, 'stack' => ['admin.settings.view', 'admin.root']]);
+        if ($notice !== null && $notice !== '') {
+            $this->telegram->sendMessage($chatId, $notice);
+        }
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->catalog->get('admin.payment_methods.list.overview', [
+                'list' => $lines === [] ? $this->catalog->get('admin.payment_methods.list.empty') : implode("\n", $lines),
+            ]),
+            $this->uiKeyboard->replyMenu($buttons)
+        );
+    }
+
+    private function openAdminPaymentMethodView(int $chatId, int $userId, int $methodId, ?string $notice = null): void
+    {
+        $method = $this->paymentMethods->findById($methodId);
+        if ($method === null) {
+            $this->openAdminPaymentMethodsList($chatId, $userId, $this->catalog->get('admin.payment_methods.errors.method_not_found'));
+            return;
+        }
+        if ($notice !== null && $notice !== '') {
+            $this->telegram->sendMessage($chatId, $notice);
+        }
+        $status = (int) ($method['is_active'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
+        $this->database->setUserState($userId, 'admin.payment_methods.view', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.list', 'admin.settings.view', 'admin.root']]);
+        $this->telegram->sendMessage(
+            $chatId,
+            $this->catalog->get('admin.payment_methods.view.overview', [
+                'title' => (string) ($method['title'] ?? $this->catalog->get('messages.generic.dash')),
+                'status' => $status,
+                'min_amount' => $this->toPersianDigits((string) (int) ($method['min_amount'] ?? 0)),
+                'max_amount' => $this->toPersianDigits((string) (int) ($method['max_amount'] ?? 0)),
+                'sort_order' => $this->toPersianDigits((string) (int) ($method['sort_order'] ?? 0)),
+                'description' => trim((string) ($method['user_description'] ?? '')) !== '' ? (string) $method['user_description'] : $this->catalog->get('messages.generic.dash'),
+            ]),
+            $this->uiKeyboard->replyMenu([
+                [$this->catalog->get('admin.payment_methods.actions.toggle_active')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_title')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_description')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
+                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
+            ])
+        );
     }
 
     private function openAdminAdminsList(int $chatId, int $userId, ?string $notice = null): void
@@ -6049,23 +6086,7 @@ final class MessageHandler
             'tariff_name' => (string) $tariff['name'],
             'amount' => (int) $this->database->effectiveTariffPrice($userId, $tariff),
         ]);
-        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
-        if ($this->settings->get('gw_card_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.card')];
-        }
-        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
-        }
-        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
-        }
-        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
-        }
-        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $buttons = $this->paymentSelectionButtons(false);
         $this->database->setUserState($userId, 'buy.await_payment_method', ['tariff_id' => $tariffId, 'stack' => ['buy.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
@@ -6249,23 +6270,7 @@ final class MessageHandler
             'tariff_name' => (string) $tariff['name'],
             'amount' => (int) $tariff['price'],
         ]);
-        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
-        if ($this->settings->get('gw_card_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.card')];
-        }
-        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
-        }
-        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
-        }
-        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
-        }
-        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $buttons = $this->paymentSelectionButtons(true);
         $this->database->setUserState($userId, 'renew.await_payment_method', ['purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'stack' => ['renew.await_purchase', 'renew.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
@@ -6318,7 +6323,7 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.card') || $text === $this->uiConst(self::PAY_CARD) || $text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+        if ($text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
             $this->database->clearUserState($userId);
             $this->createPurchasePaymentByMethod($chatId, $userId, $tariffId, $text);
             return;
@@ -6330,7 +6335,7 @@ final class MessageHandler
             return;
         }
 
-        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.card') && $text !== $this->uiConst(self::PAY_CARD) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.swapwallet') && $text !== $this->uiConst(self::PAY_SWAPWALLET) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
+        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.swapwallet') && $text !== $this->uiConst(self::PAY_SWAPWALLET) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
             return;
         }
@@ -6407,23 +6412,7 @@ final class MessageHandler
             'duration' => $durationText,
             'amount' => $this->toPersianNumber((string) $amount),
         ]);
-        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
-        if ($this->settings->get('gw_card_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.card')];
-        }
-        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
-        }
-        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
-        }
-        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
-        }
-        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $buttons = $this->paymentSelectionButtons(false);
         $this->database->setUserState($userId, 'buy.service.await_payment_method', [
             'service_id' => $serviceId,
             'tariff_id' => $tariffId,
@@ -6480,7 +6469,7 @@ final class MessageHandler
             );
             return;
         }
-        if ($text === $this->catalog->get('buttons.pay.card') || $text === $this->uiConst(self::PAY_CARD) || $text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+        if ($text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
             $this->database->clearUserState($userId);
             $this->createServicePurchasePaymentByMethod($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb, $text);
             return;
@@ -6501,23 +6490,7 @@ final class MessageHandler
             'volume' => (string) $volume,
             'amount' => $amount,
         ]);
-        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
-        if ($this->settings->get('gw_card_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.card')];
-        }
-        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
-        }
-        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
-        }
-        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
-        }
-        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $buttons = $this->paymentSelectionButtons(false);
         $this->database->setUserState($userId, 'buy.panel.await_payment_method', [
             'service_id' => (int) ($service['id'] ?? 0),
             'selected_volume_gb' => $volume,
@@ -6593,7 +6566,7 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.card') || $text === $this->uiConst(self::PAY_CARD) || $text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+        if ($text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
             $this->database->clearUserState($userId);
             $this->createPanelPurchasePaymentByMethod($chatId, $userId, $serviceId, $selectedVolumeGb, $computedAmount, $text);
             return;
@@ -6660,7 +6633,7 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.card') || $text === $this->uiConst(self::PAY_CARD) || $text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+        if ($text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
             $this->database->clearUserState($userId);
             $this->createRenewalPaymentByMethod($chatId, $userId, $purchaseId, $tariffId, $text);
             return;
@@ -6672,7 +6645,7 @@ final class MessageHandler
             return;
         }
 
-        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.card') && $text !== $this->uiConst(self::PAY_CARD) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.swapwallet') && $text !== $this->uiConst(self::PAY_SWAPWALLET) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
+        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.swapwallet') && $text !== $this->uiConst(self::PAY_SWAPWALLET) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
             return;
         }
@@ -6680,7 +6653,7 @@ final class MessageHandler
 
     private function createPurchasePaymentByMethod(int $chatId, int $userId, int $tariffId, string $methodLabel): void
     {
-        $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
+        $method = ($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay';
         $tariff = $this->database->getServiceTariff($tariffId);
         if ($tariff === null) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.tariff_not_found'));
@@ -6707,22 +6680,6 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($method === 'card') {
-            $card = htmlspecialchars($this->settings->get('payment_card', '---'));
-            $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
-            $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
-            $text = $this->catalog->get('messages.user.payment.card_purchase_intro', [
-                'card' => $card,
-                'bank_line' => $bank !== '' ? $this->catalog->get('messages.user.payment.bank_line', ['bank' => $bank]) : '',
-                'owner_line' => $owner !== '' ? $this->catalog->get('messages.user.payment.owner_line', ['owner' => $owner]) : '',
-                'pending_id' => $pendingId,
-                'amount' => $amount,
-            ]);
-            $this->database->setUserState($userId, 'await_card_receipt', ['payment_id' => $paymentId]);
-            $this->telegram->sendMessage($chatId, $text);
-            return;
-        }
 
         if ($method === 'crypto') {
             $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
@@ -6758,7 +6715,7 @@ final class MessageHandler
             return;
         }
 
-        $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
+        $method = ($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay';
         $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
@@ -6783,22 +6740,6 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($method === 'card') {
-            $card = htmlspecialchars($this->settings->get('payment_card', '---'));
-            $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
-            $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
-            $text = $this->catalog->get('messages.user.payment.card_purchase_intro', [
-                'card' => $card,
-                'bank_line' => $bank !== '' ? $this->catalog->get('messages.user.payment.bank_line', ['bank' => $bank]) : '',
-                'owner_line' => $owner !== '' ? $this->catalog->get('messages.user.payment.owner_line', ['owner' => $owner]) : '',
-                'pending_id' => $pendingId,
-                'amount' => $amount,
-            ]);
-            $this->database->setUserState($userId, 'await_card_receipt', ['payment_id' => $paymentId]);
-            $this->telegram->sendMessage($chatId, $text);
-            return;
-        }
 
         if ($method === 'crypto') {
             $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
@@ -6843,7 +6784,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.panel.errors.invalid_volume'));
             return;
         }
-        $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
+        $method = ($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay';
         $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
@@ -6870,22 +6811,6 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($method === 'card') {
-            $card = htmlspecialchars($this->settings->get('payment_card', '---'));
-            $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
-            $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
-            $text = $this->catalog->get('messages.user.payment.card_purchase_intro', [
-                'card' => $card,
-                'bank_line' => $bank !== '' ? $this->catalog->get('messages.user.payment.bank_line', ['bank' => $bank]) : '',
-                'owner_line' => $owner !== '' ? $this->catalog->get('messages.user.payment.owner_line', ['owner' => $owner]) : '',
-                'pending_id' => $pendingId,
-                'amount' => $amount,
-            ]);
-            $this->database->setUserState($userId, 'await_card_receipt', ['payment_id' => $paymentId]);
-            $this->telegram->sendMessage($chatId, $text);
-            return;
-        }
 
         if ($method === 'crypto') {
             $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
@@ -6915,7 +6840,7 @@ final class MessageHandler
 
     private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $tariffId, string $methodLabel): void
     {
-        $method = ($methodLabel === $this->catalog->get('buttons.pay.card') || $methodLabel === $this->uiConst(self::PAY_CARD)) ? 'card' : (($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay');
+        $method = ($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay';
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         $tariff = $this->database->getServiceTariff($tariffId);
         if (!is_array($purchase) || $tariff === null) {
@@ -6943,22 +6868,6 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($method === 'card') {
-            $card = htmlspecialchars($this->settings->get('payment_card', '---'));
-            $bank = htmlspecialchars($this->settings->get('payment_bank', ''));
-            $owner = htmlspecialchars($this->settings->get('payment_owner', ''));
-            $text = $this->catalog->get('messages.user.payment.card_renew_intro', [
-                'card' => $card,
-                'bank_line' => $bank !== '' ? $this->catalog->get('messages.user.payment.bank_line', ['bank' => $bank]) : '',
-                'owner_line' => $owner !== '' ? $this->catalog->get('messages.user.payment.owner_line', ['owner' => $owner]) : '',
-                'pending_id' => $pendingId,
-                'amount' => $amount,
-            ]);
-            $this->database->setUserState($userId, 'await_renewal_receipt', ['payment_id' => $paymentId]);
-            $this->telegram->sendMessage($chatId, $text);
-            return;
-        }
 
         if ($method === 'crypto') {
             $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
@@ -7365,23 +7274,7 @@ final class MessageHandler
             'tariff_name' => (string) $tariff['name'],
             'amount' => (int) $this->database->effectiveTariffPrice($userId, $tariff),
         ]);
-        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
-        if ($this->settings->get('gw_card_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.card')];
-        }
-        if ($this->settings->get('gw_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.crypto')];
-        }
-        if ($this->settings->get('gw_tetrapay_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tetrapay')];
-        }
-        if ($this->settings->get('gw_swapwallet_crypto_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.swapwallet')];
-        }
-        if ($this->settings->get('gw_tronpays_rial_enabled', '0') === '1') {
-            $buttons[] = [$this->catalog->get('buttons.pay.tronpays')];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $buttons = $this->paymentSelectionButtons(false);
         $this->database->setUserState($userId, 'buy.await_payment_method', ['tariff_id' => $tariffId, 'stack' => ['buy.await_tariff'], 'payment_method' => null, 'gateway' => null]);
         $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($buttons));
     }
@@ -7404,6 +7297,32 @@ final class MessageHandler
             $this->messageRenderer->render('messages.user.payment.verify_prompt'),
             $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.pay.verify')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
         );
+    }
+
+    private function paymentSelectionButtons(bool $forRenewal): array
+    {
+        $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
+        $methods = $forRenewal ? $this->paymentMethods->getActiveForRenewal() : $this->paymentMethods->getActiveForPurchase();
+        foreach ($methods as $method) {
+            $label = $this->paymentMethodLabel((string) ($method['code'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            $buttons[] = [$label];
+        }
+        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        return $buttons;
+    }
+
+    private function paymentMethodLabel(string $code): string
+    {
+        return match ($code) {
+            'crypto_tron' => $this->catalog->get('buttons.pay.crypto'),
+            'tetrapay' => $this->catalog->get('buttons.pay.tetrapay'),
+            'swapwallet_crypto' => $this->catalog->get('buttons.pay.swapwallet'),
+            'tronpays_rial' => $this->catalog->get('buttons.pay.tronpays'),
+            default => '',
+        };
     }
 
     private function ensurePurchaseAllowedForTariffMessage(int $chatId, int $userId, int $tariffId): bool

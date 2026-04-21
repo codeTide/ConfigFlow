@@ -37,7 +37,6 @@
     "accept_rules": "✅ قوانین را می‌پذیرم",
     "pay": {
       "wallet": "💰 پرداخت با کیف پول",
-      "card": "🏦 کارت به کارت",
       "crypto": "💎 پرداخت کریپتو",
       "tetrapay": "🏧 پرداخت TetraPay",
       "swapwallet": "💠 SwapWallet Crypto",
@@ -287,10 +286,8 @@
         "bank_line": "بانک: {bank}\n",
         "owner_line": "به نام: {owner}\n",
         "address_block": "آدرس کیف پول:\n<code>{address}</code>\n\n",
-        "card_purchase_intro": "🏦 <b>پرداخت کارت به کارت</b>\n\nشماره کارت: <code>{card}</code>\n{bank_line}{owner_line}\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nپس از واریز، رسید را همینجا (عکس/فایل/متن) ارسال کنید.",
         "crypto_purchase_intro": "💎 <b>پرداخت کریپتو</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nارز: <b>TRON</b>\nمبلغ معادل ریالی: <b>{amount}</b> تومان\n\n{address_block}پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\nمثال: <code>TX_HASH 12.345</code>",
         "tetrapay_unavailable": "🏧 <b>پرداخت TetraPay</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
-        "card_renew_intro": "🏦 <b>کارت به کارت (تمدید)</b>\n\nشماره کارت: <code>{card}</code>\n{bank_line}{owner_line}\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nپس از واریز، رسید را همینجا ارسال کنید.",
         "crypto_renew_intro": "💎 <b>پرداخت کریپتو (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nارز: <b>TRON</b>\nمبلغ معادل ریالی: <b>{amount}</b> تومان\n\n{address_block}پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\nمثال: <code>TX_HASH 12.345</code>",
         "tetrapay_renew_unavailable": "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
         "gateway": {
@@ -447,7 +444,6 @@
         "reject": "❌ رد #{payment_id}"
       },
       "wallet_charge_new": "💳 <b>درخواست شارژ کیف پول جدید</b>\n\nشماره: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nمبلغ: <b>{amount}</b> تومان",
-      "card_receipt_new": "🧾 <b>رسید کارت‌به‌کارت جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\n{note_line}",
       "renew_receipt_new": "♻️ <b>رسید تمدید جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\n{note_line}",
       "tx_new": "💎 <b>TX Hash جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nTX: <code>{tx_hash}</code>\n{amount_line}",
       "tx_renew_new": "♻️ <b>TX Hash تمدید جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nTX: <code>{tx_hash}</code>\n{amount_line}",
@@ -503,16 +499,14 @@
         "settings_refresh": "🔄 بروزرسانی",
         "settings_toggle_bot": "⚙️ وضعیت ربات",
         "settings_toggle_agency": "💼 نمایندگی",
-        "settings_toggle_gw_card": "💵 کارت‌به‌کارت",
-        "settings_toggle_gw_crypto": "🎁 کریپتو",
-        "settings_toggle_gw_tetra": "💰 درگاه TetraPay",
         "settings_set_channel": "📣 قفل کانال",
         "admins_add": "✅ افزودن ادمین",
         "admin_delete": "❌ حذف ادمین",
         "pins_add": "✅ افزودن پیام پین",
         "pin_edit": "✍️ ویرایش پیام پین",
         "pin_delete": "❌ حذف پیام پین",
-        "pin_send_all": "📣 ارسال و پین همگانی"
+        "pin_send_all": "📣 ارسال و پین همگانی",
+        "payment_methods_manage": "💳 مدیریت روش‌های پرداخت"
       },
       "keywords": {
         "delete_confirm": "حذف",
@@ -1010,7 +1004,7 @@
         "settings_admins_pins": {
           "settings": {
             "channel_unset": "تنظیم نشده",
-            "overview": "⚙️ تنظیمات سریع\n\n🤖 وضعیت ربات: {bot_status}\n🤝 درخواست نمایندگی: {agency_request_enabled}\n💳 درگاه کارت بانکی: {gw_card_enabled}\n💎 درگاه ارز دیجیتال: {gw_crypto_enabled}\n🏦 درگاه تتراپی: {gw_tetrapay_enabled}\n📢 قفل کانال: {channel_id}\n\n💡 تمامی تغییراتی که در این بخش اعمال می‌کنید، بلافاصله روی عملکرد ربات اثر می‌گذارند و نیازی به ذخیره‌سازی یا تأیید نهایی ندارند؛ بنابراین قبل از هر تغییر، از صحت تنظیمات خود اطمینان حاصل کنید."
+            "overview": "⚙️ تنظیمات سریع\n\n🤖 وضعیت ربات: {bot_status}\n🤝 درخواست نمایندگی: {agency_request_enabled}\n📢 قفل کانال: {channel_id}\n\n<blockquote>💡 تمامی تغییراتی که در این بخش اعمال می‌کنید، بلافاصله روی عملکرد ربات اثر می‌گذارند و نیازی به ذخیره‌سازی یا تأیید نهایی ندارند؛ بنابراین قبل از هر تغییر، از صحت تنظیمات خود اطمینان حاصل کنید.</blockquote>"
           },
           "admins": {
             "empty": "ادمینی ثبت نشده است.",
@@ -1211,6 +1205,39 @@
         "tariff_created": "✅ تعرفه ثبت شد.",
         "tariff_deleted": "✅ تعرفه حذف شد.",
         "tariff_updated": "✅ تعرفه بروزرسانی شد."
+      }
+    },
+    "payment_methods": {
+      "actions": {
+        "toggle_active": "🔄 فعال و غیرفعال",
+        "edit_title": "✏️ ویرایش عنوان",
+        "edit_description": "📝 ویرایش توضیح",
+        "edit_min_amount": "💰 حداقل مبلغ",
+        "edit_max_amount": "💵 حداکثر مبلغ",
+        "edit_sort_order": "🔢 ترتیب نمایش"
+      },
+      "labels": {
+        "status_on": "روشن",
+        "status_off": "خاموش"
+      },
+      "list": {
+        "overview": "💳 مدیریت روش‌های پرداخت:\nروش پرداخت موردنظر را از فهرست زیر انتخاب کنید تا تنظیمات اختصاصی آن را مدیریت کنید.\n\n<blockquote>💡 در این بخش می‌توانید وضعیت هر روش، محدودیت مبلغ، پاداش، کارمزد و سایر جزئیات مرتبط را تغییر دهید.</blockquote>",
+        "row": "{num}) {title} | {status}",
+        "button": "{num} - {title}",
+        "empty": "روش پرداختی ثبت نشده است."
+      },
+      "view": {
+        "overview": "💳 تنظیمات روش پرداخت:\n🧾 عنوان روش: {title}\n📶 وضعیت: {status}\n💰 حداقل مبلغ: {min_amount} تومان\n💵 حداکثر مبلغ: {max_amount} تومان\n🔢 ترتیب نمایش: {sort_order}\n📝 توضیح کاربر: {description}\n\n<blockquote>💡 برای به‌روزرسانی هر مورد، از دکمه همان بخش استفاده کنید.</blockquote>"
+      },
+      "prompts": {
+        "send_value": "📝 مقدار جدید را ارسال کنید:"
+      },
+      "errors": {
+        "method_not_found": "❌ روش پرداخت پیدا نشد.",
+        "invalid_value": "❌ مقدار واردشده معتبر نیست."
+      },
+      "success": {
+        "method_updated": "✅ تنظیمات روش پرداخت به‌روزرسانی شد."
       }
     }
   }
