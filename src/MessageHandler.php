@@ -4604,6 +4604,13 @@ final class MessageHandler
                 $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
                 return;
             }
+            $value = trim($text);
+            if ($value === '-' || $value === '—') {
+                $value = '';
+            }
+            $this->settings->set('channel_id', $value);
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.success.lock_channel_updated'));
+            return;
         }
 
         if ($stateName === 'admin.payment_methods.view') {
@@ -4621,7 +4628,7 @@ final class MessageHandler
                 if ($method !== null) {
                     $this->paymentMethods->updateMethodSettings($methodId, ['is_active' => ((int) ($method['is_active'] ?? 0) === 1) ? 0 : 1]);
                 }
-                $this->openAdminPaymentMethodView($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.method_updated'));
+                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.success.toggled_active'));
                 return;
             }
             $toggleActions = [
@@ -4637,7 +4644,14 @@ final class MessageHandler
                     $field = $toggleActions[$text];
                     $this->paymentMethods->updateMethodSettings($methodId, [$field => ((int) ($method[$field] ?? 0) === 1) ? 0 : 1]);
                 }
-                $this->openAdminPaymentMethodView($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.method_updated'));
+                $successMap = [
+                    'visible_to_user' => 'admin.payment_methods.success.toggled_visible',
+                    'supports_purchase' => 'admin.payment_methods.success.toggled_purchase',
+                    'supports_renewal' => 'admin.payment_methods.success.toggled_renewal',
+                    'bonus_enabled' => 'admin.payment_methods.success.toggled_bonus',
+                    'fee_enabled' => 'admin.payment_methods.success.toggled_fee',
+                ];
+                $this->telegram->sendMessage($chatId, $this->catalog->get($successMap[$toggleActions[$text]] ?? 'admin.payment_methods.success.method_updated'));
                 return;
             }
             $editable = [
@@ -4654,7 +4668,25 @@ final class MessageHandler
                     'field' => $editable[$text],
                     'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root'],
                 ]);
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.prompts.send_value'));
+                $field = $editable[$text];
+                $prompt = $this->catalog->get('admin.payment_methods.prompts.send_value');
+                if ($field === 'sort_order') {
+                    $rows = [];
+                    foreach ($this->paymentMethods->getAll() as $item) {
+                        $rows[] = $this->catalog->get('admin.payment_methods.prompts.sort_order_row', [
+                            'label' => $this->removeEmoji($this->catalog->get('admin.payment_methods.methods.' . (string) ($item['code'] ?? '') . '.label')),
+                            'sort_order' => $this->toPersianDigits((string) (int) ($item['sort_order'] ?? 0)),
+                        ]);
+                    }
+                    $prompt = $this->catalog->get('admin.payment_methods.prompts.sort_order_value', [
+                        'rows' => $rows === [] ? $this->catalog->get('messages.generic.dash') : implode("\n", $rows),
+                    ]);
+                }
+                $this->telegram->sendMessage(
+                    $chatId,
+                    $prompt,
+                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
+                );
                 return;
             }
         }
@@ -4686,7 +4718,16 @@ final class MessageHandler
                 $value = $num;
             }
             $this->paymentMethods->updateMethodSettings($methodId, [$field => $value]);
-            $this->openAdminPaymentMethodView($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.method_updated'));
+            $this->database->setUserState($userId, 'admin.payment_methods.view', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.list', 'admin.root']]);
+            $successMap = [
+                'min_amount' => 'admin.payment_methods.success.updated_min_amount',
+                'max_amount' => 'admin.payment_methods.success.updated_max_amount',
+                'sort_order' => 'admin.payment_methods.success.updated_sort_order',
+                'user_description' => 'admin.payment_methods.success.updated_description',
+                'admin_note' => 'admin.payment_methods.success.updated_admin_note',
+                'config_json' => 'admin.payment_methods.success.updated_config',
+            ];
+            $this->telegram->sendMessage($chatId, $this->catalog->get($successMap[$field] ?? 'admin.payment_methods.success.method_updated'));
             return;
         }
 
