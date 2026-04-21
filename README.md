@@ -1,6 +1,6 @@
 # ConfigFlow
 
-ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-based inventory, payment workflows, admin moderation tools, and an optional worker API for panel automation.
+ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-based inventory, payment workflows, admin moderation tools.
 
 ## Stack
 
@@ -16,8 +16,6 @@ ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-b
 - Payment gateway orchestration (wallet, crypto, tetrapay)
 - Admin review flow for payments
 - Free-test service claim tracking
-- Worker API endpoints for async x-ui style jobs (`public/WorkerApi.php`)
-- Runtime worker loop (`scripts/PhpWorkerRuntime.php`)
 - Backup runtime and SQLite migration helpers
 
 ## Project Structure
@@ -28,11 +26,9 @@ ConfigFlow/
 ├── migrate.php
 ├── install.php
 ├── public/
-│   └── WorkerApi.php
 ├── scripts/
 │   ├── InitDb.php
 │   ├── schema.sql
-│   ├── PhpWorkerRuntime.php
 │   └── BackupRuntime.php
 ├── migrations/
 ├── src/
@@ -266,14 +262,6 @@ Check status:
 curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 ```
 
-### 7) Run worker runtime (optional but recommended)
-
-```bash
-php scripts/PhpWorkerRuntime.php
-```
-
----
-
 ## Installation Guide (Shared Hosting / cPanel / aaPanel)
 
 This project can run on shared hosting if PHP 8.1+ and MySQL are available.
@@ -292,7 +280,6 @@ cd ConfigFlow
    - Browser: open `https://YOUR_DOMAIN/install.php` and submit the form
    - If you do not have terminal access, ask host support to run `php install.php` once.
 5. If webhook was skipped in installer, set it manually via Telegram API.
-6. For worker runtime, use background process if allowed, otherwise cron.
 
 ---
 

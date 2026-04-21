@@ -7,7 +7,6 @@ use ConfigFlow\Bot\Database;
 
 require_once __DIR__ . '/../src/Bootstrap.php';
 require_once __DIR__ . '/../src/Config.php';
-require_once __DIR__ . '/../src/WorkerApiStore.php';
 require_once __DIR__ . '/../src/Database.php';
 
 Bootstrap::loadEnv(__DIR__ . '/../.env');

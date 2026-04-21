@@ -6,7 +6,7 @@ namespace ConfigFlow\Bot;
 
 use PDO;
 
-final class Database implements WorkerApiStore
+final class Database
 {
     private const DELIVERY_MODE_STOCK_ONLY = 'stock_only';
     private const DELIVERY_MODE_PANEL_ONLY = 'panel_only';
@@ -1304,20 +1304,6 @@ final class Database implements WorkerApiStore
         )->fetchAll();
     }
 
-
-    public function isWorkerApiEnabled(): bool
-    {
-        $stmt = $this->pdo->prepare("SELECT `value` FROM settings WHERE `key` = 'worker_api_enabled' LIMIT 1");
-        $stmt->execute();
-        return (string) ($stmt->fetchColumn() ?: '0') === '1';
-    }
-
-    public function workerApiKey(): string
-    {
-        $stmt = $this->pdo->prepare("SELECT `value` FROM settings WHERE `key` = 'worker_api_key' LIMIT 1");
-        $stmt->execute();
-        return trim((string) ($stmt->fetchColumn() ?: ''));
-    }
 
     public function setUserStatus(int $userId, string $status): void
     {
