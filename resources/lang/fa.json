@@ -506,7 +506,8 @@
         "pins_add": "✅ افزودن پیام پین",
         "pin_edit": "✍️ ویرایش پیام پین",
         "pin_delete": "❌ حذف پیام پین",
-        "pin_send_all": "📣 ارسال و پین همگانی"
+        "pin_send_all": "📣 ارسال و پین همگانی",
+        "payment_methods_manage": "💳 مدیریت روش‌های پرداخت"
       },
       "keywords": {
         "delete_confirm": "حذف",
