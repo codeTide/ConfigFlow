@@ -6,8 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     joined_at DATETIME NOT NULL,
     last_seen_at DATETIME NOT NULL,
     first_start_notified TINYINT(1) NOT NULL DEFAULT 0,
-    status VARCHAR(32) NOT NULL DEFAULT 'unsafe',
-    is_agent TINYINT(1) NOT NULL DEFAULT 0
+    status VARCHAR(32) NOT NULL DEFAULT 'unsafe'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -124,17 +123,6 @@ CREATE TABLE IF NOT EXISTS purchases (
     INDEX idx_purchases_tariff (tariff_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS agency_requests (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    note TEXT NOT NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'pending',
-    admin_note TEXT NULL,
-    created_at DATETIME NOT NULL,
-    reviewed_at DATETIME NULL,
-    INDEX idx_agency_user (user_id),
-    INDEX idx_agency_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS free_test_service_rules (
     service_id BIGINT PRIMARY KEY,
@@ -212,32 +200,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
     permissions TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS agency_service_prices (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    service_id BIGINT NOT NULL,
-    tariff_id BIGINT NULL,
-    price INT NOT NULL,
-    UNIQUE KEY uniq_agency_service_price (user_id, service_id, tariff_id),
-    INDEX idx_agency_service_price_user (user_id),
-    INDEX idx_agency_service_price_service (service_id, tariff_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS agency_price_config (
-    user_id BIGINT PRIMARY KEY,
-    price_mode VARCHAR(32) NOT NULL DEFAULT 'service',
-    global_type VARCHAR(16) NOT NULL DEFAULT 'pct',
-    global_val INT NOT NULL DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS agency_service_discount (
-    user_id BIGINT NOT NULL,
-    service_id BIGINT NOT NULL,
-    discount_type VARCHAR(16) NOT NULL DEFAULT 'pct',
-    discount_value INT NOT NULL DEFAULT 0,
-    PRIMARY KEY (user_id, service_id),
-    INDEX idx_agency_service_discount_service (service_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pinned_messages (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

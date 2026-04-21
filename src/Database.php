@@ -250,8 +250,6 @@ final class Database implements WorkerApiStore
         $legacyStockTable = 'con' . 'figs';
         $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyTariffTable}`");
         $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyStockTable}`");
-        $legacyAgencyTable = 'agency_' . 'prices';
-        $this->pdo->exec("DROP TABLE IF EXISTS `{$legacyAgencyTable}`");
     }
 
     private function tableExists(string $table): bool
@@ -297,8 +295,8 @@ final class Database implements WorkerApiStore
 
         if (!$exists) {
             $insert = $this->pdo->prepare(
-                'INSERT INTO users (user_id, full_name, username, balance, joined_at, last_seen_at, first_start_notified, status, is_agent)
-                 VALUES (:user_id, :full_name, :username, 0, :joined_at, :last_seen_at, 0, :status, 0)'
+                'INSERT INTO users (user_id, full_name, username, balance, joined_at, last_seen_at, first_start_notified, status)
+                 VALUES (:user_id, :full_name, :username, 0, :joined_at, :last_seen_at, 0, :status)'
             );
             $insert->execute([
                 'user_id' => $userId,
@@ -337,7 +335,7 @@ final class Database implements WorkerApiStore
 
     public function getUser(int $userId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT user_id, full_name, username, balance, status, is_agent FROM users WHERE user_id = :user_id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT user_id, full_name, username, balance, status FROM users WHERE user_id = :user_id LIMIT 1');
         $stmt->execute(['user_id' => $userId]);
         $row = $stmt->fetch();
 
@@ -407,10 +405,6 @@ final class Database implements WorkerApiStore
     {
         if ($scope === 'customers') {
             $stmt = $this->pdo->query('SELECT DISTINCT user_id FROM purchases ORDER BY user_id ASC');
-            return array_map(static fn ($r) => (int) $r['user_id'], $stmt->fetchAll());
-        }
-        if ($scope === 'agents') {
-            $stmt = $this->pdo->query('SELECT user_id FROM users WHERE is_agent = 1 ORDER BY user_id ASC');
             return array_map(static fn ($r) => (int) $r['user_id'], $stmt->fetchAll());
         }
         if ($scope === 'admins') {
@@ -676,101 +670,6 @@ final class Database implements WorkerApiStore
     {
         $stmt = $this->pdo->prepare('DELETE FROM pinned_message_sends WHERE pin_id = :pin_id');
         $stmt->execute(['pin_id' => $pinId]);
-    }
-    public function createAgencyRequest(int $userId, string $note): int
-    {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO agency_requests (user_id, note, status, created_at)
-             VALUES (:user_id, :note, :status, :created_at)'
-        );
-        $stmt->execute([
-            'user_id' => $userId,
-            'note' => $note,
-            'status' => 'pending',
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-
-        return (int) $this->pdo->lastInsertId();
-    }
-
-    public function listPendingAgencyRequests(int $limit = 30): array
-    {
-        return $this->listAgencyRequestsByStatus('pending', $limit, 0);
-    }
-
-    public function listAgencyRequestsByStatus(string $status, int $limit = 30, int $offset = 0): array
-    {
-        $limit = max(1, min($limit, 100));
-        $offset = max(0, $offset);
-        $stmt = $this->pdo->prepare(
-            'SELECT id, user_id, note, created_at
-             FROM agency_requests
-             WHERE status = :status
-             ORDER BY id DESC
-             LIMIT ' . $limit . ' OFFSET ' . $offset
-        );
-        $stmt->execute(['status' => $status]);
-        return $stmt->fetchAll();
-    }
-
-    public function countAgencyRequestsByStatus(string $status): int
-    {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM agency_requests WHERE status = :status');
-        $stmt->execute(['status' => $status]);
-        return (int) $stmt->fetchColumn();
-    }
-
-    public function getAgencyRequestById(int $requestId): ?array
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT id, user_id, note, status, created_at, reviewed_at, admin_note
-             FROM agency_requests
-             WHERE id = :id LIMIT 1'
-        );
-        $stmt->execute(['id' => $requestId]);
-        $row = $stmt->fetch();
-        return is_array($row) ? $row : null;
-    }
-
-    public function reviewAgencyRequest(int $requestId, bool $approve, ?string $adminNote = null): array
-    {
-        $this->pdo->beginTransaction();
-        try {
-            $lockStmt = $this->pdo->prepare('SELECT id, user_id, status FROM agency_requests WHERE id = :id LIMIT 1 FOR UPDATE');
-            $lockStmt->execute(['id' => $requestId]);
-            $row = $lockStmt->fetch();
-            if (!is_array($row)) {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'not_found'];
-            }
-            if (($row['status'] ?? '') !== 'pending') {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'already_reviewed'];
-            }
-
-            $status = $approve ? 'approved' : 'rejected';
-            $update = $this->pdo->prepare(
-                'UPDATE agency_requests
-                 SET status = :status,
-                     admin_note = :admin_note,
-                     reviewed_at = :reviewed_at
-                 WHERE id = :id'
-            );
-            $update->execute([
-                'status' => $status,
-                'admin_note' => $adminNote,
-                'reviewed_at' => gmdate('Y-m-d H:i:s'),
-                'id' => $requestId,
-            ]);
-
-            $this->pdo->commit();
-            return ['ok' => true, 'status' => $status, 'user_id' => (int) $row['user_id']];
-        } catch (\Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['ok' => false, 'error' => 'db_error'];
-        }
     }
 
     public function setUserState(int $userId, string $stateName, array $payload = []): void
@@ -1380,7 +1279,7 @@ final class Database implements WorkerApiStore
     {
         $limit = max(1, min($limit, 200));
         $stmt = $this->pdo->prepare(
-            'SELECT user_id, full_name, username, balance, status, is_agent
+            'SELECT user_id, full_name, username, balance, status
              FROM users
              ORDER BY user_id DESC
              LIMIT :limit'
@@ -1405,61 +1304,6 @@ final class Database implements WorkerApiStore
         )->fetchAll();
     }
 
-    public function getAgencyPrice(int $userId, int $tariffId): ?int
-    {
-        $pkg = $this->getTariff($tariffId);
-        if (!is_array($pkg)) {
-            return null;
-        }
-        $stmt = $this->pdo->prepare(
-            'SELECT price FROM agency_service_prices
-             WHERE user_id = :user_id AND service_id = :service_id AND tariff_id = :tariff_id
-             LIMIT 1'
-        );
-        $stmt->execute([
-            'user_id' => $userId,
-            'service_id' => (int) ($pkg['service_id'] ?? 0),
-            'tariff_id' => $tariffId,
-        ]);
-        $val = $stmt->fetchColumn();
-        return $val === false ? null : (int) $val;
-    }
-
-    public function setAgencyPrice(int $userId, int $tariffId, int $price): void
-    {
-        $pkg = $this->getTariff($tariffId);
-        if (!is_array($pkg)) {
-            return;
-        }
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO agency_service_prices (user_id, service_id, tariff_id, price)
-             VALUES (:user_id, :service_id, :tariff_id, :price)
-             ON DUPLICATE KEY UPDATE price = VALUES(price)'
-        );
-        $stmt->execute([
-            'user_id' => $userId,
-            'service_id' => (int) ($pkg['service_id'] ?? 0),
-            'tariff_id' => $tariffId,
-            'price' => $price,
-        ]);
-    }
-
-    public function clearAgencyPrice(int $userId, int $tariffId): void
-    {
-        $pkg = $this->getTariff($tariffId);
-        if (!is_array($pkg)) {
-            return;
-        }
-        $stmt = $this->pdo->prepare(
-            'DELETE FROM agency_service_prices
-             WHERE user_id = :user_id AND service_id = :service_id AND tariff_id = :tariff_id'
-        );
-        $stmt->execute([
-            'user_id' => $userId,
-            'service_id' => (int) ($pkg['service_id'] ?? 0),
-            'tariff_id' => $tariffId,
-        ]);
-    }
 
     public function isWorkerApiEnabled(): bool
     {
@@ -1484,14 +1328,6 @@ final class Database implements WorkerApiStore
         ]);
     }
 
-    public function setUserAgent(int $userId, bool $isAgent): void
-    {
-        $stmt = $this->pdo->prepare('UPDATE users SET is_agent = :is_agent WHERE user_id = :user_id');
-        $stmt->execute([
-            'is_agent' => $isAgent ? 1 : 0,
-            'user_id' => $userId,
-        ]);
-    }
 
     public function updateUserBalance(int $userId, int $amountDelta): void
     {
@@ -2707,43 +2543,10 @@ final class Database implements WorkerApiStore
         return $stmt->fetchAll();
     }
 
-    public function getAgencyPriceStockItem(int $userId): array
-    {
-        $stmt = $this->pdo->prepare('SELECT price_mode, global_type, global_val FROM agency_price_config WHERE user_id = :user_id LIMIT 1');
-        $stmt->execute(['user_id' => $userId]);
-        $row = $stmt->fetch();
-        if (!is_array($row)) {
-            return ['price_mode' => 'service', 'global_type' => 'pct', 'global_val' => 0];
-        }
-        return [
-            'price_mode' => (string) ($row['price_mode'] ?? 'service'),
-            'global_type' => (string) ($row['global_type'] ?? 'pct'),
-            'global_val' => (int) ($row['global_val'] ?? 0),
-        ];
-    }
 
     public function effectiveTariffPrice(int $userId, array $tariff): int
     {
-        $base = (int) ($tariff['price'] ?? 0);
-        $user = $this->getUser($userId);
-        if (!is_array($user) || (int) ($user['is_agent'] ?? 0) !== 1) {
-            return $base;
-        }
-
-        $tariffId = (int) ($tariff['id'] ?? 0);
-
-        // Service-centric precedence: tariff > global
-        $pkgCustom = $this->getAgencyPrice($userId, $tariffId);
-        if ($pkgCustom !== null) {
-            return max(0, $pkgCustom);
-        }
-
-        $stock_item = $this->getAgencyPriceStockItem($userId);
-        $gType = (string) ($stock_item['global_type'] ?? 'pct');
-        $gVal = (int) ($stock_item['global_val'] ?? 0);
-        return $gType === 'pct'
-            ? max(0, $base - (int) round($base * $gVal / 100))
-            : max(0, $base - $gVal);
+        return (int) ($tariff['price'] ?? 0);
     }
 
     public function hasAcceptedPurchaseRules(int $userId): bool

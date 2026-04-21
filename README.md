@@ -14,8 +14,8 @@ ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-b
 - Start/menu/profile/support/config navigation
 - Package purchase flow with stock reservation and delivery handling
 - Payment gateway orchestration (wallet, crypto, tetrapay)
-- Admin review flows for requests and payments
-- Free-test and agency request tracking
+- Admin review flow for payments
+- Free-test service claim tracking
 - Worker API endpoints for async x-ui style jobs (`public/WorkerApi.php`)
 - Runtime worker loop (`scripts/PhpWorkerRuntime.php`)
 - Backup runtime and SQLite migration helpers

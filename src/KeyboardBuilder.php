@@ -13,7 +13,6 @@ final class KeyboardBuilder
     public static function wallet(): string { return self::label('buttons.wallet', 'wallet'); }
     public static function support(): string { return self::label('buttons.support', 'support'); }
     public static function referralButton(): string { return self::label('buttons.referral', 'referral'); }
-    public static function agency(): string { return self::label('buttons.agency', 'agency'); }
     public static function admin(): string { return self::label('buttons.admin_panel', 'admin_panel'); }
     public static function backMain(): string { return self::label('buttons.main_menu', 'main_menu'); }
     public static function backAccount(): string { return self::label('buttons.back', 'back'); }
@@ -22,7 +21,7 @@ final class KeyboardBuilder
     public static function checkChannel(): string { return self::label('buttons.check_channel', 'check_channel'); }
     public static function shareReferralLink(): string { return self::label('buttons.share_referral_link', ''); }
 
-    public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $agencyEnabled, bool $freeTestEnabled): array
+    public static function mainReply(bool $isAdmin, bool $referralEnabled, bool $freeTestEnabled): array
     {
         $keyboard = [];
         if ($isAdmin) {
@@ -38,16 +37,13 @@ final class KeyboardBuilder
         ];
     }
 
-    public static function accountReply(bool $referralEnabled, bool $agencyEnabled): array
+    public static function accountReply(bool $referralEnabled): array
     {
         $keyboard = [
             [self::wallet(), self::referralButton()],
         ];
         if (!$referralEnabled) {
             $keyboard = [[self::wallet()]];
-        }
-        if ($agencyEnabled) {
-            $keyboard[] = [self::agency()];
         }
         $keyboard[] = [self::backMain()];
 
@@ -85,8 +81,7 @@ final class KeyboardBuilder
             [self::label('buttons.admin.types_tariffs', ''), self::label('buttons.admin.inventory', ''), self::label('buttons.admin.users', '')],
             [self::label('buttons.admin.settings', '')],
             [self::label('buttons.admin.admins', ''), self::label('buttons.admin.broadcast', ''), self::label('buttons.admin.pins', '')],
-            [self::label('buttons.admin.agencies', '')],
-            [self::label('buttons.admin.delivery', ''), self::label('buttons.admin.requests', '')],
+            [self::label('buttons.admin.delivery', '')],
             [self::label('buttons.admin.backup_topics', '')],
         ];
         $keyboard[] = [self::backMain()];

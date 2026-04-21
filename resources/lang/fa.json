@@ -10,7 +10,6 @@
     "wallet": "💳 شارژ کیف پول",
     "support": "🎧 پشتیبانی",
     "referral": "🎁 دعوت",
-    "agency": "🤝 نمایندگی",
     "admin_panel": "⚙️ پنل مدیریت",
     "back_to_services": "🔙 بازگشت به سرویس‌ها",
     "back_to_orders": "🔙 بازگشت به سفارش‌ها",
@@ -25,10 +24,8 @@
       "admins": "👮 ادمین‌ها",
       "broadcast": "📣 همگانی",
       "pins": "📌 پین‌ها",
-      "agencies": "🤝 نماینده‌ها",
       "panels": "⚙️ تنظیمات اتصال پنل",
       "delivery": "📦 تحویل سفارش",
-      "requests": "🗂 درخواست‌ها",
       "backup_topics": "🗃 بکاپ/تاپیک",
       "exit_panel": "🚪 خروج",
       "types_tariffs": "🧩 سرویس‌ها",
@@ -47,7 +44,7 @@
     "messages": {
       "main_overview": "✨ <b>به فروشگاه ConfigFlow خوش آمدید!</b>\n\n🧭 راهنما: از منوی زیر بخش مورد نظر خود را انتخاب کنید.\n\n<blockquote>💡 اگر اولین بار است وارد ربات می‌شوید، ابتدا بخش حساب را باز کنید تا وضعیت موجودی و امکانات فعال خود را ببینید.</blockquote>",
       "admin_overview": "⚙️ <b>پنل مدیریت</b>\n\n🧭 راهنما: از دکمه‌های زیر بخش مدیریتی موردنظر را انتخاب کنید.\n\n<blockquote>💡 هر زمان نیاز داشتید می‌توانید با دکمه‌های بازگشت یا منوی اصلی مسیر را کنترل کنید تا عملیات مدیریتی اشتباه ثبت نشود.</blockquote>",
-      "profile_overview": "👤 <b>پروفایل کاربری</b>\n\n📱 نام: {full_name}\n🌀 نام کاربری: {username}\n🔢 آیدی: <code>{user_id}</code>\n💰 موجودی: <b>{balance}</b> تومان\n\n<blockquote>🔐 اطلاعات حساب شما امن است؛ برای شارژ، دعوت دوستان یا ثبت نمایندگی فقط از دکمه‌های همین بخش استفاده کنید.</blockquote>",
+      "profile_overview": "👤 <b>پروفایل کاربری</b>\n\n📱 نام: {full_name}\n🌀 نام کاربری: {username}\n🔢 آیدی: <code>{user_id}</code>\n💰 موجودی: <b>{balance}</b> تومان\n\n<blockquote>🔐 اطلاعات حساب شما امن است؛ برای شارژ، دعوت دوستان فقط از دکمه‌های همین بخش استفاده کنید.</blockquote>",
       "support_overview": "🎧 <b>ارتباط با پشتیبانی</b>\n\n🌀 آیدی پشتیبانی: {support_id}{support_link_line}{support_link_desc_line}\n\n<blockquote>💡 برای بررسی سریع‌تر، مشکل را همراه با جزئیات مرحله، خطا یا شناسه سفارش ارسال کنید تا تیم پشتیبانی دقیق‌تر راهنمایی کند.</blockquote>",
       "support_link_line": "\n🌐 لینک پشتیبانی: {link}",
       "support_link_desc_line": "\n📝 توضیح لینک: {description}",
@@ -128,12 +125,6 @@
           "panel_provision_failed": "⚠️ ساخت تست رایگان در پنل با خطا مواجه شد.\n\n🧾 کد خطا: <code>{error_code}</code>\n🧷 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>💡 این خطا معمولاً موقتی است؛ چند دقیقه بعد دوباره امتحان کنید. اگر مشکل ادامه داشت، کد پیگیری را برای پشتیبانی ارسال کنید.</blockquote>",
           "claim_failed": "❌ ثبت درخواست تست رایگان انجام نشد.\n\n🧾 کد خطا: <code>{error_code}</code>\n🧷 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>💡 لطفاً دوباره تلاش کنید؛ اگر مشکل ادامه داشت با پشتیبانی در ارتباط باشید و کد پیگیری را ارسال کنید.</blockquote>"
         }
-      },
-      "agency": {
-        "request_intro": "🤝 <b>درخواست نمایندگی</b>\n\nلطفاً اطلاعات تماس و توضیح کوتاه درباره سابقه/برنامه همکاری را ارسال کنید:\nپیام شما برای تیم ادمین ثبت می‌شود.",
-        "note_as_text": "⚠️ لطفاً متن درخواست نمایندگی را تایپ کنید، نه دکمه‌های منو.",
-        "note_required": "⚠️ لطفاً متن درخواست نمایندگی را ارسال کنید.",
-        "request_submitted": "✅ درخواست نمایندگی ثبت شد و برای بررسی ادمین ارسال گردید.\nشناسه درخواست: <code>{request_id}</code>"
       },
       "common": {
         "invalid_option": "گزینه نامعتبر است. لطفاً یکی از گزینه‌های لیست را انتخاب کنید."
@@ -358,7 +349,6 @@
       "legacy_button_payment": "دکمه قدیمی است؛ مسیر canonical برای بررسی پرداخت باز شد.",
       "legacy_button_request": "دکمه قدیمی است؛ مسیر canonical برای بررسی درخواست باز شد.",
       "legacy_free_request_prefix": "👀 درخواست تست",
-      "legacy_agency_request_prefix": "👀 درخواست نمایندگی",
       "note_line": "توضیح: {note}\n",
       "notice_with_optional_note": "{notice}{note_line}"
     },
@@ -366,8 +356,7 @@
       "labels": {
         "status_approved": "✅ تایید شد",
         "status_rejected": "❌ رد شد",
-        "free_request": "درخواست تست رایگان",
-        "agency_request": "درخواست نمایندگی"
+        "free_request": "درخواست تست رایگان"
       },
       "info": {
         "request_note_legacy_redirect": "💡 این مسیر legacy است؛ ادامه بررسی از مسیر canonical انجام می‌شود.",
@@ -419,7 +408,6 @@
         "freetest_rule_saved": "✅ قانون تست رایگان ذخیره شد.",
         "freetest_user_quota_reset": "✅ سهمیه تست کاربر <code>{target_user_id}</code> ریست شد.",
         "type_created": "✅ نوع سرویس ثبت شد. شناسه: <code>{service_id}</code>",
-        "agent_price_saved": "✅ قیمت اختصاصی ثبت شد.\nU:<code>{agent_id}</code> | P:<code>{package_id}</code> | <b>{price}</b>",
         "panel_created": "✅ پنل ثبت شد. ID: <code>{panel_id}</code>",
         "worker_api_key_saved": "✅ Worker API key ذخیره شد.",
         "worker_api_port_saved": "✅ Worker API port ذخیره شد.",
@@ -431,8 +419,6 @@
         "settings_restored_count": "✅ بازیابی تنظیمات انجام شد.\nتعداد کلیدهای اعمال‌شده: <b>{count}</b>"
       },
       "user_notice": {
-        "agency_approved": "✅ درخواست نمایندگی شما تایید شد.",
-        "agency_rejected": "❌ درخواست نمایندگی شما رد شد.",
         "admin_note": "\n\n📝 توضیح ادمین:\n{note}"
       }
     },
@@ -451,43 +437,23 @@
         "payments_refresh": "🔄 بروزرسانی پرداخت‌ها",
         "payment_verify_chain": "🧭 بررسی on-chain",
         "payment_approve": "✅ تایید پرداخت",
-        "payment_reject": "❌ رد پرداخت",
-        "requests_agency": "💼 درخواست‌های نمایندگی",
-        "requests_pending": "⚠️ pending",
-        "requests_approved": "✅ approved",
-        "requests_rejected": "❌ rejected",
-        "request_approve": "✅ تایید درخواست",
-        "request_reject": "❌ رد درخواست"
+        "payment_reject": "❌ رد پرداخت"
       },
       "labels": {
         "action_approve": "تایید",
         "action_reject": "رد",
-        "request_agency": "درخواست نمایندگی",
         "status_approved": "✅ تایید شد",
         "status_rejected": "❌ رد شد"
       },
-      "prompts": {
-        "request_review_note_overview": "📝 <b>ثبت یادداشت {action_text}</b>\n\n👤 شناسه درخواست: <code>{request_id}</code>\n✍️ یادداشت: یادداشت ادمین را ارسال کنید. اگر یادداشت ندارید، «-» بفرستید.\n\n<blockquote>💡 یادداشت به کاربر ارسال می‌شود؛ کوتاه و واضح بنویسید.</blockquote>"
-      },
+      "prompts": {},
       "errors": {
         "invalid_payment_option": "❌ گزینه نامعتبر است. یکی از پرداخت‌ها را انتخاب کنید.",
         "invalid_payment_id": "❌ شناسه پرداخت معتبر نبود.",
         "invalid_payment_review_action": "❌ گزینه نامعتبر است. از دکمه‌های بررسی پرداخت استفاده کنید.",
-        "invalid_payment": "❌ پرداخت نامعتبر بود.",
-        "invalid_request_kind_option": "❌ گزینه نامعتبر است. نوع درخواست را انتخاب کنید.",
-        "invalid_request_option": "❌ گزینه نامعتبر است. یکی از درخواست‌ها را انتخاب کنید.",
-        "invalid_request_info": "❌ اطلاعات درخواست معتبر نبود.",
-        "invalid_request_review_action": "❌ گزینه نامعتبر است. از دکمه‌های بررسی درخواست استفاده کنید.",
-        "invalid_request_review_info": "❌ اطلاعات بررسی درخواست معتبر نبود.",
-        "request_already_reviewed": "❌ این درخواست قبلاً بررسی شده است.",
-        "request_review_failed": "❌ ثبت نتیجه بررسی انجام نشد."
+        "invalid_payment": "❌ پرداخت نامعتبر بود."
       },
-      "success": {
-        "request_reviewed": "✅ {request_label} <code>{request_id}</code> {status_text}."
-      },
+      "success": {},
       "user_notice": {
-        "agency_approved": "✅ درخواست نمایندگی شما تایید شد.",
-        "agency_rejected": "❌ درخواست نمایندگی شما رد شد.",
         "admin_note": "\n\n📝 توضیح ادمین:\n{note}"
       }
     },
@@ -495,7 +461,6 @@
       "actions": {
         "settings_refresh": "🔄 بروزرسانی",
         "settings_toggle_bot": "⚙️ وضعیت ربات",
-        "settings_toggle_agency": "💼 نمایندگی",
         "settings_set_channel": "📣 قفل کانال",
         "admins_add": "✅ افزودن ادمین",
         "admin_delete": "❌ حذف ادمین",
@@ -557,7 +522,6 @@
     },
     "final_modules": {
       "actions": {
-        "agents_refresh": "🔄 بروزرسانی نماینده‌ها",
         "panels_add": "➕ افزودن سرویس پنلی",
         "panel_toggle": "🔄 فعال/غیرفعال‌سازی سرویس",
         "panel_delete": "🗑 حذف سرویس",
@@ -570,7 +534,6 @@
         "panel_conn_delete_cancel": "❌ انصراف",
         "broadcast_scope_all": "📋 همه",
         "broadcast_scope_users": "👤 کاربران",
-        "broadcast_scope_agents": "💼 نماینده‌ها",
         "broadcast_scope_admins": "🔐 ادمین‌ها",
         "broadcast_send": "📣 ارسال همگانی",
         "deliveries_refresh": "🔄 بروزرسانی تحویل‌ها",
@@ -579,7 +542,6 @@
         "groupops_restore": "🔄 بازیابی تنظیمات",
         "freetest_rule": "📝 قانون تست رایگان",
         "freetest_reset": "🔄 ریست سهمیه تست",
-        "agent_set_price": "💵 ثبت قیمت",
         "panels_refresh": "⚙️ تنظیمات اتصال پنل"
       },
       "keywords": {
@@ -587,7 +549,6 @@
         "deliver_confirm": "تحویل"
       },
       "prompts": {
-        "agent_price_input": "💡 قیمت را به تومان بفرستید. برای حذف قیمت اختصاصی «-» بفرستید.",
         "panel_create_format": "💡 ثبت سرویس پنلی به‌صورت مرحله‌ای انجام می‌شود.",
         "panel_delete_confirm": "💡 برای حذف سرویس #{panel_id} عبارت «{confirm_word}» را ارسال کنید.",
         "panel_pkg_create_format": "💡 ویرایش سرویس پنلی به‌صورت مرحله‌ای انجام می‌شود.",
@@ -653,8 +614,6 @@
         "invalid_menu_option": "❌ ورودی معتبر وارد کنید."
       },
       "success": {
-        "agent_price_deleted": "✅ قیمت اختصاصی حذف شد.",
-        "agent_price_saved": "✅ قیمت اختصاصی ثبت شد.",
         "panel_created": "✅ سرویس پنلی ثبت شد.",
         "panel_status_updated": "✅ وضعیت سرویس بروزرسانی شد.",
         "panel_deleted": "✅ سرویس پنلی حذف شد.",
@@ -720,12 +679,6 @@
         "panel_summary": "min={min_gb} | max={max_gb} | step={step_gb} | price/GB={price_per_gb}\nprovider={provider} | groups={provider_group_ids} | duration={duration}"
       }
     },
-    "requests": {
-      "actions": {
-        "open_agency": "👀 درخواست نمایندگی #{request_id}"
-      },
-      "new_agency_request": "🤝 <b>درخواست نمایندگی جدید</b>\n\nشناسه: <code>{request_id}</code>\nکاربر: <code>{user_id}</code>\nمتن درخواست:\n{note}"
-    },
     "users_stock": {
       "labels": {
         "balance_mode_sub": "کاهش",
@@ -760,7 +713,6 @@
       },
       "success": {
         "user_status_updated": "✅ وضعیت کاربر بروزرسانی شد.",
-        "agent_status_updated": "✅ وضعیت نمایندگی بروزرسانی شد.",
         "user_balance_updated": "✅ موجودی کاربر بروزرسانی شد.",
         "config_expire_status_updated": "✅ وضعیت انقضا بروزرسانی شد.",
         "config_deleted": "✅ کانفیگ حذف شد.",
@@ -772,7 +724,6 @@
       "actions": {
         "users_refresh": "🔄 بروزرسانی لیست کاربران",
         "user_toggle_status": "⛔️/✅ تغییر وضعیت کاربر",
-        "user_toggle_agent": "🤝 تغییر نمایندگی",
         "user_balance_add": "➕ افزایش موجودی",
         "user_balance_sub": "➖ کاهش موجودی",
         "stock_refresh": "🔄 بروزرسانی موجودی",
@@ -836,14 +787,6 @@
       },
       "nav": {
         "overview": "⚙️ <b>ناوبری پنل مدیریت</b>\n\n📍 ماژول انتخاب‌شده: <code>{route}</code>\n\n<blockquote>💡 این ماژول در chunkهای بعدی به‌صورت کامل به reply/state مهاجرت می‌شود. برای ادامه از بازگشت یا منوی اصلی استفاده کنید.</blockquote>"
-      },
-      "agents": {
-        "empty": "نماینده‌ای ثبت نشده است.",
-        "overview": "🤝 <b>مدیریت نماینده‌ها</b>\n\n📋 لیست: {list}\n\n<blockquote>💡 نماینده را انتخاب کنید تا قیمت اختصاصی پکیج‌ها را مدیریت کنید.</blockquote>",
-        "button": "{num} - نماینده {id}"
-      },
-      "agent_view": {
-        "overview": "🤝 <b>قیمت‌گذاری نماینده {agent_id}</b>\n\n📦 پکیج‌ها: {packages}\n\n<blockquote>💡 پکیج را انتخاب کنید و قیمت اختصاصی را ثبت یا حذف کنید.</blockquote>"
       },
       "panels": {
         "not_found": "سرویس پنلی پیدا نشد."
@@ -974,34 +917,10 @@
             "overview": "💰 <b>جزئیات پرداخت</b>\n\n🔢 شناسه: <code>{payment_id}</code>\n👤 کاربر: <code>{user_id}</code>\n💵 مبلغ: {amount} تومان\n🧾 روش: {method}\n📶 وضعیت: {status}\n\n<blockquote>💡 ابتدا وضعیت و روش پرداخت را بررسی کنید، سپس تایید یا رد انجام دهید.</blockquote>"
           }
         },
-        "requests": {
-          "root": {
-            "overview": "🗂 <b>مدیریت درخواست‌ها</b>\n\n📌 مرحله اول: نوع درخواست را انتخاب کنید.\n\n<blockquote>💡 بعد از انتخاب نوع، می‌توانید وضعیت pending/approved/rejected را فیلتر کنید.</blockquote>"
-          },
-          "list": {
-            "filter_pending": "⏳ pending",
-            "filter_approved": "✅ approved",
-            "filter_rejected": "❌ rejected",
-            "row": "{num}) #{request_id} | U:{uid} | {created_at}",
-            "button": "{num} - درخواست #{request_id}",
-            "kind_agency": "نمایندگی",
-            "title": "🗂 <b>درخواست‌های {kind_title}</b>",
-            "empty": "درخواستی برای این فیلتر یافت نشد.",
-            "overview": "🗂 <b>درخواست‌های {kind_title}</b>\n\n📶 فیلتر وضعیت: {status}\n📋 لیست درخواست‌ها: {list}\n\n<blockquote>💡 با تغییر فیلتر وضعیت می‌توانید سوابق تایید/رد را هم بررسی کنید.</blockquote>"
-          },
-          "view": {
-            "not_found": "درخواست پیدا نشد.",
-            "status_approved": "✅ approved",
-            "status_rejected": "❌ rejected",
-            "status_pending": "⏳ pending",
-            "kind_agency": "درخواست نمایندگی",
-            "overview": "📝 <b>{kind_title}</b>\n\n🔢 شناسه: <code>{request_id}</code>\n👤 کاربر: <code>{user_id}</code>\n📶 وضعیت: {status_text}\n🕒 زمان ثبت: {created_at}\n🧾 متن درخواست: {note}\n\n<blockquote>💡 قبل از تایید یا رد، متن درخواست را کامل بررسی کنید.</blockquote>"
-          }
-        },
         "settings_admins_pins": {
           "settings": {
             "channel_unset": "تنظیم نشده",
-            "overview": "⚙️ تنظیمات سریع\n\n🤖 وضعیت ربات: {bot_status}\n🤝 درخواست نمایندگی: {agency_request_enabled}\n📢 قفل کانال: {channel_id}\n\n<blockquote>💡 تمامی تغییراتی که در این بخش اعمال می‌کنید، بلافاصله روی عملکرد ربات اثر می‌گذارند و نیازی به ذخیره‌سازی یا تأیید نهایی ندارند؛ بنابراین قبل از هر تغییر، از صحت تنظیمات خود اطمینان حاصل کنید.</blockquote>"
+            "overview": "⚙️ تنظیمات سریع\n\n🤖 وضعیت ربات: {bot_status}\n📢 قفل کانال: {channel_id}\n\n<blockquote>💡 تمامی تغییراتی که در این بخش اعمال می‌کنید، بلافاصله روی عملکرد ربات اثر می‌گذارند و نیازی به ذخیره‌سازی یا تأیید نهایی ندارند؛ بنابراین قبل از هر تغییر، از صحت تنظیمات خود اطمینان حاصل کنید.</blockquote>"
           },
           "admins": {
             "empty": "ادمینی ثبت نشده است.",
@@ -1029,11 +948,9 @@
         },
         "user_view": {
           "not_found": "کاربر پیدا نشد.",
-          "overview": "👤 <b>جزئیات کاربر</b>\n\n🔢 کاربر: <code>{user_id}</code>\n👤 نام: {name}\n💰 موجودی: {balance} تومان\n📶 وضعیت: {status_text}\n💼 نماینده: {agent_text}\n\n<blockquote>💡 تغییرات وضعیت/موجودی فوری اعمال می‌شود.</blockquote>",
+          "overview": "👤 <b>جزئیات کاربر</b>\n\n🔢 کاربر: <code>{user_id}</code>\n👤 نام: {name}\n💰 موجودی: {balance} تومان\n📶 وضعیت: {status_text}\n\n<blockquote>💡 تغییرات وضعیت/موجودی فوری اعمال می‌شود.</blockquote>",
           "status_restricted": "⛔️ محدود",
-          "status_active": "✅ فعال",
-          "agent_yes": "✅ بله",
-          "agent_no": "❌ خیر"
+          "status_active": "✅ فعال"
         },
         "deliveries": {
           "list": {
