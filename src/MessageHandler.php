@@ -9,7 +9,6 @@ final class MessageHandler
     private const PAY_WALLET = '[legacy] buttons.pay.wallet';
     private const PAY_CRYPTO = '[legacy] buttons.pay.crypto';
     private const PAY_TETRAPAY = '[legacy] buttons.pay.tetrapay';
-    private const PAY_SWAPWALLET = '[legacy] buttons.pay.swapwallet';
     private const PAY_TRONPAYS = '[legacy] buttons.pay.tronpays';
     private const PAY_VERIFY = '[legacy] buttons.pay.verify';
     private const ACCEPT_RULES = '[legacy] buttons.accept_rules';
@@ -1314,7 +1313,6 @@ final class MessageHandler
                 $this->catalog->get('buttons.admin.broadcast') => 'admin:broadcast',
                 $this->catalog->get('buttons.admin.pins') => 'admin:pins',
                 $this->catalog->get('buttons.admin.agencies') => 'admin:agents',
-                $this->catalog->get('buttons.admin.charges') => 'admin:payments',
                 $this->catalog->get('buttons.admin.delivery') => 'admin:deliveries',
                 $this->catalog->get('buttons.admin.requests') => 'admin:requests',
                 $this->catalog->get('buttons.admin.backup_topics') => 'admin:groupops',
@@ -1332,10 +1330,6 @@ final class MessageHandler
                 }
                 if ($route === 'admin:stock') {
                     $this->openAdminStockTypesView($chatId, $userId);
-                    return;
-                }
-                if ($route === 'admin:payments') {
-                    $this->openAdminPaymentsList($chatId, $userId);
                     return;
                 }
                 if ($route === 'admin:requests') {
@@ -6697,13 +6691,13 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === $this->uiConst(self::PAY_SWAPWALLET) || $text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
+        if ($text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
             $this->database->clearUserState($userId);
-            $this->createPurchaseGatewayInvoice($chatId, $userId, $tariffId, $text);
+            $this->createPurchaseGatewayInvoice($chatId, $userId, $tariffId);
             return;
         }
 
-        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.swapwallet') && $text !== $this->uiConst(self::PAY_SWAPWALLET) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
+        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
             return;
         }
@@ -6842,9 +6836,9 @@ final class MessageHandler
             $this->createServicePurchasePaymentByMethod($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb, $text);
             return;
         }
-        if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === $this->uiConst(self::PAY_SWAPWALLET) || $text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
+        if ($text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
             $this->database->clearUserState($userId);
-            $this->createServicePurchaseGatewayInvoice($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb, $text);
+            $this->createServicePurchaseGatewayInvoice($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb);
             return;
         }
         $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
@@ -6940,9 +6934,9 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === $this->uiConst(self::PAY_SWAPWALLET) || $text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
+        if ($text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
             $this->database->clearUserState($userId);
-            $this->createPanelPurchaseGatewayInvoice($chatId, $userId, $serviceId, $selectedVolumeGb, $computedAmount, $text);
+            $this->createPanelPurchaseGatewayInvoice($chatId, $userId, $serviceId, $selectedVolumeGb, $computedAmount);
             return;
         }
 
@@ -7007,13 +7001,13 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.swapwallet') || $text === $this->uiConst(self::PAY_SWAPWALLET) || $text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
+        if ($text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
             $this->database->clearUserState($userId);
-            $this->createRenewalGatewayInvoice($chatId, $userId, $purchaseId, $tariffId, $text);
+            $this->createRenewalGatewayInvoice($chatId, $userId, $purchaseId, $tariffId);
             return;
         }
 
-        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.swapwallet') && $text !== $this->uiConst(self::PAY_SWAPWALLET) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
+        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
             return;
         }
@@ -7291,9 +7285,9 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_renew'), $pendingId, $amount, $payUrl);
     }
 
-    private function createPurchaseGatewayInvoice(int $chatId, int $userId, int $tariffId, string $methodLabel): void
+    private function createPurchaseGatewayInvoice(int $chatId, int $userId, int $tariffId): void
     {
-        $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
+        $gateway = 'tronpays_rial';
         $tariff = $this->database->getServiceTariff($tariffId);
         if ($tariff === null) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.tariff_not_found'));
@@ -7318,22 +7312,6 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-        if ($gateway === 'swapwallet_crypto') {
-            $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Purchase');
-            if (!($invoice['ok'] ?? false)) {
-                $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.swapwallet_invoice_error'));
-                return;
-            }
-            $invoiceId = (string) ($invoice['invoice_id'] ?? '');
-            if ($invoiceId !== '') {
-                $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
-            }
-            $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'tariff_id' => $tariffId, 'payment_method' => $gateway]);
-            $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_purchase'), $pendingId, $amount, $payUrl);
-            return;
-        }
         $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-' . $userId . '-' . $tariffId . '-' . time());
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
@@ -7349,7 +7327,7 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
     }
 
-    private function createPanelPurchaseGatewayInvoice(int $chatId, int $userId, int $serviceId, float $selectedVolumeGb, int $amount, string $methodLabel): void
+    private function createPanelPurchaseGatewayInvoice(int $chatId, int $userId, int $serviceId, float $selectedVolumeGb, int $amount): void
     {
         $service = $this->database->getProvisioningService($serviceId);
         if (!is_array($service) || !$this->database->validatePanelServiceVolume($service, $selectedVolumeGb)) {
@@ -7357,7 +7335,7 @@ final class MessageHandler
             return;
         }
 
-        $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
+        $gateway = 'tronpays_rial';
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
@@ -7380,24 +7358,6 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($gateway === 'swapwallet_crypto') {
-            $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Purchase');
-            if (!($invoice['ok'] ?? false)) {
-                $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.swapwallet_invoice_error'));
-                return;
-            }
-            $invoiceId = (string) ($invoice['invoice_id'] ?? '');
-            if ($invoiceId !== '') {
-                $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
-            }
-            $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'service_id' => $serviceId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => $gateway]);
-            $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_purchase'), $pendingId, $amount, $payUrl);
-            return;
-        }
-
         $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-panel-' . $userId . '-' . $serviceId . '-' . time());
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
@@ -7413,7 +7373,7 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
     }
 
-    private function createServicePurchaseGatewayInvoice(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb, string $methodLabel): void
+    private function createServicePurchaseGatewayInvoice(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb): void
     {
         $service = $this->database->getService($serviceId);
         $tariff = $this->database->getServiceTariffForService($serviceId, $tariffId);
@@ -7431,7 +7391,7 @@ final class MessageHandler
             return;
         }
 
-        $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
+        $gateway = 'tronpays_rial';
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
@@ -7456,24 +7416,6 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($gateway === 'swapwallet_crypto') {
-            $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Purchase');
-            if (!($invoice['ok'] ?? false)) {
-                $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.swapwallet_invoice_error'));
-                return;
-            }
-            $invoiceId = (string) ($invoice['invoice_id'] ?? '');
-            if ($invoiceId !== '') {
-                $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
-            }
-            $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_purchase'), 'service_id' => $serviceId, 'tariff_id' => $tariffId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => $gateway]);
-            $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_purchase'), $pendingId, $amount, $payUrl);
-            return;
-        }
-
         $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-service-' . $userId . '-' . $serviceId . '-' . $tariffId . '-' . time());
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
@@ -7489,9 +7431,9 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
     }
 
-    private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $tariffId, string $methodLabel): void
+    private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $tariffId): void
     {
-        $gateway = $methodLabel === $this->uiConst(self::PAY_SWAPWALLET) ? 'swapwallet_crypto' : 'tronpays_rial';
+        $gateway = 'tronpays_rial';
         $tariff = $this->database->getServiceTariff($tariffId);
         $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         if ($tariff === null || !is_array($purchase)) {
@@ -7517,22 +7459,6 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-        if ($gateway === 'swapwallet_crypto') {
-            $invoice = $this->gateways->createSwapwalletCryptoInvoice($amount, (string) $pendingId, 'TRON', 'Renewal');
-            if (!($invoice['ok'] ?? false)) {
-                $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.swapwallet_invoice_error'));
-                return;
-            }
-            $invoiceId = (string) ($invoice['invoice_id'] ?? '');
-            if ($invoiceId !== '') {
-                $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
-            }
-            $payUrl = (string) ($invoice['pay_url'] ?? '');
-            $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.swapwallet_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'payment_method' => $gateway]);
-            $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.swapwallet_renew'), $pendingId, $amount, $payUrl);
-            return;
-        }
         $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'rnw-' . $userId . '-' . $tariffId . '-' . time());
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
@@ -7576,7 +7502,6 @@ final class MessageHandler
         $hashId = is_array($providerPayload) ? (string) ($providerPayload['hash_id'] ?? '') : '';
         $verify = match ($gateway) {
             'tetrapay' => $this->gateways->verifyTetrapay($gatewayRef, $hashId),
-            'swapwallet_crypto' => $this->gateways->checkSwapwalletCryptoInvoice($gatewayRef),
             'tronpays_rial' => $this->gateways->checkTronpaysRialInvoice($gatewayRef),
             default => ['ok' => false, 'paid' => false],
         };

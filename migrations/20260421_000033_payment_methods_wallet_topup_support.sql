@@ -6,4 +6,4 @@ UPDATE payment_methods
 SET allow_wallet_topup = CASE WHEN code = 'tetrapay' THEN 1 ELSE 0 END,
     wallet_amount_input_mode = CASE WHEN code = 'tetrapay' THEN 'user_input' ELSE 'none' END,
     updated_at = UTC_TIMESTAMP()
-WHERE code IN ('tetrapay', 'crypto_tron', 'swapwallet_crypto', 'tronpays_rial');
+WHERE code IN ('tetrapay', 'crypto_tron', 'tronpays_rial');

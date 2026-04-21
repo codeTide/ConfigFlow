@@ -19,7 +19,6 @@ final class CallbackHandler
         'buy:',
         'renew:',
         'rpay:',
-        'pay:swapwallet_crypto:',
         'pay:tronpays_rial:',
     ];
 
