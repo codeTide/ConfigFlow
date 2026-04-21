@@ -29,7 +29,6 @@ INSERT INTO payment_methods
 VALUES
     ('crypto_tron', 'crypto', 1, 20, 10000, 0, 0, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
     ('tetrapay', 'gateway', 1, 30, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
-    ('swapwallet_crypto', 'crypto', 0, 40, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
     ('tronpays_rial', 'rial', 0, 50, 10000, 0, 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP())
 ON DUPLICATE KEY UPDATE
     category = VALUES(category),
@@ -47,12 +46,6 @@ JOIN settings s ON s.`key` = 'gw_tetrapay_enabled'
 SET pm.is_active = CASE WHEN s.`value` = '1' THEN 1 ELSE 0 END,
     pm.updated_at = UTC_TIMESTAMP()
 WHERE pm.code = 'tetrapay';
-
-UPDATE payment_methods pm
-JOIN settings s ON s.`key` = 'gw_swapwallet_crypto_enabled'
-SET pm.is_active = CASE WHEN s.`value` = '1' THEN 1 ELSE 0 END,
-    pm.updated_at = UTC_TIMESTAMP()
-WHERE pm.code = 'swapwallet_crypto';
 
 UPDATE payment_methods pm
 JOIN settings s ON s.`key` = 'gw_tronpays_rial_enabled'

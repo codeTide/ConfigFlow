@@ -86,7 +86,7 @@ final class KeyboardBuilder
             [self::label('buttons.admin.settings', '')],
             [self::label('buttons.admin.admins', ''), self::label('buttons.admin.broadcast', ''), self::label('buttons.admin.pins', '')],
             [self::label('buttons.admin.agencies', '')],
-            [self::label('buttons.admin.charges', ''), self::label('buttons.admin.delivery', ''), self::label('buttons.admin.requests', '')],
+            [self::label('buttons.admin.delivery', ''), self::label('buttons.admin.requests', '')],
             [self::label('buttons.admin.backup_topics', '')],
         ];
         $keyboard[] = [self::backMain()];

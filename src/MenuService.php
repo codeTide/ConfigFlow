@@ -70,7 +70,7 @@ final class MenuService
             [$this->catalog->get('buttons.admin.settings'), $this->catalog->get('buttons.admin.payment_methods')],
             [$this->catalog->get('buttons.admin.admins'), $this->catalog->get('buttons.admin.broadcast'), $this->catalog->get('buttons.admin.pins')],
             [$this->catalog->get('buttons.admin.agencies')],
-            [$this->catalog->get('buttons.admin.charges'), $this->catalog->get('buttons.admin.delivery'), $this->catalog->get('buttons.admin.requests')],
+            [$this->catalog->get('buttons.admin.delivery'), $this->catalog->get('buttons.admin.requests')],
             [$this->catalog->get('buttons.admin.backup_topics')],
             [$this->catalog->get('buttons.admin.exit_panel')],
         ]);

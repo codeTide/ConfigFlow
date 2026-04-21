@@ -273,16 +273,6 @@ final class PaymentMethodRepository
                 'pricing_mode' => ['type' => 'enum', 'values' => ['manual', 'market']],
                 'timeout_seconds' => ['type' => 'int'],
             ],
-            'swapwallet_crypto' => [
-                'base_url' => ['type' => 'string'],
-                'merchant_key' => ['type' => 'string'],
-                'username' => ['type' => 'string'],
-                'network' => ['type' => 'string'],
-                'asset' => ['type' => 'string'],
-                'callback_url' => ['type' => 'string'],
-                'pricing_mode' => ['type' => 'enum', 'values' => ['manual', 'market']],
-                'timeout_seconds' => ['type' => 'int'],
-            ],
             'tronpays_rial' => [
                 'base_url' => ['type' => 'string'],
                 'merchant_key' => ['type' => 'string'],

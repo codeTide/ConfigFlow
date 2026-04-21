@@ -27,7 +27,6 @@
       "pins": "📌 پین‌ها",
       "agencies": "🤝 نماینده‌ها",
       "panels": "⚙️ تنظیمات اتصال پنل",
-      "charges": "💳 شارژها",
       "delivery": "📦 تحویل سفارش",
       "requests": "🗂 درخواست‌ها",
       "backup_topics": "🗃 بکاپ/تاپیک",
@@ -40,7 +39,6 @@
       "wallet": "💰 پرداخت با کیف پول",
       "crypto": "💎 پرداخت کریپتو",
       "tetrapay": "🏧 پرداخت تتراپی",
-      "swapwallet": "💠 پرداخت سواپ‌ولت",
       "tronpays": "🧾 پرداخت ترون‌پیز",
       "verify": "🔄 بررسی پرداخت",
       "gateway_pay": "💳 پرداخت"
@@ -295,7 +293,6 @@
         "crypto_renew_intro": "💎 <b>پرداخت کریپتو (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nارز: <b>TRON</b>\nمبلغ معادل ریالی: <b>{amount}</b> تومان\n\n{address_block}پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\nمثال: <code>TX_HASH 12.345</code>",
         "tetrapay_renew_unavailable": "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
         "gateway": {
-          "swapwallet_invoice_error": "خطا در ایجاد فاکتور SwapWallet.",
           "tronpays_invoice_error": "خطا در ایجاد فاکتور TronPays.",
           "tetrapay_invoice_error": "❌ ایجاد سفارش پرداخت تتراپی انجام نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 اتصال به درگاه برقرار نشد یا سفارش توسط تتراپی رد شد. کمی بعد دوباره تلاش کنید؛ اگر مشکل ادامه داشت، همین کد پیگیری را برای پشتیبانی ارسال کنید.</blockquote>",
           "tetrapay_description": "order:{payment_id}",
@@ -307,8 +304,6 @@
           "default": "✅ پرداخت تایید شد.",
           "tetrapay_purchase": "✅ پرداخت تتراپی تایید شد. سفارش شما در صف تحویل قرار گرفت.",
           "tetrapay_renew": "✅ پرداخت تمدید تایید شد. درخواست شما در صف تحویل قرار گرفت.",
-          "swapwallet_purchase": "✅ پرداخت SwapWallet تایید شد و سفارش در صف تحویل قرار گرفت.",
-          "swapwallet_renew": "✅ پرداخت SwapWallet تایید شد و درخواست تمدید در صف تحویل قرار گرفت.",
           "tronpays_purchase": "✅ پرداخت TronPays تایید شد و سفارش در صف تحویل قرار گرفت.",
           "tronpays_renew": "✅ پرداخت TronPays تایید شد و درخواست تمدید در صف تحویل قرار گرفت.",
           "wallet_topup": "✅ شارژ کیف پول با موفقیت انجام شد."
@@ -316,8 +311,6 @@
         "titles": {
           "tetrapay_purchase": "🏧 <b>پرداخت TetraPay</b>",
           "tetrapay_renew": "🏧 <b>پرداخت TetraPay (تمدید)</b>",
-          "swapwallet_purchase": "💠 <b>پرداخت با SwapWallet</b>",
-          "swapwallet_renew": "💠 <b>پرداخت تمدید با SwapWallet</b>",
           "tronpays_purchase": "🧾 <b>پرداخت با TronPays</b>",
           "tronpays_renew": "🧾 <b>پرداخت تمدید با TronPays</b>",
           "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>"
@@ -1277,10 +1270,6 @@
           "label": "🏧 پرداخت تتراپی",
           "intro": "پرداخت از طریق درگاه تتراپی"
         },
-        "swapwallet_crypto": {
-          "label": "💠 پرداخت سواپ‌ولت",
-          "intro": "پرداخت با درگاه سواپ‌ولت"
-        },
         "tronpays_rial": {
           "label": "🧾 پرداخت ترون‌پیز",
           "intro": "پرداخت ریالی از طریق ترون‌پیز"
@@ -1323,16 +1312,6 @@
             "pricing_mode": "💹 حالت قیمت‌گذاری",
             "timeout_seconds": "⏱ مدت انتظار"
           },
-          "swapwallet_crypto": {
-            "base_url": "🌐 Base URL",
-            "merchant_key": "🔑 Merchant Key",
-            "username": "👤 نام کاربری مرچنت",
-            "network": "🌉 Network",
-            "asset": "🪙 Asset",
-            "callback_url": "🔁 نشانی بازگشت درگاه",
-            "pricing_mode": "💹 Pricing Mode",
-            "timeout_seconds": "⏱ Timeout"
-          },
           "tronpays_rial": {
             "base_url": "🌐 Base URL",
             "merchant_key": "🔑 Merchant Key",
@@ -1358,16 +1337,6 @@
             "tolerance_percent": "🎯 خطای مجاز",
             "pricing_mode": "💹 قیمت‌گذاری",
             "timeout_seconds": "⏱ انتظار"
-          },
-          "swapwallet_crypto": {
-            "base_url": "🌐 Base URL",
-            "merchant_key": "🔑 API Key",
-            "username": "👤 Username",
-            "network": "🌉 Network",
-            "asset": "🪙 Asset",
-            "callback_url": "🔁 نشانی بازگشت",
-            "pricing_mode": "💹 Pricing",
-            "timeout_seconds": "⏱ Timeout"
           },
           "tronpays_rial": {
             "base_url": "🌐 Base URL",
