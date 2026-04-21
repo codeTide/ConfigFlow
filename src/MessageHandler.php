@@ -56,7 +56,6 @@ final class MessageHandler
     private const ADMIN_REQUEST_APPROVE = '[legacy] admin.payments_requests.actions.request_approve';
     private const ADMIN_REQUEST_REJECT = '[legacy] admin.payments_requests.actions.request_reject';
     private const ADMIN_SETTINGS_REFRESH = '[legacy] admin.settings_admins_pins.actions.settings_refresh';
-    private const ADMIN_SETTINGS_EDIT = '[legacy] admin.settings_admins_pins.actions.settings_edit';
     private const ADMIN_SETTINGS_TOGGLE_BOT = '[legacy] admin.settings_admins_pins.actions.settings_toggle_bot';
     private const ADMIN_SETTINGS_TOGGLE_AGENCY = '[legacy] admin.settings_admins_pins.actions.settings_toggle_agency';
     private const ADMIN_SETTINGS_TOGGLE_GW_CARD = '[legacy] admin.settings_admins_pins.actions.settings_toggle_gw_card';
@@ -320,7 +319,7 @@ final class MessageHandler
 
         if (
             $state['state_name'] === 'admin.settings.view'
-            || $state['state_name'] === 'admin.settings.edit'
+            || $state['state_name'] === 'admin.settings.channel'
             || $state['state_name'] === 'admin.admins.list'
             || $state['state_name'] === 'admin.admin.view'
             || $state['state_name'] === 'admin.admin.create'
@@ -4621,8 +4620,6 @@ final class MessageHandler
         $settingsToggleGwCryptoLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_crypto');
         $settingsToggleGwTetraLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_gw_tetra');
         $settingsSetChannelLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_channel');
-        $settingsSetDeliveryModeLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_delivery_mode');
-        $settingsEditLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_edit');
         $adminsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.admins_add');
         $adminDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.admin_delete');
         $pinsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.pins_add');
@@ -4655,18 +4652,22 @@ final class MessageHandler
                 $cur = $this->settings->get('bot_status', 'on');
                 $next = $cur === 'on' ? 'update' : ($cur === 'update' ? 'off' : 'on');
                 $this->settings->set('bot_status', $next);
-                $this->openAdminSettingsView($chatId, $userId, $this->messageRenderer->render('admin.settings_admins_pins.success.bot_status_updated'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.success.bot_status_updated', [
+                    'status_title' => $this->catalog->get('admin.settings_admins_pins.labels.bot_status_' . $next),
+                    'status_description' => $this->catalog->get('admin.settings_admins_pins.labels.bot_status_' . $next . '_description'),
+                    'status_note' => $this->catalog->get('admin.settings_admins_pins.labels.bot_status_' . $next . '_note'),
+                ]));
                 return;
             }
             if (isset($toggleMap[$text])) {
                 $key = $toggleMap[$text];
                 $current = $this->settings->get($key, '0');
                 $this->settings->set($key, $current === '1' ? '0' : '1');
-                $this->openAdminSettingsView($chatId, $userId, $this->messageRenderer->render('admin.settings_admins_pins.success.setting_updated'));
+                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.success.setting_updated'));
                 return;
             }
             if ($text === $settingsSetChannelLabel || $text === $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)) {
-                $this->database->setUserState($userId, 'admin.settings.edit', ['mode' => 'channel', 'stack' => ['admin.settings.view', 'admin.root']]);
+                $this->database->setUserState($userId, 'admin.settings.channel', ['stack' => ['admin.settings.view', 'admin.root']]);
                 $this->telegram->sendMessage(
                     $chatId,
                     $this->messageRenderer->render('admin.settings_admins_pins.prompts.set_channel_overview'),
@@ -4674,28 +4675,9 @@ final class MessageHandler
                 );
                 return;
             }
-            if ($text === $settingsSetDeliveryModeLabel) {
-                $this->database->setUserState($userId, 'admin.settings.edit', ['mode' => 'delivery_mode', 'stack' => ['admin.settings.view', 'admin.root']]);
-                $this->telegram->sendMessage(
-                    $chatId,
-                    $this->messageRenderer->render('admin.settings_admins_pins.prompts.delivery_mode_input'),
-                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
-                );
-                return;
-            }
-            if ($text === $settingsEditLabel || $text === $this->uiConst(self::ADMIN_SETTINGS_EDIT)) {
-                $this->database->setUserState($userId, 'admin.settings.edit', ['mode' => 'kv', 'stack' => ['admin.settings.view', 'admin.root']]);
-                $this->telegram->sendMessage(
-                    $chatId,
-                    $this->messageRenderer->render('admin.settings_admins_pins.prompts.edit_setting_overview'),
-                    $this->uiKeyboard->replyMenu([[UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
-                );
-                return;
-            }
         }
 
-        if ($stateName === 'admin.settings.edit') {
-            $mode = (string) ($payload['mode'] ?? 'kv');
+        if ($stateName === 'admin.settings.channel') {
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminSettingsView($chatId, $userId);
                 return;
@@ -4704,34 +4686,12 @@ final class MessageHandler
                 $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.errors.invalid_input'));
                 return;
             }
-            if ($mode === 'channel') {
-                $value = trim($text);
-                if ($value === '-' || $value === '—') {
-                    $value = '';
-                }
-                $this->settings->set('channel_id', $value);
-                $this->openAdminSettingsView($chatId, $userId, $this->messageRenderer->render('admin.settings_admins_pins.success.lock_channel_updated'));
-                return;
+            $value = trim($text);
+            if ($value === '-' || $value === '—') {
+                $value = '';
             }
-            if ($mode === 'delivery_mode') {
-                $value = trim($text);
-                if (!in_array($value, ['stock_only', 'panel_only'], true)) {
-                    $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.errors.invalid_delivery_mode'));
-                    return;
-                }
-                $this->settings->set('delivery_mode', $value);
-                $this->openAdminSettingsView($chatId, $userId, $this->messageRenderer->render('admin.settings_admins_pins.success.delivery_mode_saved'));
-                return;
-            }
-            $parts = array_map('trim', explode('|', $text, 2));
-            $key = (string) ($parts[0] ?? '');
-            $value = (string) ($parts[1] ?? '');
-            if ($key === '' || count($parts) < 2) {
-                $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.errors.invalid_kv_format'));
-                return;
-            }
-            $this->settings->set($key, $value);
-            $this->openAdminSettingsView($chatId, $userId, $this->messageRenderer->render('admin.settings_admins_pins.success.setting_saved'));
+            $this->settings->set('channel_id', $value);
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.success.lock_channel_updated'));
             return;
         }
 
@@ -4953,25 +4913,21 @@ final class MessageHandler
             'gw_crypto_enabled' => $this->settings->get('gw_crypto_enabled', '0'),
             'gw_tetrapay_enabled' => $this->settings->get('gw_tetrapay_enabled', '0'),
             'channel_id' => trim($this->settings->get('channel_id', '')),
-            'delivery_mode' => $this->settings->get('delivery_mode', 'stock_only'),
         ];
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
         $this->database->setUserState($userId, 'admin.settings.view', ['stack' => ['admin.root']]);
         $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.ui.open.settings_admins_pins.settings.overview', [
-            'bot_status' => $vals['bot_status'],
+            'bot_status' => $this->catalog->get('admin.settings_admins_pins.labels.bot_status_' . $vals['bot_status']),
             'agency_request_enabled' => $vals['agency_request_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'gw_card_enabled' => $vals['gw_card_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'gw_crypto_enabled' => $vals['gw_crypto_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'gw_tetrapay_enabled' => $vals['gw_tetrapay_enabled'] === '1' ? $this->messageRenderer->render('messages.generic.status_enabled_icon') : $this->messageRenderer->render('messages.generic.status_disabled_icon'),
             'channel_id' => $vals['channel_id'] !== '' ? $vals['channel_id'] : $this->catalog->get('admin.ui.open.settings_admins_pins.settings.channel_unset'),
-            'delivery_mode_label' => $this->catalog->get('admin.settings_admins_pins.labels.delivery_mode'),
-            'delivery_mode' => (string) $vals['delivery_mode'],
         ]), $this->uiKeyboard->replyMenu([
-            [$this->uiConst(self::ADMIN_SETTINGS_REFRESH), $this->uiConst(self::ADMIN_SETTINGS_EDIT)],
+            [$this->uiConst(self::ADMIN_SETTINGS_REFRESH)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
-            [$this->catalog->get('admin.settings_admins_pins.actions.settings_set_delivery_mode')],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CARD), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_CRYPTO), $this->uiConst(self::ADMIN_SETTINGS_TOGGLE_GW_TETRA)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
