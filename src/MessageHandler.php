@@ -58,6 +58,7 @@ final class MessageHandler
     private const ADMIN_SETTINGS_TOGGLE_BOT = '[legacy] admin.settings_admins_pins.actions.settings_toggle_bot';
     private const ADMIN_SETTINGS_TOGGLE_AGENCY = '[legacy] admin.settings_admins_pins.actions.settings_toggle_agency';
     private const ADMIN_SETTINGS_SET_CHANNEL = '[legacy] admin.settings_admins_pins.actions.settings_set_channel';
+    private const ADMIN_SETTINGS_PAYMENT_METHODS = 'admin.settings_admins_pins.actions.payment_methods_manage';
     private const ADMIN_ADMINS_ADD = '[legacy] admin.settings_admins_pins.actions.admins_add';
     private const ADMIN_ADMIN_DELETE = '[legacy] admin.settings_admins_pins.actions.admin_delete';
     private const ADMIN_PINS_ADD = '[legacy] admin.settings_admins_pins.actions.pins_add';
@@ -4603,6 +4604,13 @@ final class MessageHandler
                 $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
                 return;
             }
+            $value = trim($text);
+            if ($value === '-' || $value === '—') {
+                $value = '';
+            }
+            $this->settings->set('channel_id', $value);
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.settings_admins_pins.success.lock_channel_updated'));
+            return;
         }
 
         if ($stateName === 'admin.payment_methods.view') {
