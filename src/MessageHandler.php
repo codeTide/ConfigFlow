@@ -4035,7 +4035,7 @@ final class MessageHandler
                     $config = $this->paymentMethods->getMethodConfig($code);
                     $current = ((int) ($config[$field] ?? 0)) === 1 ? 1 : 0;
                     $this->paymentMethods->setMethodConfigValue($code, $field, $current === 1 ? 0 : 1);
-                    $this->openAdminPaymentMethodProviderMenu($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.updated_config'));
+                    $this->openAdminPaymentMethodProviderMenu($chatId, $userId, $methodId);
                     return;
                 }
                 $this->database->setUserState($userId, 'admin.payment_methods.edit_provider_config', [

@@ -1216,7 +1216,7 @@
           "nowpayments": {
             "api_key": "🔑 کلید ای پی آی",
             "ipn_secret": "🧷 کلید محرمانه آی پی ان",
-            "callback_url": "🔁 نشانی بازگشت آی پی ان",
+            "callback_url": "🔁 نشانی بازگشت",
             "is_fixed_rate": "📌 نرخ",
             "is_fee_paid_by_user": "💸 کارمزد"
           }
@@ -1232,7 +1232,7 @@
           "nowpayments": {
             "api_key": "🔑 کلید ای پی آی",
             "ipn_secret": "🧷 کلید محرمانه آی پی ان",
-            "callback_url": "🔁 نشانی بازگشت آی پی ان",
+            "callback_url": "🔁 نشانی بازگشت",
             "is_fixed_rate": "📌 تغییر به نرخ ثابت",
             "is_fee_paid_by_user": "💸 کارمزد با کاربر"
           }
