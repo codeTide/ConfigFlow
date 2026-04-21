@@ -7,9 +7,7 @@ namespace ConfigFlow\Bot;
 final class MessageHandler
 {
     private const PAY_WALLET = '[legacy] buttons.pay.wallet';
-    private const PAY_CRYPTO = '[legacy] buttons.pay.crypto';
     private const PAY_TETRAPAY = '[legacy] buttons.pay.tetrapay';
-    private const PAY_TRONPAYS = '[legacy] buttons.pay.tronpays';
     private const PAY_VERIFY = '[legacy] buttons.pay.verify';
     private const ACCEPT_RULES = '[legacy] buttons.accept_rules';
     private const ADMIN_SERVICE_ADD = '[legacy] admin.types_tariffs.actions.add_service';
@@ -43,10 +41,6 @@ final class MessageHandler
     private const ADMIN_STOCK_SEARCH_CLEAR = '[legacy] admin.users_stock.actions.stock_search_clear';
     private const ADMIN_STOCK_EXPIRE_TOGGLE = '[legacy] admin.users_stock.actions.stock_expire_toggle';
     private const ADMIN_STOCK_DELETE_CONFIG = '[legacy] admin.users_stock.actions.stock_delete_config';
-    private const ADMIN_PAYMENTS_REFRESH = '[legacy] admin.payments_requests.actions.payments_refresh';
-    private const ADMIN_PAYMENT_APPROVE = '[legacy] admin.payments_requests.actions.payment_approve';
-    private const ADMIN_PAYMENT_REJECT = '[legacy] admin.payments_requests.actions.payment_reject';
-    private const ADMIN_PAYMENT_VERIFY_CHAIN = '[legacy] admin.payments_requests.actions.payment_verify_chain';
     private const ADMIN_REQUESTS_AGENCY = '[legacy] admin.payments_requests.actions.requests_agency';
     private const ADMIN_REQUESTS_PENDING = '[legacy] admin.ui.open.requests.list.filter_pending';
     private const ADMIN_REQUESTS_APPROVED = '[legacy] admin.ui.open.requests.list.filter_approved';
@@ -304,10 +298,7 @@ final class MessageHandler
         }
 
         if (
-            $state['state_name'] === 'admin.payments.list'
-            || $state['state_name'] === 'admin.payment.view'
-            || $state['state_name'] === 'admin.payment.review'
-            || $state['state_name'] === 'admin.requests.list'
+            $state['state_name'] === 'admin.requests.list'
             || $state['state_name'] === 'admin.request.view'
             || $state['state_name'] === 'admin.request.review'
         ) {
@@ -388,120 +379,7 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_crypto_tx') {
-            $payload = $state['payload'] ?? [];
-            $paymentId = (int) ($payload['payment_id'] ?? 0);
-            if ($paymentId <= 0) {
-                $this->database->clearUserState($userId);
-                return;
-            }
 
-            $raw = trim((string) ($message['text'] ?? ''));
-            $parts = preg_split('/\s+/', $raw) ?: [];
-            $txHash = trim((string) ($parts[0] ?? ''));
-            $claimedAmount = null;
-            if (isset($parts[1]) && is_numeric(str_replace(',', '.', (string) $parts[1]))) {
-                $claimedAmount = (float) str_replace(',', '.', (string) $parts[1]);
-            }
-            if ($txHash === '' || str_starts_with($txHash, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid'));
-                return;
-            }
-            if (strlen($txHash) < 10) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid_length'));
-                return;
-            }
-
-            $ok = $this->database->submitCryptoTxHash($paymentId, $txHash, $claimedAmount);
-            if (!$ok) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.submit_failed'));
-                return;
-            }
-
-            $this->database->clearUserState($userId);
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->catalog->get('messages.user.payment.tx.saved_purchase', ['payment_id' => $paymentId])
-            );
-
-            $adminKeyboard = $this->replyKeyboard([
-                [
-                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
-                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
-                ],
-                [KeyboardBuilder::admin()],
-            ]);
-            foreach (Config::adminIds() as $adminId) {
-                $this->telegram->sendMessage(
-                    (int) $adminId,
-                    $this->catalog->get('admin.payments.tx_new', [
-                        'payment_id' => $paymentId,
-                        'user_id' => $userId,
-                        'tx_hash' => htmlspecialchars($txHash),
-                        'amount_line' => $claimedAmount !== null ? $this->catalog->get('admin.payments.amount_line', ['amount' => $claimedAmount]) : '',
-                    ]),
-                    $adminKeyboard
-                );
-            }
-        }
-
-        if ($state['state_name'] === 'await_renewal_crypto_tx') {
-            $payload = $state['payload'] ?? [];
-            $paymentId = (int) ($payload['payment_id'] ?? 0);
-            if ($paymentId <= 0) {
-                $this->database->clearUserState($userId);
-                return;
-            }
-
-            $raw = trim((string) ($message['text'] ?? ''));
-            $parts = preg_split('/\s+/', $raw) ?: [];
-            $txHash = trim((string) ($parts[0] ?? ''));
-            $claimedAmount = null;
-            if (isset($parts[1]) && is_numeric(str_replace(',', '.', (string) $parts[1]))) {
-                $claimedAmount = (float) str_replace(',', '.', (string) $parts[1]);
-            }
-            if ($txHash === '' || str_starts_with($txHash, '/')) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid'));
-                return;
-            }
-            if (strlen($txHash) < 10) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.invalid_length'));
-                return;
-            }
-
-            $ok = $this->database->submitCryptoTxHash($paymentId, $txHash, $claimedAmount);
-            if (!$ok) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tx.submit_failed'));
-                return;
-            }
-
-            $this->database->clearUserState($userId);
-            $this->telegram->sendMessage(
-                $chatId,
-                $this->catalog->get('messages.user.payment.tx.saved_renew', ['payment_id' => $paymentId])
-            );
-
-            $adminKeyboard = $this->replyKeyboard([
-                [
-                    $this->catalog->get('admin.payments.actions.approve', ['payment_id' => $paymentId]),
-                    $this->catalog->get('admin.payments.actions.reject', ['payment_id' => $paymentId]),
-                ],
-                [KeyboardBuilder::admin()],
-            ]);
-            foreach (Config::adminIds() as $adminId) {
-                $this->telegram->sendMessage(
-                    (int) $adminId,
-                    $this->catalog->get('admin.payments.tx_renew_new', [
-                        'payment_id' => $paymentId,
-                        'user_id' => $userId,
-                        'tx_hash' => htmlspecialchars($txHash),
-                        'amount_line' => $claimedAmount !== null ? $this->catalog->get('admin.payments.amount_line', ['amount' => $claimedAmount]) : '',
-                    ]),
-                    $adminKeyboard
-                );
-            }
-            return;
-        }
 
         if ($state['state_name'] === 'await_agency_request') {
             if ($this->isBotMenuButton($text)) {
@@ -3990,89 +3868,12 @@ final class MessageHandler
 
         $stateName = (string) ($state['state_name'] ?? '');
         $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
-        $paymentsRefreshLabel = $this->catalog->get('admin.payments_requests.actions.payments_refresh');
-        $paymentVerifyChainLabel = $this->catalog->get('admin.payments_requests.actions.payment_verify_chain');
-        $paymentApproveLabel = $this->catalog->get('admin.payments_requests.actions.payment_approve');
-        $paymentRejectLabel = $this->catalog->get('admin.payments_requests.actions.payment_reject');
         $requestsAgencyLabel = $this->catalog->get('admin.payments_requests.actions.requests_agency');
         $requestsPendingLabel = $this->catalog->get('admin.payments_requests.actions.requests_pending');
         $requestsApprovedLabel = $this->catalog->get('admin.payments_requests.actions.requests_approved');
         $requestsRejectedLabel = $this->catalog->get('admin.payments_requests.actions.requests_rejected');
         $requestApproveLabel = $this->catalog->get('admin.payments_requests.actions.request_approve');
         $requestRejectLabel = $this->catalog->get('admin.payments_requests.actions.request_reject');
-
-        if ($stateName === 'admin.payments.list') {
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminRoot($chatId, $userId);
-                return;
-            }
-            if ($text === $paymentsRefreshLabel || $text === $this->uiConst(self::ADMIN_PAYMENTS_REFRESH)) {
-                $this->openAdminPaymentsList($chatId, $userId);
-                return;
-            }
-            $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
-            $selected = $this->extractOptionKey($text);
-            $paymentId = isset($options[$selected]) ? (int) $options[$selected] : 0;
-            if ($paymentId > 0) {
-                $this->openAdminPaymentView($chatId, $userId, $paymentId);
-                return;
-            }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.payments_requests.errors.invalid_payment_option'));
-            return;
-        }
-
-        if ($stateName === 'admin.payment.view') {
-            $paymentId = (int) ($payload['payment_id'] ?? 0);
-            if ($paymentId <= 0) {
-                $this->openAdminPaymentsList($chatId, $userId, $this->messageRenderer->render('admin.payments_requests.errors.invalid_payment_id'));
-                return;
-            }
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminPaymentsList($chatId, $userId);
-                return;
-            }
-            if ($text === $paymentVerifyChainLabel || $text === $this->uiConst(self::ADMIN_PAYMENT_VERIFY_CHAIN)) {
-                $this->database->setUserState($userId, 'admin.payment.review', [
-                    'payment_id' => $paymentId,
-                    'action' => 'verify',
-                    'stack' => ['admin.payment.view', 'admin.payments.list', 'admin.root'],
-                ]);
-                $this->processAdminPaymentReview($chatId, $userId, $paymentId, 'verify');
-                return;
-            }
-            if (
-                $text === $paymentApproveLabel
-                || $text === $this->uiConst(self::ADMIN_PAYMENT_APPROVE)
-                || $text === $paymentRejectLabel
-                || $text === $this->uiConst(self::ADMIN_PAYMENT_REJECT)
-            ) {
-                $action = ($text === $paymentApproveLabel || $text === $this->uiConst(self::ADMIN_PAYMENT_APPROVE)) ? 'approve' : 'reject';
-                $this->database->setUserState($userId, 'admin.payment.review', [
-                    'payment_id' => $paymentId,
-                    'action' => $action,
-                    'stack' => ['admin.payment.view', 'admin.payments.list', 'admin.root'],
-                ]);
-                $this->processAdminPaymentReview($chatId, $userId, $paymentId, $action);
-                return;
-            }
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('admin.payments_requests.errors.invalid_payment_review_action'));
-            return;
-        }
-
-        if ($stateName === 'admin.payment.review') {
-            $paymentId = (int) ($payload['payment_id'] ?? 0);
-            if ($paymentId <= 0) {
-                $this->openAdminPaymentsList($chatId, $userId, $this->messageRenderer->render('admin.payments_requests.errors.invalid_payment'));
-                return;
-            }
-            if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminPaymentView($chatId, $userId, $paymentId);
-                return;
-            }
-            $this->openAdminPaymentView($chatId, $userId, $paymentId);
-            return;
-        }
-
         if ($stateName === 'admin.requests.list') {
             if ($text === UiLabels::back($this->catalog)) {
                 $this->openAdminRoot($chatId, $userId);
@@ -4207,163 +4008,6 @@ final class MessageHandler
             return;
         }
     }
-
-    private function openAdminPaymentsList(int $chatId, int $userId, ?string $notice = null): void
-    {
-        $items = $this->database->listWaitingAdminPayments(30);
-        $options = [];
-        $lines = [];
-        $buttons = [[$this->uiConst(self::ADMIN_PAYMENTS_REFRESH)]];
-        foreach (array_values($items) as $idx => $item) {
-            $num = (string) ($idx + 1);
-            $paymentId = (int) ($item['id'] ?? 0);
-            if ($paymentId <= 0) {
-                continue;
-            }
-            $kind = (string) ($item['kind'] ?? $this->catalog->get('messages.generic.dash'));
-            $uid = (int) ($item['user_id'] ?? 0);
-            $amount = (int) ($item['amount'] ?? 0);
-            $method = (string) ($item['payment_method'] ?? $this->catalog->get('messages.generic.dash'));
-            $lines[] = $this->catalog->get('admin.ui.open.payments.list.row', ['num' => $num, 'payment_id' => $paymentId, 'kind' => $kind, 'uid' => $uid, 'amount' => $amount, 'method' => $method]);
-            $options[$num] = $paymentId;
-            $buttons[] = [$this->catalog->get('admin.ui.open.payments.list.button', ['num' => $num, 'payment_id' => $paymentId])];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.payments.list', ['options' => $options, 'stack' => ['admin.root']]);
-        if ($notice !== null && $notice !== '') {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('admin.ui.open.payments.list.overview', [
-                'list' => $lines !== [] ? implode("\n", $lines) : $this->catalog->get('admin.ui.open.payments.list.empty'),
-            ], ['list']),
-            $this->uiKeyboard->replyMenu($buttons)
-        );
-    }
-
-    private function openAdminPaymentView(int $chatId, int $userId, int $paymentId, ?string $notice = null): void
-    {
-        $payment = $this->database->getPaymentById($paymentId);
-        if ($payment === null) {
-            $this->openAdminPaymentsList($chatId, $userId, $this->messageRenderer->render('admin.ui.open.payments.view.not_found'));
-            return;
-        }
-        if ($notice !== null && $notice !== '') {
-            $this->telegram->sendMessage($chatId, $notice);
-        }
-
-        $status = (string) ($payment['status'] ?? $this->catalog->get('messages.generic.dash'));
-        $method = (string) ($payment['payment_method'] ?? $this->catalog->get('messages.generic.dash'));
-        $buttons = [];
-        if (str_starts_with($method, 'crypto:')) {
-            $buttons[] = [$this->uiConst(self::ADMIN_PAYMENT_VERIFY_CHAIN)];
-        }
-        if ($status === 'waiting_admin') {
-            $buttons[] = [$this->uiConst(self::ADMIN_PAYMENT_APPROVE), $this->uiConst(self::ADMIN_PAYMENT_REJECT)];
-        }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-
-        $this->database->setUserState($userId, 'admin.payment.view', ['payment_id' => $paymentId, 'stack' => ['admin.payments.list', 'admin.root']]);
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('admin.ui.open.payments.view.overview', [
-                'payment_id' => $paymentId,
-                'user_id' => (int) ($payment['user_id'] ?? 0),
-                'amount' => (int) ($payment['amount'] ?? 0),
-                'method' => $method,
-                'status' => $status,
-            ]),
-            $this->uiKeyboard->replyMenu($buttons)
-        );
-    }
-
-    private function processAdminPaymentReview(int $chatId, int $userId, int $paymentId, string $action): void
-    {
-        if ($action === 'verify') {
-            $attempt = $this->database->registerVerifyAttempt($paymentId);
-            if (!(bool) ($attempt['ok'] ?? false)) {
-                $error = (string) ($attempt['error'] ?? '');
-                $message = match ($error) {
-                    'cooldown' => $this->catalog->get('admin.ui.audit.payment_review.cooldown'),
-                    'max_attempts' => $this->catalog->get('admin.ui.audit.payment_review.max_attempts'),
-                    default => $this->catalog->get('admin.ui.audit.payment_review.unavailable'),
-                };
-                $this->openAdminPaymentView($chatId, $userId, $paymentId, $message);
-                return;
-            }
-
-            $payment = $this->database->getPaymentById($paymentId);
-            if ($payment === null) {
-                $this->openAdminPaymentsList($chatId, $userId, $this->messageRenderer->render('admin.ui.audit.payment_review.payment_not_found'));
-                return;
-            }
-            $pm = (string) ($payment['payment_method'] ?? '');
-            if (!str_starts_with($pm, 'crypto:')) {
-                $this->openAdminPaymentView($chatId, $userId, $paymentId, $this->messageRenderer->render('admin.ui.audit.payment_review.not_crypto'));
-                return;
-            }
-            $coin = trim(substr($pm, strlen('crypto:')));
-            $txHash = trim((string) ($payment['tx_hash'] ?? ''));
-            $claimedCoin = isset($payment['crypto_amount_claimed']) ? (float) $payment['crypto_amount_claimed'] : null;
-            if ($txHash === '') {
-                $this->openAdminPaymentView($chatId, $userId, $paymentId, $this->messageRenderer->render('admin.ui.audit.payment_review.tx_hash_missing'));
-                return;
-            }
-
-            $verify = $this->gateways->verifyCryptoTransaction($coin, $txHash);
-            $effectivePaidCoin = $this->gateways->resolveEffectivePaidAmount($verify, $claimedCoin);
-            $amountCheck = $this->gateways->validateClaimedAmount($coin, (int) ($payment['amount'] ?? 0), $effectivePaidCoin);
-            $this->database->setPaymentProviderPayload($paymentId, [
-                'source' => 'crypto_verify',
-                'response' => $verify,
-                'effective_paid_coin' => $effectivePaidCoin,
-                'amount_check' => $amountCheck,
-            ]);
-
-            $chainConfirmed = (($verify['ok'] ?? false) && ($verify['confirmed'] ?? false));
-            $amountMatched = (($amountCheck['ok'] ?? false) && ($amountCheck['amount_match'] ?? false));
-            $canApprove = $chainConfirmed || (($verify['error'] ?? '') === 'coin_not_supported_yet' && $amountMatched);
-            if ($canApprove) {
-                $result = $this->database->applyAdminPaymentDecision($paymentId, true);
-                if ($result['ok'] ?? false) {
-                    $this->notifyPaymentDecision((int) ($result['user_id'] ?? 0), (string) ($result['kind'] ?? ''), (int) ($result['amount'] ?? 0), true);
-                    $this->openAdminPaymentView($chatId, $userId, $paymentId, $this->messageRenderer->render('admin.ui.audit.payment_review.crypto_confirmed'));
-                    return;
-                }
-            }
-            $this->openAdminPaymentView($chatId, $userId, $paymentId, $this->messageRenderer->render('admin.ui.audit.payment_review.tx_not_confirmed_or_invalid'));
-            return;
-        }
-
-        $approve = $action === 'approve';
-        $result = $this->database->applyAdminPaymentDecision($paymentId, $approve);
-        if (!($result['ok'] ?? false)) {
-            $this->openAdminPaymentView($chatId, $userId, $paymentId, $this->messageRenderer->render('admin.ui.audit.payment_review.request_not_processable'));
-            return;
-        }
-        $this->notifyPaymentDecision((int) ($result['user_id'] ?? 0), (string) ($result['kind'] ?? ''), (int) ($result['amount'] ?? 0), $approve);
-        $statusText = $approve ? $this->catalog->get('admin.legacy.labels.status_approved') : $this->catalog->get('admin.legacy.labels.status_rejected');
-        $this->openAdminPaymentsList($chatId, $userId, $this->messageRenderer->render('admin.ui.audit.payment_review.request_status', ['payment_id' => $paymentId, 'status_text' => $statusText]));
-    }
-
-    private function notifyPaymentDecision(int $targetUserId, string $kind, int $amount, bool $approve): void
-    {
-        if ($targetUserId <= 0) {
-            return;
-        }
-        if ($kind === 'renewal') {
-            $userNotice = $approve
-                ? $this->catalog->get('admin.ui.audit.user_notice.renewal_approved')
-                : $this->catalog->get('admin.ui.audit.user_notice.renewal_rejected');
-        } else {
-            $userNotice = $approve
-                ? $this->catalog->get('admin.ui.audit.user_notice.order_approved')
-                : $this->catalog->get('admin.ui.audit.user_notice.order_rejected');
-        }
-        $this->telegram->sendMessage($targetUserId, $userNotice);
-    }
-
     private function openAdminRequestsList(int $chatId, int $userId, string $kind = 'agency', string $status = 'pending', ?string $notice = null): void
     {
         if ($notice !== null && $notice !== '') {
@@ -6685,22 +6329,15 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+        $gatewayCode = $this->resolveSelectedGatewayCode($text);
+        if ($gatewayCode !== null) {
             $this->database->clearUserState($userId);
-            $this->createPurchasePaymentByMethod($chatId, $userId, $tariffId, $text);
+            $this->createPurchasePaymentByMethod($chatId, $userId, $tariffId, $gatewayCode);
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
-            $this->database->clearUserState($userId);
-            $this->createPurchaseGatewayInvoice($chatId, $userId, $tariffId);
-            return;
-        }
-
-        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
-            return;
-        }
+        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
+        return;
     }
 
     private function openServicePaymentSelection(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb): void
@@ -6831,14 +6468,10 @@ final class MessageHandler
             );
             return;
         }
-        if ($text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+        $gatewayCode = $this->resolveSelectedGatewayCode($text);
+        if ($gatewayCode !== null) {
             $this->database->clearUserState($userId);
-            $this->createServicePurchasePaymentByMethod($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb, $text);
-            return;
-        }
-        if ($text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
-            $this->database->clearUserState($userId);
-            $this->createServicePurchaseGatewayInvoice($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb);
+            $this->createServicePurchasePaymentByMethod($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb, $gatewayCode);
             return;
         }
         $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
@@ -6928,15 +6561,10 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+        $gatewayCode = $this->resolveSelectedGatewayCode($text);
+        if ($gatewayCode !== null) {
             $this->database->clearUserState($userId);
-            $this->createPanelPurchasePaymentByMethod($chatId, $userId, $serviceId, $selectedVolumeGb, $computedAmount, $text);
-            return;
-        }
-
-        if ($text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
-            $this->database->clearUserState($userId);
-            $this->createPanelPurchaseGatewayInvoice($chatId, $userId, $serviceId, $selectedVolumeGb, $computedAmount);
+            $this->createPanelPurchasePaymentByMethod($chatId, $userId, $serviceId, $selectedVolumeGb, $computedAmount, $gatewayCode);
             return;
         }
 
@@ -6995,41 +6623,33 @@ final class MessageHandler
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.crypto') || $text === $this->uiConst(self::PAY_CRYPTO) || $text === $this->catalog->get('buttons.pay.tetrapay') || $text === $this->uiConst(self::PAY_TETRAPAY)) {
+        $gatewayCode = $this->resolveSelectedGatewayCode($text);
+        if ($gatewayCode !== null) {
             $this->database->clearUserState($userId);
-            $this->createRenewalPaymentByMethod($chatId, $userId, $purchaseId, $tariffId, $text);
+            $this->createRenewalPaymentByMethod($chatId, $userId, $purchaseId, $tariffId, $gatewayCode);
             return;
         }
 
-        if ($text === $this->catalog->get('buttons.pay.tronpays') || $text === $this->uiConst(self::PAY_TRONPAYS)) {
-            $this->database->clearUserState($userId);
-            $this->createRenewalGatewayInvoice($chatId, $userId, $purchaseId, $tariffId);
-            return;
-        }
-
-        if ($text !== $this->catalog->get('buttons.pay.wallet') && $text !== $this->uiConst(self::PAY_WALLET) && $text !== $this->catalog->get('buttons.pay.crypto') && $text !== $this->uiConst(self::PAY_CRYPTO) && $text !== $this->catalog->get('buttons.pay.tetrapay') && $text !== $this->uiConst(self::PAY_TETRAPAY) && $text !== $this->catalog->get('buttons.pay.tronpays') && $text !== $this->uiConst(self::PAY_TRONPAYS)) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
-            return;
-        }
+        $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
+        return;
     }
 
-    private function createPurchasePaymentByMethod(int $chatId, int $userId, int $tariffId, string $methodLabel): void
+    private function createPurchasePaymentByMethod(int $chatId, int $userId, int $tariffId, string $gatewayCode): void
     {
-        $method = ($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay';
-        $tariff = $this->database->getServiceTariff($tariffId);
+                $tariff = $this->database->getServiceTariff($tariffId);
         if ($tariff === null) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.tariff_not_found'));
             return;
         }
         $amount = (int) $this->database->effectiveTariffPrice($userId, $tariff);
-        $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
+        $paymentMethod = $gatewayCode;
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
             'tariff_id' => $tariffId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
-            'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
+            'status' => 'waiting_gateway',
             'gateway_ref' => null,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
@@ -7042,16 +6662,8 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($method === 'crypto') {
-            $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
-            $text = $this->catalog->get('messages.user.payment.crypto_purchase_intro', [
-                'pending_id' => $pendingId,
-                'amount' => $amount,
-                'address_block' => $address !== '' ? $this->catalog->get('messages.user.payment.address_block', ['address' => $address]) : '',
-            ]);
-            $this->database->setUserState($userId, 'await_crypto_tx', ['payment_id' => $paymentId]);
-            $this->telegram->sendMessage($chatId, $text);
+        if ($gatewayCode !== 'tetrapay') {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
             return;
         }
 
@@ -7076,7 +6688,7 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
     }
 
-    private function createPanelPurchasePaymentByMethod(int $chatId, int $userId, int $serviceId, float $selectedVolumeGb, int $amount, string $methodLabel): void
+    private function createPanelPurchasePaymentByMethod(int $chatId, int $userId, int $serviceId, float $selectedVolumeGb, int $amount, string $gatewayCode): void
     {
         $service = $this->database->getProvisioningService($serviceId);
         if (!is_array($service) || !$this->database->validatePanelServiceVolume($service, $selectedVolumeGb)) {
@@ -7084,15 +6696,14 @@ final class MessageHandler
             return;
         }
 
-        $method = ($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay';
-        $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
+                $paymentMethod = $gatewayCode;
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
             'tariff_id' => null,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
-            'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
+            'status' => 'waiting_gateway',
             'gateway_ref' => null,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
@@ -7109,16 +6720,8 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($method === 'crypto') {
-            $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
-            $text = $this->catalog->get('messages.user.payment.crypto_purchase_intro', [
-                'pending_id' => $pendingId,
-                'amount' => $amount,
-                'address_block' => $address !== '' ? $this->catalog->get('messages.user.payment.address_block', ['address' => $address]) : '',
-            ]);
-            $this->database->setUserState($userId, 'await_crypto_tx', ['payment_id' => $paymentId]);
-            $this->telegram->sendMessage($chatId, $text);
+        if ($gatewayCode !== 'tetrapay') {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
             return;
         }
 
@@ -7143,7 +6746,7 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
     }
 
-    private function createServicePurchasePaymentByMethod(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb, string $methodLabel): void
+    private function createServicePurchasePaymentByMethod(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb, string $gatewayCode): void
     {
         $service = $this->database->getService($serviceId);
         $tariff = $this->database->getServiceTariffForService($serviceId, $tariffId);
@@ -7160,8 +6763,7 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.panel.errors.invalid_volume'));
             return;
         }
-        $method = ($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay';
-        $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
+                $paymentMethod = $gatewayCode;
         $paymentId = $this->database->createPayment([
             'kind' => 'purchase',
             'user_id' => $userId,
@@ -7170,7 +6772,7 @@ final class MessageHandler
             'tariff_id' => $tariffId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
-            'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
+            'status' => 'waiting_gateway',
             'gateway_ref' => null,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
@@ -7187,16 +6789,8 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($method === 'crypto') {
-            $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
-            $text = $this->catalog->get('messages.user.payment.crypto_purchase_intro', [
-                'pending_id' => $pendingId,
-                'amount' => $amount,
-                'address_block' => $address !== '' ? $this->catalog->get('messages.user.payment.address_block', ['address' => $address]) : '',
-            ]);
-            $this->database->setUserState($userId, 'await_crypto_tx', ['payment_id' => $paymentId]);
-            $this->telegram->sendMessage($chatId, $text);
+        if ($gatewayCode !== 'tetrapay') {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
             return;
         }
 
@@ -7221,24 +6815,23 @@ final class MessageHandler
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_purchase'), $pendingId, $amount, $payUrl);
     }
 
-    private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $tariffId, string $methodLabel): void
+    private function createRenewalPaymentByMethod(int $chatId, int $userId, int $purchaseId, int $tariffId, string $gatewayCode): void
     {
-        $method = ($methodLabel === $this->catalog->get('buttons.pay.crypto') || $methodLabel === $this->uiConst(self::PAY_CRYPTO)) ? 'crypto' : 'tetrapay';
-        $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
+                $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
         $tariff = $this->database->getServiceTariff($tariffId);
         if (!is_array($purchase) || $tariff === null) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.renew.invalid_data'));
             return;
         }
         $amount = (int) $tariff['price'];
-        $paymentMethod = $method === 'crypto' ? 'crypto:tron' : $method;
+        $paymentMethod = $gatewayCode;
         $paymentId = $this->database->createPayment([
             'kind' => 'renewal',
             'user_id' => $userId,
             'tariff_id' => $tariffId,
             'amount' => $amount,
             'payment_method' => $paymentMethod,
-            'status' => $method === 'tetrapay' ? 'waiting_gateway' : 'waiting_admin',
+            'status' => 'waiting_gateway',
             'gateway_ref' => null,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
@@ -7251,16 +6844,8 @@ final class MessageHandler
             'created_at' => gmdate('Y-m-d H:i:s'),
             'status' => 'waiting_payment',
         ]);
-
-        if ($method === 'crypto') {
-            $address = htmlspecialchars($this->gateways->cryptoAddress('tron'));
-            $text = $this->catalog->get('messages.user.payment.crypto_renew_intro', [
-                'pending_id' => $pendingId,
-                'amount' => $amount,
-                'address_block' => $address !== '' ? $this->catalog->get('messages.user.payment.address_block', ['address' => $address]) : '',
-            ]);
-            $this->database->setUserState($userId, 'await_renewal_crypto_tx', ['payment_id' => $paymentId]);
-            $this->telegram->sendMessage($chatId, $text);
+        if ($gatewayCode !== 'tetrapay') {
+            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.select_method'));
             return;
         }
 
@@ -7284,196 +6869,6 @@ final class MessageHandler
         $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => 'tetrapay', 'ok_text' => $this->catalog->get('messages.user.payment.ok.tetrapay_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'payment_method' => 'tetrapay']);
         $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tetrapay_renew'), $pendingId, $amount, $payUrl);
     }
-
-    private function createPurchaseGatewayInvoice(int $chatId, int $userId, int $tariffId): void
-    {
-        $gateway = 'tronpays_rial';
-        $tariff = $this->database->getServiceTariff($tariffId);
-        if ($tariff === null) {
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.buy.tariff_not_found'));
-            return;
-        }
-        $amount = (int) $this->database->effectiveTariffPrice($userId, $tariff);
-        $paymentId = $this->database->createPayment([
-            'kind' => 'purchase',
-            'user_id' => $userId,
-            'tariff_id' => $tariffId,
-            'amount' => $amount,
-            'payment_method' => $gateway,
-            'status' => 'waiting_gateway',
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        $pendingId = $this->database->createPendingOrder([
-            'user_id' => $userId,
-            'tariff_id' => $tariffId,
-            'payment_id' => $paymentId,
-            'amount' => $amount,
-            'payment_method' => $gateway,
-            'created_at' => gmdate('Y-m-d H:i:s'),
-            'status' => 'waiting_payment',
-        ]);
-        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-' . $userId . '-' . $tariffId . '-' . time());
-        if (!($invoice['ok'] ?? false)) {
-            $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
-            return;
-        }
-        $invoiceId = (string) ($invoice['invoice_id'] ?? '');
-        if ($invoiceId !== '') {
-            $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
-        }
-        $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'tariff_id' => $tariffId, 'payment_method' => $gateway]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
-    }
-
-    private function createPanelPurchaseGatewayInvoice(int $chatId, int $userId, int $serviceId, float $selectedVolumeGb, int $amount): void
-    {
-        $service = $this->database->getProvisioningService($serviceId);
-        if (!is_array($service) || !$this->database->validatePanelServiceVolume($service, $selectedVolumeGb)) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.panel.errors.invalid_volume'));
-            return;
-        }
-
-        $gateway = 'tronpays_rial';
-        $paymentId = $this->database->createPayment([
-            'kind' => 'purchase',
-            'user_id' => $userId,
-            'tariff_id' => null,
-            'amount' => $amount,
-            'payment_method' => $gateway,
-            'status' => 'waiting_gateway',
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        $pendingId = $this->database->createPendingOrder([
-            'user_id' => $userId,
-            'tariff_id' => null,
-            'order_mode' => 'panel_only',
-            'service_id' => $serviceId,
-            'selected_volume_gb' => $selectedVolumeGb,
-            'computed_amount' => $amount,
-            'payment_id' => $paymentId,
-            'amount' => $amount,
-            'payment_method' => $gateway,
-            'created_at' => gmdate('Y-m-d H:i:s'),
-            'status' => 'waiting_payment',
-        ]);
-        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-panel-' . $userId . '-' . $serviceId . '-' . time());
-        if (!($invoice['ok'] ?? false)) {
-            $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
-            return;
-        }
-        $invoiceId = (string) ($invoice['invoice_id'] ?? '');
-        if ($invoiceId !== '') {
-            $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
-        }
-        $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'service_id' => $serviceId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => $gateway]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
-    }
-
-    private function createServicePurchaseGatewayInvoice(int $chatId, int $userId, int $serviceId, int $tariffId, ?float $selectedVolumeGb): void
-    {
-        $service = $this->database->getService($serviceId);
-        $tariff = $this->database->getServiceTariffForService($serviceId, $tariffId);
-        if (!is_array($service) || !is_array($tariff)) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.common.invalid_option'));
-            return;
-        }
-        if ((string) ($service['mode'] ?? 'stock') === 'stock' && $this->database->countAvailableStockItemsByService($serviceId, $tariffId) <= 0) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.errors.no_stock'));
-            return;
-        }
-        $amount = $this->database->calculateServiceTariffAmount($tariff, $selectedVolumeGb);
-        if ($amount <= 0) {
-            $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.buy.panel.errors.invalid_volume'));
-            return;
-        }
-
-        $gateway = 'tronpays_rial';
-        $paymentId = $this->database->createPayment([
-            'kind' => 'purchase',
-            'user_id' => $userId,
-            'tariff_id' => null,
-            'service_id' => $serviceId,
-            'tariff_id' => $tariffId,
-            'amount' => $amount,
-            'payment_method' => $gateway,
-            'status' => 'waiting_gateway',
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        $pendingId = $this->database->createPendingOrder([
-            'user_id' => $userId,
-            'tariff_id' => null,
-            'service_id' => $serviceId,
-            'tariff_id' => $tariffId,
-            'selected_volume_gb' => $selectedVolumeGb,
-            'computed_amount' => $amount,
-            'payment_id' => $paymentId,
-            'amount' => $amount,
-            'payment_method' => $gateway,
-            'created_at' => gmdate('Y-m-d H:i:s'),
-            'status' => 'waiting_payment',
-        ]);
-        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'buy-service-' . $userId . '-' . $serviceId . '-' . $tariffId . '-' . time());
-        if (!($invoice['ok'] ?? false)) {
-            $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
-            return;
-        }
-        $invoiceId = (string) ($invoice['invoice_id'] ?? '');
-        if ($invoiceId !== '') {
-            $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
-        }
-        $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'buy.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_purchase'), 'service_id' => $serviceId, 'tariff_id' => $tariffId, 'selected_volume_gb' => $selectedVolumeGb, 'payment_method' => $gateway]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_purchase'), $pendingId, $amount, $payUrl);
-    }
-
-    private function createRenewalGatewayInvoice(int $chatId, int $userId, int $purchaseId, int $tariffId): void
-    {
-        $gateway = 'tronpays_rial';
-        $tariff = $this->database->getServiceTariff($tariffId);
-        $purchase = $this->database->getUserPurchaseForRenewal($userId, $purchaseId);
-        if ($tariff === null || !is_array($purchase)) {
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.renew.invalid_data'));
-            return;
-        }
-        $amount = (int) $tariff['price'];
-        $paymentId = $this->database->createPayment([
-            'kind' => 'renewal',
-            'user_id' => $userId,
-            'tariff_id' => $tariffId,
-            'amount' => $amount,
-            'payment_method' => $gateway,
-            'status' => 'waiting_gateway',
-            'created_at' => gmdate('Y-m-d H:i:s'),
-        ]);
-        $pendingId = $this->database->createPendingOrder([
-            'user_id' => $userId,
-            'tariff_id' => $tariffId,
-            'payment_id' => $paymentId,
-            'amount' => $amount,
-            'payment_method' => $gateway,
-            'created_at' => gmdate('Y-m-d H:i:s'),
-            'status' => 'waiting_payment',
-        ]);
-        $invoice = $this->gateways->createTronpaysRialInvoice($amount, 'rnw-' . $userId . '-' . $tariffId . '-' . time());
-        if (!($invoice['ok'] ?? false)) {
-            $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tronpays_invoice_error'));
-            return;
-        }
-        $invoiceId = (string) ($invoice['invoice_id'] ?? '');
-        if ($invoiceId !== '') {
-            $this->database->setPaymentGatewayRef($paymentId, $invoiceId);
-        }
-        $payUrl = (string) ($invoice['pay_url'] ?? '');
-        $this->database->setUserState($userId, 'renew.await_payment_verify', ['payment_id' => $paymentId, 'gateway' => $gateway, 'ok_text' => $this->catalog->get('messages.user.payment.ok.tronpays_renew'), 'purchase_id' => $purchaseId, 'tariff_id' => $tariffId, 'payment_method' => $gateway]);
-        $this->sendGatewayPaymentIntro($chatId, $this->catalog->get('messages.user.payment.titles.tronpays_renew'), $pendingId, $amount, $payUrl);
-    }
-
     private function handleGatewayVerifyState(int $chatId, int $userId, string $text, array $state): void
     {
         if ($this->isMainMenuInput($text)) {
@@ -7502,7 +6897,6 @@ final class MessageHandler
         $hashId = is_array($providerPayload) ? (string) ($providerPayload['hash_id'] ?? '') : '';
         $verify = match ($gateway) {
             'tetrapay' => $this->gateways->verifyTetrapay($gatewayRef, $hashId),
-            'tronpays_rial' => $this->gateways->checkTronpaysRialInvoice($gatewayRef),
             default => ['ok' => false, 'paid' => false],
         };
         if (!($verify['ok'] ?? false)) {
@@ -7851,11 +7245,33 @@ final class MessageHandler
         ]));
     }
 
+
+    private function resolveSelectedGatewayCode(string $text): ?string
+    {
+        foreach ($this->paymentMethods->getActiveVisibleMethods() as $method) {
+            if ((string) ($method['category'] ?? 'gateway') !== 'gateway') {
+                continue;
+            }
+            $code = (string) ($method['code'] ?? '');
+            if ($code === '') {
+                continue;
+            }
+            if ($text === $this->paymentMethodLabel($code)) {
+                return $code;
+            }
+        }
+
+        return null;
+    }
+
     private function paymentSelectionButtons(): array
     {
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
         $methods = $this->paymentMethods->getActiveVisibleMethods();
         foreach ($methods as $method) {
+            if ((string) ($method['category'] ?? 'gateway') !== 'gateway') {
+                continue;
+            }
             $label = $this->paymentMethodLabel((string) ($method['code'] ?? ''));
             if ($label === '') {
                 continue;

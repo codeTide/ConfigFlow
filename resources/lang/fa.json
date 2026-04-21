@@ -37,9 +37,7 @@
     "accept_rules": "✅ قوانین را می‌پذیرم",
     "pay": {
       "wallet": "💰 پرداخت با کیف پول",
-      "crypto": "💎 پرداخت کریپتو",
       "tetrapay": "🏧 پرداخت تتراپی",
-      "tronpays": "🧾 پرداخت ترون‌پیز",
       "verify": "🔄 بررسی پرداخت",
       "gateway_pay": "💳 پرداخت"
     },
@@ -288,12 +286,9 @@
         "bank_line": "بانک: {bank}\n",
         "owner_line": "به نام: {owner}\n",
         "address_block": "آدرس کیف پول:\n<code>{address}</code>\n\n",
-        "crypto_purchase_intro": "💎 <b>پرداخت کریپتو</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nارز: <b>TRON</b>\nمبلغ معادل ریالی: <b>{amount}</b> تومان\n\n{address_block}پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\nمثال: <code>TX_HASH 12.345</code>",
         "tetrapay_unavailable": "🏧 <b>پرداخت TetraPay</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
-        "crypto_renew_intro": "💎 <b>پرداخت کریپتو (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nارز: <b>TRON</b>\nمبلغ معادل ریالی: <b>{amount}</b> تومان\n\n{address_block}پس از پرداخت، TX Hash و مقدار کوین پرداختی را بفرستید.\nمثال: <code>TX_HASH 12.345</code>",
         "tetrapay_renew_unavailable": "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
         "gateway": {
-          "tronpays_invoice_error": "خطا در ایجاد فاکتور TronPays.",
           "tetrapay_invoice_error": "❌ ایجاد سفارش پرداخت تتراپی انجام نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 اتصال به درگاه برقرار نشد یا سفارش توسط تتراپی رد شد. کمی بعد دوباره تلاش کنید؛ اگر مشکل ادامه داشت، همین کد پیگیری را برای پشتیبانی ارسال کنید.</blockquote>",
           "tetrapay_description": "order:{payment_id}",
           "tetrapay_verify_error": "❌ بررسی وضعیت پرداخت تتراپی کامل نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 پاسخ قطعی از درگاه دریافت نشد یا اعتبارسنجی تراکنش ناموفق بود. چند دقیقه بعد دوباره بررسی کنید؛ اگر همچنان مشکل داشتید، کد پیگیری را برای پشتیبانی بفرستید.</blockquote>",
@@ -304,15 +299,11 @@
           "default": "✅ پرداخت تایید شد.",
           "tetrapay_purchase": "✅ پرداخت تتراپی تایید شد. سفارش شما در صف تحویل قرار گرفت.",
           "tetrapay_renew": "✅ پرداخت تمدید تایید شد. درخواست شما در صف تحویل قرار گرفت.",
-          "tronpays_purchase": "✅ پرداخت TronPays تایید شد و سفارش در صف تحویل قرار گرفت.",
-          "tronpays_renew": "✅ پرداخت TronPays تایید شد و درخواست تمدید در صف تحویل قرار گرفت.",
           "wallet_topup": "✅ شارژ کیف پول با موفقیت انجام شد."
         },
         "titles": {
           "tetrapay_purchase": "🏧 <b>پرداخت TetraPay</b>",
           "tetrapay_renew": "🏧 <b>پرداخت TetraPay (تمدید)</b>",
-          "tronpays_purchase": "🧾 <b>پرداخت با TronPays</b>",
-          "tronpays_renew": "🧾 <b>پرداخت تمدید با TronPays</b>",
           "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>"
         },
         "verify_hint": "برای بررسی وضعیت، دکمه بررسی پرداخت را بزنید.",
@@ -1067,9 +1058,7 @@
           "max_attempts": "🚫 سقف دفعات بررسی این پرداخت تکمیل شده است.",
           "unavailable": "بررسی این پرداخت فعلاً ممکن نیست.",
           "payment_not_found": "پرداخت یافت نشد.",
-          "not_crypto": "این پرداخت کریپتو نیست.",
           "tx_hash_missing": "TX Hash ثبت نشده است.",
-          "crypto_confirmed": "پرداخت کریپتو تایید شد و سفارش در صف تحویل قرار گرفت.",
           "tx_not_confirmed_or_invalid": "تراکنش تایید نشد یا مقدار اعلامی معتبر نیست.",
           "request_not_processable": "این درخواست قابل پردازش نیست.",
           "request_status": "درخواست <code>{payment_id}</code> {status_text}."
@@ -1262,17 +1251,9 @@
         "updated_fee_type": "✅ نوع کارمزد این روش به‌روزرسانی شد."
       },
       "methods": {
-        "crypto_tron": {
-          "label": "💎 پرداخت کریپتو",
-          "intro": "پرداخت بر بستر ارز دیجیتال"
-        },
         "tetrapay": {
           "label": "🏧 پرداخت تتراپی",
           "intro": "پرداخت از طریق درگاه تتراپی"
-        },
-        "tronpays_rial": {
-          "label": "🧾 پرداخت ترون‌پیز",
-          "intro": "پرداخت ریالی از طریق ترون‌پیز"
         }
       },
       "bonus": {
@@ -1302,23 +1283,6 @@
           "tetrapay": {
             "api_key": "🔑 کلید API",
             "callback_url": "🔁 نشانی بازگشت درگاه"
-          },
-          "crypto_tron": {
-            "network": "🌐 شبکه",
-            "coin": "🪙 نوع ارز",
-            "wallet_address": "🏦 آدرس کیف پول",
-            "confirm_blocks": "🔒 تعداد تایید لازم",
-            "tolerance_percent": "🎯 درصد خطای مجاز",
-            "pricing_mode": "💹 حالت قیمت‌گذاری",
-            "timeout_seconds": "⏱ مدت انتظار"
-          },
-          "tronpays_rial": {
-            "base_url": "🌐 Base URL",
-            "merchant_key": "🔑 Merchant Key",
-            "callback_url": "🔁 نشانی بازگشت درگاه",
-            "mode": "🧪 Mode",
-            "verify_mode": "🔎 Verify Setting",
-            "timeout_seconds": "⏱ Timeout"
           }
         },
         "actions": {
@@ -1328,23 +1292,6 @@
           "tetrapay": {
             "api_key": "🔑 کلید API",
             "callback_url": "🔁 نشانی بازگشت"
-          },
-          "crypto_tron": {
-            "network": "🌐 شبکه",
-            "coin": "🪙 ارز",
-            "wallet_address": "🏦 کیف پول",
-            "confirm_blocks": "🔒 تایید لازم",
-            "tolerance_percent": "🎯 خطای مجاز",
-            "pricing_mode": "💹 قیمت‌گذاری",
-            "timeout_seconds": "⏱ انتظار"
-          },
-          "tronpays_rial": {
-            "base_url": "🌐 Base URL",
-            "merchant_key": "🔑 API Key",
-            "callback_url": "🔁 نشانی بازگشت",
-            "mode": "🧪 Mode",
-            "verify_mode": "🔎 Verify",
-            "timeout_seconds": "⏱ Timeout"
           }
         }
       },

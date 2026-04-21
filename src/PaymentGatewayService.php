@@ -221,63 +221,6 @@ final class PaymentGatewayService
         return ['ok' => true, 'paid' => $isPaid, 'status' => $statusCode, 'code' => $isPaid ? 'tetrapay_paid' : 'tetrapay_status_not_paid', 'raw' => $data];
     }
 
-    public function createTronpaysRialInvoice(int $amount, string $hashId): array
-    {
-        $config = $this->paymentMethods?->getMethodConfig('tronpays_rial') ?? [];
-        $apiKey = trim((string) ($config['merchant_key'] ?? $this->settings->get('tronpays_rial_api_key', '')));
-        $callback = trim((string) ($config['callback_url'] ?? $this->settings->get('tronpays_rial_callback_url', '')));
-        if ($apiKey === '') {
-            return ['ok' => false, 'error' => 'tronpays_api_key_missing'];
-        }
-        $payload = [
-            'api_key' => $apiKey,
-            'hash_id' => substr(md5($hashId), 0, 20),
-            'amount' => $amount,
-            'callback_url' => $callback !== '' ? $callback : 'https://example.com/',
-        ];
-        $baseUrl = trim((string) ($config['base_url'] ?? Config::tronpaysBaseUrl()));
-        $url = rtrim($baseUrl, '/') . '/api/invoice/create';
-        $res = $this->postJsonHeaders($url, $payload, ['Accept: application/json']);
-        if (!($res['ok'] ?? false)) {
-            return ['ok' => false, 'error' => 'request_failed'];
-        }
-        $data = $res['data'] ?? [];
-        return [
-            'ok' => true,
-            'invoice_id' => (string) ($data['invoice_id'] ?? $data['invoiceId'] ?? ''),
-            'pay_url' => (string) ($data['invoice_url'] ?? $data['invoiceUrl'] ?? ''),
-            'raw' => $data,
-        ];
-    }
-
-    public function checkTronpaysRialInvoice(string $invoiceId): array
-    {
-        $config = $this->paymentMethods?->getMethodConfig('tronpays_rial') ?? [];
-        $apiKey = trim((string) ($config['merchant_key'] ?? $this->settings->get('tronpays_rial_api_key', '')));
-        if ($apiKey === '' || trim($invoiceId) === '') {
-            return ['ok' => false, 'error' => 'missing_data'];
-        }
-        $baseUrl = trim((string) ($config['base_url'] ?? Config::tronpaysBaseUrl()));
-        $url = rtrim($baseUrl, '/') . '/api/invoice/check';
-        $res = $this->postJsonHeaders($url, [
-            'api_key' => $apiKey,
-            'invoice_id' => $invoiceId,
-        ], ['Accept: application/json']);
-        if (!($res['ok'] ?? false)) {
-            return ['ok' => false, 'error' => 'request_failed'];
-        }
-        $data = $res['data'] ?? [];
-        $status = strtoupper((string) ($data['status'] ?? $data['state'] ?? $data['payment_status'] ?? (is_string($data) ? $data : '')));
-        $isPaid = in_array($status, ['PAID', 'SUCCESS', 'SUCCESSFUL', 'COMPLETED', 'DONE'], true);
-        return ['ok' => true, 'paid' => $isPaid, 'raw' => $data];
-    }
-
-    public function cryptoAddress(string $coin): string
-    {
-        $config = $this->paymentMethods?->getMethodConfig('crypto_tron') ?? [];
-        return trim((string) ($config['wallet_address'] ?? $this->settings->get('crypto_wallet_' . $coin, '')));
-    }
-
     public function verifyCryptoTransaction(string $coin, string $txHash): array
     {
         $coin = strtolower(trim($coin));

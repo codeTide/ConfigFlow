@@ -19,7 +19,6 @@ final class CallbackHandler
         'buy:',
         'renew:',
         'rpay:',
-        'pay:tronpays_rial:',
     ];
 
     public function __construct(
