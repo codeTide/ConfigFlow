@@ -430,7 +430,7 @@
         "worker_api_port_saved": "✅ Worker API port ذخیره شد.",
         "poll_interval_saved": "✅ بازه Poll ذخیره شد: <b>{interval}</b> ثانیه",
         "channel_lock_disabled": "✅ قفل کانال غیرفعال شد.",
-        "channel_lock_saved": "✅ کانال قفل ذخیره شد: <code>{channel_id}</code>",
+        "channel_lock_saved": "✅ قفل کانال ذخیره شد: <code>{channel_id}</code>",
         "group_id_disabled": "✅ Group ID غیرفعال شد.",
         "group_id_saved": "✅ Group ID ذخیره شد: <code>{group_id}</code>",
         "settings_restored_count": "✅ بازیابی تنظیمات انجام شد.\nتعداد کلیدهای اعمال‌شده: <b>{count}</b>"
@@ -506,9 +506,7 @@
         "settings_toggle_gw_card": "💵 کارت‌به‌کارت",
         "settings_toggle_gw_crypto": "🎁 کریپتو",
         "settings_toggle_gw_tetra": "💰 درگاه TetraPay",
-        "settings_set_channel": "📣 کانال قفل",
-        "settings_set_delivery_mode": "🚚 حالت تحویل",
-        "settings_edit": "✍️ ویرایش دستی",
+        "settings_set_channel": "📣 قفل کانال",
         "admins_add": "✅ افزودن ادمین",
         "admin_delete": "❌ حذف ادمین",
         "pins_add": "✅ افزودن پیام پین",
@@ -526,14 +524,11 @@
         "pin_new_text_send": "💡 متن جدید پیام پین را ارسال کنید.",
         "pin_delete_confirm": "💡 برای حذف پیام پین #{pin_id} عبارت «{confirm_word}» را ارسال کنید.",
         "pin_send_all_confirm": "💡 برای ارسال و پین همگانی #{pin_id} عبارت «{confirm_word}» را ارسال کنید.",
-        "delivery_mode_input": "💡 حالت تحویل را انتخاب کنید: stock_only یا panel_only",
-        "set_channel_overview": "📣 <b>تنظیم کانال قفل</b>\n\n🧾 ورودی: آیدی کانال را بفرستید (@channel یا -100...). برای غیرفعال‌سازی «-» ارسال کنید.\n\n<blockquote>💡 کانال قفل روی شروع کاربرها اثر مستقیم دارد؛ مقدار را دقیق ثبت کنید.</blockquote>",
-        "edit_setting_overview": "✍️ <b>ویرایش دستی تنظیم</b>\n\n🧾 فرمت: <code>key|value</code>\n\n<blockquote>💡 برای کلیدهای حساس مقدار معتبر وارد کنید.</blockquote>",
+        "set_channel_overview": "📣 <b>تنظیم قفل کانال</b>\n\n🧾 ورودی: آیدی کانال را بفرستید (@channel یا -100...). برای غیرفعال‌سازی «-» ارسال کنید.\n\n<blockquote>💡 قفل کانال روی شروع کاربرها اثر مستقیم دارد؛ مقدار را دقیق ثبت کنید.</blockquote>",
         "add_admin_overview": "✅ <b>افزودن ادمین</b>\n\n👤 راهنما: آیدی عددی ادمین جدید را ارسال کنید.\n\n<blockquote>💡 سطح دسترسی اولیه با سطح‌های پایه ایجاد می‌شود و قابل ویرایش است.</blockquote>"
       },
       "errors": {
         "invalid_input": "❌ ورودی معتبر ارسال کنید.",
-        "invalid_kv_format": "❌ فرمت باید key|value باشد.",
         "invalid_admin_id": "❌ آیدی معتبر ارسال کنید.",
         "invalid_admin": "❌ ادمین معتبر نبود.",
         "admin_delete_confirm_required": "❌ برای تایید حذف، عبارت «{confirm_word}» را ارسال کنید.",
@@ -543,25 +538,30 @@
         "pin_delete_confirm_required": "❌ برای تایید حذف عبارت «{confirm_word}» را ارسال کنید.",
         "pin_send_confirm_required": "❌ برای تایید ارسال همگانی عبارت «{confirm_word}» را بفرستید.",
         "pin_not_found": "❌ پیام پین پیدا نشد.",
-        "invalid_section_option": "❌ گزینه نامعتبر است. لطفاً از دکمه‌های همین بخش استفاده کنید.",
-        "invalid_delivery_mode": "❌ مقدار معتبر نیست. فقط stock_only یا panel_only."
+        "invalid_section_option": "❌ گزینه نامعتبر است. لطفاً از دکمه‌های همین بخش استفاده کنید."
       },
       "success": {
-        "bot_status_updated": "✅ وضعیت ربات بروزرسانی شد.",
+        "bot_status_updated": "🤖 وضعیت ربات تغییر کرد: {status_title}\n🧾 {status_description}\n\n<blockquote>💡 {status_note}</blockquote>",
         "setting_updated": "✅ تنظیم بروزرسانی شد.",
-        "lock_channel_updated": "✅ کانال قفل بروزرسانی شد.",
-        "setting_saved": "✅ تنظیم ذخیره شد.",
+        "lock_channel_updated": "✅ قفل کانال بروزرسانی شد.",
         "admin_created": "✅ ادمین جدید ایجاد شد.",
         "permission_updated": "✅ دسترسی بروزرسانی شد.",
         "admin_deleted": "✅ ادمین حذف شد.",
         "pin_created": "✅ پیام پین ثبت شد.",
         "pin_updated": "✅ پیام پین ویرایش شد.",
         "pin_deleted": "✅ پیام پین حذف شد.",
-        "pin_send_done": "✅ ارسال انجام شد. ارسال: <b>{sent}</b> | پین: <b>{pinned}</b>",
-        "delivery_mode_saved": "✅ حالت تحویل ذخیره شد."
+        "pin_send_done": "✅ ارسال انجام شد. ارسال: <b>{sent}</b> | پین: <b>{pinned}</b>"
       },
       "labels": {
-        "delivery_mode": "حالت تحویل"
+        "bot_status_on": "روشن",
+        "bot_status_on_description": "ربات با موفقیت روشن شد و آماده پاسخ‌گویی است.",
+        "bot_status_on_note": "در صورت نیاز می‌توانید از همین بخش، وضعیت را دوباره تغییر دهید یا تنظیمات پیشرفته‌تری اعمال کنید.",
+        "bot_status_update": "در حال بروزرسانی",
+        "bot_status_update_description": "ربات در حالت بروزرسانی قرار گرفت و برخی عملیات ممکن است با تأخیر انجام شوند.",
+        "bot_status_update_note": "پس از پایان بروزرسانی، وضعیت را روی روشن قرار دهید تا همه قابلیت‌ها بدون محدودیت در دسترس باشند.",
+        "bot_status_off": "خاموش",
+        "bot_status_off_description": "ربات خاموش شد و تا تغییر وضعیت، پاسخی به کاربران ارسال نمی‌کند.",
+        "bot_status_off_note": "برای ادامه سرویس‌دهی، کافی است از همین بخش وضعیت ربات را دوباره روشن کنید."
       }
     },
     "final_modules": {
@@ -1009,8 +1009,8 @@
         },
         "settings_admins_pins": {
           "settings": {
-            "channel_unset": "❌ تنظیم نشده",
-            "overview": "⚙️ <b>تنظیمات سریع</b>\n\n🤖 bot_status: {bot_status}\n🤝 agency_request_enabled: {agency_request_enabled}\n💳 gw_card_enabled: {gw_card_enabled}\n💎 gw_crypto_enabled: {gw_crypto_enabled}\n🏦 gw_tetrapay_enabled: {gw_tetrapay_enabled}\n📢 channel_id: {channel_id}\n🚚 {delivery_mode_label}: {delivery_mode}\n\n<blockquote>💡 تغییرات این صفحه فوری اعمال می‌شوند.</blockquote>"
+            "channel_unset": "تنظیم نشده",
+            "overview": "⚙️ تنظیمات سریع\n\n🤖 وضعیت ربات: {bot_status}\n🤝 درخواست نمایندگی: {agency_request_enabled}\n💳 درگاه کارت بانکی: {gw_card_enabled}\n💎 درگاه ارز دیجیتال: {gw_crypto_enabled}\n🏦 درگاه تتراپی: {gw_tetrapay_enabled}\n📢 قفل کانال: {channel_id}\n\n💡 تمامی تغییراتی که در این بخش اعمال می‌کنید، بلافاصله روی عملکرد ربات اثر می‌گذارند و نیازی به ذخیره‌سازی یا تأیید نهایی ندارند؛ بنابراین قبل از هر تغییر، از صحت تنظیمات خود اطمینان حاصل کنید."
           },
           "admins": {
             "empty": "ادمینی ثبت نشده است.",
