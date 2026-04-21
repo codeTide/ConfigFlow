@@ -4929,18 +4929,27 @@ final class MessageHandler
         $options = [];
         $buttons = [];
         foreach (array_values($items) as $idx => $item) {
-            $num = (string) ($idx + 1);
             $id = (int) ($item['id'] ?? 0);
             if ($id <= 0) {
                 continue;
             }
             $status = (int) ($item['is_active'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
             $label = $this->catalog->get('admin.payment_methods.methods.' . (string) ($item['code'] ?? '') . '.label');
-            $lines[] = $this->catalog->get('admin.payment_methods.list.row', ['num' => $this->toPersianDigits($num), 'title' => $label, 'status' => $status]);
-            $options[$num] = $id;
-            $buttons[] = [$this->catalog->get('admin.payment_methods.list.button', ['num' => $this->toPersianDigits($num), 'title' => $label])];
+            $key = (string) ($idx + 1);
+            $lines[] = $this->catalog->get('admin.payment_methods.list.row', ['title' => $label, 'status' => $status]);
+            $options[$key] = $id;
+            $buttonLabel = $this->catalog->get('admin.payment_methods.list.button', ['title' => $label]);
+            $options[$buttonLabel] = $id;
+            $buttons[] = $buttonLabel;
         }
-        $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+        $buttonRows = [];
+        if ($buttons !== []) {
+            $buttonRows[] = array_slice($buttons, 0, 3);
+        }
+        if (count($buttons) > 3) {
+            $buttonRows[] = array_values(array_slice($buttons, 3));
+        }
+        $buttonRows[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         $this->database->setUserState($userId, 'admin.payment_methods.list', ['options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
@@ -4950,7 +4959,7 @@ final class MessageHandler
             $this->catalog->get('admin.payment_methods.list.overview', [
                 'list' => $lines === [] ? $this->catalog->get('admin.payment_methods.list.empty') : implode("\n", $lines),
             ]),
-            $this->uiKeyboard->replyMenu($buttons)
+            $this->uiKeyboard->replyMenu($buttonRows)
         );
     }
 
@@ -4975,7 +4984,7 @@ final class MessageHandler
         $this->telegram->sendMessage(
             $chatId,
             $this->catalog->get('admin.payment_methods.view.overview', [
-                'label' => $label,
+                'label' => $this->removeEmoji($label),
                 'status' => $status,
                 'min_amount' => $this->toPersianDigits((string) (int) ($method['min_amount'] ?? 0)),
                 'max_amount' => $this->toPersianDigits((string) (int) ($method['max_amount'] ?? 0)),
@@ -4988,12 +4997,11 @@ final class MessageHandler
                 'description' => trim((string) ($method['user_description'] ?? '')) !== '' ? (string) $method['user_description'] : $this->catalog->get('messages.generic.dash'),
             ]),
             $this->uiKeyboard->replyMenu([
-                [$this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible'), $this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
                 [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount')],
-                [$this->catalog->get('admin.payment_methods.actions.toggle_bonus'), $this->catalog->get('admin.payment_methods.actions.toggle_fee')],
-                [$this->catalog->get('admin.payment_methods.actions.toggle_purchase'), $this->catalog->get('admin.payment_methods.actions.toggle_renewal')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_description'), $this->catalog->get('admin.payment_methods.actions.edit_admin_note')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_sort_order'), $this->catalog->get('admin.payment_methods.actions.edit_config_json')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_bonus'), $this->catalog->get('admin.payment_methods.actions.toggle_fee'), $this->catalog->get('admin.payment_methods.actions.toggle_purchase')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_renewal'), $this->catalog->get('admin.payment_methods.actions.edit_description')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_admin_note'), $this->catalog->get('admin.payment_methods.actions.edit_config_json')],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
