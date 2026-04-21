@@ -16,7 +16,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->query(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    supports_purchase, supports_renewal, visible_to_user, config_json
+                    visible_to_user, config_json
              FROM payment_methods
              ORDER BY sort_order ASC, id ASC'
         );
@@ -24,15 +24,17 @@ final class PaymentMethodRepository
     }
 
     /** @return array<int,array<string,mixed>> */
-    public function getActiveForPurchase(): array
+    public function getActiveVisibleMethods(): array
     {
-        return $this->getActiveByFlow('supports_purchase');
-    }
-
-    /** @return array<int,array<string,mixed>> */
-    public function getActiveForRenewal(): array
-    {
-        return $this->getActiveByFlow('supports_renewal');
+        $stmt = $this->database->pdo()->query(
+            'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
+                    bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
+                    visible_to_user, config_json
+             FROM payment_methods
+             WHERE is_active = 1 AND visible_to_user = 1
+             ORDER BY sort_order ASC, id ASC'
+        );
+        return $stmt->fetchAll() ?: [];
     }
 
     /** @return array<string,mixed>|null */
@@ -41,7 +43,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->prepare(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    supports_purchase, supports_renewal, visible_to_user, config_json
+                    visible_to_user, config_json
              FROM payment_methods
              WHERE code = :code
              LIMIT 1'
@@ -57,7 +59,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->prepare(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    supports_purchase, supports_renewal, visible_to_user, config_json
+                    visible_to_user, config_json
              FROM payment_methods
              WHERE id = :id
              LIMIT 1'
@@ -74,8 +76,8 @@ final class PaymentMethodRepository
         }
         $allowed = [
             'is_active', 'sort_order', 'min_amount', 'max_amount', 'bonus_enabled', 'bonus_type', 'bonus_value',
-            'fee_enabled', 'fee_type', 'fee_value', 'supports_purchase', 'supports_renewal', 'visible_to_user',
-            'auto_verify', 'requires_receipt', 'bonus_cap_amount', 'bonus_min_amount',
+            'fee_enabled', 'fee_type', 'fee_value', 'visible_to_user', 'auto_verify', 'requires_receipt',
+            'bonus_cap_amount', 'bonus_min_amount',
         ];
         $sets = [];
         $params = ['id' => $id];
@@ -156,16 +158,132 @@ final class PaymentMethodRepository
         }
     }
 
-    private function getActiveByFlow(string $flowColumn): array
+    /** @return array<string,mixed> */
+    public function getMethodConfig(string $code): array
     {
-        $stmt = $this->database->pdo()->query(
-            "SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
-                    bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    supports_purchase, supports_renewal, visible_to_user, config_json
-             FROM payment_methods
-             WHERE is_active = 1 AND visible_to_user = 1 AND {$flowColumn} = 1
-             ORDER BY sort_order ASC, id ASC"
+        $method = $this->findByCode($code);
+        if ($method === null) {
+            return [];
+        }
+        $raw = $method['config_json'] ?? null;
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    public function setMethodConfigValue(string $code, string $key, mixed $value): bool
+    {
+        $method = $this->findByCode($code);
+        if ($method === null) {
+            return false;
+        }
+        $config = $this->getMethodConfig($code);
+        $config[$key] = $value;
+        return $this->replaceMethodConfig($code, $config);
+    }
+
+    /** @param array<string,mixed> $config */
+    public function replaceMethodConfig(string $code, array $config): bool
+    {
+        $method = $this->findByCode($code);
+        if ($method === null) {
+            return false;
+        }
+        $validated = $this->validateMethodConfig($code, $config);
+        $stmt = $this->database->pdo()->prepare(
+            'UPDATE payment_methods SET config_json = :config_json, updated_at = :updated_at WHERE code = :code'
         );
-        return $stmt->fetchAll() ?: [];
+        $stmt->execute([
+            'config_json' => json_encode($validated, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+            'code' => $code,
+        ]);
+        return true;
+    }
+
+    /** @param array<string,mixed> $config
+     *  @return array<string,mixed>
+     */
+    public function validateMethodConfig(string $code, array $config): array
+    {
+        $schema = $this->configSchema()[$code] ?? [];
+        if ($schema === []) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($schema as $key => $rules) {
+            if (!array_key_exists($key, $config)) {
+                continue;
+            }
+            $value = $config[$key];
+            $type = (string) ($rules['type'] ?? 'string');
+            if ($type === 'int') {
+                $clean[$key] = (int) $value;
+                continue;
+            }
+            if ($type === 'decimal') {
+                $clean[$key] = (float) $value;
+                continue;
+            }
+            if ($type === 'enum') {
+                $allowed = is_array($rules['values'] ?? null) ? $rules['values'] : [];
+                $stringValue = (string) $value;
+                if (in_array($stringValue, $allowed, true)) {
+                    $clean[$key] = $stringValue;
+                }
+                continue;
+            }
+            $clean[$key] = trim((string) $value);
+        }
+
+        return $clean;
+    }
+
+    /** @return array<string,array<string,array<string,mixed>>> */
+    public function configSchema(): array
+    {
+        return [
+            'tetrapay' => [
+                'create_url' => ['type' => 'string'],
+                'verify_url' => ['type' => 'string'],
+                'merchant_id' => ['type' => 'string'],
+                'secret_key' => ['type' => 'string'],
+                'mode' => ['type' => 'enum', 'values' => ['sandbox', 'live']],
+                'success_redirect' => ['type' => 'string'],
+                'fail_redirect' => ['type' => 'string'],
+                'timeout_seconds' => ['type' => 'int'],
+                'admin_note' => ['type' => 'string'],
+            ],
+            'crypto_tron' => [
+                'network' => ['type' => 'string'],
+                'coin' => ['type' => 'string'],
+                'wallet_address' => ['type' => 'string'],
+                'confirm_blocks' => ['type' => 'int'],
+                'tolerance_percent' => ['type' => 'decimal'],
+                'pricing_mode' => ['type' => 'enum', 'values' => ['manual', 'market']],
+                'timeout_seconds' => ['type' => 'int'],
+            ],
+            'swapwallet_crypto' => [
+                'base_url' => ['type' => 'string'],
+                'merchant_key' => ['type' => 'string'],
+                'username' => ['type' => 'string'],
+                'network' => ['type' => 'string'],
+                'asset' => ['type' => 'string'],
+                'callback_url' => ['type' => 'string'],
+                'pricing_mode' => ['type' => 'enum', 'values' => ['manual', 'market']],
+                'timeout_seconds' => ['type' => 'int'],
+            ],
+            'tronpays_rial' => [
+                'base_url' => ['type' => 'string'],
+                'merchant_key' => ['type' => 'string'],
+                'callback_url' => ['type' => 'string'],
+                'mode' => ['type' => 'enum', 'values' => ['sandbox', 'live']],
+                'verify_mode' => ['type' => 'enum', 'values' => ['manual', 'auto']],
+                'timeout_seconds' => ['type' => 'int'],
+            ],
+        ];
     }
 }
