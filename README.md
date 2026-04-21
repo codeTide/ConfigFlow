@@ -13,7 +13,7 @@ ConfigFlow is a PHP Telegram bot for VPN config sales and delivery, with stock-b
 - Telegram update routing (`message` + `callback_query`)
 - Start/menu/profile/support/config navigation
 - Package purchase flow with stock reservation and delivery handling
-- Payment gateway orchestration (wallet, card, crypto, tetrapay)
+- Payment gateway orchestration (wallet, crypto, tetrapay)
 - Admin review flows for requests and payments
 - Free-test and agency request tracking
 - Worker API endpoints for async x-ui style jobs (`public/WorkerApi.php`)
@@ -67,8 +67,6 @@ DB_PORT=3306
 DB_NAME=configflow
 DB_USER=root
 DB_PASS=
-TETRAPAY_CREATE_URL=https://tetra98.com/api/create_order
-TETRAPAY_VERIFY_URL=https://tetra98.com/api/verify
 ```
 
 Notes:

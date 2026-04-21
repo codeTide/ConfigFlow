@@ -87,16 +87,6 @@ final class Config
         return self::$cachedBotUsername;
     }
 
-    public static function tetrapayCreateUrl(): string
-    {
-        return (string) getenv('TETRAPAY_CREATE_URL') ?: 'https://tetra98.com/api/create_order';
-    }
-
-    public static function tetrapayVerifyUrl(): string
-    {
-        return (string) getenv('TETRAPAY_VERIFY_URL') ?: 'https://tetra98.com/api/verify';
-    }
-
     public static function swapwalletBaseUrl(): string
     {
         return (string) getenv('SWAPWALLET_BASE_URL') ?: 'https://api.swapwallet.org';

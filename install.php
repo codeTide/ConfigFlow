@@ -371,8 +371,6 @@ function cf_install(array $input): array
         'DB_PASS' => (string) ($input['DB_PASS'] ?? ''),
         'INSTALLER_USERNAME' => trim((string) ($input['INSTALLER_USERNAME'] ?? 'admin')),
         'INSTALLER_PASSWORD' => trim((string) ($input['INSTALLER_PASSWORD'] ?? 'admin')),
-        'TETRAPAY_CREATE_URL' => trim((string) ($input['TETRAPAY_CREATE_URL'] ?? 'https://tetra98.com/api/create_order')),
-        'TETRAPAY_VERIFY_URL' => trim((string) ($input['TETRAPAY_VERIFY_URL'] ?? 'https://tetra98.com/api/verify')),
     ];
 
     $errors = cf_validate($input);
@@ -460,8 +458,6 @@ if (PHP_SAPI === 'cli') {
         'DB_NAME' => cf_prompt('DB_NAME', 'configflow'),
         'DB_USER' => cf_prompt('DB_USER', 'root'),
         'DB_PASS' => cf_prompt('DB_PASS', '', false),
-        'TETRAPAY_CREATE_URL' => cf_prompt('TETRAPAY_CREATE_URL', 'https://tetra98.com/api/create_order'),
-        'TETRAPAY_VERIFY_URL' => cf_prompt('TETRAPAY_VERIFY_URL', 'https://tetra98.com/api/verify'),
     ];
 
     $result = cf_install($input);
@@ -506,8 +502,6 @@ $values = [
     'DB_NAME' => 'configflow',
     'DB_USER' => 'root',
     'DB_PASS' => '',
-    'TETRAPAY_CREATE_URL' => 'https://tetra98.com/api/create_order',
-    'TETRAPAY_VERIFY_URL' => 'https://tetra98.com/api/verify',
     'INSTALLER_USERNAME' => $authUser,
     'INSTALLER_PASSWORD' => $authPass,
     'REINSTALL_MODE' => 'preserve',
@@ -673,7 +667,7 @@ $botDeepLink = $botDeepLink ?? '';
       <div class="grid">
         <?php foreach ($values as $key => $val): ?>
           <?php if (in_array($key, ['REINSTALL_MODE'], true)) { continue; } ?>
-          <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','INSTALLER_USERNAME','INSTALLER_PASSWORD','TETRAPAY_CREATE_URL','TETRAPAY_VERIFY_URL'], true) ? 'full' : '' ?>">
+          <div class="<?= in_array($key, ['BOT_TOKEN','ADMIN_IDS','INSTALLER_USERNAME','INSTALLER_PASSWORD'], true) ? 'full' : '' ?>">
             <label for="<?= $key ?>"><?= $key ?></label>
             <input
               id="<?= $key ?>"
