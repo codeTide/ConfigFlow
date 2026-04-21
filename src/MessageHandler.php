@@ -5333,10 +5333,15 @@ final class MessageHandler
     {
         return [
             [$this->catalog->get('admin.payment_methods.bonus.actions.show_status')],
-            [$this->catalog->get('admin.payment_methods.bonus.actions.toggle_status')],
-            [$this->catalog->get('admin.payment_methods.bonus.actions.toggle_type')],
-            [$this->catalog->get('admin.payment_methods.bonus.actions.edit_value'), $this->catalog->get('admin.payment_methods.bonus.actions.edit_min_amount')],
-            [$this->catalog->get('admin.payment_methods.bonus.actions.edit_cap_amount')],
+            [
+                $this->catalog->get('admin.payment_methods.bonus.actions.toggle_status'),
+                $this->catalog->get('admin.payment_methods.bonus.actions.toggle_type'),
+                $this->catalog->get('admin.payment_methods.bonus.actions.edit_min_amount'),
+            ],
+            [
+                $this->catalog->get('admin.payment_methods.bonus.actions.edit_cap_amount'),
+                $this->catalog->get('admin.payment_methods.bonus.actions.edit_value'),
+            ],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
         ];
     }
@@ -5358,10 +5363,11 @@ final class MessageHandler
     {
         $rows = [[$this->catalog->get('admin.payment_methods.provider.actions.show_status')]];
         $buttons = array_keys($this->providerFieldButtons($code));
+        $chunkSize = 3;
         while ($buttons !== []) {
-            $chunkSize = count($rows) === 1 ? 3 : 2;
             $rows[] = array_slice($buttons, 0, $chunkSize);
             $buttons = array_slice($buttons, $chunkSize);
+            $chunkSize = $chunkSize === 3 ? 2 : 3;
         }
         $rows[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
         return $rows;
