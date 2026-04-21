@@ -27,12 +27,12 @@ final class PaymentMethodRepository
     public function getActiveVisibleMethods(): array
     {
         $stmt = $this->database->pdo()->query(
-            'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
+            "SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
                     visible_to_user, allow_wallet_topup, wallet_amount_input_mode, config_json
              FROM payment_methods
-             WHERE is_active = 1 AND visible_to_user = 1
-             ORDER BY sort_order ASC, id ASC'
+             WHERE is_active = 1 AND visible_to_user = 1 AND category = 'gateway'
+             ORDER BY sort_order ASC, id ASC"
         );
         return $stmt->fetchAll() ?: [];
     }
@@ -181,7 +181,7 @@ final class PaymentMethodRepository
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
                     visible_to_user, allow_wallet_topup, wallet_amount_input_mode, config_json
              FROM payment_methods
-             WHERE is_active = 1 AND visible_to_user = 1 AND allow_wallet_topup = 1
+             WHERE is_active = 1 AND visible_to_user = 1 AND allow_wallet_topup = 1 AND category = 'gateway'
              ORDER BY sort_order ASC, id ASC"
         );
         return $stmt->fetchAll() ?: [];
