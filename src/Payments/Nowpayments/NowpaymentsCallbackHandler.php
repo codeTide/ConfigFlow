@@ -30,10 +30,10 @@ final class NowpaymentsCallbackHandler
         ], $traceRef);
 
         $orderId = trim((string) ($payload['order_id'] ?? ''));
-        $trackingCode = $this->resolveTrackingCodeFromPayload($payload);
+        $trackingCode = $orderId;
         $payment = $trackingCode !== ''
             ? $this->database->getPaymentByTrackingCode($trackingCode, 'nowpayments')
-            : $this->resolveLegacyPaymentByOrderId($orderId);
+            : null;
         if (!is_array($payment)) {
             $ref = $this->logger->log('warning', 'callback', 'nowpayments_payment_not_found', 'NOWPayments callback payment not found', [
                 'gateway' => 'nowpayments',
@@ -85,32 +85,6 @@ final class NowpaymentsCallbackHandler
         }
 
         return ['ok' => true, 'paid' => false, 'changed' => false, 'status' => $status, 'payment_id' => $paymentId];
-    }
-
-    /** @param array<string,mixed> $payload */
-    private function resolveTrackingCodeFromPayload(array $payload): string
-    {
-        $candidates = [
-            (string) ($payload['order_description'] ?? ''),
-            (string) ($payload['order_id'] ?? ''),
-        ];
-        foreach ($candidates as $candidate) {
-            $candidate = trim($candidate);
-            if ($candidate === '' || str_starts_with($candidate, 'cf-pay:')) {
-                continue;
-            }
-            return $candidate;
-        }
-        return '';
-    }
-
-    private function resolveLegacyPaymentByOrderId(string $orderId): ?array
-    {
-        if (preg_match('/^cf-pay:(\d+)$/', $orderId, $m) !== 1) {
-            return null;
-        }
-        $paymentId = (int) $m[1];
-        return $paymentId > 0 ? $this->database->getPaymentById($paymentId) : null;
     }
 
     public function verifySignature(string $rawBody, string $signature): bool
