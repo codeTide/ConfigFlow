@@ -6447,6 +6447,13 @@ final class MessageHandler
                 $this->telegram->sendMessage($chatId, $okText . $this->bonusSuccessLine($payment));
                 return;
             }
+            if (in_array((string) ($payment['status'] ?? ''), ['gateway_error'], true)) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_failed_terminal'));
+                return;
+            }
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_waiting_confirmation'));
+            return;
         }
         if ($gateway === 'nowpayments') {
             $providerStatus = is_array($providerPayload) ? (string) ($providerPayload['last_provider_status'] ?? '') : '';
