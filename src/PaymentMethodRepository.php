@@ -16,7 +16,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->query(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    supports_purchase, supports_renewal, visible_to_user, admin_note, user_description, config_json
+                    supports_purchase, supports_renewal, visible_to_user, config_json
              FROM payment_methods
              ORDER BY sort_order ASC, id ASC'
         );
@@ -41,7 +41,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->prepare(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    supports_purchase, supports_renewal, visible_to_user, admin_note, user_description, config_json
+                    supports_purchase, supports_renewal, visible_to_user, config_json
              FROM payment_methods
              WHERE code = :code
              LIMIT 1'
@@ -57,7 +57,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->prepare(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    supports_purchase, supports_renewal, visible_to_user, admin_note, user_description, config_json
+                    supports_purchase, supports_renewal, visible_to_user, config_json
              FROM payment_methods
              WHERE id = :id
              LIMIT 1'
@@ -75,7 +75,7 @@ final class PaymentMethodRepository
         $allowed = [
             'is_active', 'sort_order', 'min_amount', 'max_amount', 'bonus_enabled', 'bonus_type', 'bonus_value',
             'fee_enabled', 'fee_type', 'fee_value', 'supports_purchase', 'supports_renewal', 'visible_to_user',
-            'user_description', 'admin_note', 'auto_verify', 'requires_receipt', 'bonus_cap_amount', 'bonus_min_amount',
+            'auto_verify', 'requires_receipt', 'bonus_cap_amount', 'bonus_min_amount',
         ];
         $sets = [];
         $params = ['id' => $id];
@@ -161,7 +161,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->query(
             "SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    supports_purchase, supports_renewal, visible_to_user, admin_note, user_description, config_json
+                    supports_purchase, supports_renewal, visible_to_user, config_json
              FROM payment_methods
              WHERE is_active = 1 AND visible_to_user = 1 AND {$flowColumn} = 1
              ORDER BY sort_order ASC, id ASC"

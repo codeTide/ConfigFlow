@@ -1211,7 +1211,6 @@
     "payment_methods": {
       "actions": {
         "toggle_active": "🔄 فعال و غیرفعال",
-        "edit_description": "📝 ویرایش توضیح",
         "edit_min_amount": "💰 حداقل مبلغ",
         "edit_max_amount": "💵 حداکثر مبلغ",
         "edit_sort_order": "🔢 ترتیب نمایش",
@@ -1220,7 +1219,6 @@
         "toggle_renewal": "♻️ تمدید",
         "toggle_bonus": "🎁 پاداش",
         "toggle_fee": "💸 کارمزد",
-        "edit_admin_note": "📌 یادداشت ادمین",
         "edit_config_json": "🧩 تنظیمات اختصاصی",
         "print_status": "📋 وضعیت روش"
       },
@@ -1237,7 +1235,7 @@
         "empty": "📭 در حال حاضر روش پرداختی ثبت نشده است."
       },
       "view": {
-        "overview": "💳 تنظیمات روش پرداخت\n\n🧾 نام روش: {label}\n📶 وضعیت: {status}\n💰 حداقل مبلغ: {min_amount} تومان\n💵 حداکثر مبلغ: {max_amount} تومان\n🎁 پاداش: {bonus_status}\n💸 کارمزد: {fee_status}\n🛍 امکان خرید: {purchase_status}\n♻️ امکان تمدید: {renewal_status}\n👁 وضعیت نمایش: {visibility_status}\n📝 توضیح کاربر: {description}\n\n<blockquote>💡 این بخش برای مدیریت وضعیت، مبلغ، پاداش، کارمزد و نمایش همین روش پرداخت است.</blockquote>"
+        "overview": "💳 تنظیمات روش پرداخت\n\n🧾 نام روش: {label}\n📶 وضعیت: {status}\n💰 حداقل مبلغ: {min_amount} تومان\n💵 حداکثر مبلغ: {max_amount} تومان\n🎁 پاداش: {bonus_status}\n💸 کارمزد: {fee_status}\n🛍 امکان خرید: {purchase_status}\n♻️ امکان تمدید: {renewal_status}\n👁 وضعیت نمایش: {visibility_status}\n\n<blockquote>💡 این بخش برای مدیریت وضعیت، مبلغ، پاداش، کارمزد و نمایش همین روش پرداخت است.</blockquote>"
       },
       "prompts": {
         "send_value": "📝 مقدار جدید را با دقت ارسال کنید:",
@@ -1259,8 +1257,6 @@
         "updated_min_amount": "✅ حداقل مبلغ این روش به‌روزرسانی شد.",
         "updated_max_amount": "✅ حداکثر مبلغ این روش به‌روزرسانی شد.",
         "updated_sort_order": "✅ ترتیب نمایش این روش به‌روزرسانی شد.",
-        "updated_description": "✅ توضیح کاربر این روش به‌روزرسانی شد.",
-        "updated_admin_note": "✅ یادداشت ادمین این روش به‌روزرسانی شد.",
         "updated_config": "✅ تنظیمات اختصاصی این روش به‌روزرسانی شد."
       },
       "methods": {

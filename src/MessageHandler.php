@@ -4655,8 +4655,6 @@ final class MessageHandler
                 $this->catalog->get('admin.payment_methods.actions.edit_min_amount') => 'min_amount',
                 $this->catalog->get('admin.payment_methods.actions.edit_max_amount') => 'max_amount',
                 $this->catalog->get('admin.payment_methods.actions.edit_sort_order') => 'sort_order',
-                $this->catalog->get('admin.payment_methods.actions.edit_description') => 'user_description',
-                $this->catalog->get('admin.payment_methods.actions.edit_admin_note') => 'admin_note',
                 $this->catalog->get('admin.payment_methods.actions.edit_config_json') => 'config_json',
             ];
             if (isset($editable[$text])) {
@@ -4731,8 +4729,6 @@ final class MessageHandler
                 'min_amount' => 'admin.payment_methods.success.updated_min_amount',
                 'max_amount' => 'admin.payment_methods.success.updated_max_amount',
                 'sort_order' => 'admin.payment_methods.success.updated_sort_order',
-                'user_description' => 'admin.payment_methods.success.updated_description',
-                'admin_note' => 'admin.payment_methods.success.updated_admin_note',
                 'config_json' => 'admin.payment_methods.success.updated_config',
             ];
             $this->telegram->sendMessage($chatId, $this->catalog->get($successMap[$field] ?? 'admin.payment_methods.success.method_updated'));
@@ -5043,15 +5039,13 @@ final class MessageHandler
                 'renewal_status' => $renewalStatus,
                 'visibility_status' => $visibility,
                 'sort_order' => $this->toPersianDigits((string) (int) ($method['sort_order'] ?? 0)),
-                'description' => trim((string) ($method['user_description'] ?? '')) !== '' ? (string) $method['user_description'] : $this->catalog->get('messages.generic.dash'),
             ]),
             $this->uiKeyboard->replyMenu([
                 [$this->catalog->get('admin.payment_methods.actions.print_status')],
                 [$this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible'), $this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount'), $this->catalog->get('admin.payment_methods.actions.toggle_bonus')],
-                [$this->catalog->get('admin.payment_methods.actions.toggle_fee'), $this->catalog->get('admin.payment_methods.actions.toggle_purchase'), $this->catalog->get('admin.payment_methods.actions.toggle_renewal')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_description')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_admin_note'), $this->catalog->get('admin.payment_methods.actions.edit_config_json')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_bonus'), $this->catalog->get('admin.payment_methods.actions.toggle_fee'), $this->catalog->get('admin.payment_methods.actions.toggle_purchase')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_renewal'), $this->catalog->get('admin.payment_methods.actions.edit_config_json')],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
