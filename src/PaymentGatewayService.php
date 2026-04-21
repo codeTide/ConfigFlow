@@ -6,6 +6,9 @@ namespace ConfigFlow\Bot;
 
 final class PaymentGatewayService
 {
+    private const TETRAPAY_CREATE_URL = 'https://tetra98.com/api/create_order';
+    private const TETRAPAY_VERIFY_URL = 'https://tetra98.com/api/verify';
+
     public function __construct(private SettingsRepository $settings)
     {
     }
@@ -24,7 +27,7 @@ final class PaymentGatewayService
             'description' => 'ConfigFlow order ' . $orderRef,
         ];
 
-        $response = $this->postJson(Config::tetrapayCreateUrl(), $payload);
+        $response = $this->postJson(self::TETRAPAY_CREATE_URL, $payload);
         if (!($response['ok'] ?? false)) {
             return ['ok' => false, 'error' => 'request_failed'];
         }
@@ -47,7 +50,7 @@ final class PaymentGatewayService
             return ['ok' => false, 'error' => 'missing_data'];
         }
 
-        $response = $this->postJson(Config::tetrapayVerifyUrl(), [
+        $response = $this->postJson(self::TETRAPAY_VERIFY_URL, [
             'api_key' => $apiKey,
             'authority' => $authority,
         ]);
