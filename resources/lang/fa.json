@@ -306,7 +306,7 @@
           "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>",
           "nowpayments_purchase": "🪙 <b>پرداخت نوپیمنت</b>",
           "nowpayments_renew": "🪙 <b>پرداخت نوپیمنت (تمدید)</b>",
-          "nowpayments_wallet_topup": "🪙 <b>شارژ کیف پول با نوپیمنت</b>"
+          "nowpayments_wallet_topup": "🪙 شارژ کیف پول با نوپیمنت"
         },
         "verify_hint": "برای بررسی وضعیت، دکمه بررسی پرداخت را بزنید.",
         "not_found": "پرداخت پیدا نشد.",
