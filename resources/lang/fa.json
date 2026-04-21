@@ -284,18 +284,31 @@
           "tetrapay_description": "order:{payment_id}",
           "tetrapay_verify_error": "❌ بررسی وضعیت پرداخت تتراپی کامل نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 پاسخ قطعی از درگاه دریافت نشد یا اعتبارسنجی تراکنش ناموفق بود. چند دقیقه بعد دوباره بررسی کنید؛ اگر همچنان مشکل داشتید، کد پیگیری را برای پشتیبانی بفرستید.</blockquote>",
           "tetrapay_callback_invalid": "درخواست callback تتراپی معتبر نیست.",
-          "tetrapay_callback_not_found": "پرداخت متناظر برای callback تتراپی پیدا نشد."
+          "tetrapay_callback_not_found": "پرداخت متناظر برای callback تتراپی پیدا نشد.",
+          "nowpayments_invoice_error": "❌ ایجاد فاکتور NOWPayments انجام نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>",
+          "nowpayments_verify_error": "❌ بررسی پرداخت NOWPayments کامل نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>",
+          "nowpayments_callback_invalid": "درخواست callback مربوط به NOWPayments معتبر نیست.",
+          "nowpayments_callback_not_found": "پرداخت متناظر برای callback NOWPayments پیدا نشد.",
+          "nowpayments_description": "order:{payment_id}",
+          "nowpayments_waiting_confirmation": "⏳ پرداخت شما هنوز توسط NOWPayments نهایی نشده است. لطفاً چند لحظه دیگر دوباره بررسی کنید.",
+          "nowpayments_partially_paid": "🟡 پرداخت شما به‌صورت ناقص ثبت شده است. لطفاً پرداخت را کامل کنید تا تایید نهایی انجام شود.",
+          "nowpayments_failed_terminal": "❌ این پرداخت در درگاه نهایی نشده است (ناموفق/منقضی/برگشت‌خورده)."
         },
         "ok": {
           "default": "✅ پرداخت تایید شد.",
           "tetrapay_purchase": "✅ پرداخت تتراپی تایید شد. سفارش شما در صف تحویل قرار گرفت.",
           "tetrapay_renew": "✅ پرداخت تمدید تایید شد. درخواست شما در صف تحویل قرار گرفت.",
-          "wallet_topup": "✅ شارژ کیف پول با موفقیت انجام شد."
+          "wallet_topup": "✅ شارژ کیف پول با موفقیت انجام شد.",
+          "nowpayments_purchase": "✅ پرداخت NOWPayments تایید شد. سفارش شما در صف تحویل قرار گرفت.",
+          "nowpayments_renew": "✅ پرداخت تمدید از طریق NOWPayments تایید شد. درخواست شما در صف تحویل قرار گرفت."
         },
         "titles": {
           "tetrapay_purchase": "🏧 <b>پرداخت TetraPay</b>",
           "tetrapay_renew": "🏧 <b>پرداخت TetraPay (تمدید)</b>",
-          "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>"
+          "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>",
+          "nowpayments_purchase": "🪙 <b>پرداخت NOWPayments</b>",
+          "nowpayments_renew": "🪙 <b>پرداخت NOWPayments (تمدید)</b>",
+          "nowpayments_wallet_topup": "🪙 <b>شارژ کیف پول با NOWPayments</b>"
         },
         "verify_hint": "برای بررسی وضعیت، دکمه بررسی پرداخت را بزنید.",
         "not_found": "پرداخت پیدا نشد.",
@@ -1167,6 +1180,10 @@
         "tetrapay": {
           "label": "🏧 پرداخت تتراپی",
           "intro": "پرداخت از طریق درگاه تتراپی"
+        },
+        "nowpayments": {
+          "label": "🪙 NOWPayments",
+          "intro": "پرداخت رمزارزی از طریق NOWPayments"
         }
       },
       "bonus": {
@@ -1196,6 +1213,19 @@
           "tetrapay": {
             "api_key": "🔑 کلید API",
             "callback_url": "🔁 نشانی بازگشت درگاه"
+          },
+          "nowpayments": {
+            "api_key": "🔑 کلید API",
+            "ipn_secret": "🧷 کلید محرمانه IPN",
+            "callback_url": "🔁 آدرس Callback",
+            "price_currency": "💵 ارز قیمت‌گذاری",
+            "pay_currency": "🪙 ارز پرداخت",
+            "success_url": "✅ آدرس موفقیت",
+            "cancel_url": "❌ آدرس لغو",
+            "partially_paid_url": "🟡 آدرس پرداخت ناقص",
+            "is_fixed_rate": "📌 نرخ ثابت",
+            "is_fee_paid_by_user": "💸 کارمزد بر عهده کاربر",
+            "order_description_template": "📝 قالب توضیحات سفارش"
           }
         },
         "actions": {
@@ -1205,6 +1235,19 @@
           "tetrapay": {
             "api_key": "🔑 کلید API",
             "callback_url": "🔁 نشانی بازگشت"
+          },
+          "nowpayments": {
+            "api_key": "🔑 کلید API",
+            "ipn_secret": "🧷 کلید محرمانه IPN",
+            "callback_url": "🔁 آدرس Callback",
+            "price_currency": "💵 ارز قیمت‌گذاری",
+            "pay_currency": "🪙 ارز پرداخت",
+            "success_url": "✅ آدرس موفقیت",
+            "cancel_url": "❌ آدرس لغو",
+            "partially_paid_url": "🟡 آدرس پرداخت ناقص",
+            "is_fixed_rate": "📌 نرخ ثابت",
+            "is_fee_paid_by_user": "💸 کارمزد بر عهده کاربر",
+            "order_description_template": "📝 قالب توضیحات سفارش"
           }
         }
       },

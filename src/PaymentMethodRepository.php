@@ -250,7 +250,24 @@ final class PaymentMethodRepository
                 }
                 continue;
             }
-            $clean[$key] = trim((string) $value);
+            if ($type === 'bool') {
+                if (is_bool($value)) {
+                    $clean[$key] = $value ? 1 : 0;
+                    continue;
+                }
+                if (is_numeric($value)) {
+                    $clean[$key] = ((int) $value) === 1 ? 1 : 0;
+                    continue;
+                }
+                $normalized = strtolower(trim((string) $value));
+                $clean[$key] = in_array($normalized, ['1', 'true', 'yes', 'on'], true) ? 1 : 0;
+                continue;
+            }
+            $stringValue = trim((string) $value);
+            if ($type === 'url' && $stringValue !== '' && filter_var($stringValue, FILTER_VALIDATE_URL) === false) {
+                continue;
+            }
+            $clean[$key] = $stringValue;
         }
 
         return $clean;
@@ -262,7 +279,20 @@ final class PaymentMethodRepository
         return [
             'tetrapay' => [
                 'api_key' => ['type' => 'string'],
-                'callback_url' => ['type' => 'string'],
+                'callback_url' => ['type' => 'url'],
+            ],
+            'nowpayments' => [
+                'api_key' => ['type' => 'string'],
+                'ipn_secret' => ['type' => 'string'],
+                'callback_url' => ['type' => 'url'],
+                'price_currency' => ['type' => 'enum', 'values' => ['usd']],
+                'pay_currency' => ['type' => 'string'],
+                'success_url' => ['type' => 'url'],
+                'cancel_url' => ['type' => 'url'],
+                'partially_paid_url' => ['type' => 'url'],
+                'is_fixed_rate' => ['type' => 'bool'],
+                'is_fee_paid_by_user' => ['type' => 'bool'],
+                'order_description_template' => ['type' => 'string'],
             ],
         ];
     }
