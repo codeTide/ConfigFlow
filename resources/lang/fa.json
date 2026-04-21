@@ -32,15 +32,16 @@
       "requests": "🗂 درخواست‌ها",
       "backup_topics": "🗃 بکاپ/تاپیک",
       "exit_panel": "🚪 خروج",
-      "types_tariffs": "🧩 سرویس‌ها"
+      "types_tariffs": "🧩 سرویس‌ها",
+      "payment_methods": "💳 روش‌های پرداخت"
     },
     "accept_rules": "✅ قوانین را می‌پذیرم",
     "pay": {
       "wallet": "💰 پرداخت با کیف پول",
       "crypto": "💎 پرداخت کریپتو",
-      "tetrapay": "🏧 پرداخت TetraPay",
-      "swapwallet": "💠 SwapWallet Crypto",
-      "tronpays": "🧾 TronPays Rial",
+      "tetrapay": "🏧 پرداخت تتراپی",
+      "swapwallet": "💠 پرداخت سواپ‌ولت",
+      "tronpays": "🧾 پرداخت ترون‌پیز",
       "verify": "🔄 بررسی پرداخت",
       "gateway_pay": "💳 پرداخت"
     },
@@ -1210,34 +1211,60 @@
     "payment_methods": {
       "actions": {
         "toggle_active": "🔄 فعال و غیرفعال",
-        "edit_title": "✏️ ویرایش عنوان",
         "edit_description": "📝 ویرایش توضیح",
         "edit_min_amount": "💰 حداقل مبلغ",
         "edit_max_amount": "💵 حداکثر مبلغ",
-        "edit_sort_order": "🔢 ترتیب نمایش"
+        "edit_sort_order": "🔢 ترتیب نمایش",
+        "toggle_visible": "👁 نمایش / عدم نمایش",
+        "toggle_purchase": "🛍 خرید جدید",
+        "toggle_renewal": "♻️ تمدید",
+        "toggle_bonus": "🎁 پاداش",
+        "toggle_fee": "💸 کارمزد",
+        "edit_admin_note": "📌 یادداشت ادمین",
+        "edit_config_json": "🧩 تنظیمات اختصاصی"
       },
       "labels": {
         "status_on": "روشن",
-        "status_off": "خاموش"
+        "status_off": "خاموش",
+        "status_visible": "نمایش داده شود",
+        "status_hidden": "پنهان"
       },
       "list": {
-        "overview": "💳 مدیریت روش‌های پرداخت:\nروش پرداخت موردنظر را از فهرست زیر انتخاب کنید تا تنظیمات اختصاصی آن را مدیریت کنید.\n\n<blockquote>💡 در این بخش می‌توانید وضعیت هر روش، محدودیت مبلغ، پاداش، کارمزد و سایر جزئیات مرتبط را تغییر دهید.</blockquote>",
+        "overview": "💳 روش پرداخت موردنظر را از فهرست زیر انتخاب کنید:\n\n🧭 با انتخاب هر روش، وارد بخش تنظیمات اختصاصی همان درگاه می‌شوید.\n\n<blockquote>💡 در این بخش می‌توانید وضعیت هر روش، محدودیت مبلغ، پاداش، کارمزد و سایر جزئیات مرتبط را با دقت مدیریت کنید؛ بنابراین بهتر است قبل از هر تغییر، ساختار و نقش آن روش را در فرایند خرید و تمدید بررسی کنید.</blockquote>",
         "row": "{num}) {title} | {status}",
         "button": "{num} - {title}",
-        "empty": "روش پرداختی ثبت نشده است."
+        "empty": "📭 در حال حاضر روش پرداختی ثبت نشده است."
       },
       "view": {
-        "overview": "💳 تنظیمات روش پرداخت:\n🧾 عنوان روش: {title}\n📶 وضعیت: {status}\n💰 حداقل مبلغ: {min_amount} تومان\n💵 حداکثر مبلغ: {max_amount} تومان\n🔢 ترتیب نمایش: {sort_order}\n📝 توضیح کاربر: {description}\n\n<blockquote>💡 برای به‌روزرسانی هر مورد، از دکمه همان بخش استفاده کنید.</blockquote>"
+        "overview": "💳 تنظیمات روش پرداخت\n\n🧾 نام روش: {label}\n📶 وضعیت: {status}\n💰 حداقل مبلغ: {min_amount} تومان\n💵 حداکثر مبلغ: {max_amount} تومان\n🎁 پاداش: {bonus_status}\n💸 کارمزد: {fee_status}\n🛍 امکان خرید: {purchase_status}\n♻️ امکان تمدید: {renewal_status}\n👁 وضعیت نمایش: {visibility_status}\n📝 توضیح کاربر: {description}\n\n<blockquote>💡 از این بخش می‌توانید وضعیت این روش، محدودیت مبلغ، پاداش، کارمزد، نمایش به کاربر و سایر جزئیات اجرایی را مدیریت کنید. هر تغییری که اینجا اعمال می‌شود باید با منطق خرید، تمدید و تجربه کاربری همان روش سازگار باشد.</blockquote>"
       },
       "prompts": {
-        "send_value": "📝 مقدار جدید را ارسال کنید:"
+        "send_value": "📝 مقدار جدید را با دقت ارسال کنید:"
       },
       "errors": {
         "method_not_found": "❌ روش پرداخت پیدا نشد.",
-        "invalid_value": "❌ مقدار واردشده معتبر نیست."
+        "invalid_value": "❌ مقدار واردشده معتبر نیست؛ لطفاً دوباره بررسی کنید."
       },
       "success": {
-        "method_updated": "✅ تنظیمات روش پرداخت به‌روزرسانی شد."
+        "method_updated": "✅ تغییرات روش پرداخت با موفقیت اعمال شد."
+      },
+      "methods": {
+        "crypto_tron": {
+          "label": "💎 پرداخت کریپتو",
+          "intro": "پرداخت بر بستر ارز دیجیتال"
+        },
+        "tetrapay": {
+          "label": "🏧 پرداخت تتراپی",
+          "intro": "پرداخت از طریق درگاه تتراپی"
+        },
+        "swapwallet_crypto": {
+          "label": "💠 پرداخت سواپ‌ولت",
+          "intro": "پرداخت با درگاه سواپ‌ولت"
+        },
+        "tronpays_rial": {
+          "label": "🧾 پرداخت ترون‌پیز",
+          "intro": "پرداخت ریالی از طریق ترون‌پیز"
+        }
       }
     }
   }

@@ -14,7 +14,7 @@ final class PaymentMethodRepository
     public function getAll(): array
     {
         $stmt = $this->database->pdo()->query(
-            'SELECT id, code, title, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
+            'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
                     supports_purchase, supports_renewal, visible_to_user, admin_note, user_description, config_json
              FROM payment_methods
@@ -39,7 +39,7 @@ final class PaymentMethodRepository
     public function findByCode(string $code): ?array
     {
         $stmt = $this->database->pdo()->prepare(
-            'SELECT id, code, title, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
+            'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
                     supports_purchase, supports_renewal, visible_to_user, admin_note, user_description, config_json
              FROM payment_methods
@@ -55,7 +55,7 @@ final class PaymentMethodRepository
     public function findById(int $id): ?array
     {
         $stmt = $this->database->pdo()->prepare(
-            'SELECT id, code, title, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
+            'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
                     supports_purchase, supports_renewal, visible_to_user, admin_note, user_description, config_json
              FROM payment_methods
@@ -73,7 +73,7 @@ final class PaymentMethodRepository
             return false;
         }
         $allowed = [
-            'title', 'is_active', 'sort_order', 'min_amount', 'max_amount', 'bonus_enabled', 'bonus_type', 'bonus_value',
+            'is_active', 'sort_order', 'min_amount', 'max_amount', 'bonus_enabled', 'bonus_type', 'bonus_value',
             'fee_enabled', 'fee_type', 'fee_value', 'supports_purchase', 'supports_renewal', 'visible_to_user',
             'user_description', 'admin_note', 'auto_verify', 'requires_receipt', 'bonus_cap_amount', 'bonus_min_amount',
         ];
@@ -100,7 +100,7 @@ final class PaymentMethodRepository
     private function getActiveByFlow(string $flowColumn): array
     {
         $stmt = $this->database->pdo()->query(
-            "SELECT id, code, title, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
+            "SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
                     supports_purchase, supports_renewal, visible_to_user, admin_note, user_description, config_json
              FROM payment_methods
@@ -110,4 +110,3 @@ final class PaymentMethodRepository
         return $stmt->fetchAll() ?: [];
     }
 }
-

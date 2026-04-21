@@ -1369,6 +1369,7 @@ final class MessageHandler
                 $this->catalog->get('buttons.admin.delivery') => 'admin:deliveries',
                 $this->catalog->get('buttons.admin.requests') => 'admin:requests',
                 $this->catalog->get('buttons.admin.backup_topics') => 'admin:groupops',
+                $this->catalog->get('buttons.admin.payment_methods') => 'admin:payment_methods',
             ];
                 $route = $adminRouteMap[$text] ?? '';
             if ($route !== '') {
@@ -1418,6 +1419,10 @@ final class MessageHandler
                 }
                 if ($route === 'admin:groupops') {
                     $this->openAdminGroupOpsView($chatId, $userId);
+                    return;
+                }
+                if ($route === 'admin:payment_methods') {
+                    $this->openAdminPaymentMethodsList($chatId, $userId);
                     return;
                 }
                 $this->database->setUserState($userId, 'admin.nav', [
@@ -4518,7 +4523,6 @@ final class MessageHandler
         $settingsToggleBotLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_bot');
         $settingsToggleAgencyLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_toggle_agency');
         $settingsSetChannelLabel = $this->catalog->get('admin.settings_admins_pins.actions.settings_set_channel');
-        $paymentMethodsManageLabel = $this->catalog->get('admin.settings_admins_pins.actions.payment_methods_manage');
         $adminsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.admins_add');
         $adminDeleteLabel = $this->catalog->get('admin.settings_admins_pins.actions.admin_delete');
         $pinsAddLabel = $this->catalog->get('admin.settings_admins_pins.actions.pins_add');
@@ -4568,10 +4572,6 @@ final class MessageHandler
                 );
                 return;
             }
-            if ($text === $paymentMethodsManageLabel || $text === $this->uiConst(self::ADMIN_SETTINGS_PAYMENT_METHODS)) {
-                $this->openAdminPaymentMethodsList($chatId, $userId);
-                return;
-            }
         }
 
         if ($stateName === 'admin.settings.channel') {
@@ -4594,7 +4594,7 @@ final class MessageHandler
 
         if ($stateName === 'admin.payment_methods.list') {
             if ($text === UiLabels::back($this->catalog)) {
-                $this->openAdminSettingsView($chatId, $userId);
+                $this->openAdminRoot($chatId, $userId);
                 return;
             }
             $options = is_array($payload['options'] ?? null) ? $payload['options'] : [];
@@ -4624,18 +4624,35 @@ final class MessageHandler
                 $this->openAdminPaymentMethodView($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.method_updated'));
                 return;
             }
+            $toggleActions = [
+                $this->catalog->get('admin.payment_methods.actions.toggle_visible') => 'visible_to_user',
+                $this->catalog->get('admin.payment_methods.actions.toggle_purchase') => 'supports_purchase',
+                $this->catalog->get('admin.payment_methods.actions.toggle_renewal') => 'supports_renewal',
+                $this->catalog->get('admin.payment_methods.actions.toggle_bonus') => 'bonus_enabled',
+                $this->catalog->get('admin.payment_methods.actions.toggle_fee') => 'fee_enabled',
+            ];
+            if (isset($toggleActions[$text])) {
+                $method = $this->paymentMethods->findById($methodId);
+                if ($method !== null) {
+                    $field = $toggleActions[$text];
+                    $this->paymentMethods->updateMethodSettings($methodId, [$field => ((int) ($method[$field] ?? 0) === 1) ? 0 : 1]);
+                }
+                $this->openAdminPaymentMethodView($chatId, $userId, $methodId, $this->catalog->get('admin.payment_methods.success.method_updated'));
+                return;
+            }
             $editable = [
                 $this->catalog->get('admin.payment_methods.actions.edit_min_amount') => 'min_amount',
                 $this->catalog->get('admin.payment_methods.actions.edit_max_amount') => 'max_amount',
                 $this->catalog->get('admin.payment_methods.actions.edit_sort_order') => 'sort_order',
-                $this->catalog->get('admin.payment_methods.actions.edit_title') => 'title',
                 $this->catalog->get('admin.payment_methods.actions.edit_description') => 'user_description',
+                $this->catalog->get('admin.payment_methods.actions.edit_admin_note') => 'admin_note',
+                $this->catalog->get('admin.payment_methods.actions.edit_config_json') => 'config_json',
             ];
             if (isset($editable[$text])) {
                 $this->database->setUserState($userId, 'admin.payment_methods.edit', [
                     'method_id' => $methodId,
                     'field' => $editable[$text],
-                    'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.settings.view', 'admin.root'],
+                    'stack' => ['admin.payment_methods.view', 'admin.payment_methods.list', 'admin.root'],
                 ]);
                 $this->telegram->sendMessage($chatId, $this->catalog->get('admin.payment_methods.prompts.send_value'));
                 return;
@@ -4900,7 +4917,6 @@ final class MessageHandler
         ]), $this->uiKeyboard->replyMenu([
             [$this->uiConst(self::ADMIN_SETTINGS_REFRESH)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_BOT), $this->uiConst(self::ADMIN_SETTINGS_SET_CHANNEL)],
-            [$this->uiConst(self::ADMIN_SETTINGS_PAYMENT_METHODS)],
             [$this->uiConst(self::ADMIN_SETTINGS_TOGGLE_AGENCY)],
             [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
         ]));
@@ -4919,13 +4935,13 @@ final class MessageHandler
                 continue;
             }
             $status = (int) ($item['is_active'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
-            $title = (string) ($item['title'] ?? $this->catalog->get('messages.generic.dash'));
-            $lines[] = $this->catalog->get('admin.payment_methods.list.row', ['num' => $this->toPersianDigits($num), 'title' => $title, 'status' => $status]);
+            $label = $this->catalog->get('admin.payment_methods.methods.' . (string) ($item['code'] ?? '') . '.label');
+            $lines[] = $this->catalog->get('admin.payment_methods.list.row', ['num' => $this->toPersianDigits($num), 'title' => $label, 'status' => $status]);
             $options[$num] = $id;
-            $buttons[] = [$this->catalog->get('admin.payment_methods.list.button', ['num' => $this->toPersianDigits($num), 'title' => $title])];
+            $buttons[] = [$this->catalog->get('admin.payment_methods.list.button', ['num' => $this->toPersianDigits($num), 'title' => $label])];
         }
         $buttons[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
-        $this->database->setUserState($userId, 'admin.payment_methods.list', ['options' => $options, 'stack' => ['admin.settings.view', 'admin.root']]);
+        $this->database->setUserState($userId, 'admin.payment_methods.list', ['options' => $options, 'stack' => ['admin.root']]);
         if ($notice !== null && $notice !== '') {
             $this->telegram->sendMessage($chatId, $notice);
         }
@@ -4949,23 +4965,35 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $notice);
         }
         $status = (int) ($method['is_active'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
-        $this->database->setUserState($userId, 'admin.payment_methods.view', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.list', 'admin.settings.view', 'admin.root']]);
+        $visibility = (int) ($method['visible_to_user'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_visible') : $this->catalog->get('admin.payment_methods.labels.status_hidden');
+        $purchaseStatus = (int) ($method['supports_purchase'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
+        $renewalStatus = (int) ($method['supports_renewal'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
+        $bonusStatus = (int) ($method['bonus_enabled'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
+        $feeStatus = (int) ($method['fee_enabled'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
+        $label = $this->catalog->get('admin.payment_methods.methods.' . (string) ($method['code'] ?? '') . '.label');
+        $this->database->setUserState($userId, 'admin.payment_methods.view', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.list', 'admin.root']]);
         $this->telegram->sendMessage(
             $chatId,
             $this->catalog->get('admin.payment_methods.view.overview', [
-                'title' => (string) ($method['title'] ?? $this->catalog->get('messages.generic.dash')),
+                'label' => $label,
                 'status' => $status,
                 'min_amount' => $this->toPersianDigits((string) (int) ($method['min_amount'] ?? 0)),
                 'max_amount' => $this->toPersianDigits((string) (int) ($method['max_amount'] ?? 0)),
+                'bonus_status' => $bonusStatus,
+                'fee_status' => $feeStatus,
+                'purchase_status' => $purchaseStatus,
+                'renewal_status' => $renewalStatus,
+                'visibility_status' => $visibility,
                 'sort_order' => $this->toPersianDigits((string) (int) ($method['sort_order'] ?? 0)),
                 'description' => trim((string) ($method['user_description'] ?? '')) !== '' ? (string) $method['user_description'] : $this->catalog->get('messages.generic.dash'),
             ]),
             $this->uiKeyboard->replyMenu([
-                [$this->catalog->get('admin.payment_methods.actions.toggle_active')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_title')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_description')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible')],
                 [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_bonus'), $this->catalog->get('admin.payment_methods.actions.toggle_fee')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_purchase'), $this->catalog->get('admin.payment_methods.actions.toggle_renewal')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_description'), $this->catalog->get('admin.payment_methods.actions.edit_admin_note')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_sort_order'), $this->catalog->get('admin.payment_methods.actions.edit_config_json')],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
         );
@@ -7316,13 +7344,7 @@ final class MessageHandler
 
     private function paymentMethodLabel(string $code): string
     {
-        return match ($code) {
-            'crypto_tron' => $this->catalog->get('buttons.pay.crypto'),
-            'tetrapay' => $this->catalog->get('buttons.pay.tetrapay'),
-            'swapwallet_crypto' => $this->catalog->get('buttons.pay.swapwallet'),
-            'tronpays_rial' => $this->catalog->get('buttons.pay.tronpays'),
-            default => '',
-        };
+        return $this->catalog->get('admin.payment_methods.methods.' . $code . '.label');
     }
 
     private function ensurePurchaseAllowedForTariffMessage(int $chatId, int $userId, int $tariffId): bool
