@@ -18,12 +18,10 @@ final class PaymentGatewayService
 
     public function createTetrapayOrder(
         int $amount,
-        string $orderRef,
         string $hashSeed,
         string $description,
         string $callbackUrl,
-        string $email = '',
-        string $mobile = ''
+        array $customer = []
     ): array
     {
         $config = $this->paymentMethods?->getMethodConfig('tetrapay') ?? [];
@@ -41,10 +39,16 @@ final class PaymentGatewayService
             'Hash_id' => $hashId,
             'Amount' => $amount,
             'Description' => $description,
-            'Email' => $email,
-            'Mobile' => $mobile,
             'CallbackURL' => $callbackUrl,
         ];
+        $email = trim((string) ($customer['email'] ?? ''));
+        if ($email !== '') {
+            $payload['Email'] = $email;
+        }
+        $mobile = trim((string) ($customer['mobile'] ?? ''));
+        if ($mobile !== '') {
+            $payload['Mobile'] = $mobile;
+        }
 
         $createUrl = self::TETRAPAY_CREATE_URL;
         $response = $this->postJson($createUrl, $payload);

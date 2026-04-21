@@ -1764,20 +1764,6 @@ final class Database implements WorkerApiStore
         }
     }
 
-    public function listWaitingWalletChargePayments(int $limit = 20): array
-    {
-        $stmt = $this->pdo->prepare(
-            "SELECT id, user_id, amount, created_at
-             FROM payments
-             WHERE kind = 'wallet_charge' AND status = 'waiting_admin'
-             ORDER BY id ASC
-             LIMIT :limit"
-        );
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll();
-    }
-
     public function listWaitingAdminPayments(int $limit = 20): array
     {
         $stmt = $this->pdo->prepare(
@@ -1790,67 +1776,6 @@ final class Database implements WorkerApiStore
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
-    }
-
-    public function applyWalletChargeDecision(int $paymentId, bool $approve): array
-    {
-        $this->pdo->beginTransaction();
-        try {
-            $stmt = $this->pdo->prepare(
-                "SELECT id, user_id, amount, status, kind
-                 FROM payments
-                 WHERE id = :id
-                 LIMIT 1
-                 FOR UPDATE"
-            );
-            $stmt->execute(['id' => $paymentId]);
-            $payment = $stmt->fetch();
-            if (!is_array($payment)) {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'not_found'];
-            }
-
-            if (($payment['kind'] ?? '') !== 'wallet_charge' || ($payment['status'] ?? '') !== 'waiting_admin') {
-                $this->pdo->rollBack();
-                return ['ok' => false, 'error' => 'not_actionable'];
-            }
-
-            $newStatus = $approve ? 'approved' : 'rejected';
-            $update = $this->pdo->prepare(
-                "UPDATE payments
-                 SET status = :status, approved_at = :approved_at
-                 WHERE id = :id"
-            );
-            $update->execute([
-                'status' => $newStatus,
-                'approved_at' => gmdate('Y-m-d H:i:s'),
-                'id' => $paymentId,
-            ]);
-
-            if ($approve) {
-                $amount = (int) $payment['amount'];
-                $balanceUpdate = $this->pdo->prepare(
-                    'UPDATE users SET balance = balance + :amount WHERE user_id = :user_id'
-                );
-                $balanceUpdate->execute([
-                    'amount' => $amount,
-                    'user_id' => (int) $payment['user_id'],
-                ]);
-            }
-
-            $this->pdo->commit();
-            return [
-                'ok' => true,
-                'status' => $newStatus,
-                'user_id' => (int) $payment['user_id'],
-                'amount' => (int) $payment['amount'],
-            ];
-        } catch (\Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return ['ok' => false, 'error' => 'db_error'];
-        }
     }
 
     public function applyAdminPaymentDecision(int $paymentId, bool $approve): array
@@ -1888,15 +1813,7 @@ final class Database implements WorkerApiStore
             ]);
 
             $kind = (string) ($payment['kind'] ?? '');
-            if ($kind === 'wallet_charge') {
-                if ($approve) {
-                    $balanceUpdate = $this->pdo->prepare('UPDATE users SET balance = balance + :amount WHERE user_id = :user_id');
-                    $balanceUpdate->execute([
-                        'amount' => (int) $payment['amount'],
-                        'user_id' => (int) $payment['user_id'],
-                    ]);
-                }
-            } elseif ($kind === 'purchase' || $kind === 'renewal') {
+            if ($kind === 'purchase' || $kind === 'renewal') {
                 $pendingStatus = $approve ? 'paid_waiting_delivery' : 'cancelled';
                 $pendingUpdate = $this->pdo->prepare('UPDATE pending_orders SET status = :status WHERE payment_id = :payment_id');
                 $pendingUpdate->execute([
@@ -2627,6 +2544,25 @@ final class Database implements WorkerApiStore
         return is_array($row) ? $row : null;
     }
 
+    public function getPaymentByGatewayRef(string $gatewayRef, ?string $method = null): ?array
+    {
+        $gatewayRef = trim($gatewayRef);
+        if ($gatewayRef === '') {
+            return null;
+        }
+        $sql = 'SELECT id, kind, user_id, amount, payment_method, gateway_ref, provider_payload, status FROM payments WHERE gateway_ref = :gateway_ref';
+        $params = ['gateway_ref' => $gatewayRef];
+        if ($method !== null && $method !== '') {
+            $sql .= ' AND payment_method = :payment_method';
+            $params['payment_method'] = $method;
+        }
+        $sql .= ' ORDER BY id DESC LIMIT 1';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
     public function markPaymentAndPendingPaid(int $paymentId): void
     {
         $payStmt = $this->pdo->prepare("UPDATE payments SET status = 'paid', approved_at = :approved_at WHERE id = :id");
@@ -2723,6 +2659,30 @@ final class Database implements WorkerApiStore
                 $this->pdo->rollBack();
             }
             return false;
+        }
+    }
+
+    public function markPaymentGatewayError(int $paymentId, string $reason): void
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $update = $this->pdo->prepare(
+                "UPDATE payments
+                 SET status = 'gateway_error',
+                     admin_note = :reason
+                 WHERE id = :id AND status = 'waiting_gateway'"
+            );
+            $update->execute([
+                'reason' => $reason,
+                'id' => $paymentId,
+            ]);
+            $pending = $this->pdo->prepare("UPDATE pending_orders SET status = 'cancelled' WHERE payment_id = :payment_id AND status = 'waiting_payment'");
+            $pending->execute(['payment_id' => $paymentId]);
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
         }
     }
 

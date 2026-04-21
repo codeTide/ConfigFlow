@@ -263,9 +263,6 @@ final class PaymentMethodRepository
             'tetrapay' => [
                 'api_key' => ['type' => 'string'],
                 'callback_url' => ['type' => 'string'],
-                'default_description' => ['type' => 'string'],
-                'email_fallback' => ['type' => 'string'],
-                'mobile_fallback' => ['type' => 'string'],
             ],
             'crypto_tron' => [
                 'network' => ['type' => 'string'],

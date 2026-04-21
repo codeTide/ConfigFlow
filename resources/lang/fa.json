@@ -104,10 +104,10 @@
     },
     "user": {
       "wallet": {
-        "enter_amount": "💳 مبلغ شارژ کیف پول را وارد کنید:\n\n🧾 مبلغ را به تومان و به‌صورت عددی ارسال کنید.\n\n<blockquote>ℹ️ حداقل و حداکثر مبلغ بر اساس روش پرداخت انتخاب‌شده اعمال می‌شود.</blockquote>",
+        "enter_amount": "💰 مبلغ شارژ کیف پول را وارد کنید:\n\n✍️ مبلغ را به تومان و فقط به‌صورت عددی ارسال کنید.\n\n<blockquote>🛡️ سقف و کف مجاز پرداخت بر اساس درگاه انتخاب‌شده به‌صورت خودکار بررسی می‌شود تا ثبت پرداخت بدون خطا انجام شود.</blockquote>",
         "invalid_amount": "مبلغ واردشده معتبر نیست.",
         "no_topup_method": "در حال حاضر روش فعالی برای شارژ کیف پول وجود ندارد.",
-        "method_prompt": "💳 روش پرداخت شارژ کیف پول را انتخاب کنید:\n\n🧾 یکی از روش‌های فعال زیر را بزنید.\n\n<blockquote>ℹ️ پس از انتخاب روش، مراحل پرداخت همان درگاه نمایش داده می‌شود.</blockquote>",
+        "method_prompt": "💳 روش شارژ کیف پول را انتخاب کنید:\n\n🎯 لطفاً یکی از درگاه‌های فعال را برای ادامه پرداخت لمس کنید.\n\n<blockquote>🧭 بعد از انتخاب درگاه، لینک پرداخت امن همان سرویس برای شما ارسال می‌شود و سپس می‌توانید وضعیت تراکنش را از داخل ربات پیگیری کنید.</blockquote>",
         "method_invalid": "روش پرداخت انتخاب‌شده معتبر نیست.",
         "amount_out_of_range": "مبلغ واردشده خارج از بازه مجاز است. حداقل: {min} | حداکثر: {max}"
       },
@@ -297,7 +297,8 @@
         "gateway": {
           "swapwallet_invoice_error": "خطا در ایجاد فاکتور SwapWallet.",
           "tronpays_invoice_error": "خطا در ایجاد فاکتور TronPays.",
-          "tetrapay_invoice_error": "خطا در ایجاد سفارش Tetrapay."
+          "tetrapay_invoice_error": "خطا در ایجاد سفارش Tetrapay.",
+          "tetrapay_description": "سفارش {purpose} | پرداخت #{payment_id} | مرجع {reference}"
         },
         "ok": {
           "default": "✅ پرداخت تایید شد.",
@@ -450,7 +451,6 @@
         "approve": "✅ تایید #{payment_id}",
         "reject": "❌ رد #{payment_id}"
       },
-      "wallet_charge_new": "💳 <b>درخواست شارژ کیف پول جدید</b>\n\nشماره: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nمبلغ: <b>{amount}</b> تومان",
       "renew_receipt_new": "♻️ <b>رسید تمدید جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\n{note_line}",
       "tx_new": "💎 <b>TX Hash جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nTX: <code>{tx_hash}</code>\n{amount_line}",
       "tx_renew_new": "♻️ <b>TX Hash تمدید جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nTX: <code>{tx_hash}</code>\n{amount_line}",
@@ -1076,8 +1076,6 @@
           "request_status": "درخواست <code>{payment_id}</code> {status_text}."
         },
         "user_notice": {
-          "wallet_approved": "✅ درخواست شارژ کیف پول شما تایید شد.\nمبلغ: <b>{amount}</b> تومان",
-          "wallet_rejected": "❌ درخواست شارژ کیف پول شما رد شد.",
           "renewal_approved": "✅ پرداخت تمدید شما تایید شد و در صف تحویل قرار گرفت.",
           "renewal_rejected": "❌ پرداخت تمدید شما رد شد.",
           "order_approved": "✅ پرداخت سفارش شما تایید شد و در صف تحویل قرار گرفت.",
@@ -1304,14 +1302,11 @@
       },
       "provider": {
         "overview": "🧩 تنظیمات اختصاصی روش پرداخت\n\n{rows}\n\n<blockquote>💡 برای هر مورد، روی همان دکمه بزنید و مقدار جدید را ارسال کنید تا تنظیمات اختصاصی این درگاه به‌صورت ساختاریافته ذخیره شود.</blockquote>",
-        "no_config": "ℹ️ برای این روش پرداخت هنوز تنظیمات اختصاصی تعریف نشده است.",
+        "no_config": "🔹 برای این روش پرداخت هنوز تنظیمات اختصاصی تعریف نشده است.",
         "fields": {
           "tetrapay": {
             "api_key": "🔑 کلید API",
-            "callback_url": "🔁 آدرس Callback",
-            "default_description": "📝 توضیح پیش‌فرض",
-            "email_fallback": "✉️ ایمیل پیش‌فرض",
-            "mobile_fallback": "📱 موبایل پیش‌فرض"
+            "callback_url": "🔁 نشانی بازگشت درگاه"
           },
           "crypto_tron": {
             "network": "🌐 شبکه",
@@ -1328,14 +1323,14 @@
             "username": "👤 نام کاربری مرچنت",
             "network": "🌉 Network",
             "asset": "🪙 Asset",
-            "callback_url": "🔁 Callback URL",
+            "callback_url": "🔁 نشانی بازگشت درگاه",
             "pricing_mode": "💹 Pricing Mode",
             "timeout_seconds": "⏱ Timeout"
           },
           "tronpays_rial": {
             "base_url": "🌐 Base URL",
             "merchant_key": "🔑 Merchant Key",
-            "callback_url": "🔁 Callback URL",
+            "callback_url": "🔁 نشانی بازگشت درگاه",
             "mode": "🧪 Mode",
             "verify_mode": "🔎 Verify Setting",
             "timeout_seconds": "⏱ Timeout"
@@ -1347,10 +1342,7 @@
         "buttons": {
           "tetrapay": {
             "api_key": "🔑 کلید API",
-            "callback_url": "🔁 Callback",
-            "default_description": "📝 توضیح پیش‌فرض",
-            "email_fallback": "✉️ ایمیل",
-            "mobile_fallback": "📱 موبایل"
+            "callback_url": "🔁 نشانی بازگشت"
           },
           "crypto_tron": {
             "network": "🌐 شبکه",
@@ -1367,14 +1359,14 @@
             "username": "👤 Username",
             "network": "🌉 Network",
             "asset": "🪙 Asset",
-            "callback_url": "🔁 Callback",
+            "callback_url": "🔁 نشانی بازگشت",
             "pricing_mode": "💹 Pricing",
             "timeout_seconds": "⏱ Timeout"
           },
           "tronpays_rial": {
             "base_url": "🌐 Base URL",
             "merchant_key": "🔑 API Key",
-            "callback_url": "🔁 Callback",
+            "callback_url": "🔁 نشانی بازگشت",
             "mode": "🧪 Mode",
             "verify_mode": "🔎 Verify",
             "timeout_seconds": "⏱ Timeout"
