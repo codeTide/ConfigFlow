@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace ConfigFlow\Bot;
 
+use ConfigFlow\Bot\Support\AppError;
+use ConfigFlow\Bot\Support\AppLogger;
+use ConfigFlow\Bot\Support\ErrorRef;
+use ConfigFlow\Bot\Support\PayloadSanitizer;
+
 final class PaymentGatewayService
 {
     private const TETRAPAY_CREATE_URL = 'https://tetra98.com/api/create_order';
@@ -11,65 +16,172 @@ final class PaymentGatewayService
 
     public function __construct(
         private SettingsRepository $settings,
-        private ?PaymentMethodRepository $paymentMethods = null
+        private ?PaymentMethodRepository $paymentMethods = null,
+        private ?AppLogger $logger = null
     )
     {
+        $this->logger ??= new AppLogger();
     }
 
-    public function createTetrapayOrder(int $amount, string $orderRef): array
+    public function createTetrapayOrder(
+        int $amount,
+        string $hashSeed,
+        string $description,
+        string $callbackUrl,
+        array $customer = []
+    ): array
     {
         $config = $this->paymentMethods?->getMethodConfig('tetrapay') ?? [];
-        $apiKey = trim((string) ($config['secret_key'] ?? $this->settings->get('tetrapay_api_key', '')));
+        $apiKey = trim((string) ($config['api_key'] ?? $this->settings->get('tetrapay_api_key', '')));
         if ($apiKey === '') {
             return ['ok' => false, 'error' => 'tetrapay_api_key_missing'];
         }
 
+        if (trim($callbackUrl) === '') {
+            return ['ok' => false, 'error' => 'tetrapay_callback_missing'];
+        }
+        $hashId = substr(hash('sha256', $hashSeed), 0, 40);
         $payload = [
-            'api_key' => $apiKey,
-            'amount' => $amount,
-            'factorNumber' => $orderRef,
-            'description' => 'ConfigFlow order ' . $orderRef,
+            'ApiKey' => $apiKey,
+            'Hash_id' => $hashId,
+            'Amount' => $amount,
+            'Description' => $description,
+            'CallbackURL' => $callbackUrl,
         ];
-
-        $createUrl = trim((string) ($config['create_url'] ?? self::TETRAPAY_CREATE_URL));
-        $response = $this->postJson($createUrl, $payload);
-        if (!($response['ok'] ?? false)) {
-            return ['ok' => false, 'error' => 'request_failed'];
+        $email = trim((string) ($customer['email'] ?? ''));
+        if ($email !== '') {
+            $payload['Email'] = $email;
+        }
+        $mobile = trim((string) ($customer['mobile'] ?? ''));
+        if ($mobile !== '') {
+            $payload['Mobile'] = $mobile;
         }
 
-        $data = $response['data'] ?? [];
-        $payUrl = (string) ($data['paymentUrl'] ?? $data['url'] ?? '');
-        $authority = (string) ($data['authority'] ?? $data['token'] ?? '');
+        $createUrl = self::TETRAPAY_CREATE_URL;
+        $response = $this->postJson($createUrl, $payload);
+        if (!(bool) ($response['transport_ok'] ?? false)) {
+            $isTimeout = ((int) ($response['curl_errno'] ?? 0)) === 28;
+            $code = $isTimeout ? 'tetrapay_timeout' : 'tetrapay_transport_error';
+            $errorRef = $this->logger->log('error', 'tetrapay', $code, 'Tetrapay create order transport failure', [
+                'gateway' => 'tetrapay',
+                'stage' => 'create_order',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'provider_error' => (string) ($response['curl_error'] ?? ''),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('TP'));
+            return AppError::make($code, 'messages.user.payment.gateway.tetrapay_invoice_error', 'tetrapay', 'create_order', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'curl_errno' => (int) ($response['curl_errno'] ?? 0),
+                'curl_error' => (string) ($response['curl_error'] ?? ''),
+            ], true, $errorRef);
+        }
+        if (!(bool) ($response['decoded_ok'] ?? false)) {
+            $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_invalid_json', 'Tetrapay create order invalid JSON', [
+                'gateway' => 'tetrapay',
+                'stage' => 'create_order',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'provider_error' => (string) ($response['decode_error'] ?? ''),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_invalid_json', 'messages.user.payment.gateway.tetrapay_invoice_error', 'tetrapay', 'create_order', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'decode_error' => (string) ($response['decode_error'] ?? ''),
+            ], false, $errorRef);
+        }
+        if ((int) ($response['http_status'] ?? 0) < 200 || (int) ($response['http_status'] ?? 0) >= 300) {
+            $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_http_error', 'Tetrapay create order HTTP error', [
+                'gateway' => 'tetrapay',
+                'stage' => 'create_order',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'response_payload' => (array) ($response['decoded_body'] ?? []),
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_http_error', 'messages.user.payment.gateway.tetrapay_invoice_error', 'tetrapay', 'create_order', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+            ], true, $errorRef);
+        }
+
+        $data = is_array($response['decoded_body'] ?? null) ? $response['decoded_body'] : [];
+        $providerStatus = (int) ($data['status'] ?? 0);
+        if ($providerStatus !== 100 && $providerStatus !== 1 && $providerStatus !== 0) {
+            $errorRef = $this->logger->log('warning', 'tetrapay', 'tetrapay_provider_rejected', 'Tetrapay provider rejected create order', [
+                'gateway' => 'tetrapay',
+                'stage' => 'create_order',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'response_payload' => $data,
+                'provider_error' => (string) ($data['message'] ?? ''),
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_provider_rejected', 'messages.user.payment.gateway.tetrapay_invoice_error', 'tetrapay', 'create_order', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'provider_status' => $providerStatus,
+                'provider_message' => (string) ($data['message'] ?? ''),
+            ], false, $errorRef);
+        }
+        $payUrl = (string) ($data['payment_url_web'] ?? $data['payment_url_bot'] ?? '');
+        $authority = (string) ($data['Authority'] ?? '');
+        $trackingId = (string) ($data['tracking_id'] ?? '');
 
         if ($payUrl === '') {
-            return ['ok' => false, 'error' => 'invalid_response'];
+            $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_missing_pay_url', 'Tetrapay create order missing pay url', [
+                'gateway' => 'tetrapay',
+                'stage' => 'create_order',
+                'response_payload' => $data,
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_missing_pay_url', 'messages.user.payment.gateway.tetrapay_invoice_error', 'tetrapay', 'create_order', [
+                'provider_status' => $providerStatus,
+                'response' => $data,
+            ], false, $errorRef);
         }
 
-        return ['ok' => true, 'pay_url' => $payUrl, 'authority' => $authority];
+        return ['ok' => true, 'pay_url' => $payUrl, 'authority' => $authority, 'tracking_id' => $trackingId, 'hash_id' => $hashId, 'raw' => $data];
     }
 
-    public function verifyTetrapay(string $authority): array
+    public function verifyTetrapay(string $authority, string $hashId = ''): array
     {
         $config = $this->paymentMethods?->getMethodConfig('tetrapay') ?? [];
-        $apiKey = trim((string) ($config['secret_key'] ?? $this->settings->get('tetrapay_api_key', '')));
+        $apiKey = trim((string) ($config['api_key'] ?? $this->settings->get('tetrapay_api_key', '')));
         if ($apiKey === '' || $authority === '') {
             return ['ok' => false, 'error' => 'missing_data'];
         }
 
-        $verifyUrl = trim((string) ($config['verify_url'] ?? self::TETRAPAY_VERIFY_URL));
-        $response = $this->postJson($verifyUrl, [
-            'api_key' => $apiKey,
-            'authority' => $authority,
-        ]);
-
-        if (!($response['ok'] ?? false)) {
-            return ['ok' => false, 'error' => 'request_failed'];
+        $payload = [
+            'ApiKey' => $apiKey,
+            'Authority' => $authority,
+        ];
+        if ($hashId !== '') {
+            $payload['Hash_id'] = $hashId;
         }
+        $response = $this->postJson(self::TETRAPAY_VERIFY_URL, $payload);
+        if (!(bool) ($response['transport_ok'] ?? false)) {
+            $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_transport_error', 'Tetrapay verify transport failure', [
+                'gateway' => 'tetrapay',
+                'stage' => 'verify',
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'provider_error' => (string) ($response['curl_error'] ?? ''),
+                'request_payload' => PayloadSanitizer::sanitize($payload),
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_transport_error', 'messages.user.payment.not_confirmed', 'tetrapay', 'verify', [
+                'http_status' => (int) ($response['http_status'] ?? 0),
+                'curl_error' => (string) ($response['curl_error'] ?? ''),
+            ], true, $errorRef);
+        }
+        if (!(bool) ($response['decoded_ok'] ?? false)) {
+            $errorRef = $this->logger->log('error', 'tetrapay', 'tetrapay_invalid_json', 'Tetrapay verify invalid JSON', [
+                'gateway' => 'tetrapay',
+                'stage' => 'verify',
+                'raw_response' => (string) ($response['raw_body'] ?? ''),
+            ], ErrorRef::make('TP'));
+            return AppError::make('tetrapay_invalid_json', 'messages.user.payment.not_confirmed', 'tetrapay', 'verify', [], false, $errorRef);
+        }
+        $data = is_array($response['decoded_body'] ?? null) ? $response['decoded_body'] : [];
+        $statusCode = (int) ($data['status'] ?? 0);
+        $isPaid = $statusCode === 100;
 
-        $data = $response['data'] ?? [];
-        $isPaid = (bool) ($data['paid'] ?? $data['success'] ?? false);
-
-        return ['ok' => true, 'paid' => $isPaid, 'raw' => $data];
+        return ['ok' => true, 'paid' => $isPaid, 'status' => $statusCode, 'raw' => $data];
     }
 
     public function createSwapwalletCryptoInvoice(int $amount, string $orderId, string $network = 'TRON', string $description = 'Payment'): array
@@ -369,18 +481,22 @@ final class PaymentGatewayService
 
         $raw = curl_exec($ch);
         $err = curl_error($ch);
+        $errno = curl_errno($ch);
+        $httpStatus = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-
-        if ($raw === false || $err !== '') {
-            return ['ok' => false];
-        }
-
-        $decoded = json_decode((string) $raw, true);
-        if (!is_array($decoded)) {
-            return ['ok' => false];
-        }
-
-        return ['ok' => true, 'data' => $decoded];
+        $decoded = is_string($raw) ? json_decode($raw, true) : null;
+        return [
+            'ok' => ($raw !== false && $err === ''),
+            'transport_ok' => ($raw !== false && $err === ''),
+            'provider_ok' => $httpStatus >= 200 && $httpStatus < 300,
+            'http_status' => $httpStatus,
+            'curl_error' => $err,
+            'curl_errno' => $errno,
+            'raw_body' => is_string($raw) ? $raw : '',
+            'decoded_ok' => is_array($decoded),
+            'decoded_body' => is_array($decoded) ? $decoded : null,
+            'decode_error' => is_array($decoded) ? '' : json_last_error_msg(),
+        ];
     }
 
     private function postJsonHeaders(string $url, array $payload, array $headers): array
@@ -396,15 +512,23 @@ final class PaymentGatewayService
         ]);
         $raw = curl_exec($ch);
         $err = curl_error($ch);
+        $errno = curl_errno($ch);
+        $httpStatus = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        if ($raw === false || $err !== '') {
-            return ['ok' => false, 'error' => $err];
-        }
-        $decoded = json_decode((string) $raw, true);
-        if (!is_array($decoded)) {
-            return ['ok' => false, 'error' => 'decode_error'];
-        }
-        return ['ok' => true, 'data' => $decoded];
+        $decoded = is_string($raw) ? json_decode($raw, true) : null;
+        return [
+            'ok' => ($raw !== false && $err === '' && is_array($decoded)),
+            'transport_ok' => ($raw !== false && $err === ''),
+            'provider_ok' => $httpStatus >= 200 && $httpStatus < 300,
+            'http_status' => $httpStatus,
+            'curl_error' => $err,
+            'curl_errno' => $errno,
+            'raw_body' => is_string($raw) ? $raw : '',
+            'decoded_ok' => is_array($decoded),
+            'decoded_body' => is_array($decoded) ? $decoded : null,
+            'decode_error' => is_array($decoded) ? '' : json_last_error_msg(),
+            'data' => is_array($decoded) ? $decoded : [],
+        ];
     }
 
     private function getJsonHeaders(string $url, array $headers): array
@@ -417,15 +541,23 @@ final class PaymentGatewayService
         ]);
         $raw = curl_exec($ch);
         $err = curl_error($ch);
+        $errno = curl_errno($ch);
+        $httpStatus = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        if ($raw === false || $err !== '') {
-            return ['ok' => false, 'error' => $err];
-        }
-        $decoded = json_decode((string) $raw, true);
-        if (!is_array($decoded)) {
-            return ['ok' => false, 'error' => 'decode_error'];
-        }
-        return ['ok' => true, 'data' => $decoded];
+        $decoded = is_string($raw) ? json_decode($raw, true) : null;
+        return [
+            'ok' => ($raw !== false && $err === '' && is_array($decoded)),
+            'transport_ok' => ($raw !== false && $err === ''),
+            'provider_ok' => $httpStatus >= 200 && $httpStatus < 300,
+            'http_status' => $httpStatus,
+            'curl_error' => $err,
+            'curl_errno' => $errno,
+            'raw_body' => is_string($raw) ? $raw : '',
+            'decoded_ok' => is_array($decoded),
+            'decoded_body' => is_array($decoded) ? $decoded : null,
+            'decode_error' => is_array($decoded) ? '' : json_last_error_msg(),
+            'data' => is_array($decoded) ? $decoded : [],
+        ];
     }
 
     private function getJson(string $url): array
