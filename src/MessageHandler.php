@@ -7064,7 +7064,8 @@ final class MessageHandler
         $tp = $this->createTetrapayInvoiceForPayment($userId, $amount, $paymentId, 'purchase', (string) $pendingId);
         if (!($tp['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($tp['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tetrapay_unavailable', ['pending_id' => $pendingId, 'amount' => $amount]));
+            $this->database->setPaymentLastError($paymentId, (string) ($tp['code'] ?? 'tetrapay_request_failed'), 'create_order', (string) ($tp['error_ref'] ?? ''), (array) ($tp['details'] ?? []));
+            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.tetrapay_invoice_error', (string) ($tp['error_ref'] ?? ''));
             return;
         }
         $authority = (string) ($tp['authority'] ?? '');
@@ -7130,7 +7131,8 @@ final class MessageHandler
         $tp = $this->createTetrapayInvoiceForPayment($userId, $amount, $paymentId, 'purchase', (string) $pendingId);
         if (!($tp['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($tp['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tetrapay_unavailable', ['pending_id' => $pendingId, 'amount' => $amount]));
+            $this->database->setPaymentLastError($paymentId, (string) ($tp['code'] ?? 'tetrapay_request_failed'), 'create_order', (string) ($tp['error_ref'] ?? ''), (array) ($tp['details'] ?? []));
+            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.tetrapay_invoice_error', (string) ($tp['error_ref'] ?? ''));
             return;
         }
         $authority = (string) ($tp['authority'] ?? '');
@@ -7207,7 +7209,8 @@ final class MessageHandler
         $tp = $this->createTetrapayInvoiceForPayment($userId, $amount, $paymentId, 'purchase', (string) $pendingId);
         if (!($tp['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($tp['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tetrapay_unavailable', ['pending_id' => $pendingId, 'amount' => $amount]));
+            $this->database->setPaymentLastError($paymentId, (string) ($tp['code'] ?? 'tetrapay_request_failed'), 'create_order', (string) ($tp['error_ref'] ?? ''), (array) ($tp['details'] ?? []));
+            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.tetrapay_invoice_error', (string) ($tp['error_ref'] ?? ''));
             return;
         }
         $authority = (string) ($tp['authority'] ?? '');
@@ -7270,7 +7273,8 @@ final class MessageHandler
         $tp = $this->createTetrapayInvoiceForPayment($userId, $amount, $paymentId, 'renewal', (string) $pendingId);
         if (!($tp['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($tp['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.tetrapay_renew_unavailable', ['pending_id' => $pendingId, 'amount' => $amount]));
+            $this->database->setPaymentLastError($paymentId, (string) ($tp['code'] ?? 'tetrapay_request_failed'), 'create_order', (string) ($tp['error_ref'] ?? ''), (array) ($tp['details'] ?? []));
+            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.tetrapay_invoice_error', (string) ($tp['error_ref'] ?? ''));
             return;
         }
         $authority = (string) ($tp['authority'] ?? '');
@@ -7576,6 +7580,20 @@ final class MessageHandler
             'tronpays_rial' => $this->gateways->checkTronpaysRialInvoice($gatewayRef),
             default => ['ok' => false, 'paid' => false],
         };
+        if (!($verify['ok'] ?? false)) {
+            $errorRef = (string) ($verify['error_ref'] ?? '');
+            $this->database->setPaymentLastError(
+                $paymentId,
+                (string) ($verify['code'] ?? $verify['error'] ?? 'verify_failed'),
+                'verify',
+                $errorRef,
+                (array) ($verify['details'] ?? [])
+            );
+            if ($gateway === 'tetrapay' && $errorRef !== '') {
+                $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.tetrapay_verify_error', $errorRef);
+                return;
+            }
+        }
         if (($verify['ok'] ?? false) && ($verify['paid'] ?? false)) {
             $changed = (string) ($payment['kind'] ?? '') === 'wallet_topup'
                 ? $this->database->markWalletTopupPaidIfWaitingGateway($paymentId)
@@ -7838,7 +7856,8 @@ final class MessageHandler
         $invoice = $creator($paymentId);
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.tetrapay_invoice_error'));
+            $this->database->setPaymentLastError($paymentId, (string) ($invoice['code'] ?? 'tetrapay_request_failed'), 'create_order', (string) ($invoice['error_ref'] ?? ''), (array) ($invoice['details'] ?? []));
+            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.tetrapay_invoice_error', (string) ($invoice['error_ref'] ?? ''));
             return;
         }
         $authority = (string) ($invoice['authority'] ?? '');
@@ -7894,6 +7913,14 @@ final class MessageHandler
         ]);
     }
 
+    private function sendGatewayUserError(int $chatId, string $messageKey, string $errorRef): void
+    {
+        $ref = trim($errorRef);
+        $this->telegram->sendMessage($chatId, $this->catalog->get($messageKey, [
+            'error_ref' => $ref !== '' ? htmlspecialchars($ref) : $this->catalog->get('messages.generic.dash'),
+        ]));
+    }
+
     private function paymentSelectionButtons(): array
     {
         $buttons = [[$this->catalog->get('buttons.pay.wallet')]];
@@ -7947,22 +7974,17 @@ final class MessageHandler
 
     private function logFreeTestClaimFailure(int $chatId, array $claim): string
     {
-        $ref = 'FT-' . gmdate('YmdHis') . '-' . str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $logDir = dirname(__DIR__) . '/storage/logs';
-        if (!is_dir($logDir)) {
-            @mkdir($logDir, 0775, true);
-        }
-        $entry = [
-            'ref' => $ref,
-            'at' => gmdate('c'),
-            'chat_id' => $chatId,
-            'error_code' => (string) ($claim['error_code'] ?? ''),
+        $logger = new \ConfigFlow\Bot\Support\AppLogger();
+        return $logger->log('error', 'free_test', 'free_test_claim_failed', 'Free-test claim failed', [
+            'stage' => 'free_test_claim',
+            'user_id' => $chatId,
             'provider_error' => (string) ($claim['provider_error'] ?? ''),
-            'service_id' => isset($claim['service_id']) ? (int) $claim['service_id'] : null,
-            'purchase_id' => isset($claim['purchase_id']) ? (int) $claim['purchase_id'] : null,
-        ];
-        @file_put_contents($logDir . '/free_test_claim_errors.log', json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
-        return $ref;
+            'request_payload' => [
+                'error_code' => (string) ($claim['error_code'] ?? ''),
+                'service_id' => isset($claim['service_id']) ? (int) $claim['service_id'] : null,
+                'purchase_id' => isset($claim['purchase_id']) ? (int) $claim['purchase_id'] : null,
+            ],
+        ], \ConfigFlow\Bot\Support\ErrorRef::make('FT'));
     }
 
     private function replyKeyboard(array $rows): array

@@ -8,6 +8,10 @@ use ConfigFlow\Bot\WorkerApiApp;
 
 require __DIR__ . '/../src/Bootstrap.php';
 require __DIR__ . '/../src/Config.php';
+require __DIR__ . '/../src/Support/ErrorRef.php';
+require __DIR__ . '/../src/Support/PayloadSanitizer.php';
+require __DIR__ . '/../src/Support/AppLogger.php';
+require __DIR__ . '/../src/Support/AppError.php';
 require __DIR__ . '/../src/ProvisioningProviderInterface.php';
 require __DIR__ . '/../src/PGClient.php';
 require __DIR__ . '/../src/PasarGuardProvisioningProvider.php';

@@ -2686,6 +2686,27 @@ final class Database implements WorkerApiStore
         }
     }
 
+    /** @param array<string,mixed> $details */
+    public function setPaymentLastError(int $paymentId, string $code, string $stage, string $errorRef, array $details = []): void
+    {
+        $existing = $this->getPaymentById($paymentId);
+        $payload = [];
+        if (is_array($existing) && is_string($existing['provider_payload'] ?? null)) {
+            $decoded = json_decode((string) $existing['provider_payload'], true);
+            if (is_array($decoded)) {
+                $payload = $decoded;
+            }
+        }
+        $payload['last_error_ref'] = $errorRef;
+        $payload['last_error_code'] = $code;
+        $payload['last_error_stage'] = $stage;
+        $payload['last_error_at'] = gmdate('c');
+        if ($details !== []) {
+            $payload['last_error_details'] = $details;
+        }
+        $this->setPaymentProviderPayload($paymentId, $payload);
+    }
+
     public function registerVerifyAttempt(int $paymentId, int $cooldownSeconds = 20, int $maxAttempts = 15): array
     {
         $this->pdo->beginTransaction();

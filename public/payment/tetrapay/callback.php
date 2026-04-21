@@ -16,6 +16,10 @@ require_once __DIR__ . '/../../../src/Database.php';
 require_once __DIR__ . '/../../../src/SettingsRepository.php';
 require_once __DIR__ . '/../../../src/PaymentMethodRepository.php';
 require_once __DIR__ . '/../../../src/PaymentGatewayService.php';
+require_once __DIR__ . '/../../../src/Support/ErrorRef.php';
+require_once __DIR__ . '/../../../src/Support/PayloadSanitizer.php';
+require_once __DIR__ . '/../../../src/Support/AppLogger.php';
+require_once __DIR__ . '/../../../src/Support/AppError.php';
 require_once __DIR__ . '/../../../src/Payments/Tetrapay/TetrapayGateway.php';
 require_once __DIR__ . '/../../../src/Payments/Tetrapay/TetrapayCallbackHandler.php';
 
