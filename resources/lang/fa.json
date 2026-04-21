@@ -284,37 +284,37 @@
           "tetrapay_description": "order:{payment_id}",
           "tetrapay_verify_error": "❌ بررسی وضعیت پرداخت تتراپی کامل نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 پاسخ قطعی از درگاه دریافت نشد یا اعتبارسنجی تراکنش ناموفق بود. چند دقیقه بعد دوباره بررسی کنید؛ اگر همچنان مشکل داشتید، کد پیگیری را برای پشتیبانی بفرستید.</blockquote>",
           "tetrapay_callback_invalid": "درخواست callback تتراپی معتبر نیست.",
-          "tetrapay_callback_not_found": "پرداخت متناظر برای callback تتراپی پیدا نشد."
+          "tetrapay_callback_not_found": "پرداخت متناظر برای callback تتراپی پیدا نشد.",
+          "nowpayments_invoice_error": "❌ ایجاد فاکتور نوپیمنت انجام نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>",
+          "nowpayments_verify_error": "❌ بررسی پرداخت نوپیمنت کامل نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>",
+          "nowpayments_callback_invalid": "درخواست callback مربوط به نوپیمنت معتبر نیست.",
+          "nowpayments_callback_not_found": "پرداخت متناظر برای callback نوپیمنت پیدا نشد.",
+          "nowpayments_waiting_confirmation": "⏳ پرداخت شما هنوز توسط نوپیمنت نهایی نشده است. لطفاً چند لحظه دیگر دوباره بررسی کنید.",
+          "nowpayments_partially_paid": "🟡 پرداخت شما به‌صورت ناقص ثبت شده است. لطفاً پرداخت را کامل کنید تا تایید نهایی انجام شود.",
+          "nowpayments_failed_terminal": "❌ این پرداخت در درگاه نهایی نشده است (ناموفق/منقضی/برگشت‌خورده)."
         },
         "ok": {
           "default": "✅ پرداخت تایید شد.",
           "tetrapay_purchase": "✅ پرداخت تتراپی تایید شد. سفارش شما در صف تحویل قرار گرفت.",
           "tetrapay_renew": "✅ پرداخت تمدید تایید شد. درخواست شما در صف تحویل قرار گرفت.",
-          "wallet_topup": "✅ شارژ کیف پول با موفقیت انجام شد."
+          "wallet_topup": "✅ شارژ کیف پول با موفقیت انجام شد.",
+          "nowpayments_purchase": "✅ پرداخت نوپیمنت تایید شد. سفارش شما در صف تحویل قرار گرفت.",
+          "nowpayments_renew": "✅ پرداخت تمدید از طریق نوپیمنت تایید شد. درخواست شما در صف تحویل قرار گرفت."
         },
         "titles": {
           "tetrapay_purchase": "🏧 <b>پرداخت TetraPay</b>",
           "tetrapay_renew": "🏧 <b>پرداخت TetraPay (تمدید)</b>",
-          "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>"
+          "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>",
+          "nowpayments_purchase": "🪙 <b>پرداخت نوپیمنت</b>",
+          "nowpayments_renew": "🪙 <b>پرداخت نوپیمنت (تمدید)</b>",
+          "nowpayments_wallet_topup": "🪙 <b>شارژ کیف پول با نوپیمنت</b>"
         },
         "verify_hint": "برای بررسی وضعیت، دکمه بررسی پرداخت را بزنید.",
         "not_found": "پرداخت پیدا نشد.",
         "not_confirmed": "پرداخت هنوز تایید نشده است.",
+        "bonus_applied": "🎁 پاداش این تراکنش: <b>{bonus_amount}</b> تومان (به کیف پول شما اضافه شد).",
         "gateway_intro_tip": "💡 بعد از تکمیل پرداخت، وضعیت تراکنش را از طریق دکمه بررسی پرداخت پیگیری کنید تا سرویس شما سریع‌تر نهایی شود.",
-        "verify_prompt": "برای بررسی پرداخت از دکمه زیر استفاده کنید.",
-        "receipt": {
-          "missing_purchase": "⚠️ لطفاً رسید را به‌صورت عکس/فایل یا متن ارسال کنید.",
-          "saved_purchase": "✅ رسید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>",
-          "missing_renew": "⚠️ لطفاً رسید تمدید را به‌صورت عکس/فایل یا متن ارسال کنید.",
-          "saved_renew": "✅ رسید تمدید شما ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>"
-        },
-        "tx": {
-          "invalid": "⚠️ لطفاً TX Hash معتبر ارسال کنید.",
-          "invalid_length": "⚠️ طول TX Hash معتبر نیست.",
-          "submit_failed": "❌ ثبت TX Hash انجام نشد. لطفاً دوباره تلاش کنید.",
-          "saved_purchase": "✅ TX Hash ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>",
-          "saved_renew": "✅ TX Hash تمدید ثبت شد و برای بررسی ادمین ارسال گردید.\nشماره پرداخت: <code>{payment_id}</code>"
-        }
+        "verify_prompt": "برای بررسی پرداخت از دکمه زیر استفاده کنید."
       }
     },
     "system": {
@@ -423,9 +423,6 @@
         "approve": "✅ تایید #{payment_id}",
         "reject": "❌ رد #{payment_id}"
       },
-      "renew_receipt_new": "♻️ <b>رسید تمدید جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\n{note_line}",
-      "tx_new": "💎 <b>TX Hash جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nTX: <code>{tx_hash}</code>\n{amount_line}",
-      "tx_renew_new": "♻️ <b>TX Hash تمدید جدید</b>\n\nپرداخت: <code>{payment_id}</code>\nکاربر: <code>{user_id}</code>\nTX: <code>{tx_hash}</code>\n{amount_line}",
       "amount_line": "Amount: <b>{amount}</b>\n"
     },
     "payments_requests": {
@@ -971,7 +968,6 @@
           "max_attempts": "🚫 سقف دفعات بررسی این پرداخت تکمیل شده است.",
           "unavailable": "بررسی این پرداخت فعلاً ممکن نیست.",
           "payment_not_found": "پرداخت یافت نشد.",
-          "tx_hash_missing": "TX Hash ثبت نشده است.",
           "tx_not_confirmed_or_invalid": "تراکنش تایید نشد یا مقدار اعلامی معتبر نیست.",
           "request_not_processable": "این درخواست قابل پردازش نیست.",
           "request_status": "درخواست <code>{payment_id}</code> {status_text}."
@@ -1167,6 +1163,10 @@
         "tetrapay": {
           "label": "🏧 پرداخت تتراپی",
           "intro": "پرداخت از طریق درگاه تتراپی"
+        },
+        "nowpayments": {
+          "label": "🪙 نوپیمنت",
+          "intro": "پرداخت رمزارزی از طریق نوپیمنت"
         }
       },
       "bonus": {
@@ -1190,12 +1190,19 @@
         }
       },
       "provider": {
-        "overview": "🧩 تنظیمات اختصاصی روش پرداخت\n\n{rows}\n\n<blockquote>💡 برای هر مورد، روی همان دکمه بزنید و مقدار جدید را ارسال کنید تا تنظیمات اختصاصی این درگاه به‌صورت ساختاریافته ذخیره شود.</blockquote>",
+        "overview": "🧩 تنظیمات اختصاصی روش پرداخت\n\n{rows}\n\n<blockquote>💡 برای ویرایش هر مورد، روی دکمه همان گزینه بزنید. بعضی گزینه‌ها مستقیم تغییر می‌کنند و بعضی گزینه‌ها نیاز به ارسال مقدار جدید دارند.</blockquote>",
         "no_config": "🔹 برای این روش پرداخت هنوز تنظیمات اختصاصی تعریف نشده است.",
         "fields": {
           "tetrapay": {
             "api_key": "🔑 کلید API",
             "callback_url": "🔁 نشانی بازگشت درگاه"
+          },
+          "nowpayments": {
+            "api_key": "🔑 کلید ای پی آی",
+            "ipn_secret": "🧷 کلید محرمانه آی پی ان",
+            "callback_url": "🔁 نشانی بازگشت",
+            "is_fixed_rate": "📌 نرخ",
+            "is_fee_paid_by_user": "💸 کارمزد"
           }
         },
         "actions": {
@@ -1205,6 +1212,13 @@
           "tetrapay": {
             "api_key": "🔑 کلید API",
             "callback_url": "🔁 نشانی بازگشت"
+          },
+          "nowpayments": {
+            "api_key": "🔑 کلید ای پی آی",
+            "ipn_secret": "🧷 کلید محرمانه آی پی ان",
+            "callback_url": "🔁 نشانی بازگشت",
+            "is_fixed_rate": "📌 تغییر به نرخ ثابت",
+            "is_fee_paid_by_user": "💸 کارمزد با کاربر"
           }
         }
       },
