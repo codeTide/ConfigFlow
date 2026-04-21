@@ -14,7 +14,6 @@ require_once __DIR__ . '/../src/Support/AppError.php';
 require_once __DIR__ . '/../src/ProvisioningProviderInterface.php';
 require_once __DIR__ . '/../src/PGClient.php';
 require_once __DIR__ . '/../src/PasarGuardProvisioningProvider.php';
-require_once __DIR__ . '/../src/WorkerApiStore.php';
 require_once __DIR__ . '/../src/Database.php';
 
 Bootstrap::loadEnv(__DIR__ . '/../.env');

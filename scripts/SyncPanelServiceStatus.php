@@ -16,7 +16,6 @@ require_once __DIR__ . '/../src/Support/ErrorRef.php';
 require_once __DIR__ . '/../src/Support/PayloadSanitizer.php';
 require_once __DIR__ . '/../src/Support/AppLogger.php';
 require_once __DIR__ . '/../src/Support/AppError.php';
-require_once __DIR__ . '/../src/WorkerApiStore.php';
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/PGClient.php';
 require_once __DIR__ . '/../src/TelegramClient.php';

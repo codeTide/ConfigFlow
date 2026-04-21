@@ -569,38 +569,6 @@ final class MessageHandler
             return;
         }
 
-        if ($state['state_name'] === 'await_worker_api_key') {
-            if (!$this->database->isAdminUser($userId)) {
-                $this->database->clearUserState($userId);
-                return;
-            }
-            $key = trim($text);
-            if ($key === '' || strlen($key) < 8) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_worker_api_key'));
-                return;
-            }
-            $this->database->clearUserState($userId);
-            $this->database->pdo()->prepare('INSERT INTO settings (`key`,`value`) VALUES (\'worker_api_key\', :v) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)')->execute(['v' => $key]);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.worker_api_key_saved'));
-            return;
-        }
-
-        if ($state['state_name'] === 'await_worker_api_port') {
-            if (!$this->database->isAdminUser($userId)) {
-                $this->database->clearUserState($userId);
-                return;
-            }
-            $port = (int) preg_replace('/\D+/', '', $text);
-            if ($port < 1 || $port > 65535) {
-                $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.errors.invalid_worker_api_port'));
-                return;
-            }
-            $this->database->clearUserState($userId);
-            $this->database->pdo()->prepare('INSERT INTO settings (`key`,`value`) VALUES (\'worker_api_port\', :v) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)')->execute(['v' => (string) $port]);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('admin.legacy.success.worker_api_port_saved'));
-            return;
-        }
-
         if ($state['state_name'] === 'await_php_worker_poll_interval') {
             if (!$this->database->isAdminUser($userId)) {
                 $this->database->clearUserState($userId);
