@@ -5046,11 +5046,11 @@ final class MessageHandler
                 'description' => trim((string) ($method['user_description'] ?? '')) !== '' ? (string) $method['user_description'] : $this->catalog->get('messages.generic.dash'),
             ]),
             $this->uiKeyboard->replyMenu([
-                [$this->catalog->get('admin.payment_methods.actions.print_status'), $this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount')],
-                [$this->catalog->get('admin.payment_methods.actions.toggle_bonus'), $this->catalog->get('admin.payment_methods.actions.toggle_fee'), $this->catalog->get('admin.payment_methods.actions.toggle_purchase')],
-                [$this->catalog->get('admin.payment_methods.actions.toggle_renewal'), $this->catalog->get('admin.payment_methods.actions.edit_description')],
+                [$this->catalog->get('admin.payment_methods.actions.print_status')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible'), $this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount'), $this->catalog->get('admin.payment_methods.actions.toggle_bonus')],
+                [$this->catalog->get('admin.payment_methods.actions.toggle_fee'), $this->catalog->get('admin.payment_methods.actions.toggle_purchase'), $this->catalog->get('admin.payment_methods.actions.toggle_renewal')],
+                [$this->catalog->get('admin.payment_methods.actions.edit_description')],
                 [$this->catalog->get('admin.payment_methods.actions.edit_admin_note'), $this->catalog->get('admin.payment_methods.actions.edit_config_json')],
                 [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
             ])
