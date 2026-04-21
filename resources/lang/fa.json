@@ -7,7 +7,7 @@
     "buy": "🛒 خرید",
     "free_test": "🎁 تست رایگان",
     "profile": "👤 حساب",
-    "wallet": "💳 شارژ حساب",
+    "wallet": "💳 شارژ کیف پول",
     "support": "🎧 پشتیبانی",
     "referral": "🎁 دعوت",
     "agency": "🤝 نمایندگی",
@@ -104,9 +104,12 @@
     },
     "user": {
       "wallet": {
-        "enter_amount": "💵 لطفاً مبلغ موردنظر را به تومان ارسال کنید:",
-        "invalid_amount": "مبلغ وارد شده معتبر نیست. لطفاً فقط عدد صحیح وارد کنید.",
-        "request_submitted": "✅ درخواست شارژ کیف پول ثبت شد.\n\nشماره درخواست: <code>{payment_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nبعد از تایید ادمین موجودی شما شارژ می‌شود."
+        "enter_amount": "💳 مبلغ شارژ کیف پول را وارد کنید:\n\n🧾 مبلغ را به تومان و به‌صورت عددی ارسال کنید.\n\n<blockquote>ℹ️ حداقل و حداکثر مبلغ بر اساس روش پرداخت انتخاب‌شده اعمال می‌شود.</blockquote>",
+        "invalid_amount": "مبلغ واردشده معتبر نیست.",
+        "no_topup_method": "در حال حاضر روش فعالی برای شارژ کیف پول وجود ندارد.",
+        "method_prompt": "💳 روش پرداخت شارژ کیف پول را انتخاب کنید:\n\n🧾 یکی از روش‌های فعال زیر را بزنید.\n\n<blockquote>ℹ️ پس از انتخاب روش، مراحل پرداخت همان درگاه نمایش داده می‌شود.</blockquote>",
+        "method_invalid": "روش پرداخت انتخاب‌شده معتبر نیست.",
+        "amount_out_of_range": "مبلغ واردشده خارج از بازه مجاز است. حداقل: {min} | حداکثر: {max}"
       },
       "free_test": {
         "not_available": "⚠️ فعلاً سرویس تست رایگان فعالی برای دریافت وجود ندارد.",
@@ -293,7 +296,8 @@
         "tetrapay_renew_unavailable": "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
         "gateway": {
           "swapwallet_invoice_error": "خطا در ایجاد فاکتور SwapWallet.",
-          "tronpays_invoice_error": "خطا در ایجاد فاکتور TronPays."
+          "tronpays_invoice_error": "خطا در ایجاد فاکتور TronPays.",
+          "tetrapay_invoice_error": "خطا در ایجاد سفارش Tetrapay."
         },
         "ok": {
           "default": "✅ پرداخت تایید شد.",
@@ -302,7 +306,8 @@
           "swapwallet_purchase": "✅ پرداخت SwapWallet تایید شد و سفارش در صف تحویل قرار گرفت.",
           "swapwallet_renew": "✅ پرداخت SwapWallet تایید شد و درخواست تمدید در صف تحویل قرار گرفت.",
           "tronpays_purchase": "✅ پرداخت TronPays تایید شد و سفارش در صف تحویل قرار گرفت.",
-          "tronpays_renew": "✅ پرداخت TronPays تایید شد و درخواست تمدید در صف تحویل قرار گرفت."
+          "tronpays_renew": "✅ پرداخت TronPays تایید شد و درخواست تمدید در صف تحویل قرار گرفت.",
+          "wallet_topup": "✅ شارژ کیف پول با موفقیت انجام شد."
         },
         "titles": {
           "tetrapay_purchase": "🏧 <b>پرداخت TetraPay</b>",
@@ -310,7 +315,8 @@
           "swapwallet_purchase": "💠 <b>پرداخت با SwapWallet</b>",
           "swapwallet_renew": "💠 <b>پرداخت تمدید با SwapWallet</b>",
           "tronpays_purchase": "🧾 <b>پرداخت با TronPays</b>",
-          "tronpays_renew": "🧾 <b>پرداخت تمدید با TronPays</b>"
+          "tronpays_renew": "🧾 <b>پرداخت تمدید با TronPays</b>",
+          "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>"
         },
         "verify_hint": "برای بررسی وضعیت، دکمه بررسی پرداخت را بزنید.",
         "not_found": "پرداخت پیدا نشد.",
@@ -1301,15 +1307,11 @@
         "no_config": "ℹ️ برای این روش پرداخت هنوز تنظیمات اختصاصی تعریف نشده است.",
         "fields": {
           "tetrapay": {
-            "create_url": "🌐 آدرس ایجاد سفارش",
-            "verify_url": "🔎 آدرس بررسی پرداخت",
-            "merchant_id": "🏷️ شناسه پذیرنده",
-            "secret_key": "🔑 کلید یا توکن",
-            "mode": "🧪 حالت اجرا",
-            "success_redirect": "✅ آدرس بازگشت موفق",
-            "fail_redirect": "❌ آدرس بازگشت ناموفق",
-            "timeout_seconds": "⏱ زمان انتظار",
-            "admin_note": "📝 توضیح داخلی"
+            "api_key": "🔑 کلید API",
+            "callback_url": "🔁 آدرس Callback",
+            "default_description": "📝 توضیح پیش‌فرض",
+            "email_fallback": "✉️ ایمیل پیش‌فرض",
+            "mobile_fallback": "📱 موبایل پیش‌فرض"
           },
           "crypto_tron": {
             "network": "🌐 شبکه",
@@ -1344,15 +1346,11 @@
         },
         "buttons": {
           "tetrapay": {
-            "create_url": "🌐 ایجاد سفارش",
-            "verify_url": "🔎 بررسی پرداخت",
-            "merchant_id": "🏷️ شناسه",
-            "secret_key": "🔑 کلید",
-            "mode": "🧪 حالت اجرا",
-            "success_redirect": "✅ بازگشت موفق",
-            "fail_redirect": "❌ بازگشت ناموفق",
-            "timeout_seconds": "⏱ زمان انتظار",
-            "admin_note": "📝 توضیح داخلی"
+            "api_key": "🔑 کلید API",
+            "callback_url": "🔁 Callback",
+            "default_description": "📝 توضیح پیش‌فرض",
+            "email_fallback": "✉️ ایمیل",
+            "mobile_fallback": "📱 موبایل"
           },
           "crypto_tron": {
             "network": "🌐 شبکه",

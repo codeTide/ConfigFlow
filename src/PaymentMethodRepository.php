@@ -16,7 +16,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->query(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    visible_to_user, config_json
+                    visible_to_user, allow_wallet_topup, wallet_amount_input_mode, config_json
              FROM payment_methods
              ORDER BY sort_order ASC, id ASC'
         );
@@ -29,7 +29,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->query(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    visible_to_user, config_json
+                    visible_to_user, allow_wallet_topup, wallet_amount_input_mode, config_json
              FROM payment_methods
              WHERE is_active = 1 AND visible_to_user = 1
              ORDER BY sort_order ASC, id ASC'
@@ -43,7 +43,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->prepare(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    visible_to_user, config_json
+                    visible_to_user, allow_wallet_topup, wallet_amount_input_mode, config_json
              FROM payment_methods
              WHERE code = :code
              LIMIT 1'
@@ -59,7 +59,7 @@ final class PaymentMethodRepository
         $stmt = $this->database->pdo()->prepare(
             'SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
                     bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
-                    visible_to_user, config_json
+                    visible_to_user, allow_wallet_topup, wallet_amount_input_mode, config_json
              FROM payment_methods
              WHERE id = :id
              LIMIT 1'
@@ -77,7 +77,7 @@ final class PaymentMethodRepository
         $allowed = [
             'is_active', 'sort_order', 'min_amount', 'max_amount', 'bonus_enabled', 'bonus_type', 'bonus_value',
             'fee_enabled', 'fee_type', 'fee_value', 'visible_to_user', 'auto_verify', 'requires_receipt',
-            'bonus_cap_amount', 'bonus_min_amount',
+            'bonus_cap_amount', 'bonus_min_amount', 'allow_wallet_topup', 'wallet_amount_input_mode',
         ];
         $sets = [];
         $params = ['id' => $id];
@@ -173,6 +173,20 @@ final class PaymentMethodRepository
         return is_array($decoded) ? $decoded : [];
     }
 
+    /** @return array<int,array<string,mixed>> */
+    public function getActiveVisibleWalletTopupMethods(): array
+    {
+        $stmt = $this->database->pdo()->query(
+            "SELECT id, code, category, is_active, sort_order, bonus_enabled, bonus_type, bonus_value, bonus_cap_amount,
+                    bonus_min_amount, min_amount, max_amount, fee_enabled, fee_type, fee_value, auto_verify, requires_receipt,
+                    visible_to_user, allow_wallet_topup, wallet_amount_input_mode, config_json
+             FROM payment_methods
+             WHERE is_active = 1 AND visible_to_user = 1 AND allow_wallet_topup = 1
+             ORDER BY sort_order ASC, id ASC"
+        );
+        return $stmt->fetchAll() ?: [];
+    }
+
     public function setMethodConfigValue(string $code, string $key, mixed $value): bool
     {
         $method = $this->findByCode($code);
@@ -247,15 +261,11 @@ final class PaymentMethodRepository
     {
         return [
             'tetrapay' => [
-                'create_url' => ['type' => 'string'],
-                'verify_url' => ['type' => 'string'],
-                'merchant_id' => ['type' => 'string'],
-                'secret_key' => ['type' => 'string'],
-                'mode' => ['type' => 'enum', 'values' => ['sandbox', 'live']],
-                'success_redirect' => ['type' => 'string'],
-                'fail_redirect' => ['type' => 'string'],
-                'timeout_seconds' => ['type' => 'int'],
-                'admin_note' => ['type' => 'string'],
+                'api_key' => ['type' => 'string'],
+                'callback_url' => ['type' => 'string'],
+                'default_description' => ['type' => 'string'],
+                'email_fallback' => ['type' => 'string'],
+                'mobile_fallback' => ['type' => 'string'],
             ],
             'crypto_tron' => [
                 'network' => ['type' => 'string'],
