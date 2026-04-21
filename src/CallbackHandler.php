@@ -112,6 +112,11 @@ final class CallbackHandler
             return;
         }
 
+        if (str_starts_with($data, 'pv:')) {
+            $this->handlePaymentVerifyInline($chatId, $messageId, $userId, $callbackId, $data, $message);
+            return;
+        }
+
         if ($data === 'nav:main') {
             $this->telegram->editMessageText($chatId, $messageId, $this->menus->mainMenuText());
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.generic.main_menu'), $this->menus->mainMenuReplyKeyboard($userId));
@@ -120,6 +125,115 @@ final class CallbackHandler
         }
 
         $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.callback.expired_operation'));
+    }
+
+    /** @param array<string,mixed> $message */
+    private function handlePaymentVerifyInline(int $chatId, int $messageId, int $userId, string $callbackId, string $data, array $message): void
+    {
+        $paymentId = (int) substr($data, 3);
+        if ($paymentId <= 0) {
+            $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.callback.expired_operation'));
+            return;
+        }
+        $payment = $this->database->getPaymentById($paymentId);
+        if (!is_array($payment) || (int) ($payment['user_id'] ?? 0) !== $userId) {
+            $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.callback.expired_operation'));
+            return;
+        }
+
+        $gateway = (string) ($payment['payment_method'] ?? '');
+        if (!in_array($gateway, ['tetrapay', 'nowpayments'], true)) {
+            $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.user.payment.not_found'));
+            return;
+        }
+
+        $gatewayRef = (string) ($payment['gateway_ref'] ?? '');
+        $providerPayload = $this->providerPayload($payment);
+        $hashId = (string) ($providerPayload['hash_id'] ?? '');
+        $verify = match ($gateway) {
+            'tetrapay' => $this->gateways->verifyTetrapay($gatewayRef, $hashId),
+            'nowpayments' => ['ok' => true, 'paid' => in_array((string) ($payment['status'] ?? ''), ['paid', 'completed'], true)],
+            default => ['ok' => false, 'paid' => false],
+        };
+
+        if (!($verify['ok'] ?? false)) {
+            if ($gateway === 'tetrapay') {
+                $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.user.payment.not_confirmed'));
+                return;
+            }
+            $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.user.payment.gateway.nowpayments_waiting_confirmation'));
+            return;
+        }
+
+        if (($verify['paid'] ?? false) || in_array((string) ($payment['status'] ?? ''), ['paid', 'completed'], true)) {
+            $changed = (string) ($payment['kind'] ?? '') === 'wallet_topup'
+                ? $this->database->markWalletTopupPaidIfWaitingGateway($paymentId)
+                : $this->database->markPaymentAndPendingPaidIfWaitingGateway($paymentId);
+            $latest = $this->database->getPaymentById($paymentId) ?? $payment;
+            $this->database->clearUserState($userId);
+            $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.user.payment.ok.default'));
+            $text = trim((string) ($message['text'] ?? ''));
+            if ($text !== '') {
+                $this->telegram->editMessageText($chatId, $messageId, $text);
+            }
+            if ($changed || in_array((string) ($latest['status'] ?? ''), ['paid', 'completed'], true)) {
+                $this->telegram->sendMessage($chatId, $this->resolveGatewayOkText($gateway, (string) ($latest['kind'] ?? '')) . $this->bonusSuccessLine($latest));
+            }
+            return;
+        }
+
+        if ($gateway === 'nowpayments') {
+            $providerStatus = (string) ($providerPayload['last_provider_status'] ?? '');
+            if ($providerStatus === 'partially_paid') {
+                $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.user.payment.gateway.nowpayments_partially_paid'));
+                return;
+            }
+            if (in_array((string) ($payment['status'] ?? ''), ['gateway_error'], true)) {
+                $this->database->clearUserState($userId);
+                $text = trim((string) ($message['text'] ?? ''));
+                if ($text !== '') {
+                    $this->telegram->editMessageText($chatId, $messageId, $text);
+                }
+                $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.user.payment.gateway.nowpayments_failed_terminal'));
+                return;
+            }
+            $this->telegram->answerCallbackQuery($callbackId, $this->catalog->get('messages.user.payment.gateway.nowpayments_waiting_confirmation'));
+            return;
+        }
+
+        $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.user.payment.not_confirmed'));
+    }
+
+    /** @param array<string,mixed> $payment
+     *  @return array<string,mixed>
+     */
+    private function providerPayload(array $payment): array
+    {
+        if (!is_string($payment['provider_payload'] ?? null)) {
+            return [];
+        }
+        $decoded = json_decode((string) $payment['provider_payload'], true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /** @param array<string,mixed> $payment */
+    private function bonusSuccessLine(array $payment): string
+    {
+        $bonusAmount = max(0, (int) ($payment['bonus_amount'] ?? 0));
+        if ($bonusAmount <= 0) {
+            return '';
+        }
+        return "\n\n" . $this->catalog->get('messages.user.payment.bonus_applied', ['bonus_amount' => $bonusAmount]);
+    }
+
+    private function resolveGatewayOkText(string $gateway, string $kind): string
+    {
+        return match ($kind) {
+            'purchase' => $this->catalog->get('messages.user.payment.ok.' . $gateway . '_purchase'),
+            'renewal' => $this->catalog->get('messages.user.payment.ok.' . $gateway . '_renew'),
+            'wallet_topup' => $this->catalog->get('messages.user.payment.ok.wallet_topup'),
+            default => $this->catalog->get('messages.user.payment.ok.default'),
+        };
     }
 
     private function isDeprecatedUserInlineAction(string $data): bool

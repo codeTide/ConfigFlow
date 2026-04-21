@@ -6447,6 +6447,13 @@ final class MessageHandler
                 $this->telegram->sendMessage($chatId, $okText . $this->bonusSuccessLine($payment));
                 return;
             }
+            if (in_array((string) ($payment['status'] ?? ''), ['gateway_error'], true)) {
+                $this->database->clearUserState($userId);
+                $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_failed_terminal'));
+                return;
+            }
+            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.nowpayments_waiting_confirmation'));
+            return;
         }
         if ($gateway === 'nowpayments') {
             $providerStatus = is_array($providerPayload) ? (string) ($providerPayload['last_provider_status'] ?? '') : '';
@@ -6547,21 +6554,27 @@ final class MessageHandler
     private function sendGatewayPaymentIntro(int $chatId, string $title, string $trackingCode, int $amount, string $payUrl): void
     {
         $text = $this->messageRenderer->render('payments.created.overview_with_tip', [
-            'title' => trim($title),
-            'tracking_code' => $trackingCode,
-            'amount' => $amount,
+            'title' => $this->removeEmoji(trim($title)),
+            'tracking_code' => $this->toPersianDigits($trackingCode),
+            'amount' => $this->toPersianNumber(number_format(max(0, $amount), 0, '.', ',')),
             'tip' => $this->catalog->get('messages.user.payment.gateway_intro_tip'),
         ]);
+        $payment = $this->database->getPaymentByTrackingCode($trackingCode);
+        $paymentId = is_array($payment) ? (int) ($payment['id'] ?? 0) : 0;
+        $markup = $paymentId > 0
+            ? $this->gatewayInvoiceInlineKeyboard($paymentId, $payUrl)
+            : ($payUrl !== '' ? $this->uiKeyboard->inlineUrl($this->catalog->get('buttons.pay.gateway_pay'), $payUrl) : null);
+        $this->telegram->sendMessage($chatId, $text, $markup);
+    }
+
+    private function gatewayInvoiceInlineKeyboard(int $paymentId, string $payUrl): array
+    {
+        $row = [];
         if ($payUrl !== '') {
-            $this->telegram->sendMessage($chatId, $text, $this->uiKeyboard->inlineUrl($this->catalog->get('buttons.pay.gateway_pay'), $payUrl));
-        } else {
-            $this->telegram->sendMessage($chatId, $text);
+            $row[] = ['text' => $this->catalog->get('buttons.pay.gateway_pay'), 'url' => $payUrl];
         }
-        $this->telegram->sendMessage(
-            $chatId,
-            $this->messageRenderer->render('messages.user.payment.verify_prompt'),
-            $this->uiKeyboard->replyMenu([[$this->catalog->get('buttons.pay.verify')], [UiLabels::back($this->catalog), UiLabels::main($this->catalog)]])
-        );
+        $row[] = ['text' => $this->catalog->get('buttons.pay.verify'), 'callback_data' => 'pv:' . $paymentId];
+        return ['inline_keyboard' => [$row]];
     }
 
     private function startWalletTopupFlow(int $chatId, int $userId): void
@@ -6773,7 +6786,7 @@ final class MessageHandler
     private function createNowpaymentsInvoiceForPayment(int $amount, int $paymentId): array
     {
         $orderId = 'cf-pay:' . $paymentId;
-        $description = $orderId;
+        $description = $this->buildGatewayPaymentDescription($paymentId);
         return $this->gateways->createNowpaymentsInvoice($amount, $orderId, $description, []);
     }
 
@@ -6784,7 +6797,7 @@ final class MessageHandler
         return $this->gateways->createTetrapayOrder(
             $amount,
             $purpose . ':' . $paymentId,
-            $this->buildTetrapayDescription($purpose, $paymentId, $reference),
+            $this->buildGatewayPaymentDescription($paymentId),
             $callbackUrl,
             $this->resolveTetrapayCustomerData($userId)
         );
@@ -6802,13 +6815,9 @@ final class MessageHandler
         return $email !== '' ? ['email' => $email] : [];
     }
 
-    private function buildTetrapayDescription(string $purpose, int $paymentId, string $reference): string
+    private function buildGatewayPaymentDescription(int $paymentId): string
     {
-        return $this->catalog->get('messages.user.payment.gateway.tetrapay_description', [
-            'purpose' => $purpose,
-            'payment_id' => $paymentId,
-            'reference' => $reference,
-        ]);
+        return $this->paymentTrackingCode($paymentId);
     }
 
     private function sendGatewayUserError(int $chatId, string $messageKey, string $errorRef): void

@@ -2358,6 +2358,25 @@ final class Database
         return is_array($row) ? $row : null;
     }
 
+    public function getPaymentByTrackingCode(string $trackingCode, ?string $method = null): ?array
+    {
+        $trackingCode = trim($trackingCode);
+        if ($trackingCode === '') {
+            return null;
+        }
+        $sql = 'SELECT id, tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, provider_payload, status, status_reason, approved_at, verified_at, bonus_applied_at, verify_attempts, last_verify_at FROM payments WHERE tracking_code = :tracking_code';
+        $params = ['tracking_code' => $trackingCode];
+        if ($method !== null && $method !== '') {
+            $sql .= ' AND payment_method = :payment_method';
+            $params['payment_method'] = $method;
+        }
+        $sql .= ' ORDER BY id DESC LIMIT 1';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
     public function markPaymentAndPendingPaid(int $paymentId): void
     {
         $payStmt = $this->pdo->prepare("UPDATE payments SET status = 'paid', approved_at = :approved_at WHERE id = :id");

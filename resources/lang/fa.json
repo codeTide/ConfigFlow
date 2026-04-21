@@ -281,7 +281,6 @@
         "tetrapay_renew_unavailable": "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
         "gateway": {
           "tetrapay_invoice_error": "❌ ایجاد سفارش پرداخت تتراپی انجام نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 اتصال به درگاه برقرار نشد یا سفارش توسط تتراپی رد شد. کمی بعد دوباره تلاش کنید؛ اگر مشکل ادامه داشت، همین کد پیگیری را برای پشتیبانی ارسال کنید.</blockquote>",
-          "tetrapay_description": "order:{payment_id}",
           "tetrapay_verify_error": "❌ بررسی وضعیت پرداخت تتراپی کامل نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 پاسخ قطعی از درگاه دریافت نشد یا اعتبارسنجی تراکنش ناموفق بود. چند دقیقه بعد دوباره بررسی کنید؛ اگر همچنان مشکل داشتید، کد پیگیری را برای پشتیبانی بفرستید.</blockquote>",
           "tetrapay_callback_invalid": "درخواست callback تتراپی معتبر نیست.",
           "tetrapay_callback_not_found": "پرداخت متناظر برای callback تتراپی پیدا نشد.",
@@ -313,8 +312,7 @@
         "not_found": "پرداخت پیدا نشد.",
         "not_confirmed": "پرداخت هنوز تایید نشده است.",
         "bonus_applied": "🎁 پاداش این تراکنش: <b>{bonus_amount}</b> تومان (به کیف پول شما اضافه شد).",
-        "gateway_intro_tip": "💡 بعد از تکمیل پرداخت، وضعیت تراکنش را از طریق دکمه بررسی پرداخت پیگیری کنید تا سرویس شما سریع‌تر نهایی شود.",
-        "verify_prompt": "برای بررسی پرداخت از دکمه زیر استفاده کنید."
+        "gateway_intro_tip": "💡 بعد از تکمیل پرداخت، وضعیت تراکنش را از طریق دکمه بررسی پرداخت پیگیری کنید تا سرویس شما سریع‌تر نهایی شود."
       }
     },
     "system": {
@@ -323,8 +321,8 @@
   },
   "payments": {
     "created": {
-      "overview": "💳 <b>{title}</b>\n\n🧾 شناسه سفارش: <code>{tracking_code}</code>\n💰 مبلغ: <b>{amount}</b> تومان",
-      "overview_with_tip": "💳 <b>{title}</b>\n\n🧾 شناسه سفارش: <code>{tracking_code}</code>\n💰 مبلغ: <b>{amount}</b> تومان\n\n<blockquote>{tip}</blockquote>"
+      "overview": "{title}\n\nشناسه سفارش: <code>{tracking_code}</code>\nمبلغ: <b>{amount}</b> تومان",
+      "overview_with_tip": "{title}\n\nشناسه سفارش: <code>{tracking_code}</code>\nمبلغ: <b>{amount}</b> تومان\n\n<blockquote>{tip}</blockquote>"
     }
   },
   "validation": {
