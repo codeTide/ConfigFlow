@@ -224,7 +224,7 @@ final class PaymentGatewayService
 
 
 
-    public function createNowpaymentsInvoice(int $amount, string $orderId, string $description, array $options = []): array
+    public function createNowpaymentsInvoice(float $amount, string $orderId, string $description, array $options = []): array
     {
         $config = $this->paymentMethods?->getMethodConfig('nowpayments') ?? [];
         $apiKey = trim((string) ($config['api_key'] ?? ''));

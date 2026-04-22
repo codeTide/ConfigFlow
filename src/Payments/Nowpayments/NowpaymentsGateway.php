@@ -12,7 +12,7 @@ final class NowpaymentsGateway
     {
     }
 
-    public function createInvoice(int $amount, string $orderId, string $description, array $options = []): array
+    public function createInvoice(float $amount, string $orderId, string $description, array $options = []): array
     {
         return $this->service->createNowpaymentsInvoice($amount, $orderId, $description, $options);
     }
