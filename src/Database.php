@@ -1426,8 +1426,8 @@ final class Database
             $trackingCode = $this->generatePaymentTrackingCode();
             try {
                 $stmt = $this->pdo->prepare(
-                    'INSERT INTO payments (tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, status, status_reason, created_at)
-                     VALUES (:tracking_code, :kind, :user_id, :service_id, :tariff_id, :amount, :fee_amount, :bonus_amount, :paid_amount, :payment_method, :gateway_ref, :status, :status_reason, :created_at)'
+                    'INSERT INTO payments (tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, external_code, status, status_reason, created_at)
+                     VALUES (:tracking_code, :kind, :user_id, :service_id, :tariff_id, :amount, :fee_amount, :bonus_amount, :paid_amount, :payment_method, :gateway_ref, :external_code, :status, :status_reason, :created_at)'
                 );
                 $stmt->execute([
                     'tracking_code' => $trackingCode,
@@ -1441,6 +1441,7 @@ final class Database
                     'paid_amount' => $financials['paid_amount'],
                     'payment_method' => $method,
                     'gateway_ref' => $data['gateway_ref'] ?? null,
+                    'external_code' => $data['external_code'] ?? null,
                     'status' => $data['status'],
                     'status_reason' => $data['status_reason'] ?? null,
                     'created_at' => $data['created_at'],
@@ -2386,7 +2387,7 @@ final class Database
 
     public function getPaymentById(int $paymentId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, provider_payload, status, status_reason, approved_at, verified_at, bonus_applied_at, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, external_code, provider_payload, status, status_reason, approved_at, verified_at, bonus_applied_at, verify_attempts, last_verify_at FROM payments WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $paymentId]);
         $row = $stmt->fetch();
         return is_array($row) ? $row : null;
@@ -2398,7 +2399,7 @@ final class Database
         if ($gatewayRef === '') {
             return null;
         }
-        $sql = 'SELECT id, tracking_code, kind, user_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, provider_payload, status, status_reason, verified_at FROM payments WHERE gateway_ref = :gateway_ref';
+        $sql = 'SELECT id, tracking_code, kind, user_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, external_code, provider_payload, status, status_reason, verified_at FROM payments WHERE gateway_ref = :gateway_ref';
         $params = ['gateway_ref' => $gatewayRef];
         if ($method !== null && $method !== '') {
             $sql .= ' AND payment_method = :payment_method';
@@ -2417,7 +2418,7 @@ final class Database
         if ($trackingCode === '') {
             return null;
         }
-        $sql = 'SELECT id, tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, provider_payload, status, status_reason, approved_at, verified_at, bonus_applied_at, verify_attempts, last_verify_at FROM payments WHERE tracking_code = :tracking_code';
+        $sql = 'SELECT id, tracking_code, kind, user_id, service_id, tariff_id, amount, fee_amount, bonus_amount, paid_amount, payment_method, gateway_ref, external_code, provider_payload, status, status_reason, approved_at, verified_at, bonus_applied_at, verify_attempts, last_verify_at FROM payments WHERE tracking_code = :tracking_code';
         $params = ['tracking_code' => $trackingCode];
         if ($method !== null && $method !== '') {
             $sql .= ' AND payment_method = :payment_method';
@@ -2490,6 +2491,34 @@ final class Database
         $stmt->execute(['gateway_ref' => $gatewayRef, 'id' => $paymentId]);
     }
 
+    public function setPaymentExternalCode(int $paymentId, string $externalCode): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE payments SET external_code = :external_code WHERE id = :id');
+        $stmt->execute(['external_code' => $externalCode, 'id' => $paymentId]);
+    }
+
+    public function findPaymentByExternalCode(string $paymentMethod, string $externalCode): ?array
+    {
+        $externalCode = trim($externalCode);
+        if ($paymentMethod === '' || $externalCode === '') {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT id, tracking_code, kind, user_id, amount, payment_method, status, status_reason, verified_at
+             FROM payments
+             WHERE payment_method = :payment_method AND external_code = :external_code
+             ORDER BY id DESC
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'payment_method' => $paymentMethod,
+            'external_code' => $externalCode,
+        ]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
+    }
+
     public function setPaymentProviderPayload(int $paymentId, array $payload): void
     {
         $stmt = $this->pdo->prepare('UPDATE payments SET provider_payload = :provider_payload WHERE id = :id');
@@ -2536,6 +2565,113 @@ final class Database
                 'user_id' => (int) ($payment['user_id'] ?? 0),
             ]);
 
+            $this->pdo->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return false;
+        }
+    }
+
+    public function finalizeWalletTopupPaymentIfWaitingGateway(int $paymentId, int $amount, string $paymentMethod, ?string $gatewayRef, array $providerPayload): bool
+    {
+        if ($amount <= 0) {
+            return false;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, user_id, kind, status
+                 FROM payments
+                 WHERE id = :id
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $stmt->execute(['id' => $paymentId]);
+            $payment = $stmt->fetch();
+            if (!is_array($payment) || ($payment['kind'] ?? '') !== 'wallet_topup' || ($payment['status'] ?? '') !== 'waiting_gateway') {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            $financials = $this->calculatePaymentFinancials($paymentMethod, $amount);
+            $bonusAmount = max(0, (int) ($financials['bonus_amount'] ?? 0));
+            $creditAmount = $amount + $bonusAmount;
+            $verifiedAt = gmdate('Y-m-d H:i:s');
+
+            $updatePayment = $this->pdo->prepare(
+                "UPDATE payments
+                 SET amount = :amount,
+                     fee_amount = :fee_amount,
+                     bonus_amount = :bonus_amount,
+                     paid_amount = :paid_amount,
+                     gateway_ref = :gateway_ref,
+                     provider_payload = :provider_payload,
+                     status = 'paid',
+                     verified_at = :verified_at,
+                     status_reason = NULL,
+                     bonus_applied_at = :bonus_applied_at
+                 WHERE id = :id"
+            );
+            $updatePayment->execute([
+                'amount' => $amount,
+                'fee_amount' => (int) ($financials['fee_amount'] ?? 0),
+                'bonus_amount' => $bonusAmount,
+                'paid_amount' => (int) ($financials['paid_amount'] ?? $amount),
+                'gateway_ref' => $gatewayRef,
+                'provider_payload' => json_encode($providerPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'verified_at' => $verifiedAt,
+                'bonus_applied_at' => $bonusAmount > 0 ? $verifiedAt : null,
+                'id' => $paymentId,
+            ]);
+
+            $updateBalance = $this->pdo->prepare('UPDATE users SET balance = balance + :amount WHERE user_id = :user_id');
+            $updateBalance->execute([
+                'amount' => $creditAmount,
+                'user_id' => (int) ($payment['user_id'] ?? 0),
+            ]);
+
+            $this->pdo->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return false;
+        }
+    }
+
+    public function markPaymentManualReviewIfWaitingGateway(int $paymentId, string $reason, array $providerPayload = [], ?string $gatewayRef = null): bool
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare("SELECT id, status FROM payments WHERE id = :id LIMIT 1 FOR UPDATE");
+            $stmt->execute(['id' => $paymentId]);
+            $payment = $stmt->fetch();
+            if (!is_array($payment) || ($payment['status'] ?? '') !== 'waiting_gateway') {
+                $this->pdo->rollBack();
+                return false;
+            }
+
+            $update = $this->pdo->prepare(
+                "UPDATE payments
+                 SET status = 'gateway_error',
+                     status_reason = :status_reason,
+                     admin_note = :admin_note,
+                     gateway_ref = :gateway_ref,
+                     provider_payload = :provider_payload
+                 WHERE id = :id"
+            );
+            $update->execute([
+                'status_reason' => $reason,
+                'admin_note' => $reason,
+                'gateway_ref' => $gatewayRef,
+                'provider_payload' => json_encode($providerPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => $paymentId,
+            ]);
             $this->pdo->commit();
             return true;
         } catch (\Throwable $e) {

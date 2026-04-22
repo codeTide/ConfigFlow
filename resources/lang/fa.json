@@ -98,6 +98,7 @@
     "user": {
       "wallet": {
         "enter_amount": "💰 مبلغ شارژ کیف پول را وارد کنید:\n\n✍️ مبلغ را به تومان و فقط به‌صورت عددی ارسال کنید.\n\n<blockquote>🛡️ سقف و کف مجاز پرداخت بر اساس درگاه انتخاب‌شده به‌صورت خودکار بررسی می‌شود تا ثبت پرداخت بدون خطا انجام شود.</blockquote>",
+        "enter_premiumvoucher_code": "⚜️ کد ووچر پرمیوم را ارسال کنید.\n\n<blockquote>این روش فقط برای شارژ کیف پول است. مبلغ ووچر پس از تأیید، با نرخ روز به تومان تبدیل می‌شود و در صورت موفقیت بلافاصله به کیف پول شما افزوده خواهد شد.</blockquote>",
         "invalid_amount": "مبلغ واردشده معتبر نیست.",
         "no_topup_method": "در حال حاضر روش فعالی برای شارژ کیف پول وجود ندارد.",
         "method_prompt": "💳 روش شارژ کیف پول را انتخاب کنید:\n\n🎯 لطفاً یکی از درگاه‌های فعال را برای ادامه پرداخت لمس کنید.\n\n<blockquote>🧭 بعد از انتخاب درگاه، لینک پرداخت امن همان سرویس برای شما ارسال می‌شود و سپس می‌توانید وضعیت تراکنش را از داخل ربات پیگیری کنید.</blockquote>",
@@ -292,7 +293,14 @@
           "nowpayments_callback_not_found": "پرداخت متناظر برای callback نوپیمنت پیدا نشد.",
           "nowpayments_waiting_confirmation": "⏳ پرداخت شما هنوز توسط نوپیمنت نهایی نشده است. لطفاً چند لحظه دیگر دوباره بررسی کنید.",
           "nowpayments_partially_paid": "🟡 پرداخت شما به‌صورت ناقص ثبت شده است. لطفاً پرداخت را کامل کنید تا تایید نهایی انجام شود.",
-          "nowpayments_failed_terminal": "❌ این پرداخت در درگاه نهایی نشده است (ناموفق/منقضی/برگشت‌خورده)."
+          "nowpayments_failed_terminal": "❌ این پرداخت در درگاه نهایی نشده است (ناموفق/منقضی/برگشت‌خورده).",
+          "premiumvoucher_invalid_format": "❌ فرمت کد ووچر معتبر نیست. لطفاً کد را دقیق و بدون فاصله اضافی ارسال کنید.",
+          "premiumvoucher_invalid_or_used": "❌ این ووچر معتبر نیست یا قبلاً استفاده شده است.",
+          "premiumvoucher_redeem_failed": "❌ ثبت ووچر انجام نشد. لطفاً دوباره تلاش کنید.",
+          "premiumvoucher_rate_unavailable": "⚠️ ووچر ثبت شد اما نرخ تبدیل در دسترس نبود.",
+          "premiumvoucher_rate_stale": "⏳ ووچر ثبت شد اما نرخ تبدیل به‌روز نبود.",
+          "premiumvoucher_pending_manual_review": "🟡 ووچر شما ثبت شد اما به‌دلیل نیاز به بررسی مالی، شارژ کیف پول در وضعیت بررسی قرار گرفت.",
+          "premiumvoucher_not_allowed_for_purchase": "❌ روش پرداخت پرمیوم ووچر فقط برای شارژ کیف پول قابل استفاده است."
         },
         "ok": {
           "default": "✅ پرداخت تایید شد.",
@@ -300,7 +308,8 @@
           "tetrapay_renew": "✅ پرداخت تمدید تایید شد. درخواست شما در صف تحویل قرار گرفت.",
           "wallet_topup": "✅ شارژ کیف پول با موفقیت انجام شد.",
           "nowpayments_purchase": "✅ پرداخت نوپیمنت تایید شد. سفارش شما در صف تحویل قرار گرفت.",
-          "nowpayments_renew": "✅ پرداخت تمدید از طریق نوپیمنت تایید شد. درخواست شما در صف تحویل قرار گرفت."
+          "nowpayments_renew": "✅ پرداخت تمدید از طریق نوپیمنت تایید شد. درخواست شما در صف تحویل قرار گرفت.",
+          "premiumvoucher_wallet_topup": "✅ شارژ کیف پول با پرمیوم ووچر انجام شد.\n\n🧾 کد پیگیری: <code>{tracking_code}</code>\n💵 مبلغ ووچر (USD): <b>{usd_amount}</b>\n💱 نرخ تبدیل: <b>{rate_price}</b>\n💰 مبلغ پایه شارژ: <b>{base_amount}</b> تومان\n🎁 پاداش: <b>{bonus_amount}</b> تومان\n✅ مبلغ نهایی افزوده‌شده: <b>{final_amount}</b> تومان\n👛 موجودی جدید: <b>{new_balance}</b> تومان"
         },
         "titles": {
           "tetrapay_purchase": "🏧 <b>پرداخت تتراپی</b>",
@@ -308,7 +317,8 @@
           "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>",
           "nowpayments_purchase": "🪙 <b>پرداخت نوپیمنت</b>",
           "nowpayments_renew": "🪙 <b>پرداخت نوپیمنت (تمدید)</b>",
-          "nowpayments_wallet_topup": "🪙 شارژ کیف پول با نوپیمنت"
+          "nowpayments_wallet_topup": "🪙 شارژ کیف پول با نوپیمنت",
+          "premiumvoucher_wallet_topup": "⚜️ شارژ کیف پول با پرمیوم ووچر"
         },
         "verify_hint": "برای بررسی وضعیت، دکمه بررسی پرداخت را بزنید.",
         "not_found": "پرداخت پیدا نشد.",
@@ -1167,6 +1177,10 @@
         "nowpayments": {
           "label": "🪙 نوپیمنت",
           "intro": "پرداخت رمزارزی از طریق نوپیمنت"
+        },
+        "premiumvoucher": {
+          "label": "⚜️ پرمیوم ووچر",
+          "intro": "شارژ کیف پول با استفاده از کد ووچر"
         }
       },
       "bonus": {
@@ -1203,6 +1217,19 @@
             "callback_url": "🔁 نشانی بازگشت",
             "is_fixed_rate": "📌 نرخ",
             "is_fee_paid_by_user": "💸 کارمزد"
+          },
+          "premiumvoucher": {
+            "api_key": "🔑 کلید API",
+            "api_base_url": "🌐 آدرس پایه API",
+            "api_version": "🧭 نسخه API",
+            "redeem_endpoint": "🛠 نام Endpoint",
+            "voucher_regex": "🧪 الگوی اعتبارسنجی کد",
+            "rate_source": "📈 منبع نرخ",
+            "rate_symbol": "💱 نماد نرخ",
+            "min_usd_amount": "📉 حداقل مبلغ دلاری",
+            "max_usd_amount": "📈 حداکثر مبلغ دلاری",
+            "allowed_code_prefix": "🏷 پیشوند مجاز کد",
+            "is_enabled_precheck_regex": "🧪 اعتبارسنجی اولیه کد"
           }
         },
         "actions": {
@@ -1219,6 +1246,19 @@
             "callback_url": "🔁 نشانی بازگشت",
             "is_fixed_rate": "📌 تغییر به نرخ ثابت",
             "is_fee_paid_by_user": "💸 کارمزد با کاربر"
+          },
+          "premiumvoucher": {
+            "api_key": "🔑 کلید API",
+            "api_base_url": "🌐 آدرس پایه API",
+            "api_version": "🧭 نسخه API",
+            "redeem_endpoint": "🛠 نام Endpoint",
+            "voucher_regex": "🧪 الگوی اعتبارسنجی کد",
+            "rate_source": "📈 منبع نرخ",
+            "rate_symbol": "💱 نماد نرخ",
+            "min_usd_amount": "📉 حداقل مبلغ دلاری",
+            "max_usd_amount": "📈 حداکثر مبلغ دلاری",
+            "allowed_code_prefix": "🏷 پیشوند مجاز کد",
+            "is_enabled_precheck_regex": "🧪 اعتبارسنجی اولیه کد"
           }
         }
       },

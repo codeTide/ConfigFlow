@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS payments (
     paid_amount INT NULL,
     payment_method VARCHAR(64) NOT NULL,
     gateway_ref VARCHAR(191) NULL,
+    external_code VARCHAR(191) NULL,
     provider_payload TEXT NULL,
     status VARCHAR(64) NOT NULL,
     status_reason VARCHAR(128) NULL,
@@ -165,7 +166,8 @@ CREATE TABLE IF NOT EXISTS payments (
     INDEX idx_payments_user (user_id),
     INDEX idx_payments_status (status),
     INDEX idx_payments_service (service_id),
-    INDEX idx_payments_tariff (tariff_id)
+    INDEX idx_payments_tariff (tariff_id),
+    INDEX idx_payments_external_code (external_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pending_orders (
