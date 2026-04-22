@@ -290,16 +290,6 @@ final class PaymentMethodRepository
             ],
             'premiumvoucher' => [
                 'api_key' => ['type' => 'string'],
-                'api_base_url' => ['type' => 'url'],
-                'api_version' => ['type' => 'string'],
-                'redeem_endpoint' => ['type' => 'string'],
-                'voucher_regex' => ['type' => 'string'],
-                'rate_source' => ['type' => 'string'],
-                'rate_symbol' => ['type' => 'string'],
-                'min_usd_amount' => ['type' => 'decimal'],
-                'max_usd_amount' => ['type' => 'decimal'],
-                'allowed_code_prefix' => ['type' => 'string'],
-                'is_enabled_precheck_regex' => ['type' => 'bool'],
             ],
         ];
     }

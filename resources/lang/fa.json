@@ -1219,17 +1219,7 @@
             "is_fee_paid_by_user": "💸 کارمزد"
           },
           "premiumvoucher": {
-            "api_key": "🔑 کلید API",
-            "api_base_url": "🌐 آدرس پایه API",
-            "api_version": "🧭 نسخه API",
-            "redeem_endpoint": "🛠 نام Endpoint",
-            "voucher_regex": "🧪 الگوی اعتبارسنجی کد",
-            "rate_source": "📈 منبع نرخ",
-            "rate_symbol": "💱 نماد نرخ",
-            "min_usd_amount": "📉 حداقل مبلغ دلاری",
-            "max_usd_amount": "📈 حداکثر مبلغ دلاری",
-            "allowed_code_prefix": "🏷 پیشوند مجاز کد",
-            "is_enabled_precheck_regex": "🧪 اعتبارسنجی اولیه کد"
+            "api_key": "🔑 کلید ای پی آی"
           }
         },
         "actions": {
@@ -1248,17 +1238,7 @@
             "is_fee_paid_by_user": "💸 کارمزد با کاربر"
           },
           "premiumvoucher": {
-            "api_key": "🔑 کلید API",
-            "api_base_url": "🌐 آدرس پایه API",
-            "api_version": "🧭 نسخه API",
-            "redeem_endpoint": "🛠 نام Endpoint",
-            "voucher_regex": "🧪 الگوی اعتبارسنجی کد",
-            "rate_source": "📈 منبع نرخ",
-            "rate_symbol": "💱 نماد نرخ",
-            "min_usd_amount": "📉 حداقل مبلغ دلاری",
-            "max_usd_amount": "📈 حداکثر مبلغ دلاری",
-            "allowed_code_prefix": "🏷 پیشوند مجاز کد",
-            "is_enabled_precheck_regex": "🧪 اعتبارسنجی اولیه کد"
+            "api_key": "🔑 کلید ای پی آی"
           }
         }
       },

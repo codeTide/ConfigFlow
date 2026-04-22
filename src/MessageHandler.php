@@ -67,6 +67,10 @@ final class MessageHandler
     private const ADMIN_DELIVERY_DO = '[legacy] admin.final_modules.actions.delivery_do';
     private const ADMIN_GROUPOPS_SET_GROUP = '[legacy] admin.final_modules.actions.groupops_set_group';
     private const ADMIN_GROUPOPS_RESTORE = '[legacy] admin.final_modules.actions.groupops_restore';
+    private const PREMIUM_VOUCHER_PREFIX = 'PSVouchers-';
+    private const PREMIUM_VOUCHER_REGEX = '^PSVouchers-\d+(?:_\d+)?-(?:USD|PSV|PM)-\d+-[A-Za-z0-9]{20,}$';
+    private const PREMIUM_VOUCHER_RATE_SOURCE = 'wallex';
+    private const PREMIUM_VOUCHER_RATE_SYMBOL = 'USDTTMN';
 
     public function __construct(
         private Database $database,
@@ -3776,8 +3780,9 @@ final class MessageHandler
                 $this->openAdminPaymentMethodsList($chatId, $userId);
                 return;
             }
+            $method = $this->paymentMethods->findById($methodId);
+            $methodCode = (string) ($method['code'] ?? '');
             if ($text === $this->catalog->get('admin.payment_methods.actions.toggle_active')) {
-                $method = $this->paymentMethods->findById($methodId);
                 if ($method !== null) {
                     $this->paymentMethods->updateMethodSettings($methodId, ['is_active' => ((int) ($method['is_active'] ?? 0) === 1) ? 0 : 1]);
                 }
@@ -3793,6 +3798,10 @@ final class MessageHandler
                 return;
             }
             if ($text === $this->catalog->get('admin.payment_methods.actions.fee_settings')) {
+                if ($methodCode === 'premiumvoucher') {
+                    $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
+                    return;
+                }
                 $this->openAdminPaymentMethodFeeMenu($chatId, $userId, $methodId);
                 return;
             }
@@ -3821,6 +3830,10 @@ final class MessageHandler
                 $this->catalog->get('admin.payment_methods.actions.edit_sort_order') => 'sort_order',
             ];
             if (isset($editable[$text])) {
+                if ($methodCode === 'premiumvoucher' && in_array($editable[$text], ['min_amount', 'max_amount'], true)) {
+                    $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
+                    return;
+                }
                 $this->database->setUserState($userId, 'admin.payment_methods.edit', [
                     'method_id' => $methodId,
                     'field' => $editable[$text],
@@ -3874,6 +3887,11 @@ final class MessageHandler
             $method = $this->paymentMethods->findById($methodId);
             if ($method === null || $field === '') {
                 $this->openAdminPaymentMethodsList($chatId, $userId);
+                return;
+            }
+            $methodCode = (string) ($method['code'] ?? '');
+            if ($methodCode === 'premiumvoucher' && in_array($field, ['min_amount', 'max_amount', 'fee_value'], true)) {
+                $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
                 return;
             }
             $raw = trim($text);
@@ -3993,6 +4011,10 @@ final class MessageHandler
             $method = $this->paymentMethods->findById($methodId);
             if ($method === null) {
                 $this->openAdminPaymentMethodsList($chatId, $userId);
+                return;
+            }
+            if ((string) ($method['code'] ?? '') === 'premiumvoucher') {
+                $this->openAdminPaymentMethodView($chatId, $userId, $methodId);
                 return;
             }
             if ($text === $this->catalog->get('admin.payment_methods.fee.actions.show_status')) {
@@ -4400,27 +4422,35 @@ final class MessageHandler
         $bonusStatus = (int) ($method['bonus_enabled'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
         $feeStatus = (int) ($method['fee_enabled'] ?? 0) === 1 ? $this->catalog->get('admin.payment_methods.labels.status_on') : $this->catalog->get('admin.payment_methods.labels.status_off');
         $label = $this->catalog->get('admin.payment_methods.methods.' . (string) ($method['code'] ?? '') . '.label');
+        $methodCode = (string) ($method['code'] ?? '');
+        $isPremiumVoucher = $methodCode === 'premiumvoucher';
         $this->database->setUserState($userId, 'admin.payment_methods.view', ['method_id' => $methodId, 'stack' => ['admin.payment_methods.list', 'admin.root']]);
+        $rows = [
+            [$this->catalog->get('admin.payment_methods.actions.print_status')],
+            [$this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible'), $this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
+        ];
+        if (!$isPremiumVoucher) {
+            $rows[] = [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount')];
+            $rows[] = [$this->catalog->get('admin.payment_methods.actions.bonus_settings'), $this->catalog->get('admin.payment_methods.actions.fee_settings')];
+        } else {
+            $rows[] = [$this->catalog->get('admin.payment_methods.actions.bonus_settings')];
+        }
+        $rows[] = [$this->catalog->get('admin.payment_methods.actions.provider_settings')];
+        $rows[] = [UiLabels::back($this->catalog), UiLabels::main($this->catalog)];
+
         $this->telegram->sendMessage(
             $chatId,
             $this->catalog->get('admin.payment_methods.view.overview', [
                 'label' => $this->removeEmoji($label),
                 'status' => $status,
-                'min_amount' => $this->toPersianDigits((string) (int) ($method['min_amount'] ?? 0)),
-                'max_amount' => $this->toPersianDigits((string) (int) ($method['max_amount'] ?? 0)),
+                'min_amount' => $isPremiumVoucher ? $this->catalog->get('messages.generic.dash') : $this->toPersianDigits((string) (int) ($method['min_amount'] ?? 0)),
+                'max_amount' => $isPremiumVoucher ? $this->catalog->get('messages.generic.dash') : $this->toPersianDigits((string) (int) ($method['max_amount'] ?? 0)),
                 'bonus_status' => $bonusStatus,
-                'fee_status' => $feeStatus,
+                'fee_status' => $isPremiumVoucher ? $this->catalog->get('messages.generic.dash') : $feeStatus,
                 'visibility_status' => $visibility,
                 'sort_order' => $this->toPersianDigits((string) (int) ($method['sort_order'] ?? 0)),
             ]),
-            $this->uiKeyboard->replyMenu([
-                [$this->catalog->get('admin.payment_methods.actions.print_status')],
-                [$this->catalog->get('admin.payment_methods.actions.toggle_active'), $this->catalog->get('admin.payment_methods.actions.toggle_visible'), $this->catalog->get('admin.payment_methods.actions.edit_sort_order')],
-                [$this->catalog->get('admin.payment_methods.actions.edit_min_amount'), $this->catalog->get('admin.payment_methods.actions.edit_max_amount')],
-                [$this->catalog->get('admin.payment_methods.actions.bonus_settings'), $this->catalog->get('admin.payment_methods.actions.fee_settings')],
-                [$this->catalog->get('admin.payment_methods.actions.provider_settings')],
-                [UiLabels::back($this->catalog), UiLabels::main($this->catalog)],
-            ])
+            $this->uiKeyboard->replyMenu($rows)
         );
     }
 
@@ -6826,8 +6856,7 @@ final class MessageHandler
             return;
         }
 
-        $config = $this->paymentMethods->getMethodConfig('premiumvoucher');
-        if (!$this->validatePremiumVoucherPrecheck($voucherCode, $config)) {
+        if (!$this->validatePremiumVoucherPrecheck($voucherCode)) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.premiumvoucher_invalid_format'));
             return;
         }
@@ -6874,17 +6903,7 @@ final class MessageHandler
             return;
         }
 
-        $minUsdAmount = (float) ($config['min_usd_amount'] ?? 0);
-        $maxUsdAmount = (float) ($config['max_usd_amount'] ?? 0);
-        if (($minUsdAmount > 0 && $effectiveUsd < $minUsdAmount) || ($maxUsdAmount > 0 && $effectiveUsd > $maxUsdAmount)) {
-            $this->database->markPaymentManualReviewIfWaitingGateway($paymentId, 'premiumvoucher_usd_amount_out_of_policy', $providerPayload, $gatewayRef !== '' ? $gatewayRef : null);
-            $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.payment.gateway.premiumvoucher_pending_manual_review'));
-            return;
-        }
-
-        $rateSource = trim((string) ($config['rate_source'] ?? 'wallex'));
-        $rateSymbol = trim((string) ($config['rate_symbol'] ?? 'USDTTMN'));
-        $latestRate = $this->exchangeRates->getLatestRate($rateSource, $rateSymbol);
+        $latestRate = $this->exchangeRates->getLatestRate(self::PREMIUM_VOUCHER_RATE_SOURCE, self::PREMIUM_VOUCHER_RATE_SYMBOL);
         if (!is_array($latestRate)) {
             $providerPayload['status_reason'] = 'premiumvoucher_rate_unavailable_after_redeem';
             $this->database->markPaymentManualReviewIfWaitingGateway($paymentId, 'premiumvoucher_rate_unavailable_after_redeem', $providerPayload, $gatewayRef !== '' ? $gatewayRef : null);
@@ -6892,7 +6911,7 @@ final class MessageHandler
             return;
         }
 
-        $freshRate = $this->exchangeRates->getFreshRateOrNull($rateSource, $rateSymbol, 15 * 60);
+        $freshRate = $this->exchangeRates->getFreshRateOrNull(self::PREMIUM_VOUCHER_RATE_SOURCE, self::PREMIUM_VOUCHER_RATE_SYMBOL, 15 * 60);
         if (!is_array($freshRate)) {
             $providerPayload['status_reason'] = 'premiumvoucher_rate_stale_after_redeem';
             $this->database->markPaymentManualReviewIfWaitingGateway($paymentId, 'premiumvoucher_rate_stale_after_redeem', $providerPayload, $gatewayRef !== '' ? $gatewayRef : null);
@@ -6909,8 +6928,8 @@ final class MessageHandler
             return;
         }
 
-        $providerPayload['rate_source'] = $rateSource;
-        $providerPayload['rate_symbol'] = $rateSymbol;
+        $providerPayload['rate_source'] = self::PREMIUM_VOUCHER_RATE_SOURCE;
+        $providerPayload['rate_symbol'] = self::PREMIUM_VOUCHER_RATE_SYMBOL;
         $providerPayload['rate_price'] = $ratePrice;
         $providerPayload['rate_fetched_at'] = (string) ($freshRate['fetched_at'] ?? '');
         $providerPayload['converted_toman_amount'] = $convertedAmount;
@@ -6943,21 +6962,15 @@ final class MessageHandler
         ]));
     }
 
-    /** @param array<string,mixed> $config */
-    private function validatePremiumVoucherPrecheck(string $voucherCode, array $config): bool
+    private function validatePremiumVoucherPrecheck(string $voucherCode): bool
     {
-        $prefix = trim((string) ($config['allowed_code_prefix'] ?? ''));
-        if ($prefix !== '' && !str_starts_with($voucherCode, $prefix)) {
+        if (!str_starts_with($voucherCode, self::PREMIUM_VOUCHER_PREFIX)) {
             return false;
         }
 
-        $regexEnabled = ((int) ($config['is_enabled_precheck_regex'] ?? 1)) === 1;
-        $regex = trim((string) ($config['voucher_regex'] ?? ''));
-        if ($regexEnabled && $regex !== '') {
-            $matched = @preg_match('/' . str_replace('/', '\/', $regex) . '/u', $voucherCode);
-            if ($matched !== 1) {
-                return false;
-            }
+        $matched = @preg_match('/' . str_replace('/', '\/', self::PREMIUM_VOUCHER_REGEX) . '/u', $voucherCode);
+        if ($matched !== 1) {
+            return false;
         }
 
         return true;

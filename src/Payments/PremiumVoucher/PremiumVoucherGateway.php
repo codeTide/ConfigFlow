@@ -10,6 +10,10 @@ use ConfigFlow\Bot\Support\ErrorRef;
 
 final class PremiumVoucherGateway
 {
+    private const API_BASE_URL = 'https://api.premiummoney.com';
+    private const API_VERSION = 'v2';
+    private const REDEEM_ENDPOINT = 'RedeemCode';
+
     public function __construct(
         private PaymentMethodRepository $paymentMethods,
         private ?AppLogger $logger = null,
@@ -22,11 +26,7 @@ final class PremiumVoucherGateway
     {
         $config = $this->paymentMethods->getMethodConfig('premiumvoucher');
         $apiKey = trim((string) ($config['api_key'] ?? ''));
-        $apiBaseUrl = rtrim(trim((string) ($config['api_base_url'] ?? '')), '/');
-        $apiVersion = trim((string) ($config['api_version'] ?? ''));
-        $redeemEndpoint = trim((string) ($config['redeem_endpoint'] ?? ''));
-
-        if ($apiKey === '' || $apiBaseUrl === '' || $apiVersion === '' || $redeemEndpoint === '') {
+        if ($apiKey === '') {
             $errorRef = $this->logger->log('error', 'premiumvoucher', 'premiumvoucher_required_config_missing', 'Premium Voucher required config missing', [
                 'gateway' => 'premiumvoucher',
                 'stage' => 'config_validation',
@@ -45,7 +45,7 @@ final class PremiumVoucherGateway
             ];
         }
 
-        $url = $apiBaseUrl . '/api/' . rawurlencode($apiVersion) . '/' . ltrim($redeemEndpoint, '/');
+        $url = rtrim(self::API_BASE_URL, '/') . '/api/' . self::API_VERSION . '/' . self::REDEEM_ENDPOINT;
         $payload = [
             'Voucher' => $voucherCode,
             'InvoiceId' => $invoiceId,
