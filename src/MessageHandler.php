@@ -6880,28 +6880,22 @@ final class MessageHandler
         }
 
         $freshRate = $this->exchangeRates->getFreshRateOrNull('wallex', 'USDTTMN', 15 * 60);
-        if (!is_array($freshRate)) {
-            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_rate_stale', 'NOWPayments rate is stale', [
+        $isRateStale = !is_array($freshRate);
+        $rateValue = (float) ($rate['price'] ?? 0);
+        $usdAmount = $this->exchangeRates->convertTomanToUsd($amount, $rateValue);
+        $quoteFetchedAt = (string) ($rate['fetched_at'] ?? '');
+        if ($isRateStale) {
+            $this->logger->log('warning', 'nowpayments', 'nowpayments_rate_stale_but_used', 'NOWPayments latest rate is stale but used', [
                 'gateway' => 'nowpayments',
                 'stage' => 'quote_rate',
+                'event' => 'nowpayments_rate_stale_but_used',
                 'amount_toman' => $amount,
                 'rate_source' => 'wallex',
                 'rate_symbol' => 'USDTTMN',
-                'rate_value' => (float) ($rate['price'] ?? 0),
-                'rate_fetched_at' => (string) ($rate['fetched_at'] ?? ''),
+                'rate_value' => $rateValue,
+                'rate_fetched_at' => $quoteFetchedAt,
             ], ErrorRef::make('NP'));
-            return [
-                'ok' => false,
-                'error' => 'nowpayments_rate_stale',
-                'code' => 'nowpayments_rate_stale',
-                'message_key' => 'messages.user.payment.gateway.nowpayments_rate_stale',
-                'error_ref' => $errorRef,
-            ];
         }
-
-        $rateValue = (float) ($freshRate['price'] ?? 0);
-        $usdAmount = $this->exchangeRates->convertTomanToUsd($amount, $rateValue);
-        $quoteFetchedAt = (string) ($freshRate['fetched_at'] ?? '');
         $this->logger->log('info', 'nowpayments', 'nowpayments_rate_quoted', 'NOWPayments quote rate selected', [
             'gateway' => 'nowpayments',
             'stage' => 'quote_rate',
@@ -6927,6 +6921,7 @@ final class MessageHandler
             'quote_rate' => $rateValue,
             'quote_usd_amount' => $usdAmount,
             'quote_fetched_at' => $quoteFetchedAt,
+            'quote_rate_is_stale' => $isRateStale ? 1 : 0,
             'quote_rounded_by' => 'ceil_3',
         ];
         return $invoice;
