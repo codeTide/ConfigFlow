@@ -6587,22 +6587,24 @@ final class MessageHandler
         }
         $options = [];
         $rows = [];
+        $methodRow = [];
         foreach ($methods as $method) {
             $code = (string) ($method['code'] ?? '');
             $label = $this->paymentMethodLabel($code);
             if ($label === '') {
                 continue;
             }
-            $rows[] = [$label];
+            $methodRow[] = $label;
             $options[$label] = [
                 'id' => (int) ($method['id'] ?? 0),
                 'code' => $code,
             ];
         }
-        if ($rows === []) {
+        if ($methodRow === []) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.wallet.no_topup_method'));
             return;
         }
+        $rows[] = $methodRow;
         $rows[] = [KeyboardBuilder::backAccount(), KeyboardBuilder::backMain()];
         $this->database->setUserState($userId, 'wallet_topup.await_method', ['options' => $options]);
         $this->telegram->sendMessage(
