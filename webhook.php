@@ -39,6 +39,7 @@ require_once __DIR__ . '/src/Support/AppError.php';
 require_once __DIR__ . '/src/MenuService.php';
 require_once __DIR__ . '/src/SettingsRepository.php';
 require_once __DIR__ . '/src/DatabaseBackupService.php';
+require_once __DIR__ . '/src/ExchangeRateService.php';
 require_once __DIR__ . '/src/TelegramClient.php';
 require_once __DIR__ . '/src/StartHandler.php';
 require_once __DIR__ . '/src/CallbackHandler.php';

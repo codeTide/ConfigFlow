@@ -247,6 +247,20 @@ final class Database
             $legacyTariffColumn = 'pack' . 'age_id';
             $this->pdo->exec("ALTER TABLE pending_orders DROP COLUMN IF EXISTS `{$legacyTariffColumn}`");
         }
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS exchange_rates (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                source VARCHAR(64) NOT NULL,
+                symbol VARCHAR(64) NOT NULL,
+                price DECIMAL(20,8) NOT NULL,
+                fetched_at DATETIME NOT NULL,
+                raw_payload JSON NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                UNIQUE KEY uq_exchange_rates_source_symbol (source, symbol),
+                INDEX idx_exchange_rates_fetched_at (fetched_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
         if ($this->tableExists('purchases')) {
             $this->pdo->exec("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS service_id BIGINT NULL");
             $this->pdo->exec("ALTER TABLE purchases ADD COLUMN IF NOT EXISTS tariff_id BIGINT NULL AFTER service_id");
@@ -294,6 +308,45 @@ final class Database
     public function pdo(): PDO
     {
         return $this->pdo;
+    }
+
+    public function upsertExchangeRate(string $source, string $symbol, float $price, string $fetchedAt, array $rawPayload = []): void
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO exchange_rates (source, symbol, price, fetched_at, raw_payload, created_at, updated_at)
+             VALUES (:source, :symbol, :price, :fetched_at, :raw_payload, :created_at, :updated_at)
+             ON DUPLICATE KEY UPDATE
+                price = VALUES(price),
+                fetched_at = VALUES(fetched_at),
+                raw_payload = VALUES(raw_payload),
+                updated_at = VALUES(updated_at)'
+        );
+        $now = gmdate('Y-m-d H:i:s');
+        $stmt->execute([
+            'source' => $source,
+            'symbol' => $symbol,
+            'price' => $price,
+            'fetched_at' => $fetchedAt,
+            'raw_payload' => json_encode($rawPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    public function getExchangeRate(string $source, string $symbol): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, source, symbol, price, fetched_at, raw_payload, created_at, updated_at
+             FROM exchange_rates
+             WHERE source = :source AND symbol = :symbol
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'source' => $source,
+            'symbol' => $symbol,
+        ]);
+        $row = $stmt->fetch();
+        return is_array($row) ? $row : null;
     }
 
     public function ensureUser(array $fromUser): bool

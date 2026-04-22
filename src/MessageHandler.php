@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace ConfigFlow\Bot;
 
+use ConfigFlow\Bot\Support\AppLogger;
+use ConfigFlow\Bot\Support\ErrorRef;
+
 final class MessageHandler
 {
     private const PAY_WALLET = '[legacy] buttons.pay.wallet';
@@ -74,11 +77,15 @@ final class MessageHandler
         private ?UiKeyboardFactoryInterface $uiKeyboard = null,
         private ?UiJsonCatalog $catalog = null,
         private ?UiMessageRenderer $messageRenderer = null,
+        private ?ExchangeRateService $exchangeRates = null,
+        private ?AppLogger $logger = null,
     ) {
         $this->uiKeyboard ??= new UiKeyboardFactory();
         $this->catalog ??= new UiJsonCatalog();
         $this->messageRenderer ??= new UiMessageRenderer($this->catalog);
         $this->paymentMethods ??= new PaymentMethodRepository($this->database);
+        $this->exchangeRates ??= new ExchangeRateService($this->database);
+        $this->logger ??= new AppLogger();
     }
 
 
@@ -6220,7 +6227,7 @@ final class MessageHandler
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
             $this->database->setPaymentLastError($paymentId, (string) ($invoice['code'] ?? $gatewayCode . '_request_failed'), 'create_order', (string) ($invoice['error_ref'] ?? ''), (array) ($invoice['details'] ?? []));
-            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.' . $gatewayCode . '_invoice_error', (string) ($invoice['error_ref'] ?? ''));
+            $this->sendGatewayUserError($chatId, (string) ($invoice['message_key'] ?? ('messages.user.payment.gateway.' . $gatewayCode . '_invoice_error')), (string) ($invoice['error_ref'] ?? ''));
             return;
         }
         $this->updatePaymentFromGatewayInvoice($paymentId, $gatewayCode, $invoice);
@@ -6265,7 +6272,7 @@ final class MessageHandler
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
             $this->database->setPaymentLastError($paymentId, (string) ($invoice['code'] ?? $gatewayCode . '_request_failed'), 'create_order', (string) ($invoice['error_ref'] ?? ''), (array) ($invoice['details'] ?? []));
-            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.' . $gatewayCode . '_invoice_error', (string) ($invoice['error_ref'] ?? ''));
+            $this->sendGatewayUserError($chatId, (string) ($invoice['message_key'] ?? ('messages.user.payment.gateway.' . $gatewayCode . '_invoice_error')), (string) ($invoice['error_ref'] ?? ''));
             return;
         }
         $this->updatePaymentFromGatewayInvoice($paymentId, $gatewayCode, $invoice);
@@ -6321,7 +6328,7 @@ final class MessageHandler
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
             $this->database->setPaymentLastError($paymentId, (string) ($invoice['code'] ?? $gatewayCode . '_request_failed'), 'create_order', (string) ($invoice['error_ref'] ?? ''), (array) ($invoice['details'] ?? []));
-            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.' . $gatewayCode . '_invoice_error', (string) ($invoice['error_ref'] ?? ''));
+            $this->sendGatewayUserError($chatId, (string) ($invoice['message_key'] ?? ('messages.user.payment.gateway.' . $gatewayCode . '_invoice_error')), (string) ($invoice['error_ref'] ?? ''));
             return;
         }
         $this->updatePaymentFromGatewayInvoice($paymentId, $gatewayCode, $invoice);
@@ -6363,7 +6370,7 @@ final class MessageHandler
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
             $this->database->setPaymentLastError($paymentId, (string) ($invoice['code'] ?? $gatewayCode . '_request_failed'), 'create_order', (string) ($invoice['error_ref'] ?? ''), (array) ($invoice['details'] ?? []));
-            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.' . $gatewayCode . '_invoice_error', (string) ($invoice['error_ref'] ?? ''));
+            $this->sendGatewayUserError($chatId, (string) ($invoice['message_key'] ?? ('messages.user.payment.gateway.' . $gatewayCode . '_invoice_error')), (string) ($invoice['error_ref'] ?? ''));
             return;
         }
         $this->updatePaymentFromGatewayInvoice($paymentId, $gatewayCode, $invoice);
@@ -6780,7 +6787,7 @@ final class MessageHandler
         if (!($invoice['ok'] ?? false)) {
             $this->database->markPaymentGatewayError($paymentId, (string) ($invoice['error'] ?? 'invoice_create_failed'));
             $this->database->setPaymentLastError($paymentId, (string) ($invoice['code'] ?? $gateway . '_request_failed'), 'create_order', (string) ($invoice['error_ref'] ?? ''), (array) ($invoice['details'] ?? []));
-            $this->sendGatewayUserError($chatId, 'messages.user.payment.gateway.' . $gateway . '_invoice_error', (string) ($invoice['error_ref'] ?? ''));
+            $this->sendGatewayUserError($chatId, (string) ($invoice['message_key'] ?? ('messages.user.payment.gateway.' . $gateway . '_invoice_error')), (string) ($invoice['error_ref'] ?? ''));
             return;
         }
         $this->updatePaymentFromGatewayInvoice($paymentId, $gateway, $invoice);
@@ -6847,16 +6854,82 @@ final class MessageHandler
                 'invoice_url' => (string) ($invoice['pay_url'] ?? ''),
                 'last_provider_status' => null,
                 'last_ipn_at' => null,
+                'pricing' => is_array($invoice['pricing'] ?? null) ? $invoice['pricing'] : null,
             ]);
         }
     }
 
     private function createNowpaymentsInvoiceForPayment(int $amount, int $paymentId): array
     {
+        $rate = $this->exchangeRates->getLatestRate('wallex', 'USDTTMN');
+        if (!is_array($rate)) {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_rate_unavailable', 'NOWPayments rate is unavailable', [
+                'gateway' => 'nowpayments',
+                'stage' => 'quote_rate',
+                'amount_toman' => $amount,
+                'rate_source' => 'wallex',
+                'rate_symbol' => 'USDTTMN',
+            ], ErrorRef::make('NP'));
+            return [
+                'ok' => false,
+                'error' => 'nowpayments_rate_unavailable',
+                'code' => 'nowpayments_rate_unavailable',
+                'message_key' => 'messages.user.payment.gateway.nowpayments_rate_unavailable',
+                'error_ref' => $errorRef,
+            ];
+        }
+
+        $freshRate = $this->exchangeRates->getFreshRateOrNull('wallex', 'USDTTMN', 15 * 60);
+        if (!is_array($freshRate)) {
+            $errorRef = $this->logger->log('error', 'nowpayments', 'nowpayments_rate_stale', 'NOWPayments rate is stale', [
+                'gateway' => 'nowpayments',
+                'stage' => 'quote_rate',
+                'amount_toman' => $amount,
+                'rate_source' => 'wallex',
+                'rate_symbol' => 'USDTTMN',
+                'rate_value' => (float) ($rate['price'] ?? 0),
+                'rate_fetched_at' => (string) ($rate['fetched_at'] ?? ''),
+            ], ErrorRef::make('NP'));
+            return [
+                'ok' => false,
+                'error' => 'nowpayments_rate_stale',
+                'code' => 'nowpayments_rate_stale',
+                'message_key' => 'messages.user.payment.gateway.nowpayments_rate_stale',
+                'error_ref' => $errorRef,
+            ];
+        }
+
+        $rateValue = (float) ($freshRate['price'] ?? 0);
+        $usdAmount = $this->exchangeRates->convertTomanToUsd($amount, $rateValue);
+        $quoteFetchedAt = (string) ($freshRate['fetched_at'] ?? '');
+        $this->logger->log('info', 'nowpayments', 'nowpayments_rate_quoted', 'NOWPayments quote rate selected', [
+            'gateway' => 'nowpayments',
+            'stage' => 'quote_rate',
+            'amount_toman' => $amount,
+            'rate_source' => 'wallex',
+            'rate_symbol' => 'USDTTMN',
+            'rate_value' => $rateValue,
+            'usd_amount' => $usdAmount,
+            'rate_fetched_at' => $quoteFetchedAt,
+        ], ErrorRef::make('NP'));
+
         $trackingCode = $this->buildGatewayPaymentDescription($paymentId);
         $orderId = $trackingCode;
         $description = $trackingCode;
-        return $this->gateways->createNowpaymentsInvoice($amount, $orderId, $description, []);
+        $invoice = $this->gateways->createNowpaymentsInvoice((float) $usdAmount, $orderId, $description, []);
+        if (($invoice['ok'] ?? false) !== true) {
+            return $invoice;
+        }
+        $invoice['pricing'] = [
+            'input_amount_toman' => $amount,
+            'quote_source' => 'wallex',
+            'quote_symbol' => 'USDTTMN',
+            'quote_rate' => $rateValue,
+            'quote_usd_amount' => $usdAmount,
+            'quote_fetched_at' => $quoteFetchedAt,
+            'quote_rounded_by' => 'ceil_3',
+        ];
+        return $invoice;
     }
 
     private function createTetrapayInvoiceForPayment(int $userId, int $amount, int $paymentId, string $purpose, string $reference): array
