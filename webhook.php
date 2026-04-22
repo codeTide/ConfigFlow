@@ -43,6 +43,7 @@ require_once __DIR__ . '/src/ExchangeRateService.php';
 require_once __DIR__ . '/src/TelegramClient.php';
 require_once __DIR__ . '/src/StartHandler.php';
 require_once __DIR__ . '/src/CallbackHandler.php';
+require_once __DIR__ . '/src/Payments/PremiumVoucher/PremiumVoucherGateway.php';
 require_once __DIR__ . '/src/MessageHandler.php';
 require_once __DIR__ . '/src/PaymentGatewayService.php';
 require_once __DIR__ . '/src/PaymentMethodRepository.php';

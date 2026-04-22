@@ -288,6 +288,9 @@ final class PaymentMethodRepository
                 'is_fixed_rate' => ['type' => 'bool'],
                 'is_fee_paid_by_user' => ['type' => 'bool'],
             ],
+            'premiumvoucher' => [
+                'api_key' => ['type' => 'string'],
+            ],
         ];
     }
 }
