@@ -174,7 +174,7 @@ final class CallbackHandler
             $this->telegram->answerCallbackQuery($callbackId, $this->messageRenderer->render('messages.user.payment.ok.default'));
             $text = trim((string) ($message['text'] ?? ''));
             if ($text !== '') {
-                $this->telegram->editMessageText($chatId, $messageId, $text);
+                $this->telegram->editMessageText($chatId, $messageId, $text, ['inline_keyboard' => []]);
             }
             if ($changed || in_array((string) ($latest['status'] ?? ''), ['paid', 'completed'], true)) {
                 $this->telegram->sendMessage($chatId, $this->resolveGatewayOkText($gateway, (string) ($latest['kind'] ?? '')) . $this->bonusSuccessLine($latest));

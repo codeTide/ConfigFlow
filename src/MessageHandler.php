@@ -6378,6 +6378,10 @@ final class MessageHandler
             $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
             return;
         }
+        if ($text === UiLabels::back($this->catalog)) {
+            $this->returnFromGatewayVerifyToPreviousStep($chatId, $userId, $state);
+            return;
+        }
         if ($text !== $this->catalog->get('buttons.pay.verify') && $text !== $this->uiConst(self::PAY_VERIFY)) {
             $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.verify_hint'));
             return;
@@ -6470,6 +6474,68 @@ final class MessageHandler
             return;
         }
         $this->telegram->sendMessage($chatId, $this->messageRenderer->render('messages.user.payment.not_confirmed'));
+    }
+
+    private function returnFromGatewayVerifyToPreviousStep(int $chatId, int $userId, array $state): void
+    {
+        $stateName = (string) ($state['state_name'] ?? '');
+        $payload = is_array($state['payload'] ?? null) ? $state['payload'] : [];
+
+        if ($stateName === 'wallet_topup.await_verify') {
+            $this->startWalletTopupFlow($chatId, $userId);
+            return;
+        }
+
+        if ($stateName === 'renew.await_payment_verify') {
+            $purchaseId = (int) ($payload['purchase_id'] ?? 0);
+            $tariffId = (int) ($payload['tariff_id'] ?? 0);
+            $tariff = $tariffId > 0 ? $this->database->getServiceTariff($tariffId) : null;
+            if ($purchaseId > 0 && $tariff !== null) {
+                $textOut = $this->messageRenderer->render('messages.user.renew.payment.overview', [
+                    'purchase_id' => $purchaseId,
+                    'tariff_name' => (string) ($tariff['name'] ?? ''),
+                    'amount' => (int) ($tariff['price'] ?? 0),
+                ]);
+                $this->database->setUserState($userId, 'renew.await_payment_method', [
+                    'purchase_id' => $purchaseId,
+                    'tariff_id' => $tariffId,
+                    'payment_method' => null,
+                    'gateway' => null,
+                ]);
+                $this->telegram->sendMessage($chatId, $textOut, $this->uiKeyboard->replyMenu($this->paymentSelectionButtons()));
+                return;
+            }
+            $this->showMyStockItemsWithReplyFlow($chatId, $userId);
+            return;
+        }
+
+        $serviceId = (int) ($payload['service_id'] ?? 0);
+        $tariffId = (int) ($payload['tariff_id'] ?? 0);
+        $selectedVolumeGb = isset($payload['selected_volume_gb']) ? (float) $payload['selected_volume_gb'] : null;
+
+        if ($serviceId > 0 && $tariffId > 0) {
+            $this->openServicePaymentSelection($chatId, $userId, $serviceId, $tariffId, $selectedVolumeGb);
+            return;
+        }
+
+        if ($serviceId > 0 && $selectedVolumeGb !== null && $selectedVolumeGb > 0) {
+            $paymentId = (int) ($payload['payment_id'] ?? 0);
+            $payment = $paymentId > 0 ? $this->database->getPaymentById($paymentId) : null;
+            $service = $this->database->getProvisioningService($serviceId);
+            $amount = is_array($payment) ? (int) ($payment['amount'] ?? 0) : 0;
+            if (is_array($service) && $amount > 0) {
+                $this->openPanelPaymentSelection($chatId, $userId, $service, $selectedVolumeGb, $amount);
+                return;
+            }
+        }
+
+        if ($tariffId > 0) {
+            $this->startBuyTypeReplyFlow($chatId, $userId);
+            return;
+        }
+
+        $this->database->clearUserState($userId);
+        $this->telegram->sendMessage($chatId, $this->menus->mainMenuText(), $this->menus->mainMenuReplyKeyboard($userId));
     }
 
     private function handlePurchaseRulesAcceptState(int $chatId, int $userId, string $text, array $state): void
@@ -6587,22 +6653,24 @@ final class MessageHandler
         }
         $options = [];
         $rows = [];
+        $methodRow = [];
         foreach ($methods as $method) {
             $code = (string) ($method['code'] ?? '');
             $label = $this->paymentMethodLabel($code);
             if ($label === '') {
                 continue;
             }
-            $rows[] = [$label];
+            $methodRow[] = $label;
             $options[$label] = [
                 'id' => (int) ($method['id'] ?? 0),
                 'code' => $code,
             ];
         }
-        if ($rows === []) {
+        if ($methodRow === []) {
             $this->telegram->sendMessage($chatId, $this->catalog->get('messages.user.wallet.no_topup_method'));
             return;
         }
+        $rows[] = $methodRow;
         $rows[] = [KeyboardBuilder::backAccount(), KeyboardBuilder::backMain()];
         $this->database->setUserState($userId, 'wallet_topup.await_method', ['options' => $options]);
         $this->telegram->sendMessage(
@@ -6785,8 +6853,9 @@ final class MessageHandler
 
     private function createNowpaymentsInvoiceForPayment(int $amount, int $paymentId): array
     {
-        $orderId = 'cf-pay:' . $paymentId;
-        $description = $this->buildGatewayPaymentDescription($paymentId);
+        $trackingCode = $this->buildGatewayPaymentDescription($paymentId);
+        $orderId = $trackingCode;
+        $description = $trackingCode;
         return $this->gateways->createNowpaymentsInvoice($amount, $orderId, $description, []);
     }
 

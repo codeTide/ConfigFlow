@@ -34,7 +34,7 @@
     "accept_rules": "✅ قوانین را می‌پذیرم",
     "pay": {
       "wallet": "💰 پرداخت با کیف پول",
-      "tetrapay": "🏧 پرداخت تتراپی",
+      "tetrapay": "🏧 تتراپی",
       "verify": "🔄 بررسی پرداخت",
       "gateway_pay": "💳 پرداخت"
     },
@@ -277,8 +277,8 @@
         "bank_line": "بانک: {bank}\n",
         "owner_line": "به نام: {owner}\n",
         "address_block": "آدرس کیف پول:\n<code>{address}</code>\n\n",
-        "tetrapay_unavailable": "🏧 <b>پرداخت TetraPay</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
-        "tetrapay_renew_unavailable": "🏧 <b>پرداخت TetraPay (تمدید)</b>\n\nشناسه سفارش: <code>{pending_id}</code>\nمبلغ: <b>{amount}</b> تومان\n\nارتباط با درگاه برقرار نشد.",
+        "tetrapay_unavailable": "🏧 <b>پرداخت تتراپی</b>\n\n🔖 شناسه سفارش: <code>{pending_id}</code>\n💰 مبلغ: <b>{amount}</b> تومان\n\n❌ ارتباط با درگاه برقرار نشد.",
+        "tetrapay_renew_unavailable": "🏧 <b>پرداخت تتراپی (تمدید)</b>\n\n🔖 شناسه سفارش: <code>{pending_id}</code>\n💰 مبلغ: <b>{amount}</b> تومان\n\n❌ ارتباط با درگاه برقرار نشد.",
         "gateway": {
           "tetrapay_invoice_error": "❌ ایجاد سفارش پرداخت تتراپی انجام نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 اتصال به درگاه برقرار نشد یا سفارش توسط تتراپی رد شد. کمی بعد دوباره تلاش کنید؛ اگر مشکل ادامه داشت، همین کد پیگیری را برای پشتیبانی ارسال کنید.</blockquote>",
           "tetrapay_verify_error": "❌ بررسی وضعیت پرداخت تتراپی کامل نشد.\n\n🧾 کد پیگیری: <code>{error_ref}</code>\n\n<blockquote>🔎 پاسخ قطعی از درگاه دریافت نشد یا اعتبارسنجی تراکنش ناموفق بود. چند دقیقه بعد دوباره بررسی کنید؛ اگر همچنان مشکل داشتید، کد پیگیری را برای پشتیبانی بفرستید.</blockquote>",
@@ -301,8 +301,8 @@
           "nowpayments_renew": "✅ پرداخت تمدید از طریق نوپیمنت تایید شد. درخواست شما در صف تحویل قرار گرفت."
         },
         "titles": {
-          "tetrapay_purchase": "🏧 <b>پرداخت TetraPay</b>",
-          "tetrapay_renew": "🏧 <b>پرداخت TetraPay (تمدید)</b>",
+          "tetrapay_purchase": "🏧 <b>پرداخت تتراپی</b>",
+          "tetrapay_renew": "🏧 <b>پرداخت تتراپی (تمدید)</b>",
           "tetrapay_wallet_topup": "💳 <b>شارژ کیف پول با تتراپی</b>",
           "nowpayments_purchase": "🪙 <b>پرداخت نوپیمنت</b>",
           "nowpayments_renew": "🪙 <b>پرداخت نوپیمنت (تمدید)</b>",
@@ -321,8 +321,8 @@
   },
   "payments": {
     "created": {
-      "overview": "{title}\n\nشناسه سفارش: <code>{tracking_code}</code>\nمبلغ: <b>{amount}</b> تومان",
-      "overview_with_tip": "{title}\n\nشناسه سفارش: <code>{tracking_code}</code>\nمبلغ: <b>{amount}</b> تومان\n\n<blockquote>{tip}</blockquote>"
+      "overview": "🧾 {title}\n\n🔖 شناسه سفارش: <code>{tracking_code}</code>\n💰 مبلغ: <b>{amount}</b> تومان",
+      "overview_with_tip": "🧾 {title}\n\n🔖 شناسه سفارش: <code>{tracking_code}</code>\n💰 مبلغ: <b>{amount}</b> تومان\n\n<blockquote>{tip}</blockquote>"
     }
   },
   "validation": {
@@ -1159,8 +1159,8 @@
       },
       "methods": {
         "tetrapay": {
-          "label": "🏧 پرداخت تتراپی",
-          "intro": "پرداخت از طریق درگاه تتراپی"
+          "label": "🏧 تتراپی",
+          "intro": "پرداخت از طریق تتراپی"
         },
         "nowpayments": {
           "label": "🪙 نوپیمنت",
